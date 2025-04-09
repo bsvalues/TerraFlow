@@ -1,0 +1,46 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center mt-5">
+        <div class="col-md-6">
+            <div class="login-container">
+                <div class="login-logo mb-4 text-center">
+                    <i class="fas fa-map-marked-alt fa-4x text-primary"></i>
+                    <h1 class="mt-3">Benton County GIS</h1>
+                    <p class="text-muted">Assessor's Office Data Management System</p>
+                </div>
+                
+                <form method="post" action="{{ url_for('login') }}">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">
+                            <i class="fas fa-user me-2"></i>Username
+                        </label>
+                        <input type="text" class="form-control" id="username" name="username" required autofocus>
+                        <div class="form-text">Enter your Benton County network username</div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="password" class="form-label">
+                            <i class="fas fa-lock me-2"></i>Password
+                        </label>
+                        <input type="password" class="form-control" id="password" name="password" required>
+                        <div class="form-text">Enter your network password</div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-sign-in-alt me-2"></i>Login
+                    </button>
+                </form>
+                
+                <div class="mt-4 text-center text-muted">
+                    <small>
+                        Access is restricted to authorized Benton County personnel only.
+                        <br>For support, contact IT at ext. 1234.
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,127 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="bg-light p-4 rounded border">
+                <h1 class="display-5">Welcome to Benton County GIS System</h1>
+                <p class="lead">Manage, visualize, and search geographic information for Benton County Assessor's Office.</p>
+                <hr class="my-4">
+                <p>Use the tools below to navigate the system functionality.</p>
+                <div class="d-flex flex-wrap gap-2">
+                    <a href="{{ url_for('file_manager') }}" class="btn btn-primary">
+                        <i class="fas fa-file me-2"></i> File Manager
+                    </a>
+                    <a href="{{ url_for('map_viewer') }}" class="btn btn-success">
+                        <i class="fas fa-map me-2"></i> Map Viewer
+                    </a>
+                    <a href="{{ url_for('search_page') }}" class="btn btn-info">
+                        <i class="fas fa-search me-2"></i> Search GIS Data
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="stats-card bg-light">
+                <div class="stats-icon text-primary">
+                    <i class="fas fa-file"></i>
+                </div>
+                <div class="stats-number">{{ file_count|default('0') }}</div>
+                <div class="stats-label">GIS Files</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stats-card bg-light">
+                <div class="stats-icon text-success">
+                    <i class="fas fa-folder"></i>
+                </div>
+                <div class="stats-number">{{ project_count|default('0') }}</div>
+                <div class="stats-label">Projects</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stats-card bg-light">
+                <div class="stats-icon text-info">
+                    <i class="fas fa-search"></i>
+                </div>
+                <div class="stats-number">{{ query_count|default('0') }}</div>
+                <div class="stats-label">Searches</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-clock me-2"></i> Recent File Activity
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_files %}
+                        <ul class="list-group list-group-flush">
+                            {% for file in recent_files %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>{{ file.filename }}</strong>
+                                        <small class="d-block text-muted">{{ file.upload_date.strftime('%Y-%m-%d %H:%M') }}</small>
+                                    </div>
+                                    <a href="{{ url_for('download_file', file_id=file.id) }}" class="btn btn-sm btn-outline-secondary">
+                                        <i class="fas fa-download"></i>
+                                    </a>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="text-muted">No recent file activity</p>
+                    {% endif %}
+                </div>
+                <div class="card-footer text-end">
+                    <a href="{{ url_for('file_manager') }}" class="btn btn-sm btn-outline-primary">View All Files</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-search me-2"></i> Recent Searches
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_queries %}
+                        <ul class="list-group list-group-flush">
+                            {% for query in recent_queries %}
+                                <li class="list-group-item">
+                                    <div class="mb-1">
+                                        <strong>"{{ query.query }}"</strong>
+                                    </div>
+                                    <small class="text-muted">{{ query.timestamp.strftime('%Y-%m-%d %H:%M') }}</small>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="text-muted">No recent searches</p>
+                    {% endif %}
+                </div>
+                <div class="card-footer text-end">
+                    <a href="{{ url_for('search_page') }}" class="btn btn-sm btn-outline-primary">New Search</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // You could add a chart or additional interactive elements here
+    });
+</script>
+{% endblock %}
