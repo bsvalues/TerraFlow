@@ -11,12 +11,25 @@ import os
 import json
 import tempfile
 from typing import Dict, List, Any, Optional
-import geopandas as gpd
-from shapely.geometry import mapping, shape, Point, LineString, Polygon
-import numpy as np
 
 from .base_agent import BaseAgent
 from ..core import mcp_instance
+
+# Import GIS libraries only if available
+try:
+    import geopandas as gpd
+    from shapely.geometry import mapping, shape, Point, LineString, Polygon
+    import numpy as np
+    HAS_GIS_LIBS = True
+except ImportError:
+    HAS_GIS_LIBS = False
+    # Create dummy classes for type checking
+    np = None
+    class Point:
+        def __init__(self, *args):
+            pass
+        def distance(self, other):
+            return 0
 
 class SpatialAnalysisAgent(BaseAgent):
     """

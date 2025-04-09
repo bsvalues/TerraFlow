@@ -10,12 +10,25 @@ import time
 import os
 import json
 from typing import Dict, List, Any, Optional
-import geopandas as gpd
-from shapely.geometry import mapping
-import fiona
 
 from .base_agent import BaseAgent
 from ..core import mcp_instance
+
+# Import GIS libraries only if available
+try:
+    import geopandas as gpd
+    import fiona
+    from shapely.geometry import mapping
+    HAS_GIS_LIBS = True
+except ImportError:
+    HAS_GIS_LIBS = False
+    # Create dummy functions/classes for type checking
+    gpd = None
+    class GeoDataFrameMock:
+        def __init__(self, *args, **kwargs):
+            pass
+        def to_file(self, *args, **kwargs):
+            pass
 
 class DataProcessingAgent(BaseAgent):
     """

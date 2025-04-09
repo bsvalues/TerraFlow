@@ -14,12 +14,18 @@ from typing import Dict, List, Any, Optional
 import base64
 import openai
 from openai import OpenAI
-import geopandas as gpd
-import matplotlib.pyplot as plt
 from io import BytesIO
 
 from .base_agent import BaseAgent
 from ..core import mcp_instance
+
+# Import GIS and visualization libraries only if available
+try:
+    import geopandas as gpd
+    import matplotlib.pyplot as plt
+    HAS_VIZ_LIBS = True
+except ImportError:
+    HAS_VIZ_LIBS = False
 
 # Initialize OpenAI client
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")

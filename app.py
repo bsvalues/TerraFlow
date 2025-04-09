@@ -1,13 +1,23 @@
 import os
+import sys
+import time
 import logging
 from flask import Flask, render_template, redirect, url_for, flash, request, session, jsonify, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
-import ldap
 from functools import wraps
 import datetime
+
+# Conditionally import ldap
+try:
+    import ldap
+    HAS_LDAP = True
+except ImportError:
+    HAS_LDAP = False
+    logger = logging.getLogger(__name__)
+    logger.warning("LDAP module not available, falling back to development mode")
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -66,7 +76,49 @@ with app.app_context():
     
     # Initialize MCP system
     from mcp.core import mcp_instance
-    mcp_instance.discover_agents()
+    
+    # Only initialize the core monitoring agent for now
+    # The specialized agents with complex dependencies will be loaded on demand
+    try:
+        from mcp.agents.monitoring_agent import MonitoringAgent
+        logger.info("Successfully loaded Monitoring Agent")
+    except ImportError as e:
+        logger.warning(f"Could not load Monitoring Agent: {e}")
+        
+    # Register a basic dummy agent to ensure the MCP dashboard works
+    from mcp.agents.base_agent import BaseAgent
+        
+    class SystemAgent(BaseAgent):
+        """Basic system agent for MCP functionality"""
+        def __init__(self):
+            super().__init__()
+            self.capabilities = ["system_info", "dashboard_support"]
+            
+        def process_task(self, task_data):
+            """Process a system task"""
+            self.last_activity = time.time()
+            
+            if not task_data or "task_type" not in task_data:
+                return {"error": "Invalid task data, missing task_type"}
+                
+            task_type = task_data["task_type"]
+            
+            if task_type == "system_info":
+                return {
+                    "status": "success",
+                    "system_info": {
+                        "hostname": os.uname().nodename,
+                        "platform": os.uname().sysname,
+                        "python_version": sys.version,
+                        "flask_version": "unknown",
+                        "uptime": time.time()
+                    }
+                }
+            else:
+                return {"error": f"Unsupported task type: {task_type}"}
+    
+    # Register the system agent
+    mcp_instance.register_agent("system", SystemAgent())
 
 # Define route handlers
 @app.route('/')

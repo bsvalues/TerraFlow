@@ -1,5 +1,7 @@
 {pkgs}: {
   deps = [
+    pkgs.gdal
+    pkgs.expat
     pkgs.rustc
     pkgs.libiconv
     pkgs.cargo

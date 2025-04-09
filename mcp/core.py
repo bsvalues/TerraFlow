@@ -55,7 +55,7 @@ class MCP:
         return True
     
     def submit_task(self, agent_id: str, task_data: Dict[str, Any], 
-                   callback: Optional[Callable] = None) -> str:
+                   callback: Optional[Callable] = None) -> Optional[str]:
         """Submit a task to an agent"""
         if agent_id not in self.agents:
             logger.error(f"Cannot submit task to unknown agent {agent_id}")
@@ -83,7 +83,7 @@ class MCP:
         
         return task_id
     
-    def get_task_status(self, task_id: str) -> Dict[str, Any]:
+    def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
         """Get the status of a specific task"""
         if task_id not in self.tasks:
             logger.warning(f"Task {task_id} not found")
@@ -167,7 +167,7 @@ class MCP:
         
         logger.info("Worker loop terminated")
     
-    def get_agent_info(self, agent_id: Optional[str] = None) -> Dict[str, Any]:
+    def get_agent_info(self, agent_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """Get information about registered agents"""
         if agent_id:
             if agent_id not in self.agents:
@@ -190,12 +190,12 @@ class MCP:
                 for agent_id, agent in self.agents.items()
             }
     
-    def discover_agents(self, agent_dir: str = 'mcp/agents') -> List[str]:
+    def discover_agents(self, agent_dir: str = 'agents') -> List[str]:
         """Automatically discover and register available agents"""
         agent_modules = []
         
         # Get absolute path to the agent directory
-        agent_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', agent_dir))
+        agent_path = os.path.abspath(os.path.join(os.path.dirname(__file__), agent_dir))
         
         # Add to Python path if needed
         if agent_path not in sys.path:
@@ -207,7 +207,8 @@ class MCP:
                 module_name = file[:-3]  # Remove .py extension
                 try:
                     # Import the module
-                    module = importlib.import_module(f"agents.{module_name}")
+                    import_path = f"mcp.agents.{module_name}"
+                    module = importlib.import_module(import_path)
                     agent_modules.append(module_name)
                     
                     # Look for Agent classes in the module
@@ -217,9 +218,18 @@ class MCP:
                             attr_name.endswith('Agent') and 
                             hasattr(attr, 'process_task')):
                             
+                            # Skip if it's the BaseAgent class
+                            if attr_name == 'BaseAgent':
+                                continue
+                                
+                            # Skip if already registered from direct import
+                            agent_id = f"{module_name}.{attr_name}"
+                            if agent_id in self.agents:
+                                logger.info(f"Agent {agent_id} already registered")
+                                continue
+                                
                             # Create instance and register
                             agent_instance = attr()
-                            agent_id = f"{module_name}.{attr_name}"
                             self.register_agent(agent_id, agent_instance)
                 
                 except Exception as e:

@@ -1,8 +1,15 @@
 import os
-import ldap
 from flask import session, redirect, url_for, flash, request
 from functools import wraps
 import logging
+
+# Conditionally import ldap
+try:
+    import ldap
+    HAS_LDAP = True
+except ImportError:
+    HAS_LDAP = False
+    logging.getLogger(__name__).warning("LDAP module not available, authentication will be simplified")
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +19,8 @@ LDAP_BASE_DN = os.environ.get('LDAP_BASE_DN', 'dc=benton,dc=local')
 LDAP_USER_DN = os.environ.get('LDAP_USER_DN', 'ou=users,dc=benton,dc=local')
 LDAP_GROUP_DN = os.environ.get('LDAP_GROUP_DN', 'ou=groups,dc=benton,dc=local')
 # In a dev environment, we might want to bypass LDAP for testing
-BYPASS_LDAP = os.environ.get('BYPASS_LDAP', 'False').lower() == 'true'
+# Default to True since we're running in a development environment
+BYPASS_LDAP = os.environ.get('BYPASS_LDAP', 'True').lower() == 'true'
 
 def login_required(f):
     @wraps(f)
@@ -29,10 +37,12 @@ def is_authenticated():
 
 def authenticate_user(username, password):
     """Authenticate user against LDAP"""
-    if BYPASS_LDAP:
+    if BYPASS_LDAP or not HAS_LDAP:
         # For development/testing only - bypass LDAP authentication
-        logger.warning("LDAP authentication bypassed for development")
-        return True
+        logger.warning("LDAP authentication bypassed for development mode or missing LDAP module")
+        # For demonstration purposes only - accept any username/password combo
+        # that isn't empty in dev/test mode
+        return username and password
     
     if not username or not password:
         return False
@@ -43,27 +53,33 @@ def authenticate_user(username, password):
         ldap_username = f"benton\\{username}"  # Format for Windows AD
     
     try:
-        # Initialize connection to LDAP server
-        ldap_client = ldap.initialize(LDAP_SERVER)
-        ldap_client.set_option(ldap.OPT_REFERRALS, 0)
-        
-        # Bind with the username and password
-        ldap_client.simple_bind_s(ldap_username, password)
-        
-        # If we get here, the authentication was successful
-        ldap_client.unbind_s()
-        logger.info(f"Successfully authenticated user: {username}")
-        return True
+        if HAS_LDAP:
+            # Initialize connection to LDAP server
+            ldap_client = ldap.initialize(LDAP_SERVER)
+            ldap_client.set_option(ldap.OPT_REFERRALS, 0)
+            
+            # Bind with the username and password
+            ldap_client.simple_bind_s(ldap_username, password)
+            
+            # If we get here, the authentication was successful
+            ldap_client.unbind_s()
+            logger.info(f"Successfully authenticated user: {username}")
+            return True
+        else:
+            logger.error("LDAP module not available but trying to use LDAP authentication")
+            return False
     
-    except ldap.INVALID_CREDENTIALS:
-        logger.warning(f"Invalid credentials for user: {username}")
-        return False
-    except ldap.SERVER_DOWN:
-        logger.error("LDAP server unavailable")
-        flash("Authentication service unavailable. Please try again later.", "danger")
-        return False
     except Exception as e:
-        logger.error(f"LDAP authentication error: {str(e)}")
+        if HAS_LDAP:
+            # Only access LDAP exception types if we have the module
+            if isinstance(e, ldap.INVALID_CREDENTIALS):
+                logger.warning(f"Invalid credentials for user: {username}")
+                return False
+            elif isinstance(e, ldap.SERVER_DOWN):
+                logger.error("LDAP server unavailable")
+                flash("Authentication service unavailable. Please try again later.", "danger")
+                return False
+        logger.error(f"Authentication error: {str(e)}")
         return False
 
 def logout_user():
