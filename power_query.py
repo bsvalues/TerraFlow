@@ -869,3 +869,195 @@ class PowerQuery:
 
 # Create a singleton instance
 power_query = PowerQuery()
+
+# Add SQLite Data Source class
+class SQLiteDataSource(PowerQueryDataSource):
+    """SQLite file data source"""
+    
+    def __init__(self, name: str, file_path: str, description: str = ""):
+        super().__init__(name, description)
+        self.file_path = file_path
+        self.engine = None
+        
+    def connect(self) -> bool:
+        """Connect to SQLite database"""
+        if not HAS_PANDAS:
+            logger.error("Cannot connect to SQLite: pandas or sqlalchemy not available")
+            return False
+            
+        try:
+            if not os.path.exists(self.file_path):
+                logger.error(f"SQLite database file not found: {self.file_path}")
+                return False
+                
+            conn_str = f"sqlite:///{self.file_path}"
+            self.connection_string = conn_str
+            self.engine = create_engine(conn_str)
+            
+            # Test connection
+            with self.engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            
+            self.is_connected = True
+            self.last_connect_time = datetime.datetime.now()
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error connecting to SQLite: {str(e)}")
+            self.is_connected = False
+            return False
+    
+    def disconnect(self) -> bool:
+        """Disconnect from SQLite"""
+        if self.engine:
+            self.engine.dispose()
+        self.is_connected = False
+        return True
+    
+    def execute_query(self, query: str) -> Any:
+        """Execute a SQL query against SQLite"""
+        if not HAS_PANDAS:
+            logger.error("Cannot execute query: pandas not available")
+            return None
+            
+        if not self.is_connected:
+            self.connect()
+            
+        try:
+            df = pd.read_sql_query(text(query), self.engine)
+            return df
+        except Exception as e:
+            logger.error(f"Error executing SQL query: {str(e)}")
+            return None
+    
+    def get_tables(self) -> List[str]:
+        """Get list of tables in the database"""
+        if not HAS_PANDAS:
+            logger.error("Cannot get tables: pandas not available")
+            return []
+            
+        if not self.is_connected:
+            self.connect()
+            
+        try:
+            query = """
+            SELECT name FROM sqlite_master
+            WHERE type='table'
+            ORDER BY name
+            """
+            df = pd.read_sql_query(text(query), self.engine)
+            return df['name'].tolist()
+        except Exception as e:
+            logger.error(f"Error getting tables: {str(e)}")
+            return []
+    
+    def get_table_schema(self, table_name: str) -> List[Dict[str, str]]:
+        """Get schema for a specific table"""
+        if not HAS_PANDAS:
+            logger.error("Cannot get table schema: pandas not available")
+            return []
+            
+        if not self.is_connected:
+            self.connect()
+            
+        try:
+            query = f"PRAGMA table_info({table_name})"
+            df = pd.read_sql_query(text(query), self.engine)
+            
+            schema = []
+            for _, row in df.iterrows():
+                schema.append({
+                    "name": row['name'],
+                    "type": row['type'],
+                    "nullable": row['notnull'] == 0,
+                    "primary_key": row['pk'] == 1
+                })
+            return schema
+        except Exception as e:
+            logger.error(f"Error getting table schema: {str(e)}")
+            return []
+
+# Initialize default PostgreSQL connection if environment variables are available
+def initialize_default_postgres():
+    """Initialize default PostgreSQL connection using environment variables"""
+    try:
+        import os
+        pg_host = os.environ.get('PGHOST')
+        pg_port = os.environ.get('PGPORT')
+        pg_database = os.environ.get('PGDATABASE')
+        pg_user = os.environ.get('PGUSER')
+        pg_password = os.environ.get('PGPASSWORD')
+        
+        if all([pg_host, pg_port, pg_database, pg_user, pg_password]):
+            logger.info("Initializing default PostgreSQL connection")
+            pg_source = PostgreSQLDataSource(
+                name="Default PostgreSQL",
+                host=pg_host,
+                port=int(pg_port),
+                database=pg_database,
+                username=pg_user,
+                password=pg_password,
+                description="System PostgreSQL database"
+            )
+            power_query.register_data_source(pg_source)
+            logger.info("Default PostgreSQL connection registered")
+            return True
+        else:
+            logger.warning("Not all PostgreSQL environment variables are available")
+            return False
+    except Exception as e:
+        logger.error(f"Error initializing default PostgreSQL connection: {str(e)}")
+        return False
+        
+# Add sample data sources for demo purposes
+def initialize_sample_data_sources():
+    """Initialize sample data sources for demo purposes"""
+    try:
+        import os
+        
+        # Sample SQLite database
+        sqlite_path = os.path.join("uploads", "power_query", "sample_gis_data.db")
+        if os.path.exists(sqlite_path):
+            logger.info("Initializing sample SQLite data source")
+            sqlite_source = SQLiteDataSource(
+                name="Sample GIS Data",
+                file_path=sqlite_path,
+                description="Sample SQLite database with GIS data"
+            )
+            power_query.register_data_source(sqlite_source)
+            logger.info("Sample SQLite data source registered")
+        
+        # Sample CSV file
+        csv_path = os.path.join("uploads", "power_query", "sample_addresses.csv")
+        if os.path.exists(csv_path):
+            logger.info("Initializing sample CSV data source")
+            csv_source = CSVDataSource(
+                name="Sample Addresses",
+                file_path=csv_path,
+                description="Sample CSV file with address data"
+            )
+            power_query.register_data_source(csv_source)
+            logger.info("Sample CSV data source registered")
+        
+        # Sample Excel file
+        excel_path = os.path.join("uploads", "power_query", "property_records.xlsx")
+        if os.path.exists(excel_path):
+            logger.info("Initializing sample Excel data source")
+            excel_source = ExcelDataSource(
+                name="Property Records",
+                file_path=excel_path,
+                description="Sample Excel file with property records"
+            )
+            power_query.register_data_source(excel_source)
+            logger.info("Sample Excel data source registered")
+            
+        return True
+    except Exception as e:
+        logger.error(f"Error initializing sample data sources: {str(e)}")
+        return False
+
+# Try to initialize the default PostgreSQL connection
+initialize_default_postgres()
+
+# Also initialize sample data sources
+initialize_sample_data_sources()
