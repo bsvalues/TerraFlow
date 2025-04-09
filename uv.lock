@@ -1803,6 +1803,7 @@ dependencies = [
     { name = "pyodbc" },
     { name = "python-ldap" },
     { name = "shapely" },
+    { name = "simpledbf" },
     { name = "sqlalchemy" },
     { name = "tiktoken" },
     { name = "trafilatura" },
@@ -1831,6 +1832,7 @@ requires-dist = [
     { name = "pyodbc", specifier = ">=5.2.0" },
     { name = "python-ldap", specifier = ">=3.4.4" },
     { name = "shapely", specifier = ">=2.1.0" },
+    { name = "simpledbf", specifier = ">=0.2.6" },
     { name = "sqlalchemy", specifier = ">=2.0.40" },
     { name = "tiktoken", specifier = ">=0.9.0" },
     { name = "trafilatura", specifier = ">=2.0.0" },
@@ -1915,6 +1917,12 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/c8/6a/8c0b7de3aeb5014a23f06c5e9d3c7852ebcf0d6b00fe660b93261e310e24/shapely-2.1.0-cp313-cp313t-win32.whl", hash = "sha256:a9580bda119b1f42f955aa8e52382d5c73f7957e0203bc0c0c60084846f3db94", size = 1535993 },
     { url = "https://files.pythonhosted.org/packages/a8/91/ae80359a58409d52e4d62c7eacc7eb3ddee4b9135f1db884b6a43cf2e174/shapely-2.1.0-cp313-cp313t-win_amd64.whl", hash = "sha256:e8ff4e5cfd799ba5b6f37b5d5527dbd85b4a47c65b6d459a03d0962d2a9d4d10", size = 1717777 },
 ]
+
+[[package]]
+name = "simpledbf"
+version = "0.2.6"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/8a/d3/e4c25cd8f739dd7ddd19c255cd5552e08cdd439ac51a36ae12640ce8a748/simpledbf-0.2.6.tar.gz", hash = "sha256:345d4f1e58549c4a6ad8079d6ed65ad8550ccdc1acd8444a946cdb04d0212af4", size = 17823 }
 
 [[package]]
 name = "six"

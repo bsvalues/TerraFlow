@@ -29,7 +29,7 @@
                                     <i class="fas fa-cloud-upload-alt fa-3x text-muted"></i>
                                 </div>
                                 <p class="mb-1">Drag files here or click to browse</p>
-                                <p class="text-muted small">Supported formats: SHP, GeoJSON, KML, etc.</p>
+                                <p class="text-muted small">Supported formats: SHP, DBF, XML, GeoJSON, KML, etc.</p>
                                 <p id="file-name" class="mt-2 mb-0 fw-bold">No file selected</p>
                             </label>
                         </div>
@@ -91,6 +91,20 @@
                             </div>
                         </li>
                         <li class="list-group-item d-flex align-items-center">
+                            <i class="fas fa-file-code text-info me-3 fa-lg"></i>
+                            <div>
+                                <strong>XML</strong>
+                                <small class="d-block text-muted">GML and other XML-based formats</small>
+                            </div>
+                        </li>
+                        <li class="list-group-item d-flex align-items-center">
+                            <i class="fas fa-database text-secondary me-3 fa-lg"></i>
+                            <div>
+                                <strong>DBF</strong>
+                                <small class="d-block text-muted">dBASE database files</small>
+                            </div>
+                        </li>
+                        <li class="list-group-item d-flex align-items-center">
                             <i class="fas fa-file-archive text-warning me-3 fa-lg"></i>
                             <div>
                                 <strong>KML/KMZ</strong>
@@ -132,6 +146,8 @@
                     <option value="all">All Types</option>
                     <option value="geojson">GeoJSON</option>
                     <option value="shp">Shapefile</option>
+                    <option value="dbf">DBF</option>
+                    <option value="xml">XML</option>
                     <option value="kml">KML/KMZ</option>
                     <option value="xlsx">Excel/CSV</option>
                     <option value="pdf">Documents</option>
@@ -148,15 +164,19 @@
                         <div class="card-body">
                             <div class="d-flex align-items-center mb-3">
                                 {% if file.filename.endswith('.geojson') or file.filename.endswith('.json') %}
-                                    <i class="fas fa-file-code file-icon"></i>
+                                    <i class="fas fa-file-code file-icon text-primary"></i>
                                 {% elif file.filename.endswith('.shp') or file.filename.endswith('.zip') %}
-                                    <i class="fas fa-file-alt file-icon"></i>
+                                    <i class="fas fa-file-alt file-icon text-success"></i>
+                                {% elif file.filename.endswith('.xml') or file.filename.endswith('.gml') %}
+                                    <i class="fas fa-file-code file-icon text-info"></i>
+                                {% elif file.filename.endswith('.dbf') %}
+                                    <i class="fas fa-database file-icon text-secondary"></i>
                                 {% elif file.filename.endswith('.kml') or file.filename.endswith('.kmz') %}
-                                    <i class="fas fa-map-marker-alt file-icon"></i>
+                                    <i class="fas fa-map-marker-alt file-icon text-warning"></i>
                                 {% elif file.filename.endswith('.csv') or file.filename.endswith('.xlsx') %}
-                                    <i class="fas fa-table file-icon"></i>
+                                    <i class="fas fa-table file-icon text-info"></i>
                                 {% elif file.filename.endswith('.pdf') %}
-                                    <i class="fas fa-file-pdf file-icon"></i>
+                                    <i class="fas fa-file-pdf file-icon text-danger"></i>
                                 {% else %}
                                     <i class="fas fa-file file-icon"></i>
                                 {% endif %}

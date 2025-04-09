@@ -26,6 +26,10 @@ def extract_gis_metadata(file_path: str, file_type: str) -> Optional[Dict[str, A
             return extract_geojson_metadata(file_path)
         elif file_type == 'shp':
             return extract_shapefile_metadata(file_path)
+        elif file_type == 'dbf':
+            return extract_dbf_metadata(file_path)
+        elif file_type == 'xml':
+            return extract_xml_metadata(file_path)
         elif file_type in ['zip'] and HAS_GIS_LIBS:
             # Check if zip contains shapefiles
             return extract_zipped_shapefile_metadata(file_path)
@@ -273,6 +277,99 @@ def validate_geojson(file_path: str) -> bool:
         return True
     except:
         return False
+
+def extract_dbf_metadata(file_path: str) -> Dict[str, Any]:
+    """Extract metadata from DBF file"""
+    if not HAS_GIS_LIBS:
+        return {"type": "DBF", "note": "GIS libraries not available for detailed metadata"}
+    
+    try:
+        # Use geopandas to read the DBF file
+        import pandas as pd
+        from simpledbf import Dbf5
+        
+        try:
+            # Try using simpledbf if available
+            dbf = Dbf5(file_path)
+            df = dbf.to_dataframe()
+        except (ImportError, Exception) as e:
+            # Fall back to geopandas if simpledbf is not available or fails
+            # Geopandas can read DBF files as it uses fiona underneath
+            df = gpd.read_file(file_path, driver='ESRI Shapefile')
+        
+        # Extract basic metadata
+        metadata = {
+            "type": "DBF",
+            "record_count": len(df),
+            "field_count": len(df.columns),
+            "field_names": df.columns.tolist(),
+            "field_types": {col: str(df[col].dtype) for col in df.columns}
+        }
+        
+        # Sample data (first few rows, limited fields)
+        if len(df) > 0:
+            sample_data = df.head(5).to_dict(orient='records')
+            if sample_data:
+                metadata["sample_data"] = sample_data
+        
+        return metadata
+    
+    except Exception as e:
+        logger.error(f"Error extracting DBF metadata: {str(e)}")
+        return {"type": "DBF", "error": str(e)}
+
+def extract_xml_metadata(file_path: str) -> Dict[str, Any]:
+    """Extract metadata from XML file"""
+    try:
+        import xml.etree.ElementTree as ET
+        
+        # Parse the XML file
+        tree = ET.parse(file_path)
+        root = tree.getroot()
+        
+        # Get namespace info
+        namespaces = {}
+        if root.tag.startswith('{'):
+            ns_uri = root.tag[1:].split('}')[0]
+            namespaces['default'] = ns_uri
+        
+        # Extract basic metadata
+        metadata = {
+            "type": "XML",
+            "root_tag": root.tag,
+            "namespaces": namespaces,
+            "element_count": sum(1 for _ in tree.iter())
+        }
+        
+        # Get child elements of root (first level structure)
+        first_level = []
+        for child in root:
+            first_level.append(child.tag)
+        
+        metadata["first_level_elements"] = first_level
+        
+        # Look for GIS specific elements - common GIS XML formats
+        gis_indicators = {
+            "is_gml": any("gml" in str(elem.tag).lower() for elem in tree.iter()),
+            "is_kml": any("kml" in str(elem.tag).lower() for elem in tree.iter()),
+            "has_coordinates": any("coord" in str(elem.tag).lower() for elem in tree.iter()),
+            "has_geometry": any("geom" in str(elem.tag).lower() for elem in tree.iter()),
+            "has_feature": any("feature" in str(elem.tag).lower() for elem in tree.iter())
+        }
+        
+        metadata["gis_indicators"] = gis_indicators
+        
+        # Try to determine if this is a GIS XML file
+        metadata["is_likely_gis_xml"] = any(gis_indicators.values())
+        
+        # File size
+        metadata["file_size_bytes"] = os.path.getsize(file_path)
+        
+        return metadata
+    
+    except Exception as e:
+        logger.error(f"Error extracting XML metadata: {str(e)}")
+        return {"type": "XML", "error": str(e)}
 
 def get_shapefile_info(file_path: str) -> Dict[str, Any]:
     """Get information about a shapefile"""

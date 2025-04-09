@@ -240,10 +240,14 @@ def upload_file():
             
             file_record = process_file_upload(file, filename, session['user']['id'], project_name, description)
             
-            # Index the file for RAG if it's a text file or metadata
-            if filename.endswith(('.txt', '.pdf', '.xml')):
+            # Index the file for RAG if it's a text file, PDF, XML or metadata
+            if filename.endswith(('.txt', '.pdf', '.xml', '.dbf', '.shp')):
                 file_path = os.path.join(app.config['UPLOAD_FOLDER'], str(file_record.id), filename)
-                index_document(file_path, file_record.id, description)
+                try:
+                    index_document(file_path, file_record.id, description)
+                    logger.info(f"Indexed file {filename} for RAG search")
+                except Exception as e:
+                    logger.error(f"Error indexing file {filename} for RAG search: {str(e)}")
                 
             flash('File uploaded successfully', 'success')
         except Exception as e:
