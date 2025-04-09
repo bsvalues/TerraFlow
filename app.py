@@ -138,28 +138,38 @@ with app.app_context():
             super().__init__()
             self.capabilities = ["system_info", "dashboard_support"]
             
-        def process_task(self, task_data):
-            """Process a system task"""
-            self.last_activity = time.time()
+    # Register the API Gateway
+    try:
+        from api.gateway import register_api_endpoint_modules
+        if register_api_endpoint_modules(app):
+            logger.info("API Gateway registered successfully")
+        else:
+            logger.warning("API Gateway registration failed")
+    except Exception as e:
+        logger.warning(f"Could not load API Gateway modules: {str(e)}")
+        
+    def process_task(self, task_data):
+        """Process a system task"""
+        self.last_activity = time.time()
+        
+        if not task_data or "task_type" not in task_data:
+            return {"error": "Invalid task data, missing task_type"}
             
-            if not task_data or "task_type" not in task_data:
-                return {"error": "Invalid task data, missing task_type"}
-                
-            task_type = task_data["task_type"]
-            
-            if task_type == "system_info":
-                return {
-                    "status": "success",
-                    "system_info": {
-                        "hostname": os.uname().nodename,
-                        "platform": os.uname().sysname,
-                        "python_version": sys.version,
-                        "flask_version": "unknown",
-                        "uptime": time.time()
-                    }
+        task_type = task_data["task_type"]
+        
+        if task_type == "system_info":
+            return {
+                "status": "success",
+                "system_info": {
+                    "hostname": os.uname().nodename,
+                    "platform": os.uname().sysname,
+                    "python_version": sys.version,
+                    "flask_version": "unknown",
+                    "uptime": time.time()
                 }
-            else:
-                return {"error": f"Unsupported task type: {task_type}"}
+            }
+        else:
+            return {"error": f"Unsupported task type: {task_type}"}
     
     # Register the system agent
     mcp_instance.register_agent("system", SystemAgent())
@@ -435,6 +445,21 @@ def download_power_query_file():
         logger.error(f"Error downloading Power Query file: {str(e)}")
         flash(f'Error downloading file: {str(e)}', 'danger')
         return redirect(url_for('power_query'))
+
+@app.route('/api-direct')
+def api_direct():
+    """Direct API access (for testing)"""
+    return jsonify({
+        'name': 'Benton County Data Hub API',
+        'version': '1.0.0',
+        'status': 'active',
+        'auth_required': True,
+        'endpoints': {
+            'docs': '/api/docs',
+            'spatial': '/api/spatial/layers',
+            'data': '/api/data/sources'
+        }
+    })
 
 @app.route('/api/search', methods=['POST'])
 @login_required

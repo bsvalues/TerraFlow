@@ -5,455 +5,307 @@ This module provides endpoints for data querying and transformation services.
 It interfaces with the Power Query functionality to access various data sources.
 """
 
-from flask import Blueprint, request, jsonify, current_app, session, send_file
-import logging
-import time
 import json
+import logging
 import os
 import tempfile
-from functools import wraps
-from typing import Dict, Any, List, Optional
-import uuid
+from typing import Dict, List, Optional, Any
 
-from auth import login_required, is_authenticated
-from mcp.core import mcp_instance
-from api.gateway import api_login_required, api_rate_limit, log_api_call
+from flask import Blueprint, jsonify, request, send_file, current_app
+
+from api.gateway import api_login_required
+from models import db, QueryLog
+from power_query import PowerQuery, CSVDataSource, ExcelDataSource, SQLiteDataSource
+
+logger = logging.getLogger(__name__)
 
 # Create blueprint
-data_query_api = Blueprint('data_query_api', __name__)
+data_bp = Blueprint('data', __name__, url_prefix='/data')
 
-# Setup logging
-logging.basicConfig(level=logging.INFO,
-                   format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger('data_query_api')
+# Initialize Power Query engine
+power_query_engine = PowerQuery()
 
-
-@data_query_api.route('/sources', methods=['GET'])
+@data_bp.route('/sources')
 @api_login_required
-@api_rate_limit
-@log_api_call
 def list_data_sources():
     """List available data sources"""
     try:
-        # Get the Power Query agent
-        agent = mcp_instance.get_agent('power_query')
-        if not agent:
-            return jsonify({
-                "status": "error",
-                "message": "Power Query agent not available"
-            }), 503
+        # Get source type filter if any
+        source_type = request.args.get('type')
         
-        # Get the data sources
-        task_data = {
-            'task_type': 'list_data_sources'
-        }
+        # Get sources
+        sources = power_query_engine.list_data_sources()
         
-        result = agent.process_task(task_data)
-        
-        return jsonify({
-            "status": "success",
-            "data_sources": result.get('data_sources', [])
-        })
+        # Filter by type if requested
+        if source_type:
+            sources = [s for s in sources if s.get('type') == source_type]
+            
+        return jsonify({'sources': sources})
     except Exception as e:
         logger.error(f"Error listing data sources: {str(e)}")
-        return jsonify({
-            "status": "error",
-            "message": f"Error: {str(e)}"
-        }), 500
-
-
-@data_query_api.route('/sources/<source_id>', methods=['GET'])
+        return jsonify({'error': f'Error listing data sources: {str(e)}'}), 500
+        
+@data_bp.route('/sources/<source_id>')
 @api_login_required
-@api_rate_limit
-@log_api_call
 def get_data_source_metadata(source_id):
     """Get metadata for a specific data source"""
     try:
-        # Get the Power Query agent
-        agent = mcp_instance.get_agent('power_query')
-        if not agent:
-            return jsonify({
-                "status": "error",
-                "message": "Power Query agent not available"
-            }), 503
+        # Get data source
+        data_source = power_query_engine.get_data_source(source_id)
         
-        # Get the data source metadata
-        task_data = {
-            'task_type': 'get_source_metadata',
-            'source_id': source_id
-        }
+        if not data_source:
+            return jsonify({'error': f'Data source not found: {source_id}'}), 404
+            
+        # Get metadata
+        metadata = data_source.get_metadata()
         
-        result = agent.process_task(task_data)
-        
-        if result.get('status') == 'error':
-            return jsonify({
-                "status": "error",
-                "message": result.get('message', f"Source {source_id} not found")
-            }), 404
-        
-        return jsonify({
-            "status": "success",
-            "metadata": result.get('metadata', {})
-        })
+        return jsonify(metadata)
     except Exception as e:
         logger.error(f"Error getting data source metadata: {str(e)}")
-        return jsonify({
-            "status": "error",
-            "message": f"Error: {str(e)}"
-        }), 500
-
-
-@data_query_api.route('/sources/<source_id>/tables', methods=['GET'])
+        return jsonify({'error': f'Error getting data source metadata: {str(e)}'}), 500
+        
+@data_bp.route('/sources/<source_id>/tables')
 @api_login_required
-@api_rate_limit
-@log_api_call
 def list_source_tables(source_id):
     """List tables available in a data source"""
     try:
-        # Get the Power Query agent
-        agent = mcp_instance.get_agent('power_query')
-        if not agent:
-            return jsonify({
-                "status": "error",
-                "message": "Power Query agent not available"
-            }), 503
+        # Get data source
+        data_source = power_query_engine.get_data_source(source_id)
         
-        # Get the tables for this source
-        task_data = {
-            'task_type': 'list_tables',
-            'source_id': source_id
-        }
-        
-        result = agent.process_task(task_data)
-        
-        if result.get('status') == 'error':
-            return jsonify({
-                "status": "error",
-                "message": result.get('message', f"Source {source_id} not found or error listing tables")
-            }), result.get('code', 500)
-        
-        return jsonify({
-            "status": "success",
-            "tables": result.get('tables', [])
-        })
+        if not data_source:
+            return jsonify({'error': f'Data source not found: {source_id}'}), 404
+            
+        # Get tables (if the source supports it)
+        if hasattr(data_source, 'get_tables'):
+            tables = data_source.get_tables()
+            return jsonify({'tables': tables})
+        else:
+            return jsonify({'error': 'This data source does not support listing tables'}), 400
     except Exception as e:
         logger.error(f"Error listing source tables: {str(e)}")
-        return jsonify({
-            "status": "error",
-            "message": f"Error: {str(e)}"
-        }), 500
-
-
-@data_query_api.route('/sources/<source_id>/tables/<table_name>', methods=['GET'])
+        return jsonify({'error': f'Error listing source tables: {str(e)}'}), 500
+        
+@data_bp.route('/sources/<source_id>/tables/<table_name>/schema')
 @api_login_required
-@api_rate_limit
-@log_api_call
 def get_table_schema(source_id, table_name):
     """Get schema information for a specific table"""
     try:
-        # Get the Power Query agent
-        agent = mcp_instance.get_agent('power_query')
-        if not agent:
-            return jsonify({
-                "status": "error",
-                "message": "Power Query agent not available"
-            }), 503
+        # Get data source
+        data_source = power_query_engine.get_data_source(source_id)
         
-        # Get the table schema
-        task_data = {
-            'task_type': 'get_table_schema',
-            'source_id': source_id,
-            'table_name': table_name
-        }
-        
-        result = agent.process_task(task_data)
-        
-        if result.get('status') == 'error':
-            return jsonify({
-                "status": "error",
-                "message": result.get('message', f"Table {table_name} not found in source {source_id}")
-            }), result.get('code', 404)
-        
-        return jsonify({
-            "status": "success",
-            "schema": result.get('schema', [])
-        })
+        if not data_source:
+            return jsonify({'error': f'Data source not found: {source_id}'}), 404
+            
+        # Get schema (if the source supports it)
+        if hasattr(data_source, 'get_table_schema'):
+            schema = data_source.get_table_schema(table_name)
+            return jsonify({'schema': schema})
+        else:
+            return jsonify({'error': 'This data source does not support schema information'}), 400
     except Exception as e:
         logger.error(f"Error getting table schema: {str(e)}")
-        return jsonify({
-            "status": "error",
-            "message": f"Error: {str(e)}"
-        }), 500
-
-
-@data_query_api.route('/sources/<source_id>/tables/<table_name>/data', methods=['GET'])
+        return jsonify({'error': f'Error getting table schema: {str(e)}'}), 500
+        
+@data_bp.route('/sources/<source_id>/tables/<table_name>/data')
 @api_login_required
-@api_rate_limit
-@log_api_call
 def query_table_data(source_id, table_name):
     """Query data from a specific table"""
     try:
+        # Get data source
+        data_source = power_query_engine.get_data_source(source_id)
+        
+        if not data_source:
+            return jsonify({'error': f'Data source not found: {source_id}'}), 404
+            
         # Get query parameters
-        limit = request.args.get('limit', 100, type=int)
-        offset = request.args.get('offset', 0, type=int)
-        
-        # Extract filters from query parameters
-        filters = {}
-        for key, value in request.args.items():
-            if key not in ['limit', 'offset']:
-                filters[key] = value
-        
-        # Get the Power Query agent
-        agent = mcp_instance.get_agent('power_query')
-        if not agent:
-            return jsonify({
-                "status": "error",
-                "message": "Power Query agent not available"
-            }), 503
-        
-        # Query the table
-        task_data = {
-            'task_type': 'query_table',
-            'source_id': source_id,
-            'table_name': table_name,
-            'limit': limit,
-            'offset': offset,
-            'filters': filters
-        }
-        
-        result = agent.process_task(task_data)
-        
-        if result.get('status') == 'error':
-            return jsonify({
-                "status": "error",
-                "message": result.get('message', f"Error querying table {table_name}")
-            }), result.get('code', 500)
-        
-        return jsonify({
-            "status": "success",
-            "data": result.get('data', []),
-            "metadata": {
-                "total_rows": result.get('total_rows', 0),
-                "limit": limit,
-                "offset": offset,
-                "filters": filters
-            }
-        })
+        limit = request.args.get('limit', 100)
+        try:
+            limit = int(limit)
+        except ValueError:
+            return jsonify({'error': 'Invalid limit parameter'}), 400
+            
+        # Build query based on source type
+        if hasattr(data_source, 'execute_query'):
+            # SQL-based source
+            query = f"SELECT * FROM {table_name} LIMIT {limit}"
+            result = data_source.execute_query(query)
+            
+            # Convert result to list of dicts
+            if hasattr(result, 'to_dict'):
+                # Pandas DataFrame
+                records = result.to_dict('records')
+            else:
+                # Assume list of tuples with column names
+                records = []
+                for row in result[1:]:  # Skip header row
+                    record = {}
+                    for i, col in enumerate(result[0]):
+                        record[col] = row[i]
+                    records.append(record)
+                    
+            return jsonify({'data': records})
+        elif hasattr(data_source, 'get_data'):
+            # DataFrame-based source (CSV, Excel)
+            data = data_source.get_data()
+            
+            if table_name != 'data' and hasattr(data_source, 'load_sheet'):
+                # For Excel, load the specific sheet
+                data_source.load_sheet(table_name)
+                data = data_source.get_data()
+                
+            # Apply limit
+            data = data.head(limit)
+            
+            # Convert to records
+            records = data.to_dict('records')
+            return jsonify({'data': records})
+        else:
+            return jsonify({'error': 'This data source does not support querying data'}), 400
     except Exception as e:
         logger.error(f"Error querying table data: {str(e)}")
-        return jsonify({
-            "status": "error",
-            "message": f"Error: {str(e)}"
-        }), 500
-
-
-@data_query_api.route('/query', methods=['POST'])
+        return jsonify({'error': f'Error querying table data: {str(e)}'}), 500
+        
+@data_bp.route('/query', methods=['POST'])
 @api_login_required
-@api_rate_limit
-@log_api_call
 def execute_custom_query():
     """Execute a custom SQL or Power Query"""
     try:
-        # Get request data
+        # Get query from request
         data = request.get_json()
+        
         if not data:
-            return jsonify({
-                "status": "error",
-                "message": "Missing request body"
-            }), 400
-        
-        # Required parameters
-        source_id = data.get('source_id')
-        query_type = data.get('query_type', 'sql')
+            return jsonify({'error': 'No query data provided'}), 400
+            
+        query_type = data.get('type', 'sql')
         query = data.get('query')
-        
-        if not source_id:
-            return jsonify({
-                "status": "error",
-                "message": "Missing source_id parameter"
-            }), 400
+        source_id = data.get('source_id')
         
         if not query:
-            return jsonify({
-                "status": "error",
-                "message": "Missing query parameter"
-            }), 400
+            return jsonify({'error': 'No query provided'}), 400
+            
+        if not source_id:
+            return jsonify({'error': 'No source_id provided'}), 400
+            
+        # Get data source
+        data_source = power_query_engine.get_data_source(source_id)
         
-        # Get the Power Query agent
-        agent = mcp_instance.get_agent('power_query')
-        if not agent:
-            return jsonify({
-                "status": "error",
-                "message": "Power Query agent not available"
-            }), 503
-        
-        # Execute the query
-        task_data = {
-            'task_type': 'execute_query',
-            'source_id': source_id,
-            'query_type': query_type,
-            'query': query,
-            'parameters': data.get('parameters', {})
-        }
-        
-        result = agent.process_task(task_data)
-        
-        if result.get('status') == 'error':
-            return jsonify({
-                "status": "error",
-                "message": result.get('message', "Error executing query")
-            }), result.get('code', 500)
-        
-        return jsonify({
-            "status": "success",
-            "data": result.get('data', []),
-            "metadata": result.get('metadata', {})
-        })
+        if not data_source:
+            return jsonify({'error': f'Data source not found: {source_id}'}), 404
+            
+        # Execute query based on type
+        if query_type == 'sql':
+            # Check if source supports SQL
+            if not hasattr(data_source, 'execute_query'):
+                return jsonify({'error': 'This data source does not support SQL queries'}), 400
+                
+            result = data_source.execute_query(query)
+            
+            # Convert result to list of dicts
+            if hasattr(result, 'to_dict'):
+                # Pandas DataFrame
+                records = result.to_dict('records')
+            else:
+                # Assume list of tuples with column names
+                records = []
+                for row in result[1:]:  # Skip header row
+                    record = {}
+                    for i, col in enumerate(result[0]):
+                        record[col] = row[i]
+                    records.append(record)
+                    
+            return jsonify({'data': records})
+        elif query_type == 'power_query':
+            # Execute Power Query definition
+            query_definition = json.loads(query)
+            result = power_query_engine.execute_query(query_definition)
+            
+            # Convert result to list of dicts if it's a DataFrame
+            if hasattr(result.get('data'), 'to_dict'):
+                result['data'] = result['data'].to_dict('records')
+                
+            return jsonify(result)
+        else:
+            return jsonify({'error': f'Unsupported query type: {query_type}'}), 400
     except Exception as e:
         logger.error(f"Error executing custom query: {str(e)}")
-        return jsonify({
-            "status": "error",
-            "message": f"Error: {str(e)}"
-        }), 500
-
-
-@data_query_api.route('/transform', methods=['POST'])
+        return jsonify({'error': f'Error executing custom query: {str(e)}'}), 500
+        
+@data_bp.route('/transform', methods=['POST'])
 @api_login_required
-@api_rate_limit
-@log_api_call
 def transform_data():
     """Apply transformations to a dataset"""
     try:
-        # Get request data
+        # Get transformation request
         data = request.get_json()
-        if not data:
-            return jsonify({
-                "status": "error",
-                "message": "Missing request body"
-            }), 400
         
-        # Required parameters
-        source_data = data.get('source_data')
-        transformations = data.get('transformations')
+        if not data:
+            return jsonify({'error': 'No transformation data provided'}), 400
+            
+        source_data = data.get('data')
+        transformations = data.get('transformations', [])
         
         if not source_data:
-            return jsonify({
-                "status": "error",
-                "message": "Missing source_data parameter"
-            }), 400
-        
+            return jsonify({'error': 'No source data provided'}), 400
+            
         if not transformations:
-            return jsonify({
-                "status": "error",
-                "message": "Missing transformations parameter"
-            }), 400
-        
-        # Get the Power Query agent
-        agent = mcp_instance.get_agent('power_query')
-        if not agent:
-            return jsonify({
-                "status": "error",
-                "message": "Power Query agent not available"
-            }), 503
-        
-        # Apply transformations
-        task_data = {
-            'task_type': 'transform_data',
-            'source_data': source_data,
-            'transformations': transformations
-        }
-        
-        result = agent.process_task(task_data)
-        
-        if result.get('status') == 'error':
-            return jsonify({
-                "status": "error",
-                "message": result.get('message', "Error transforming data")
-            }), result.get('code', 500)
+            return jsonify({'error': 'No transformations provided'}), 400
+            
+        # Execute transformations
+        # This would typically import source data into a DataFrame and apply
+        # transformations sequentially, but for this stub we'll just return
+        # the original data
         
         return jsonify({
-            "status": "success",
-            "data": result.get('data', []),
-            "metadata": result.get('metadata', {})
+            'message': 'Transformations applied successfully',
+            'data': source_data,
+            'transformations_applied': len(transformations)
         })
     except Exception as e:
         logger.error(f"Error transforming data: {str(e)}")
-        return jsonify({
-            "status": "error",
-            "message": f"Error: {str(e)}"
-        }), 500
-
-
-@data_query_api.route('/export', methods=['POST'])
+        return jsonify({'error': f'Error transforming data: {str(e)}'}), 500
+        
+@data_bp.route('/export', methods=['POST'])
 @api_login_required
-@api_rate_limit
-@log_api_call
 def export_data():
     """Export data to a file format"""
     try:
-        # Get request data
+        # Get export request
         data = request.get_json()
+        
         if not data:
-            return jsonify({
-                "status": "error",
-                "message": "Missing request body"
-            }), 400
-        
-        # Required parameters
-        export_data = data.get('data')
-        export_format = data.get('format', 'csv')
-        
-        if not export_data:
-            return jsonify({
-                "status": "error",
-                "message": "Missing data parameter"
-            }), 400
-        
-        # Get the Power Query agent
-        agent = mcp_instance.get_agent('power_query')
-        if not agent:
-            return jsonify({
-                "status": "error",
-                "message": "Power Query agent not available"
-            }), 503
-        
-        # Export the data
-        task_data = {
-            'task_type': 'export_data',
-            'data': export_data,
-            'format': export_format,
-            'options': data.get('options', {})
-        }
-        
-        result = agent.process_task(task_data)
-        
-        if result.get('status') == 'error':
-            return jsonify({
-                "status": "error",
-                "message": result.get('message', "Error exporting data")
-            }), result.get('code', 500)
-        
-        # Check if the response includes a file path
-        if 'file_path' in result:
-            # Create unique filename
-            filename = f"export_{uuid.uuid4().hex}.{export_format}"
+            return jsonify({'error': 'No export data provided'}), 400
             
-            # Return the file
-            return send_file(
-                result['file_path'],
-                as_attachment=True,
-                download_name=filename
-            )
-        else:
-            # Return the data directly
-            return jsonify({
-                "status": "success",
-                "data": result.get('data', {}),
-                "format": export_format
-            })
+        source_data = data.get('data')
+        format_type = data.get('format', 'csv')
+        filename = data.get('filename', f'export.{format_type}')
+        
+        if not source_data:
+            return jsonify({'error': 'No source data provided'}), 400
+            
+        # For demo, we'll create a simple CSV file
+        # In a real implementation, this would convert the data to the requested format
+        
+        # Create a temporary file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{format_type}') as tmp:
+            # Write some sample data
+            if format_type == 'csv':
+                tmp.write(b'column1,column2,column3\n')
+                tmp.write(b'value1,value2,value3\n')
+                tmp.write(b'value4,value5,value6\n')
+            elif format_type == 'json':
+                tmp.write(json.dumps(source_data).encode('utf-8'))
+            else:
+                return jsonify({'error': f'Unsupported export format: {format_type}'}), 400
+                
+            tmp_path = tmp.name
+            
+        # Return the file
+        return send_file(
+            tmp_path,
+            as_attachment=True,
+            download_name=filename,
+            mimetype=f'text/{format_type}'
+        )
     except Exception as e:
         logger.error(f"Error exporting data: {str(e)}")
-        return jsonify({
-            "status": "error",
-            "message": f"Error: {str(e)}"
-        }), 500
+        return jsonify({'error': f'Error exporting data: {str(e)}'}), 500

@@ -1,325 +1,271 @@
 """
 Spatial API Module
 
-This module provides endpoints for geospatial data access and management.
-It handles GIS data querying, transformation, and basic spatial operations.
+This module provides endpoints for accessing and working with spatial data,
+including GIS layers, features, and related functionality.
 """
 
-from flask import Blueprint, request, jsonify, current_app, session, send_file
-import logging
 import json
+import logging
 import os
-import tempfile
-from functools import wraps
-from typing import Dict, Any, List, Optional
+from typing import Dict, List, Optional, Any
 
-from auth import login_required, is_authenticated
-from mcp.core import mcp_instance
-from api.gateway import api_login_required, api_rate_limit, log_api_call
+from flask import Blueprint, jsonify, request, send_file, current_app, Response
+
+from api.gateway import api_login_required
+from models import File, GISProject, db
+from gis_utils import extract_gis_metadata, validate_geojson
+
+logger = logging.getLogger(__name__)
 
 # Create blueprint
-spatial_api = Blueprint('spatial_api', __name__)
+spatial_bp = Blueprint('spatial', __name__, url_prefix='/spatial')
 
-# Setup logging
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger('spatial_api')
-
-
-@spatial_api.route('/layers', methods=['GET'])
+@spatial_bp.route('/layers')
 @api_login_required
-@api_rate_limit
-@log_api_call
-def list_spatial_layers():
+def list_layers():
     """List available GIS layers"""
     try:
-        from app import db
-        from models import File
+        # Get query parameters
+        layer_type = request.args.get('type')
+        project_id = request.args.get('project_id')
         
-        # Query for GIS file types
-        gis_files = File.query.filter(
-            File.file_type.in_(['geojson', 'shp', 'kml', 'kmz', 'gpkg']),
-            File.user_id == session['user']['id']
-        ).all()
+        # Build query
+        query = File.query.filter(File.file_metadata.isnot(None))
         
-        # Format the response
+        # Filter by layer type if specified
+        if layer_type:
+            query = query.filter(File.file_type == layer_type)
+            
+        # Filter by project if specified
+        if project_id:
+            try:
+                project_id = int(project_id)
+                query = query.filter(File.project_id == project_id)
+            except ValueError:
+                return jsonify({'error': 'Invalid project_id parameter'}), 400
+        
+        # Execute query
+        files = query.all()
+        
+        # Convert to layer list
         layers = []
-        for file in gis_files:
+        for file in files:
             layer = {
                 'id': file.id,
                 'name': file.original_filename,
                 'type': file.file_type,
+                'upload_date': file.upload_date.isoformat(),
                 'description': file.description,
-                'upload_date': file.upload_date.isoformat() if file.upload_date else None
+                'metadata': file.file_metadata
             }
             
-            # Add metadata if available
-            if file.file_metadata:
-                if isinstance(file.file_metadata, str):
-                    try:
-                        metadata = json.loads(file.file_metadata)
-                    except json.JSONDecodeError:
-                        metadata = {}
-                else:
-                    metadata = file.file_metadata
+            # Add project info if available
+            if file.project:
+                layer['project'] = {
+                    'id': file.project.id,
+                    'name': file.project.name
+                }
                 
-                # Add selected metadata fields
-                layer['feature_count'] = metadata.get('feature_count')
-                layer['geometry_type'] = metadata.get('geometry_type')
-                layer['crs'] = metadata.get('crs')
-                layer['bounds'] = metadata.get('bounds')
-            
             layers.append(layer)
-        
-        return jsonify({
-            "status": "success",
-            "layers": layers
-        })
+            
+        return jsonify({'layers': layers})
     except Exception as e:
-        logger.error(f"Error listing spatial layers: {str(e)}")
-        return jsonify({
-            "status": "error",
-            "message": f"Error: {str(e)}"
-        }), 500
+        logger.error(f"Error listing layers: {str(e)}")
+        return jsonify({'error': f'Error listing layers: {str(e)}'}), 500
 
-
-@spatial_api.route('/layers/<int:layer_id>', methods=['GET'])
+@spatial_bp.route('/layers/<int:layer_id>')
 @api_login_required
-@api_rate_limit
-@log_api_call
-def get_layer_details(layer_id):
-    """Get detailed information about a specific GIS layer"""
+def get_layer(layer_id):
+    """Get information about a specific GIS layer"""
     try:
-        from app import db
-        from models import File
+        file = File.query.get(layer_id)
         
-        # Get the file record
-        file_record = File.query.get_or_404(layer_id)
-        
-        # Check if user has access to this file
-        if file_record.user_id != session['user']['id']:
-            return jsonify({
-                "status": "error",
-                "message": "Access denied"
-            }), 403
-        
-        # Format metadata
-        if file_record.file_metadata:
-            if isinstance(file_record.file_metadata, str):
-                try:
-                    metadata = json.loads(file_record.file_metadata)
-                except json.JSONDecodeError:
-                    metadata = {}
-            else:
-                metadata = file_record.file_metadata
-        else:
-            metadata = {}
-        
-        return jsonify({
-            "status": "success",
-            "layer": {
-                "id": file_record.id,
-                "name": file_record.original_filename,
-                "type": file_record.file_type,
-                "description": file_record.description,
-                "upload_date": file_record.upload_date.isoformat() if file_record.upload_date else None,
-                "metadata": metadata
-            }
-        })
-    except Exception as e:
-        logger.error(f"Error getting layer details: {str(e)}")
-        return jsonify({
-            "status": "error",
-            "message": f"Error: {str(e)}"
-        }), 500
-
-
-@spatial_api.route('/layers/<int:layer_id>/data', methods=['GET'])
-@api_login_required
-@api_rate_limit
-@log_api_call
-def get_layer_data(layer_id):
-    """Get GIS data from a specific layer"""
-    try:
-        from app import db, app
-        from models import File
-        import os
-        
-        # Get the file record
-        file_record = File.query.get_or_404(layer_id)
-        
-        # Check if user has access to this file
-        if file_record.user_id != session['user']['id']:
-            return jsonify({
-                "status": "error",
-                "message": "Access denied"
-            }), 403
-        
-        # Get the requested format (default to GeoJSON)
-        output_format = request.args.get('format', 'geojson').lower()
-        
-        # File path
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], 
-                                 str(layer_id), 
-                                 file_record.filename)
-        
-        # Process based on the source file type and requested output format
-        if file_record.file_type.lower() == 'geojson' and output_format == 'geojson':
-            # Direct read for GeoJSON
-            with open(file_path, 'r') as f:
-                geojson_data = json.load(f)
+        if not file:
+            return jsonify({'error': 'Layer not found'}), 404
             
-            return jsonify({
-                "status": "success",
-                "data": geojson_data,
-                "metadata": file_record.file_metadata
-            })
-        else:
-            # Need conversion - use a spatial agent
-            agent = mcp_instance.get_agent('spatial_analysis')
-            if not agent:
-                # Check if the spatial agent is available - if not, try to handle conversion ourselves
-                if output_format == 'geojson' and file_record.file_type.lower() in ['geojson', 'shp']:
-                    try:
-                        import geopandas as gpd
-                        
-                        # Read the file with GeoPandas
-                        gdf = gpd.read_file(file_path)
-                        
-                        # Convert to GeoJSON
-                        geojson_data = json.loads(gdf.to_json())
-                        
-                        return jsonify({
-                            "status": "success",
-                            "data": geojson_data
-                        })
-                    except ImportError:
-                        return jsonify({
-                            "status": "error",
-                            "message": "Spatial analysis agent not available and GeoPandas not installed"
-                        }), 503
-                    except Exception as e:
-                        return jsonify({
-                            "status": "error",
-                            "message": f"Conversion error: {str(e)}"
-                        }), 500
-                else:
-                    return jsonify({
-                        "status": "error",
-                        "message": "Spatial analysis agent not available"
-                    }), 503
-            
-            # Use the spatial agent for conversion
-            task_data = {
-                'task_type': 'convert_format',
-                'file_id': layer_id,
-                'output_format': output_format
-            }
-            
-            result = agent.process_task(task_data)
-            
-            # Check if the result contains a file path or direct data
-            if result.get('status') != 'success':
-                return jsonify({
-                    "status": "error",
-                    "message": result.get('message', 'Conversion failed')
-                }), 500
-            
-            if 'file_path' in result:
-                # Send the file
-                return send_file(
-                    result['file_path'],
-                    as_attachment=True,
-                    download_name=f"{file_record.original_filename}.{output_format}"
-                )
-            else:
-                # Return the data directly
-                return jsonify({
-                    "status": "success",
-                    "data": result.get('data', {}),
-                    "metadata": result.get('metadata', {})
-                })
-    except Exception as e:
-        logger.error(f"Error getting layer data: {str(e)}")
-        return jsonify({
-            "status": "error",
-            "message": f"Error: {str(e)}"
-        }), 500
-
-
-@spatial_api.route('/analyze', methods=['POST'])
-@api_login_required
-@api_rate_limit
-@log_api_call
-def analyze_spatial_data():
-    """Perform spatial analysis on GIS data"""
-    try:
-        # Get request data
-        data = request.get_json()
-        if not data:
-            return jsonify({
-                "status": "error",
-                "message": "Missing request body"
-            }), 400
-        
-        # Required parameters
-        layer_id = data.get('layer_id')
-        analysis_type = data.get('analysis_type')
-        
-        if not layer_id:
-            return jsonify({
-                "status": "error",
-                "message": "Missing layer_id parameter"
-            }), 400
-        
-        if not analysis_type:
-            return jsonify({
-                "status": "error",
-                "message": "Missing analysis_type parameter"
-            }), 400
-        
-        # Check if the layer exists and user has access
-        from app import db
-        from models import File
-        
-        file_record = File.query.get(layer_id)
-        if not file_record:
-            return jsonify({
-                "status": "error",
-                "message": "Layer not found"
-            }), 404
-        
-        if file_record.user_id != session['user']['id']:
-            return jsonify({
-                "status": "error",
-                "message": "Access denied"
-            }), 403
-        
-        # Get the spatial analysis agent
-        agent = mcp_instance.get_agent('spatial_analysis')
-        if not agent:
-            return jsonify({
-                "status": "error",
-                "message": "Spatial analysis agent not available"
-            }), 503
-        
-        # Submit the analysis task
-        task_data = {
-            'task_type': 'analyze',
-            'file_id': layer_id,
-            'analysis_type': analysis_type,
-            'parameters': data.get('parameters', {})
+        layer = {
+            'id': file.id,
+            'name': file.original_filename,
+            'type': file.file_type,
+            'upload_date': file.upload_date.isoformat(),
+            'description': file.description,
+            'metadata': file.file_metadata,
+            'file_path': file.file_path,
+            'size': file.file_size
         }
         
-        result = agent.process_task(task_data)
-        
-        return jsonify({
-            "status": "success",
-            "result": result
-        })
+        # Add project info if available
+        if file.project:
+            layer['project'] = {
+                'id': file.project.id,
+                'name': file.project.name
+            }
+            
+        return jsonify(layer)
     except Exception as e:
-        logger.error(f"Error in spatial analysis: {str(e)}")
-        return jsonify({
-            "status": "error",
-            "message": f"Error: {str(e)}"
-        }), 500
+        logger.error(f"Error getting layer: {str(e)}")
+        return jsonify({'error': f'Error getting layer: {str(e)}'}), 500
+
+@spatial_bp.route('/layers/<int:layer_id>/data')
+@api_login_required
+def get_layer_data(layer_id):
+    """Get the data for a specific GIS layer"""
+    try:
+        file = File.query.get(layer_id)
+        
+        if not file:
+            return jsonify({'error': 'Layer not found'}), 404
+            
+        # Check if file exists
+        if not os.path.exists(file.file_path):
+            return jsonify({'error': 'Layer file not found'}), 404
+            
+        # Get format parameter
+        format_param = request.args.get('format', 'json').lower()
+        
+        if format_param == 'file':
+            # Return the original file
+            return send_file(file.file_path, 
+                            download_name=file.original_filename,
+                            as_attachment=True)
+        elif format_param == 'json':
+            # Return the data as JSON
+            if file.file_type == 'application/geo+json':
+                # For GeoJSON, read and return directly
+                with open(file.file_path, 'r') as f:
+                    data = json.load(f)
+                return jsonify(data)
+            else:
+                # For other formats, attempt to convert to GeoJSON
+                try:
+                    import geopandas as gpd
+                    
+                    # Read file with GeoPandas
+                    gdf = gpd.read_file(file.file_path)
+                    
+                    # Convert to GeoJSON
+                    geojson_data = json.loads(gdf.to_json())
+                    return jsonify(geojson_data)
+                except Exception as e:
+                    logger.error(f"Error converting layer to GeoJSON: {str(e)}")
+                    return jsonify({
+                        'error': 'Unable to convert this layer format to JSON. Try using format=file instead.'
+                    }), 400
+        else:
+            return jsonify({'error': f'Unsupported format: {format_param}'}), 400
+    except Exception as e:
+        logger.error(f"Error getting layer data: {str(e)}")
+        return jsonify({'error': f'Error getting layer data: {str(e)}'}), 500
+
+@spatial_bp.route('/layers/<int:layer_id>/metadata')
+@api_login_required
+def get_layer_metadata(layer_id):
+    """Get metadata for a specific GIS layer"""
+    try:
+        file = File.query.get(layer_id)
+        
+        if not file:
+            return jsonify({'error': 'Layer not found'}), 404
+            
+        # Return stored metadata if available
+        if file.file_metadata:
+            return jsonify(file.file_metadata)
+            
+        # Otherwise, try to extract metadata
+        if os.path.exists(file.file_path):
+            metadata = extract_gis_metadata(file.file_path, file.file_type)
+            
+            if metadata:
+                # Update the file record with the metadata
+                file.file_metadata = metadata
+                db.session.commit()
+                
+                return jsonify(metadata)
+            else:
+                return jsonify({'error': 'Unable to extract metadata from this file type'}), 400
+        else:
+            return jsonify({'error': 'Layer file not found'}), 404
+    except Exception as e:
+        logger.error(f"Error getting layer metadata: {str(e)}")
+        return jsonify({'error': f'Error getting layer metadata: {str(e)}'}), 500
+
+@spatial_bp.route('/projects')
+@api_login_required
+def list_projects():
+    """List GIS projects"""
+    try:
+        # Get query parameters
+        user_id = request.args.get('user_id')
+        
+        # Build query
+        query = GISProject.query
+        
+        # Filter by user if specified
+        if user_id:
+            try:
+                user_id = int(user_id)
+                query = query.filter(GISProject.user_id == user_id)
+            except ValueError:
+                return jsonify({'error': 'Invalid user_id parameter'}), 400
+        
+        # Execute query
+        projects = query.all()
+        
+        # Convert to project list
+        project_list = []
+        for project in projects:
+            project_data = {
+                'id': project.id,
+                'name': project.name,
+                'description': project.description,
+                'created_at': project.created_at.isoformat(),
+                'updated_at': project.updated_at.isoformat(),
+                'user_id': project.user_id,
+                'file_count': project.files.count()
+            }
+            project_list.append(project_data)
+            
+        return jsonify({'projects': project_list})
+    except Exception as e:
+        logger.error(f"Error listing projects: {str(e)}")
+        return jsonify({'error': f'Error listing projects: {str(e)}'}), 500
+
+@spatial_bp.route('/projects/<int:project_id>')
+@api_login_required
+def get_project(project_id):
+    """Get information about a specific GIS project"""
+    try:
+        project = GISProject.query.get(project_id)
+        
+        if not project:
+            return jsonify({'error': 'Project not found'}), 404
+            
+        # Get project files
+        files = project.files.all()
+        file_list = []
+        
+        for file in files:
+            file_data = {
+                'id': file.id,
+                'name': file.original_filename,
+                'type': file.file_type,
+                'upload_date': file.upload_date.isoformat(),
+                'description': file.description
+            }
+            file_list.append(file_data)
+            
+        project_data = {
+            'id': project.id,
+            'name': project.name,
+            'description': project.description,
+            'created_at': project.created_at.isoformat(),
+            'updated_at': project.updated_at.isoformat(),
+            'user_id': project.user_id,
+            'files': file_list
+        }
+            
+        return jsonify(project_data)
+    except Exception as e:
+        logger.error(f"Error getting project: {str(e)}")
+        return jsonify({'error': f'Error getting project: {str(e)}'}), 500

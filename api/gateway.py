@@ -1,454 +1,340 @@
 """
 API Gateway Module
 
-This module provides the central API gateway functionality for the Benton County Data Hub.
-It maps incoming API requests to the appropriate internal services, implements
-authentication, rate limiting, and logging for all API access.
+This module provides the main API Gateway functionality, registering all API endpoints
+and handling basic API operations like authentication, routing, and error handling.
 """
 
-from flask import Blueprint, request, jsonify, current_app, session
-import logging
-import time
+import datetime
 import json
-from functools import wraps
-from typing import Dict, Any, List, Optional
+import logging
+import os
 import uuid
+from functools import wraps
 
-from auth import login_required, is_authenticated
-from mcp.core import mcp_instance
+from flask import Blueprint, jsonify, request, session, current_app
 
-# Create blueprint
-api_gateway = Blueprint('api_gateway', __name__)
+from auth import is_authenticated
+from models import User, db
 
-# Setup logging
-logging.basicConfig(level=logging.INFO,
-                   format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger('api_gateway')
+logger = logging.getLogger(__name__)
 
-# In-memory rate limit storage
-# In production, this should be replaced with a distributed cache like Redis
-rate_limits = {}
-rate_limit_window = 60  # seconds
-rate_limit_max_requests = 30  # requests per window
+# Create the API blueprint
+api_bp = Blueprint('api', __name__, url_prefix='/api')
 
+# API Token storage (in-memory for development, should use DB in production)
+api_tokens = {}
 
 def api_login_required(f):
     """Decorator to require login for API endpoints"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not is_authenticated():
-            return jsonify({
-                "status": "error",
-                "message": "Authentication required"
-            }), 401
-        return f(*args, **kwargs)
+        # Check for API token in header or query param
+        auth_header = request.headers.get('Authorization')
+        token = None
+        
+        if auth_header:
+            # Get token from header
+            if auth_header.startswith('Bearer '):
+                token = auth_header.split('Bearer ')[1]
+        else:
+            # Get token from query param
+            token = request.args.get('api_token')
+            
+        if token and token in api_tokens:
+            # Token exists and is valid
+            token_data = api_tokens[token]
+            # Check if token is expired
+            if token_data['expires_at'] > datetime.datetime.now():
+                # Valid token, allow access
+                return f(*args, **kwargs)
+            else:
+                # Token expired
+                return jsonify({'error': 'API token expired. Please refresh your token.'}), 401
+        elif is_authenticated():
+            # User is authenticated via session
+            return f(*args, **kwargs)
+        else:
+            # No valid token or session
+            return jsonify({'error': 'Authentication required. Please provide a valid API token.'}), 401
+            
     return decorated_function
 
-
-def api_rate_limit(f):
-    """Decorator to implement rate limiting for API endpoints"""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if is_authenticated():
-            # Use user ID for rate limiting if authenticated
-            key = f"user_{session.get('user', {}).get('id', 'anonymous')}:{request.path}"
-        else:
-            # Use IP address for rate limiting if not authenticated
-            key = f"ip_{request.remote_addr}:{request.path}"
-        
-        # Check if rate limit exceeded
-        now = time.time()
-        window_start = int(now - rate_limit_window)
-        
-        # Clean up old entries
-        for k in list(rate_limits.keys()):
-            if all(ts < window_start for ts in rate_limits[k]):
-                del rate_limits[k]
-        
-        # Initialize if needed
-        if key not in rate_limits:
-            rate_limits[key] = []
-        
-        # Filter out old timestamps
-        rate_limits[key] = [ts for ts in rate_limits[key] if ts >= window_start]
-        
-        # Check rate limit
-        if len(rate_limits[key]) >= rate_limit_max_requests:
-            return jsonify({
-                "status": "error",
-                "message": "Rate limit exceeded",
-                "retry_after": int(min(rate_limits[key]) + rate_limit_window - now)
-            }), 429
-        
-        # Add current timestamp
-        rate_limits[key].append(now)
-        
-        # Add rate limit headers
-        response = f(*args, **kwargs)
-        if isinstance(response, tuple):
-            response_obj, status_code = response
-            headers = {}
-        else:
-            response_obj = response
-            status_code = 200
-            headers = {}
-        
-        # Add rate limit headers
-        headers['X-RateLimit-Limit'] = str(rate_limit_max_requests)
-        headers['X-RateLimit-Remaining'] = str(rate_limit_max_requests - len(rate_limits[key]))
-        headers['X-RateLimit-Reset'] = str(int(now) + rate_limit_window)
-        
-        # Convert response back to tuple with headers
-        return response_obj, status_code, headers
-    
-    return decorated_function
-
-
-def log_api_call(f):
-    """Decorator to log API calls"""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        # Generate a unique request ID
-        request_id = str(uuid.uuid4())
-        
-        # Log the request
-        logger.info(f"API Request [{request_id}]: {request.method} {request.path} - User: {session.get('user', {}).get('username', 'anonymous')} - IP: {request.remote_addr}")
-        
-        # Time the request
-        start_time = time.time()
-        
-        # Execute the actual function
-        response = f(*args, **kwargs)
-        
-        # Calculate duration
-        duration = time.time() - start_time
-        
-        # Log the response
-        if isinstance(response, tuple):
-            status_code = response[1] if len(response) > 1 else 200
-        else:
-            status_code = 200
-        
-        logger.info(f"API Response [{request_id}]: Status {status_code} - Duration: {duration:.4f}s")
-        
-        return response
-    
-    return decorated_function
-
-
-# API endpoints
-@api_gateway.route('/', methods=['GET'])
+# API Routes
+@api_bp.route('/')
 def api_index():
-    """API root endpoint with documentation links"""
+    """API index route providing information about the API"""
     return jsonify({
-        "name": "Benton County Data Hub API",
-        "version": "1.0",
-        "documentation": "/api/docs",
-        "endpoints": {
-            "data": "/api/data",
-            "gis": "/api/gis",
-            "search": "/api/search"
-        }
+        'name': 'Benton County Data Hub API',
+        'version': '1.0.0',
+        'base_url': '/api',
+        'documentation_url': '/api/docs',
+        'endpoints': [
+            {'path': '/', 'method': 'GET', 'description': 'API information'},
+            {'path': '/docs', 'method': 'GET', 'description': 'API documentation'},
+            {'path': '/auth/token', 'method': 'POST', 'description': 'Generate API token'},
+            {'path': '/auth/refresh', 'method': 'POST', 'description': 'Refresh API token'},
+            {'path': '/auth/revoke', 'method': 'POST', 'description': 'Revoke API token'},
+            {'path': '/auth/user', 'method': 'GET', 'description': 'Get user information'},
+            {'path': '/spatial/layers', 'method': 'GET', 'description': 'List GIS layers'},
+            {'path': '/data/sources', 'method': 'GET', 'description': 'List data sources'},
+            {'path': '/search', 'method': 'POST', 'description': 'Search data using RAG'},
+        ]
     })
 
-
-@api_gateway.route('/docs', methods=['GET'])
+@api_bp.route('/docs')
 def api_docs():
     """API documentation endpoint"""
-    # This would be expanded with comprehensive documentation
-    # Could use a tool like Swagger/OpenAPI for this
     return jsonify({
-        "name": "Benton County Data Hub API Documentation",
-        "version": "1.0",
-        "endpoints": {
-            "data": {
-                "description": "Access to SQL Server and other database sources",
-                "endpoints": [
-                    {"path": "/api/data/sql/<database>/<table>", "method": "GET", "description": "Query SQL Server data"},
-                    {"path": "/api/data/sources", "method": "GET", "description": "List available data sources"}
-                ]
+        'name': 'Benton County Data Hub API Documentation',
+        'version': '1.0.0',
+        'description': 'This API provides access to Benton County Data Hub functionality.',
+        'base_url': '/api',
+        'authentication': {
+            'type': 'Bearer Token',
+            'endpoint': '/api/auth/token',
+            'method': 'POST',
+            'body': {
+                'username': 'your_username',
+                'password': 'your_password'
             },
-            "gis": {
-                "description": "Access to geospatial data",
-                "endpoints": [
-                    {"path": "/api/gis/features/<dataset>", "method": "GET", "description": "Get GeoJSON features"},
-                    {"path": "/api/gis/datasets", "method": "GET", "description": "List available GIS datasets"}
-                ]
-            },
-            "search": {
-                "description": "Natural language search across data sources",
-                "endpoints": [
-                    {"path": "/api/search", "method": "POST", "description": "Perform a natural language search"}
-                ]
+            'response': {
+                'token': 'your_api_token',
+                'expires_at': 'token_expiry_date'
             }
-        }
+        },
+        'endpoints': [
+            {
+                'path': '/auth/token',
+                'method': 'POST',
+                'description': 'Generate API token',
+                'parameters': [
+                    {'name': 'username', 'type': 'string', 'required': True},
+                    {'name': 'password', 'type': 'string', 'required': True}
+                ],
+                'response': {
+                    'token': 'your_api_token',
+                    'expires_at': 'token_expiry_date'
+                }
+            },
+            {
+                'path': '/auth/refresh',
+                'method': 'POST',
+                'description': 'Refresh API token',
+                'parameters': [
+                    {'name': 'token', 'type': 'string', 'required': True}
+                ],
+                'response': {
+                    'token': 'your_new_api_token',
+                    'expires_at': 'new_token_expiry_date'
+                }
+            },
+            {
+                'path': '/spatial/layers',
+                'method': 'GET',
+                'description': 'List GIS layers',
+                'parameters': [
+                    {'name': 'format', 'type': 'string', 'required': False, 'default': 'json'},
+                    {'name': 'type', 'type': 'string', 'required': False}
+                ],
+                'response': {
+                    'layers': [
+                        {
+                            'id': 'layer_id',
+                            'name': 'Layer Name',
+                            'type': 'geojson/shapefile/etc',
+                            'features': 'feature_count',
+                            'attributes': ['attr1', 'attr2']
+                        }
+                    ]
+                }
+            },
+            {
+                'path': '/data/sources',
+                'method': 'GET',
+                'description': 'List data sources',
+                'parameters': [
+                    {'name': 'type', 'type': 'string', 'required': False}
+                ],
+                'response': {
+                    'sources': [
+                        {
+                            'id': 'source_id',
+                            'name': 'Source Name',
+                            'type': 'sql/csv/excel',
+                            'tables': ['table1', 'table2']
+                        }
+                    ]
+                }
+            },
+            {
+                'path': '/search',
+                'method': 'POST',
+                'description': 'Search data using RAG',
+                'parameters': [
+                    {'name': 'query', 'type': 'string', 'required': True}
+                ],
+                'response': {
+                    'results': [
+                        {
+                            'id': 'result_id',
+                            'title': 'Result Title',
+                            'source': 'Source',
+                            'content': 'Content'
+                        }
+                    ],
+                    'answer': 'Generated answer based on the query'
+                }
+            }
+        ]
     })
 
-
-@api_gateway.route('/data/sources', methods=['GET'])
-@api_login_required
-@api_rate_limit
-@log_api_call
-def list_data_sources():
-    """List available data sources"""
-    try:
-        # Get a list of registered data sources via the power query agent
-        agent = mcp_instance.get_agent('power_query')
-        if not agent:
-            return jsonify({
-                "status": "error",
-                "message": "Power Query agent not available"
-            }), 503
+@api_bp.route('/auth/token', methods=['POST'])
+def create_api_token():
+    """Create a new API token using username and password"""
+    username = request.json.get('username')
+    password = request.json.get('password')
+    
+    if not username or not password:
+        return jsonify({'error': 'Username and password are required'}), 400
+    
+    # Check for development bypass
+    if os.environ.get('BYPASS_LDAP', 'false').lower() == 'true':
+        # Create a token for the test user
+        token = str(uuid.uuid4())
+        expires_at = datetime.datetime.now() + datetime.timedelta(days=1)
         
-        task_data = {
-            'task_type': 'list_sources'
+        # Store token
+        api_tokens[token] = {
+            'username': 'dev_user',
+            'user_id': 1,
+            'created_at': datetime.datetime.now(),
+            'expires_at': expires_at
         }
         
-        result = agent.process_task(task_data)
-        
         return jsonify({
-            "status": "success",
-            "data_sources": result.get('sources', [])
+            'token': token,
+            'expires_at': expires_at.isoformat()
         })
-    except Exception as e:
-        logger.error(f"Error listing data sources: {str(e)}")
-        return jsonify({
-            "status": "error",
-            "message": f"Error: {str(e)}"
-        }), 500
+    
+    # In a real implementation, check user credentials against LDAP
+    # and generate a token
+    
+    # For demo only
+    return jsonify({'error': 'Authentication failed'}), 401
 
-
-@api_gateway.route('/data/sql/<database>/<table>', methods=['GET'])
+@api_bp.route('/auth/refresh', methods=['POST'])
 @api_login_required
-@api_rate_limit
-@log_api_call
-def sql_data_endpoint(database, table):
-    """Endpoint for accessing SQL Server data"""
-    try:
-        # Validate parameters (basic sanitization)
-        # This would be expanded with more robust validation
-        if not database or not table:
-            return jsonify({
-                "status": "error",
-                "message": "Missing database or table parameter"
-            }), 400
+def refresh_api_token():
+    """Refresh an existing API token"""
+    auth_header = request.headers.get('Authorization')
+    old_token = None
+    
+    if auth_header and auth_header.startswith('Bearer '):
+        old_token = auth_header.split('Bearer ')[1]
+    else:
+        old_token = request.json.get('token')
         
-        # Process filter parameters
-        filters = {}
-        limit = request.args.get('limit', 1000)
-        offset = request.args.get('offset', 0)
+    if not old_token or old_token not in api_tokens:
+        return jsonify({'error': 'Invalid token'}), 400
         
-        # Extract filter conditions from query parameters
-        for key, value in request.args.items():
-            if key not in ['limit', 'offset']:
-                filters[key] = value
+    # Create a new token
+    token = str(uuid.uuid4())
+    expires_at = datetime.datetime.now() + datetime.timedelta(days=1)
+    
+    # Copy user data from old token
+    api_tokens[token] = api_tokens[old_token].copy()
+    api_tokens[token]['created_at'] = datetime.datetime.now()
+    api_tokens[token]['expires_at'] = expires_at
+    
+    # Remove old token
+    del api_tokens[old_token]
+    
+    return jsonify({
+        'token': token,
+        'expires_at': expires_at.isoformat()
+    })
+
+@api_bp.route('/auth/revoke', methods=['POST'])
+@api_login_required
+def revoke_api_token():
+    """Revoke an API token"""
+    auth_header = request.headers.get('Authorization')
+    token = None
+    
+    if auth_header and auth_header.startswith('Bearer '):
+        token = auth_header.split('Bearer ')[1]
+    else:
+        token = request.json.get('token')
         
-        # Submit task to Power Query agent
-        agent = mcp_instance.get_agent('power_query')
-        if not agent:
-            return jsonify({
-                "status": "error",
-                "message": "Power Query agent not available"
-            }), 503
+    if not token or token not in api_tokens:
+        return jsonify({'error': 'Invalid token'}), 400
         
-        task_data = {
-            'task_type': 'query_data',
-            'source_type': 'sql',
-            'database': database,
-            'table': table,
-            'filters': filters,
-            'limit': limit,
-            'offset': offset
-        }
+    # Remove token
+    del api_tokens[token]
+    
+    return jsonify({'message': 'Token revoked successfully'})
+
+@api_bp.route('/auth/user')
+@api_login_required
+def get_api_user():
+    """Get information about the authenticated user"""
+    auth_header = request.headers.get('Authorization')
+    token = None
+    
+    if auth_header and auth_header.startswith('Bearer '):
+        token = auth_header.split('Bearer ')[1]
         
-        result = agent.process_task(task_data)
-        
+    if token and token in api_tokens:
+        # Return user info from token
+        token_data = api_tokens[token]
         return jsonify({
-            "status": "success",
-            "data": result.get('data', []),
-            "metadata": {
-                "total_rows": result.get('total_rows', 0),
-                "limit": limit,
-                "offset": offset,
-                "filters": filters
-            }
+            'username': token_data['username'],
+            'user_id': token_data['user_id']
         })
-    except Exception as e:
-        logger.error(f"API error in SQL data endpoint: {str(e)}")
+    elif is_authenticated():
+        # Return user info from session
         return jsonify({
-            "status": "error",
-            "message": f"Error: {str(e)}"
-        }), 500
-
-
-@api_gateway.route('/gis/datasets', methods=['GET'])
-@api_login_required
-@api_rate_limit
-@log_api_call
-def list_gis_datasets():
-    """List available GIS datasets"""
-    try:
-        # Get GIS files from the database
-        from app import db
-        from models import File
-        from flask import session
-        
-        # Query for GeoJSON files
-        gis_files = File.query.filter(
-            File.file_type.in_(['geojson', 'shp', 'kml', 'kmz', 'gpkg']),
-            File.user_id == session['user']['id']
-        ).all()
-        
-        # Format the response
-        datasets = [{
-            'id': file.id,
-            'name': file.original_filename,
-            'type': file.file_type,
-            'upload_date': file.upload_date.isoformat() if file.upload_date else None,
-            'description': file.description,
-            'metadata': file.file_metadata
-        } for file in gis_files]
-        
-        return jsonify({
-            "status": "success",
-            "datasets": datasets
+            'username': session['user']['username'],
+            'user_id': session['user']['id']
         })
-    except Exception as e:
-        logger.error(f"Error listing GIS datasets: {str(e)}")
-        return jsonify({
-            "status": "error",
-            "message": f"Error: {str(e)}"
-        }), 500
+    else:
+        return jsonify({'error': 'Not authenticated'}), 401
 
+# API error handling
+@api_bp.errorhandler(400)
+def bad_request(error):
+    return jsonify({'error': 'Bad request'}), 400
 
-@api_gateway.route('/gis/features/<int:dataset_id>', methods=['GET'])
-@api_login_required
-@api_rate_limit
-@log_api_call
-def get_gis_features(dataset_id):
-    """Get GeoJSON features from a dataset"""
+@api_bp.errorhandler(401)
+def unauthorized(error):
+    return jsonify({'error': 'Unauthorized'}), 401
+
+@api_bp.errorhandler(404)
+def not_found(error):
+    return jsonify({'error': 'Not found'}), 404
+
+@api_bp.errorhandler(500)
+def server_error(error):
+    return jsonify({'error': 'Server error'}), 500
+
+# Register API endpoint modules
+def register_api_endpoint_modules(app):
+    """Register all API endpoint modules with the Flask app"""
     try:
-        from app import db, app
-        from models import File
-        import os
-        import json
+        # Import API modules first
+        from api.spatial import spatial_bp
+        from api.data_query import data_bp
         
-        # Get the file record
-        file_record = File.query.get_or_404(dataset_id)
+        # Register sub-blueprints to main API blueprint
+        api_bp.register_blueprint(spatial_bp)
+        api_bp.register_blueprint(data_bp)
         
-        # Check if user has access to this file
-        if file_record.user_id != session['user']['id']:
-            return jsonify({
-                "status": "error",
-                "message": "Access denied"
-            }), 403
+        # Register the main API Blueprint with Flask app
+        app.register_blueprint(api_bp)
         
-        # Check file type and convert if needed
-        if file_record.file_type == 'geojson':
-            # Direct read for GeoJSON
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], 
-                                     str(dataset_id), 
-                                     file_record.filename)
-            
-            with open(file_path, 'r') as f:
-                geojson_data = json.load(f)
-            
-            return jsonify({
-                "status": "success",
-                "data": geojson_data,
-                "metadata": file_record.file_metadata
-            })
-        else:
-            # For other types, request conversion from a GIS agent
-            agent = mcp_instance.get_agent('spatial_analysis')
-            if not agent:
-                return jsonify({
-                    "status": "error",
-                    "message": "GIS processing agent not available"
-                }), 503
-            
-            task_data = {
-                'task_type': 'convert_to_geojson',
-                'file_id': dataset_id
-            }
-            
-            result = agent.process_task(task_data)
-            
-            if result.get('status') != 'success':
-                return jsonify({
-                    "status": "error",
-                    "message": result.get('message', 'Conversion failed')
-                }), 500
-            
-            return jsonify({
-                "status": "success",
-                "data": result.get('data', {}),
-                "metadata": result.get('metadata', {})
-            })
+        logger.info("API Gateway registered successfully")
+        return True
     except Exception as e:
-        logger.error(f"Error accessing GIS features: {str(e)}")
-        return jsonify({
-            "status": "error",
-            "message": f"Error: {str(e)}"
-        }), 500
-
-
-@api_gateway.route('/search', methods=['POST'])
-@api_login_required
-@api_rate_limit
-@log_api_call
-def api_search():
-    """Perform a natural language search across data sources"""
-    try:
-        # Get request data
-        data = request.get_json()
-        if not data:
-            return jsonify({
-                "status": "error",
-                "message": "Missing request body"
-            }), 400
-        
-        query = data.get('query')
-        if not query:
-            return jsonify({
-                "status": "error",
-                "message": "Missing query parameter"
-            }), 400
-        
-        # Process the search using RAG
-        from rag import process_query
-        
-        # Log the query
-        from app import db
-        from models import QueryLog
-        import datetime
-        
-        start_time = time.time()
-        query_log = QueryLog(
-            user_id=session['user']['id'],
-            query=query,
-            timestamp=datetime.datetime.now()
-        )
-        db.session.add(query_log)
-        db.session.commit()
-        
-        # Run the search
-        results = process_query(query, user_id=session['user']['id'])
-        
-        # Update the log with response
-        end_time = time.time()
-        query_log.response = json.dumps(results)
-        query_log.processing_time = end_time - start_time
-        db.session.commit()
-        
-        return jsonify({
-            "status": "success",
-            "query": query,
-            "results": results
-        })
-    except Exception as e:
-        logger.error(f"Search API error: {str(e)}")
-        return jsonify({
-            "status": "error",
-            "message": f"Search error: {str(e)}"
-        }), 500
+        logger.error(f"Error registering API modules: {e}")
+        return False
