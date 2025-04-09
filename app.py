@@ -56,9 +56,17 @@ with app.app_context():
     from file_handlers import allowed_file, process_file_upload, get_user_files, delete_file
     from rag import process_query, index_document
     from gis_utils import validate_geojson, get_shapefile_info
+    from mcp_api import mcp_api
+    
+    # Register blueprints
+    app.register_blueprint(mcp_api, url_prefix='/mcp')
     
     # Create database tables
     db.create_all()
+    
+    # Initialize MCP system
+    from mcp.core import mcp_instance
+    mcp_instance.discover_agents()
 
 # Define route handlers
 @app.route('/')
@@ -201,6 +209,12 @@ def map_data(file_id):
 @login_required
 def search_page():
     return render_template('search.html')
+
+@app.route('/mcp-dashboard')
+@login_required
+def mcp_dashboard():
+    """MCP system dashboard page"""
+    return render_template('mcp_dashboard.html')
 
 @app.route('/api/search', methods=['POST'])
 @login_required
