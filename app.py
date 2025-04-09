@@ -84,6 +84,14 @@ with app.app_context():
         logger.info("Successfully loaded Monitoring Agent")
     except ImportError as e:
         logger.warning(f"Could not load Monitoring Agent: {e}")
+    
+    # Try to load the Power Query agent
+    try:
+        from mcp.agents.power_query_agent import PowerQueryAgent
+        mcp_instance.register_agent("power_query", PowerQueryAgent())
+        logger.info("Successfully loaded Power Query Agent")
+    except ImportError as e:
+        logger.warning(f"Could not load Power Query Agent: {e}")
         
     # Register a basic dummy agent to ensure the MCP dashboard works
     from mcp.agents.base_agent import BaseAgent
@@ -267,6 +275,65 @@ def search_page():
 def mcp_dashboard():
     """MCP system dashboard page"""
     return render_template('mcp_dashboard.html')
+
+@app.route('/power-query')
+@login_required
+def power_query():
+    """Power Query page for data integration and transformation"""
+    return render_template('power_query.html')
+
+@app.route('/upload-power-query-file', methods=['POST'])
+@login_required
+def upload_power_query_file():
+    """Handle file uploads for Power Query data sources"""
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part'}), 400
+    
+    file = request.files['file']
+    source_name = request.form.get('source_name', '')
+    description = request.form.get('description', '')
+    
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+    
+    try:
+        # Create directory for Power Query files if it doesn't exist
+        power_query_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'power_query')
+        os.makedirs(power_query_dir, exist_ok=True)
+        
+        # Secure the filename
+        filename = secure_filename(file.filename)
+        
+        # Save the file
+        file_path = os.path.join(power_query_dir, filename)
+        file.save(file_path)
+        
+        return jsonify({
+            'success': True,
+            'file_path': file_path,
+            'filename': filename
+        })
+    except Exception as e:
+        logger.error(f"Error uploading Power Query file: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/download-power-query-file')
+@login_required
+def download_power_query_file():
+    """Download a Power Query export file"""
+    filename = request.args.get('file')
+    
+    if not filename:
+        flash('No file specified', 'danger')
+        return redirect(url_for('power_query'))
+    
+    try:
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], 'power_query')
+        return send_from_directory(file_path, filename, as_attachment=True)
+    except Exception as e:
+        logger.error(f"Error downloading Power Query file: {str(e)}")
+        flash(f'Error downloading file: {str(e)}', 'danger')
+        return redirect(url_for('power_query'))
 
 @app.route('/api/search', methods=['POST'])
 @login_required

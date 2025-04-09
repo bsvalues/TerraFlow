@@ -1,5 +1,7 @@
 {pkgs}: {
   deps = [
+    pkgs.glibcLocales
+    pkgs.unixODBC
     pkgs.gdal
     pkgs.expat
     pkgs.rustc
