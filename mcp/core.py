@@ -167,6 +167,12 @@ class MCP:
         
         logger.info("Worker loop terminated")
     
+    def get_agent(self, agent_id: str):
+        """Get an agent by its ID"""
+        if agent_id in self.agents:
+            return self.agents[agent_id]
+        return None
+        
     def get_agent_info(self, agent_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """Get information about registered agents"""
         if agent_id:
