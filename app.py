@@ -68,7 +68,24 @@ with app.app_context():
     from gis_utils import validate_geojson, get_shapefile_info
     from mcp_api import mcp_api
     
-    # Register blueprints
+    # Import API blueprints
+    try:
+        from api.gateway import api_gateway
+        from api.auth import auth_api
+        from api.spatial import spatial_api
+        from api.data_query import data_query_api
+        
+        # Register API blueprints
+        app.register_blueprint(api_gateway, url_prefix='/api')
+        app.register_blueprint(auth_api, url_prefix='/api/auth')
+        app.register_blueprint(spatial_api, url_prefix='/api/spatial')
+        app.register_blueprint(data_query_api, url_prefix='/api/data')
+        
+        logger.info("API Gateway registered successfully")
+    except ImportError as e:
+        logger.warning(f"Could not load API Gateway modules: {e}")
+    
+    # Register MCP API blueprint
     app.register_blueprint(mcp_api, url_prefix='/mcp')
     
     # Create database tables
@@ -103,6 +120,14 @@ with app.app_context():
         logger.info("Successfully loaded Power Query Agent")
     except ImportError as e:
         logger.warning(f"Could not load Power Query Agent: {e}")
+    
+    # Try to load the Spatial Analysis agent
+    try:
+        from mcp.agents.spatial_analysis_agent import SpatialAnalysisAgent
+        mcp_instance.register_agent("spatial_analysis", SpatialAnalysisAgent())
+        logger.info("Successfully loaded Spatial Analysis Agent")
+    except ImportError as e:
+        logger.warning(f"Could not load Spatial Analysis Agent: {e}")
         
     # Register a basic dummy agent to ensure the MCP dashboard works
     from mcp.agents.base_agent import BaseAgent
@@ -292,6 +317,71 @@ def mcp_dashboard():
 def power_query():
     """Power Query page for data integration and transformation"""
     return render_template('power_query.html')
+
+@app.route('/api-tester')
+@login_required
+def api_tester():
+    """API testing interface"""
+    return render_template('api_tester.html')
+
+@app.route('/api-test-setup')
+@login_required
+def api_test_setup():
+    """Set up test data for API testing"""
+    # Get test files already imported
+    test_files = File.query.filter(
+        File.user_id == session['user']['id'],
+        File.description.like('%API testing%')
+    ).all()
+    
+    return render_template('api_test_setup.html', test_files=test_files)
+
+@app.route('/import-test-data', methods=['POST'])
+@login_required
+def import_test_data():
+    """Import test GeoJSON data for API testing"""
+    try:
+        project_name = request.form.get('project_name', 'Test Project')
+        description = request.form.get('description', 'Sample GeoJSON test data for API testing.')
+        
+        # Get the test GeoJSON file
+        test_file_path = os.path.join(app.root_path, 'static', 'data', 'test_geo.geojson')
+        
+        if not os.path.exists(test_file_path):
+            flash('Test data file not found', 'danger')
+            return redirect(url_for('api_test_setup'))
+        
+        # Read the file
+        with open(test_file_path, 'rb') as f:
+            file_content = f.read()
+        
+        # Create a file-like object from the content
+        from io import BytesIO
+        from werkzeug.datastructures import FileStorage
+        
+        # Create a proper FileStorage object which has a filename attribute
+        file_obj = FileStorage(
+            stream=BytesIO(file_content),
+            filename='test_geo.geojson',
+            content_type='application/geo+json',
+        )
+        
+        # Process the file
+        file_record = process_file_upload(
+            file_obj, 
+            'test_geo.geojson', 
+            session['user']['id'], 
+            project_name, 
+            description
+        )
+        
+        flash('Test data imported successfully', 'success')
+        
+    except Exception as e:
+        logger.error(f"Error importing test data: {str(e)}")
+        flash(f'Error importing test data: {str(e)}', 'danger')
+    
+    return redirect(url_for('api_test_setup'))
 
 @app.route('/upload-power-query-file', methods=['POST'])
 @login_required
