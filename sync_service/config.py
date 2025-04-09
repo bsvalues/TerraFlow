@@ -7,6 +7,10 @@ import os
 PROD_CLONE_DB_URI = os.environ.get('PROD_CLONE_DB_URI', None)
 TRAINING_DB_URI = os.environ.get('TRAINING_DB_URI', None)
 
+# MS SQL Server connection string for property export
+# Format: 'DRIVER={ODBC Driver 17 for SQL Server};SERVER=server_name;DATABASE=pacs_oltp;UID=username;PWD=password;'
+SQL_SERVER_CONNECTION_STRING = os.environ.get('SQL_SERVER_CONNECTION_STRING', None)
+
 # Default to the main application's database for configuration
 CONFIG_DB_URI = os.environ.get('DATABASE_URL')
 

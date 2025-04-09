@@ -146,3 +146,54 @@ def run_full_sync():
     job_id = DataSynchronizer.start_full_sync(session['user']['id'])
     flash(f'Full sync job started. Job ID: {job_id}', 'success')
     return redirect(url_for('sync.job_details', job_id=job_id))
+
+# Property Export Routes
+@sync_bp.route('/property-export')
+@login_required
+@role_required('administrator')
+def property_export():
+    """Property export form."""
+    recent_jobs = SyncJob.query.filter_by(job_type='property_export').order_by(SyncJob.created_at.desc()).limit(5).all()
+    return render_template('sync/property_export.html', recent_jobs=recent_jobs)
+
+@sync_bp.route('/run/property-export', methods=['POST'])
+@login_required
+@role_required('administrator')
+def run_property_export():
+    """Run a property export job."""
+    database_name = request.form.get('database_name', '')
+    num_years = int(request.form.get('num_years', -1))
+    min_bill_years = int(request.form.get('min_bill_years', 2))
+    
+    job_id = DataSynchronizer.start_property_export(
+        session['user']['id'], 
+        database_name, 
+        num_years, 
+        min_bill_years
+    )
+    
+    flash(f'Property export job started. Job ID: {job_id}', 'success')
+    return redirect(url_for('sync.job_details', job_id=job_id))
+
+@sync_bp.route('/api/start-property-export', methods=['POST'])
+@login_required
+@role_required('administrator')
+def api_start_property_export():
+    """Start a property export job via API."""
+    database_name = request.json.get('database_name', '')
+    num_years = request.json.get('num_years', -1)
+    min_bill_years = request.json.get('min_bill_years', 2)
+    user_id = session['user']['id']
+    
+    job_id = DataSynchronizer.start_property_export(
+        user_id,
+        database_name,
+        num_years,
+        min_bill_years
+    )
+    
+    return jsonify({
+        'job_id': job_id,
+        'status': 'started',
+        'message': f"Property export job started successfully."
+    })

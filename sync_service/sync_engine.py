@@ -8,6 +8,7 @@ import os
 import uuid
 import datetime
 import logging
+import pyodbc
 from typing import Dict, List, Any, Union, Optional, Tuple
 
 import sqlalchemy as sa
@@ -24,7 +25,8 @@ from sync_service.models import (
 )
 from sync_service.config import (
     PROD_CLONE_DB_URI, TRAINING_DB_URI, CONFIG_DB_URI,
-    BATCH_SIZE, MAX_RETRIES, ERROR_WAIT_SECONDS
+    BATCH_SIZE, MAX_RETRIES, ERROR_WAIT_SECONDS,
+    SQL_SERVER_CONNECTION_STRING
 )
 
 # Set up logging
@@ -372,6 +374,184 @@ class SyncEngine:
         self.log("Updated global settings", level="INFO", component="Admin")
 
 
+class PropertyExportEngine:
+    """
+    Engine for executing the existing ExportPropertyAccess stored procedure.
+    
+    This class provides a way to execute the True Automation ExportPropertyAccess
+    stored procedure as-is, without any modifications, and integrate it with the
+    Data Hub API Gateway.
+    """
+    
+    def __init__(self, job_id: str = None, user_id: int = None, 
+                 database_name: str = '', num_years: int = -1, min_bill_years: int = 2):
+        """Initialize the property export engine.
+        
+        Args:
+            job_id: Optional job ID for tracking. If None, a new UUID will be generated.
+            user_id: Optional user ID who initiated the export.
+            database_name: The name of the target database to create or update.
+            num_years: Number of years to include in the export (-1 for all).
+            min_bill_years: Minimum number of billing years to include.
+        """
+        self.job_id = job_id or str(uuid.uuid4())
+        self.user_id = user_id
+        self.database_name = database_name
+        self.num_years = num_years
+        self.min_bill_years = min_bill_years
+        self.job = None
+        self._initialize_job()
+    
+    def _initialize_job(self):
+        """Initialize or retrieve the export job record."""
+        self.job = SyncJob.query.filter_by(job_id=self.job_id).first()
+        
+        if not self.job:
+            self.job = SyncJob(
+                job_id=self.job_id,
+                name=f"PropertyAccess Export to {self.database_name or 'default database'}",
+                status='pending',
+                start_time=None,
+                end_time=None,
+                total_records=1,  # Just one operation - running the stored procedure
+                processed_records=0,
+                error_records=0,
+                error_details={},
+                job_type='property_export',
+                source_db='pacs_oltp',
+                target_db=self.database_name or 'web_internet_benton_auto',
+                initiated_by=self.user_id
+            )
+            db.session.add(self.job)
+            db.session.commit()
+            self.log("Property export job initialized", level="INFO")
+    
+    def log(self, message: str, level: str = "INFO", component: str = None, 
+            table_name: str = None, record_count: int = None, duration_ms: int = None):
+        """Log a message to the sync log."""
+        log_entry = SyncLog(
+            job_id=self.job_id,
+            level=level.upper(),
+            message=message,
+            component=component or "PropertyExport",
+            table_name=table_name,
+            record_count=record_count,
+            duration_ms=duration_ms
+        )
+        db.session.add(log_entry)
+        db.session.commit()
+        
+        # Also log to standard logger
+        log_method = getattr(logger, level.lower(), logger.info)
+        log_method(f"[{self.job_id}] {message}")
+    
+    def start_export(self):
+        """Start the property export process."""
+        if not SQL_SERVER_CONNECTION_STRING:
+            self.log("SQL Server connection string not configured. Cannot start export.", level="ERROR")
+            self.job.status = 'failed'
+            self.job.error_details = {'error': 'SQL Server connection string not configured', 'step': 'initialization'}
+            db.session.commit()
+            return False
+        
+        try:
+            # Update job status
+            self.job.status = 'running'
+            self.job.start_time = datetime.datetime.utcnow()
+            db.session.commit()
+            
+            self.log("Starting property export process", level="INFO")
+            
+            # Execute the ExportPropertyAccess stored procedure
+            start_time = datetime.datetime.utcnow()
+            success, result = self._execute_stored_procedure()
+            end_time = datetime.datetime.utcnow()
+            duration = (end_time - start_time).total_seconds() * 1000  # milliseconds
+            
+            if success:
+                self.job.processed_records = 1
+                self.job.status = 'completed'
+                self.log(
+                    f"Completed property export: {result}",
+                    level="INFO",
+                    duration_ms=int(duration)
+                )
+            else:
+                self.job.error_records = 1
+                self.job.status = 'failed'
+                self.job.error_details = {'error': result, 'step': 'stored_procedure_execution'}
+                self.log(
+                    f"Failed property export: {result}",
+                    level="ERROR",
+                    duration_ms=int(duration)
+                )
+            
+            self.job.end_time = datetime.datetime.utcnow()
+            db.session.commit()
+            
+            return success
+        
+        except Exception as e:
+            self.log(f"Error in property export process: {str(e)}", level="ERROR")
+            self.job.status = 'failed'
+            self.job.end_time = datetime.datetime.utcnow()
+            self.job.error_details = {
+                'error': str(e),
+                'step': 'export'
+            }
+            db.session.commit()
+            return False
+    
+    def _execute_stored_procedure(self) -> Tuple[bool, str]:
+        """Execute the ExportPropertyAccess stored procedure.
+        
+        Returns:
+            A tuple containing:
+                - A boolean indicating success or failure
+                - A result message or error message
+        """
+        self.log("Connecting to SQL Server database", level="INFO")
+        
+        try:
+            # Connect to the SQL Server database
+            conn = pyodbc.connect(SQL_SERVER_CONNECTION_STRING)
+            cursor = conn.cursor()
+            
+            # Log the parameters we're using
+            self.log(
+                f"Executing ExportPropertyAccess with parameters: database_name='{self.database_name}', "
+                f"num_years={self.num_years}, min_bill_years={self.min_bill_years}",
+                level="INFO"
+            )
+            
+            # Execute the stored procedure
+            sql = """
+            EXEC [dbo].[ExportPropertyAccess]
+                @input_database_name = ?,
+                @input_num_years = ?,
+                @input_min_bill_years = ?
+            """
+            
+            cursor.execute(sql, (self.database_name, self.num_years, self.min_bill_years))
+            
+            # Get the results (if any)
+            rows = cursor.fetchall()
+            result_message = f"ExportPropertyAccess executed successfully. Created/updated database '{self.database_name or 'default'}'"
+            if rows:
+                result_details = "\n".join([str(row) for row in rows])
+                result_message += f" with results: {result_details}"
+            
+            conn.commit()
+            conn.close()
+            
+            self.log("SQL Server connection closed", level="INFO")
+            return True, result_message
+            
+        except Exception as e:
+            self.log(f"Error executing stored procedure: {str(e)}", level="ERROR")
+            return False, str(e)
+
+
 class DataSynchronizer:
     """Utility class for performing different types of data synchronization operations."""
     
@@ -417,6 +597,35 @@ class DataSynchronizer:
         # Start in a separate thread or process
         import threading
         thread = threading.Thread(target=engine.start_sync)
+        thread.daemon = True
+        thread.start()
+        
+        return job_id
+        
+    @staticmethod
+    def start_property_export(user_id: int = None, database_name: str = '', num_years: int = -1, min_bill_years: int = 2) -> str:
+        """Start a property export job using the ExportPropertyAccess stored procedure.
+        
+        Args:
+            user_id: Optional user ID who initiated the export.
+            database_name: The name of the target database to create or update.
+            num_years: Number of years to include in the export.
+            min_bill_years: Minimum number of billing years to include.
+            
+        Returns:
+            The job ID of the created export job.
+        """
+        job_id = str(uuid.uuid4())
+        
+        # Create a specialized export engine
+        engine = PropertyExportEngine(job_id, user_id, database_name, num_years, min_bill_years)
+        engine.job.job_type = 'property_export'
+        engine.job.name = f"Property Export to {database_name or 'default'}"
+        db.session.commit()
+        
+        # Start in a separate thread or process
+        import threading
+        thread = threading.Thread(target=engine.start_export)
         thread.daemon = True
         thread.start()
         
