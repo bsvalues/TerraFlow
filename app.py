@@ -358,6 +358,36 @@ def search_api():
     except Exception as e:
         logger.error(f"Search error: {str(e)}")
         return jsonify({'error': f'Search error: {str(e)}'}), 500
+        
+@app.route('/mcp/task', methods=['POST'])
+@login_required
+def mcp_task():
+    """Handle MCP agent tasks"""
+    try:
+        data = request.json
+        if not data:
+            return jsonify({'error': 'Invalid request data'}), 400
+            
+        agent_id = data.get('agent_id')
+        task_data = data.get('task_data', {})
+        
+        if not agent_id:
+            return jsonify({'error': 'Missing agent_id parameter'}), 400
+            
+        # Get the agent
+        from mcp.core import mcp_instance
+        agent = mcp_instance.get_agent(agent_id)
+        
+        if not agent:
+            return jsonify({'error': f'Agent not found: {agent_id}'}), 404
+            
+        # Submit the task
+        result = agent.process_task(task_data)
+        
+        return jsonify({'result': result})
+    except Exception as e:
+        logger.error(f"MCP task error: {str(e)}")
+        return jsonify({'error': f'MCP task error: {str(e)}'}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
