@@ -1,0 +1,96 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Building 1",
+        "type": "Commercial",
+        "address": "123 Main St",
+        "parcel_id": "BC-00001"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-119.2882, 46.2527],
+            [-119.2880, 46.2527],
+            [-119.2880, 46.2525],
+            [-119.2882, 46.2525],
+            [-119.2882, 46.2527]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Building 2",
+        "type": "Residential",
+        "address": "456 Oak Ave",
+        "parcel_id": "BC-00002"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-119.2890, 46.2520],
+            [-119.2888, 46.2520],
+            [-119.2888, 46.2518],
+            [-119.2890, 46.2518],
+            [-119.2890, 46.2520]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Park",
+        "type": "Recreation",
+        "address": "789 Park Rd",
+        "parcel_id": "BC-00003"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-119.2875, 46.2515],
+            [-119.2870, 46.2515],
+            [-119.2870, 46.2510],
+            [-119.2875, 46.2510],
+            [-119.2875, 46.2515]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Main Road",
+        "type": "Transportation",
+        "road_id": "MR-001"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [-119.2890, 46.2530],
+          [-119.2875, 46.2520],
+          [-119.2860, 46.2510]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Water Fountain",
+        "type": "Utility",
+        "asset_id": "WF-001"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-119.2872, 46.2518]
+      }
+    }
+  ]
+}

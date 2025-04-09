@@ -33,8 +33,25 @@ def list_data_sources():
         # Get source type filter if any
         source_type = request.args.get('type')
         
-        # Get sources
+        # Get sources from power query engine
         sources = power_query_engine.list_data_sources()
+        
+        # Add PostgreSQL connection info directly (this ensures it shows up)
+        if os.environ.get('DATABASE_URL'):
+            from urllib.parse import urlparse
+            db_url = urlparse(os.environ.get('DATABASE_URL'))
+            pg_source = {
+                "name": "Benton County PostgreSQL",
+                "description": "Primary PostgreSQL database for Benton County GIS data",
+                "type": "PostgreSQLDataSource",
+                "is_connected": True,
+                "connection_info": {
+                    "host": db_url.hostname,
+                    "database": db_url.path.lstrip('/') if db_url.path else 'postgres',
+                    "port": db_url.port or 5432
+                }
+            }
+            sources.append(pg_source)
         
         # Filter by type if requested
         if source_type:
@@ -69,7 +86,26 @@ def get_data_source_metadata(source_id):
 def list_source_tables(source_id):
     """List tables available in a data source"""
     try:
-        # Get data source
+        # Special handling for the primary PostgreSQL database
+        if source_id == "benton_postgresql" or source_id == "Benton County PostgreSQL":
+            # Get direct database connection using the DATABASE_URL
+            import sqlalchemy
+            from sqlalchemy import create_engine, text
+            
+            engine = create_engine(os.environ.get('DATABASE_URL'))
+            
+            with engine.connect() as conn:
+                result = conn.execute(text("""
+                    SELECT table_name 
+                    FROM information_schema.tables 
+                    WHERE table_schema = 'public'
+                    ORDER BY table_name
+                """))
+                tables = [row[0] for row in result]
+                
+            return jsonify({'tables': tables})
+
+        # Default handling
         data_source = power_query_engine.get_data_source(source_id)
         
         if not data_source:
@@ -90,7 +126,50 @@ def list_source_tables(source_id):
 def get_table_schema(source_id, table_name):
     """Get schema information for a specific table"""
     try:
-        # Get data source
+        # Special handling for the primary PostgreSQL database
+        if source_id == "benton_postgresql" or source_id == "Benton County PostgreSQL":
+            # Get direct database connection using the DATABASE_URL
+            import sqlalchemy
+            from sqlalchemy import create_engine, text
+            
+            # Sanitize table name to prevent SQL injection
+            table_name = table_name.replace("'", "''")
+            
+            engine = create_engine(os.environ.get('DATABASE_URL'))
+            
+            query = f"""
+            SELECT 
+                column_name, 
+                data_type,
+                character_maximum_length,
+                column_default,
+                is_nullable
+            FROM 
+                information_schema.columns
+            WHERE 
+                table_schema = 'public'
+                AND table_name = '{table_name}'
+            ORDER BY 
+                ordinal_position
+            """
+            
+            schema = []
+            with engine.connect() as conn:
+                result = conn.execute(text(query))
+                
+                for row in result:
+                    column_info = {
+                        "name": row[0],
+                        "type": row[1],
+                        "length": int(row[2]) if row[2] is not None else None,
+                        "default": row[3],
+                        "nullable": row[4] == "YES"
+                    }
+                    schema.append(column_info)
+            
+            return jsonify({'schema': schema})
+            
+        # Default handling
         data_source = power_query_engine.get_data_source(source_id)
         
         if not data_source:
@@ -111,18 +190,85 @@ def get_table_schema(source_id, table_name):
 def query_table_data(source_id, table_name):
     """Query data from a specific table"""
     try:
-        # Get data source
-        data_source = power_query_engine.get_data_source(source_id)
-        
-        if not data_source:
-            return jsonify({'error': f'Data source not found: {source_id}'}), 404
-            
         # Get query parameters
         limit = request.args.get('limit', 100)
         try:
             limit = int(limit)
         except ValueError:
             return jsonify({'error': 'Invalid limit parameter'}), 400
+            
+        # Special handling for the primary PostgreSQL database
+        if source_id == "benton_postgresql" or source_id == "Benton County PostgreSQL":
+            import sqlalchemy
+            import pandas as pd
+            from sqlalchemy import create_engine, text
+            
+            # Sanitize table name to prevent SQL injection
+            table_name = table_name.replace("'", "''")
+            
+            # Get filters from request
+            filter_column = request.args.get('filter_column')
+            filter_value = request.args.get('filter_value')
+            filter_operator = request.args.get('filter_operator', 'equals')
+            order_by = request.args.get('order_by')
+            order_direction = request.args.get('order_direction', 'asc')
+            
+            # Connect to the database
+            engine = create_engine(os.environ.get('DATABASE_URL'))
+            
+            # Build the query
+            query = f"SELECT * FROM {table_name}"
+            
+            # Add filtering if specified
+            if filter_column and filter_value is not None:
+                # Sanitize column name and value
+                filter_column = filter_column.replace("'", "''")
+                
+                # Different operators
+                if filter_operator == 'equals':
+                    query += f" WHERE {filter_column} = '{filter_value}'"
+                elif filter_operator == 'contains':
+                    query += f" WHERE {filter_column} LIKE '%{filter_value}%'"
+                elif filter_operator == 'startswith':
+                    query += f" WHERE {filter_column} LIKE '{filter_value}%'"
+                elif filter_operator == 'endswith':
+                    query += f" WHERE {filter_column} LIKE '%{filter_value}'"
+                elif filter_operator == 'greater_than':
+                    query += f" WHERE {filter_column} > '{filter_value}'"
+                elif filter_operator == 'less_than':
+                    query += f" WHERE {filter_column} < '{filter_value}'"
+            
+            # Add ordering if specified
+            if order_by:
+                # Sanitize
+                order_by = order_by.replace("'", "''")
+                order_direction = "ASC" if order_direction.lower() == 'asc' else "DESC"
+                query += f" ORDER BY {order_by} {order_direction}"
+            
+            # Add limit
+            query += f" LIMIT {limit}"
+            
+            # Execute the query
+            with engine.connect() as conn:
+                df = pd.read_sql_query(text(query), conn)
+                
+                # Convert to records
+                records = df.to_dict('records')
+                
+                # Handle spatial data types - convert to WKT strings
+                for record in records:
+                    for key, value in record.items():
+                        # Check if it's a geometry object
+                        if hasattr(value, 'wkt'):
+                            record[key] = value.wkt
+                
+                return jsonify({'data': records})
+            
+        # Default handling for other data sources
+        data_source = power_query_engine.get_data_source(source_id)
+        
+        if not data_source:
+            return jsonify({'error': f'Data source not found: {source_id}'}), 404
             
         # Build query based on source type
         if hasattr(data_source, 'execute_query'):
@@ -185,8 +331,41 @@ def execute_custom_query():
             
         if not source_id:
             return jsonify({'error': 'No source_id provided'}), 400
+        
+        # Special handling for the primary PostgreSQL database    
+        if source_id == "benton_postgresql" or source_id == "Benton County PostgreSQL":
+            import sqlalchemy
+            import pandas as pd
+            from sqlalchemy import create_engine, text
             
-        # Get data source
+            # Connect to the database
+            engine = create_engine(os.environ.get('DATABASE_URL'))
+            
+            if query_type == 'sql':
+                # Execute SQL query directly against PostgreSQL
+                try:
+                    with engine.connect() as conn:
+                        df = pd.read_sql_query(text(query), conn)
+                        
+                        # Convert to records
+                        records = df.to_dict('records')
+                        
+                        # Handle spatial data types - convert to WKT strings
+                        for record in records:
+                            for key, value in record.items():
+                                # Check if it's a geometry object
+                                if hasattr(value, 'wkt'):
+                                    record[key] = value.wkt
+                        
+                        return jsonify({'data': records})
+                except Exception as sql_error:
+                    logger.error(f"SQL error executing query on primary database: {str(sql_error)}")
+                    return jsonify({'error': f'SQL error: {str(sql_error)}'}), 400
+            
+            # For Power Query format, use the built-in engine
+            # (This falls through to the default handling)
+            
+        # Default handling for other data sources
         data_source = power_query_engine.get_data_source(source_id)
         
         if not data_source:

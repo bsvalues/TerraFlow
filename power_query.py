@@ -301,6 +301,77 @@ class PostgreSQLDataSource(PowerQueryDataSource):
         except Exception as e:
             logger.error(f"Error getting tables: {str(e)}")
             return []
+            
+    def get_table_schema(self, table_name: str) -> List[Dict[str, str]]:
+        """Get schema for a specific table"""
+        if not HAS_PANDAS:
+            logger.error("Cannot get table schema: pandas not available")
+            return []
+            
+        if not self.is_connected:
+            self.connect()
+            
+        try:
+            # Sanitize table name to prevent SQL injection
+            table_name = table_name.replace("'", "''")
+            
+            query = f"""
+            SELECT 
+                column_name, 
+                data_type,
+                character_maximum_length,
+                column_default,
+                is_nullable
+            FROM 
+                information_schema.columns
+            WHERE 
+                table_schema = 'public'
+                AND table_name = '{table_name}'
+            ORDER BY 
+                ordinal_position
+            """
+            
+            df = pd.read_sql_query(text(query), self.engine)
+            
+            # Convert to list of dictionaries
+            schema = []
+            for _, row in df.iterrows():
+                column_info = {
+                    "name": row["column_name"],
+                    "type": row["data_type"],
+                    "length": int(row["character_maximum_length"]) if row["character_maximum_length"] and not pd.isna(row["character_maximum_length"]) else None,
+                    "default": row["column_default"],
+                    "nullable": row["is_nullable"] == "YES"
+                }
+                schema.append(column_info)
+                
+            return schema
+        except Exception as e:
+            logger.error(f"Error getting schema for table {table_name}: {str(e)}")
+            return []
+            
+    def get_metadata(self) -> Dict[str, Any]:
+        """Get metadata about the data source"""
+        metadata = super().get_metadata()
+        
+        # Add PostgreSQL-specific information
+        metadata.update({
+            "connection_info": {
+                "host": self.host,
+                "database": self.database,
+                "port": self.port
+            }
+        })
+        
+        # Try to get table count if connected
+        if self.is_connected:
+            try:
+                tables = self.get_tables()
+                metadata["table_count"] = len(tables)
+            except Exception as e:
+                logger.error(f"Error getting table count for metadata: {str(e)}")
+                
+        return metadata
 
 
 class CSVDataSource(PowerQueryDataSource):
