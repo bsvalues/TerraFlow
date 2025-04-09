@@ -1,0 +1,166 @@
+{% extends 'layout.html' %}
+
+{% block title %}User Profile - {{ user.username }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>User Profile</h1>
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">User Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Username:</strong> {{ user.username }}</p>
+                            <p><strong>Email:</strong> {{ user.email }}</p>
+                            <p><strong>Full Name:</strong> {{ user.full_name or 'Not set' }}</p>
+                            <p><strong>Department:</strong> {{ user.department or 'Not set' }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Last Login:</strong> {{ user.last_login.strftime('%Y-%m-%d %H:%M:%S') if user.last_login else 'Never' }}</p>
+                            <p><strong>Account Status:</strong> 
+                                {% if user.active %}
+                                <span class="badge bg-success">Active</span>
+                                {% else %}
+                                <span class="badge bg-danger">Inactive</span>
+                                {% endif %}
+                            </p>
+                            <p><strong>MFA Enabled:</strong> 
+                                {% if user.mfa_enabled %}
+                                <span class="badge bg-success">Enabled</span>
+                                {% else %}
+                                <span class="badge bg-warning">Disabled</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Roles and Permissions</h5>
+                </div>
+                <div class="card-body">
+                    <h6>Assigned Roles</h6>
+                    <div class="mb-3">
+                        {% for role in user.roles %}
+                        <span class="badge bg-info me-2 mb-2">{{ role.name }}</span>
+                        {% else %}
+                        <p>No roles assigned.</p>
+                        {% endfor %}
+                    </div>
+
+                    <h6>Effective Permissions</h6>
+                    <div class="mb-3">
+                        {% for permission in user.get_permissions() %}
+                        <span class="badge bg-secondary me-2 mb-2">{{ permission }}</span>
+                        {% else %}
+                        <p>No permissions assigned.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">API Tokens</h5>
+                </div>
+                <div class="card-body">
+                    {% if api_tokens %}
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Created</th>
+                                <th>Expires</th>
+                                <th>Last Used</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for token in api_tokens %}
+                            <tr>
+                                <td>{{ token.name }}</td>
+                                <td>{{ token.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                <td>{{ token.expires_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                <td>{{ token.last_used_at.strftime('%Y-%m-%d %H:%M:%S') if token.last_used_at else 'Never' }}</td>
+                                <td>
+                                    {% if token.revoked %}
+                                    <span class="badge bg-danger">Revoked</span>
+                                    {% elif token.expires_at < now %}
+                                    <span class="badge bg-warning">Expired</span>
+                                    {% else %}
+                                    <span class="badge bg-success">Active</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p>No API tokens found.</p>
+                    <a href="/api/auth/token" class="btn btn-primary">Create API Token</a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Recent Activity</h5>
+                </div>
+                <div class="card-body">
+                    {% if audit_logs %}
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Action</th>
+                                <th>Resource</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in audit_logs %}
+                            <tr>
+                                <td>{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                <td>{{ log.action }}</td>
+                                <td>{{ log.resource_type }}{% if log.resource_id %} #{{ log.resource_id }}{% endif %}</td>
+                                <td>
+                                    {% if log.details %}
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#logModal{{ log.id }}">
+                                        View Details
+                                    </button>
+                                    <div class="modal fade" id="logModal{{ log.id }}" tabindex="-1" aria-labelledby="logModalLabel{{ log.id }}" aria-hidden="true">
+                                        <div class="modal-dialog">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title" id="logModalLabel{{ log.id }}">Log Details</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <pre class="bg-light p-3">{{ log.details | tojson(indent=2) }}</pre>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% else %}
+                                    -
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p>No audit logs found.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -207,39 +207,56 @@ def login():
             user = User.query.filter_by(username=username).first()
             
             if not user:
-                # Create user if not exists
-                user = User(
-                    username=username, 
-                    email=user_info.get('email', f"{username}@co.benton.wa.us"),
-                    full_name=user_info.get('full_name', ''),
-                    department=user_info.get('department', ''),
-                    ad_object_id=user_info.get('ad_object_id', None),
-                    last_login=datetime.datetime.utcnow(),
-                    active=True
-                )
-                db.session.add(user)
-                db.session.commit()
-                
-                # For new users, add them to the 'readonly' role by default
-                readonly_role = Role.query.filter_by(name='readonly').first()
-                if readonly_role:
-                    user.roles.append(readonly_role)
+                try:
+                    # Create user if not exists
+                    user = User(
+                        username=username, 
+                        email=user_info.get('email', f"{username}@co.benton.wa.us"),
+                        full_name=user_info.get('full_name', ''),
+                        department=user_info.get('department', ''),
+                        ad_object_id=user_info.get('ad_object_id', None),
+                        last_login=datetime.datetime.utcnow(),
+                        active=True
+                    )
+                    db.session.add(user)
                     db.session.commit()
+                    
+                    # For new users, add them to the 'readonly' role by default
+                    readonly_role = Role.query.filter_by(name='readonly').first()
+                    if readonly_role:
+                        user.roles.append(readonly_role)
+                        db.session.commit()
+                        
+                    logger.info(f"Created new user: {username}")
+                except Exception as e:
+                    # Handle any errors during user creation
+                    logger.error(f"Error creating user: {str(e)}")
+                    db.session.rollback()
+                    
+                    # Try to find the user again (maybe it was created in another process)
+                    user = User.query.filter_by(username=username).first()
+                    if not user:
+                        flash('Error creating user account. Please contact an administrator.', 'danger')
+                        return render_template('login.html')
             else:
-                # Update user information from LDAP if available
-                if user_info:
-                    if 'full_name' in user_info and user_info['full_name']:
-                        user.full_name = user_info['full_name']
-                    if 'email' in user_info and user_info['email']:
-                        user.email = user_info['email']
-                    if 'department' in user_info and user_info['department']:
-                        user.department = user_info['department']
-                    if 'ad_object_id' in user_info and user_info['ad_object_id']:
-                        user.ad_object_id = user_info['ad_object_id']
-                
-                # Update last login time
-                user.last_login = datetime.datetime.utcnow()
-                db.session.commit()
+                try:
+                    # Update user information from LDAP if available
+                    if user_info:
+                        if 'full_name' in user_info and user_info['full_name']:
+                            user.full_name = user_info['full_name']
+                        if 'email' in user_info and user_info['email']:
+                            user.email = user_info['email']
+                        if 'department' in user_info and user_info['department']:
+                            user.department = user_info['department']
+                        if 'ad_object_id' in user_info and user_info['ad_object_id']:
+                            user.ad_object_id = user_info['ad_object_id']
+                    
+                    # Update last login time
+                    user.last_login = datetime.datetime.utcnow()
+                    db.session.commit()
+                except Exception as e:
+                    logger.error(f"Error updating user: {str(e)}")
+                    db.session.rollback()
             
             # Get user roles and permissions for the session
             user_roles = [role.name for role in user.roles]
@@ -376,6 +393,41 @@ def map_data(file_id):
 @login_required
 def search_page():
     return render_template('search.html')
+
+@app.route('/profile')
+@login_required
+def user_profile():
+    """User profile page showing roles and permissions"""
+    from models import User, Role, Permission, AuditLog, ApiToken
+    import datetime
+    
+    user = User.query.get(session['user']['id'])
+    if not user:
+        flash('User not found', 'danger')
+        return redirect(url_for('index'))
+    
+    # Get all available roles and permissions for display
+    all_roles = Role.query.all()
+    all_permissions = Permission.query.all()
+    
+    # Get audit logs for the user (limit to the most recent 20)
+    audit_logs = AuditLog.query.filter_by(user_id=user.id).order_by(AuditLog.timestamp.desc()).limit(20).all()
+    
+    # Get API tokens for the user
+    api_tokens = ApiToken.query.filter_by(user_id=user.id, revoked=False).all()
+    
+    # Current time for token status calculation
+    now = datetime.datetime.utcnow()
+    
+    return render_template(
+        'profile.html', 
+        user=user, 
+        all_roles=all_roles,
+        all_permissions=all_permissions,
+        audit_logs=audit_logs,
+        api_tokens=api_tokens,
+        now=now
+    )
 
 @app.route('/mcp-dashboard')
 @login_required
@@ -547,6 +599,20 @@ def api_direct():
             'data': '/api/data/sources'
         }
     })
+
+@app.route('/system/initialize-roles')
+@login_required
+def initialize_roles():
+    """Initialize roles and permissions in the database"""
+    try:
+        from initialize_roles import main as init_roles
+        init_roles()
+        flash('Roles and permissions have been initialized successfully', 'success')
+        return redirect(url_for('index'))
+    except Exception as e:
+        logger.error(f"Error initializing roles: {str(e)}")
+        flash(f'Error initializing roles: {str(e)}', 'danger')
+        return redirect(url_for('index'))
 
 @app.route('/api/search', methods=['POST'])
 @login_required
