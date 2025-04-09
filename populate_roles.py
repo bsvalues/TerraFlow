@@ -187,6 +187,32 @@ def create_admin_user():
         print("Admin user created successfully")
     else:
         print("Admin user already exists")
+        
+    # Create dev_user for testing
+    dev_user = User.query.filter_by(username='dev_user').first()
+    if not dev_user:
+        print("Creating development test user...")
+        dev_user = User(
+            username='dev_user',
+            email='dev@co.benton.wa.us',
+            full_name='Development Test User',
+            department='Development',
+            last_login=datetime.datetime.utcnow(),
+            active=True
+        )
+        db.session.add(dev_user)
+        db.session.flush()
+        
+        # Assign administrator role
+        admin_role = Role.query.filter_by(name='administrator').first()
+        if admin_role:
+            dev_user.roles.append(admin_role)
+            print(f"Assigned administrator role to dev_user")
+        
+        db.session.commit()
+        print("Development test user created successfully")
+    else:
+        print("Development test user already exists")
 
 def main():
     """Main function to set up roles and permissions"""

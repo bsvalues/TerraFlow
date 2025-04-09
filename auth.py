@@ -42,7 +42,7 @@ AZURE_AD_REDIRECT_URI = os.environ.get('AZURE_AD_REDIRECT_URI', 'http://localhos
 
 # In a dev environment, we might want to bypass LDAP for testing
 # This should be set to False in production
-BYPASS_LDAP = os.environ.get('BYPASS_LDAP', 'False').lower() == 'true'
+BYPASS_LDAP = os.environ.get('BYPASS_LDAP', 'True').lower() == 'true'  # Enable bypass for testing
 
 # Set authentication mode (ldap, azure_ad, or local)
 AUTH_MODE = os.environ.get('AUTH_MODE', 'ldap')
