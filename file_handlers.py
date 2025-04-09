@@ -28,12 +28,13 @@ def process_file_upload(file, filename, user_id, project_name, description):
     file_record = File(
         filename=filename,
         original_filename=file.filename,
+        file_path=os.path.join(current_app.config['UPLOAD_FOLDER'], 'temp', filename),  # Temporary path
         file_size=0,  # Will be updated after saving
         file_type=filename.rsplit('.', 1)[1].lower() if '.' in filename else '',
         user_id=user_id,
         project_id=project.id,
         description=description,
-        metadata={}
+        file_metadata={}  # Fixed field name to match models.py
     )
     
     # Save the file record to get an ID

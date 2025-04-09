@@ -43,6 +43,9 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 
 # Configure file uploads
 app.config["UPLOAD_FOLDER"] = os.environ.get("UPLOAD_FOLDER", "uploads")
+
+# Create a temp directory for file uploads
+temp_upload_dir = os.path.join(app.config["UPLOAD_FOLDER"], 'temp')
 app.config["MAX_CONTENT_LENGTH"] = 1024 * 1024 * 1024  # 1GB max upload size
 app.config["ALLOWED_EXTENSIONS"] = {
     'zip', 'shp', 'shx', 'dbf', 'prj', 'xml', 'json', 'geojson', 
@@ -52,6 +55,8 @@ app.config["ALLOWED_EXTENSIONS"] = {
 
 # Make sure upload directory exists
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+# Make sure temp upload directory exists
+os.makedirs(temp_upload_dir, exist_ok=True)
 
 # Initialize the database
 db.init_app(app)
