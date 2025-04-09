@@ -189,22 +189,77 @@ def login():
         username = request.form.get('username')
         password = request.form.get('password')
         
-        if authenticate_user(username, password):
+        auth_result = authenticate_user(username, password)
+        
+        if auth_result:
+            # Unpack user info if returned from LDAP
+            if isinstance(auth_result, tuple):
+                success, user_info = auth_result
+                if not success:
+                    flash('Authentication failed. Please check your credentials.', 'danger')
+                    return render_template('login.html')
+            else:
+                # For bypass mode or other authentication methods
+                user_info = {}
+            
             # After successful authentication
+            from models import User, Role
             user = User.query.filter_by(username=username).first()
+            
             if not user:
                 # Create user if not exists
-                user = User(username=username, email=f"{username}@co.benton.wa.us")
+                user = User(
+                    username=username, 
+                    email=user_info.get('email', f"{username}@co.benton.wa.us"),
+                    full_name=user_info.get('full_name', ''),
+                    department=user_info.get('department', ''),
+                    ad_object_id=user_info.get('ad_object_id', None),
+                    last_login=datetime.datetime.utcnow(),
+                    active=True
+                )
                 db.session.add(user)
                 db.session.commit()
+                
+                # For new users, add them to the 'readonly' role by default
+                readonly_role = Role.query.filter_by(name='readonly').first()
+                if readonly_role:
+                    user.roles.append(readonly_role)
+                    db.session.commit()
+            else:
+                # Update user information from LDAP if available
+                if user_info:
+                    if 'full_name' in user_info and user_info['full_name']:
+                        user.full_name = user_info['full_name']
+                    if 'email' in user_info and user_info['email']:
+                        user.email = user_info['email']
+                    if 'department' in user_info and user_info['department']:
+                        user.department = user_info['department']
+                    if 'ad_object_id' in user_info and user_info['ad_object_id']:
+                        user.ad_object_id = user_info['ad_object_id']
+                
+                # Update last login time
+                user.last_login = datetime.datetime.utcnow()
+                db.session.commit()
             
+            # Get user roles and permissions for the session
+            user_roles = [role.name for role in user.roles]
+            user_permissions = user.get_permissions()
+            
+            # Store user in session
             session['user'] = {
                 'id': user.id,
                 'username': user.username,
-                'email': user.email
+                'email': user.email,
+                'full_name': user.full_name,
+                'department': user.department,
+                'roles': user_roles,
+                'permissions': user_permissions
             }
             
-            return redirect(url_for('index'))
+            # Log successful login
+            logger.info(f"User {username} logged in successfully")
+            next_page = request.args.get('next', url_for('index'))
+            return redirect(next_page)
         else:
             flash('Invalid credentials. Please try again.', 'danger')
     
