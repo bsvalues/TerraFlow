@@ -209,6 +209,7 @@ def login():
             
             # After successful authentication
             from models import User, Role
+            from auth import map_ad_groups_to_roles
             user = User.query.filter_by(username=username).first()
             
             if not user:
@@ -226,11 +227,15 @@ def login():
                     db.session.add(user)
                     db.session.commit()
                     
-                    # For new users, add them to the 'readonly' role by default
-                    readonly_role = Role.query.filter_by(name='readonly').first()
-                    if readonly_role:
-                        user.roles.append(readonly_role)
-                        db.session.commit()
+                    # Map AD groups to roles if we have group membership info
+                    if user_info and 'groups' in user_info:
+                        map_ad_groups_to_roles(user, user_info['groups'])
+                    else:
+                        # For new users, add them to the 'readonly' role by default if no AD groups mapped
+                        readonly_role = Role.query.filter_by(name='readonly').first()
+                        if readonly_role:
+                            user.roles.append(readonly_role)
+                            db.session.commit()
                         
                     logger.info(f"Created new user: {username}")
                 except Exception as e:
@@ -255,6 +260,10 @@ def login():
                             user.department = user_info['department']
                         if 'ad_object_id' in user_info and user_info['ad_object_id']:
                             user.ad_object_id = user_info['ad_object_id']
+                        
+                        # Update role mapping on each login
+                        if 'groups' in user_info:
+                            map_ad_groups_to_roles(user, user_info['groups'])
                     
                     # Update last login time
                     user.last_login = datetime.datetime.utcnow()

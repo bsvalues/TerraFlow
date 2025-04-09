@@ -30,6 +30,9 @@ LDAP_SERVER = os.environ.get('LDAP_SERVER', 'ldap://benton.local')
 LDAP_BASE_DN = os.environ.get('LDAP_BASE_DN', 'dc=benton,dc=local')
 LDAP_USER_DN = os.environ.get('LDAP_USER_DN', 'ou=users,dc=benton,dc=local')
 LDAP_GROUP_DN = os.environ.get('LDAP_GROUP_DN', 'ou=groups,dc=benton,dc=local')
+LDAP_BIND_USER = os.environ.get('LDAP_BIND_USER', '')  # Service account for binding
+LDAP_BIND_PASSWORD = os.environ.get('LDAP_BIND_PASSWORD', '')  # Service account password
+LDAP_DOMAIN = os.environ.get('LDAP_DOMAIN', 'benton')  # Domain for username format
 
 # Azure AD configuration
 AZURE_AD_TENANT_ID = os.environ.get('AZURE_AD_TENANT_ID', '')
@@ -38,8 +41,11 @@ AZURE_AD_CLIENT_SECRET = os.environ.get('AZURE_AD_CLIENT_SECRET', '')
 AZURE_AD_REDIRECT_URI = os.environ.get('AZURE_AD_REDIRECT_URI', 'http://localhost:5000/auth/callback')
 
 # In a dev environment, we might want to bypass LDAP for testing
-# Default to True since we're running in a development environment
-BYPASS_LDAP = os.environ.get('BYPASS_LDAP', 'True').lower() == 'true'
+# This should be set to False in production
+BYPASS_LDAP = os.environ.get('BYPASS_LDAP', 'False').lower() == 'true'
+
+# Set authentication mode (ldap, azure_ad, or local)
+AUTH_MODE = os.environ.get('AUTH_MODE', 'ldap')
 
 def login_required(f):
     """Decorator to require login for view functions"""
@@ -171,12 +177,66 @@ def authenticate_user(username, password):
             return True
         return False
     
-    auth_method = request.form.get('auth_method', 'ldap')
+    # Determine authentication method
+    auth_method = request.form.get('auth_method', AUTH_MODE)
     
+    # Use the appropriate authentication method
     if auth_method == 'azure_ad' and HAS_MSAL:
         return _authenticate_azure_ad()
-    else:
+    elif auth_method == 'ldap' and HAS_LDAP:
         return _authenticate_ldap(username, password)
+    else:
+        # If we don't have a working authentication method, log and fail
+        logger.error(f"No valid authentication method available: {auth_method}")
+        flash("Authentication service is currently unavailable. Please contact your administrator.", "danger")
+        return False
+
+def map_ad_groups_to_roles(user, ad_groups):
+    """Map AD groups to application roles"""
+    if not ad_groups:
+        return
+        
+    # Import models
+    from models import Role, db
+    
+    # Define mapping of AD group names to application roles
+    # This mapping should be moved to a configuration file or database in production
+    GROUP_ROLE_MAPPING = {
+        'GIS-Administrators': 'administrator',
+        'GIS-Assessors': 'assessor',
+        'GIS-Analysts': 'gis_analyst',
+        'GIS-IT': 'it_staff',
+        'GIS-Users': 'readonly',
+        # Add more mappings as needed
+    }
+    
+    # Remove any existing roles first to ensure clean mapping
+    # user.roles.clear()  # SQLAlchemy 2.0 style
+    # For SQLAlchemy 1.4 compatibility:
+    user.roles = []
+    
+    # Add roles based on group membership
+    roles_added = []
+    for group in ad_groups:
+        if group in GROUP_ROLE_MAPPING:
+            role_name = GROUP_ROLE_MAPPING[group]
+            role = Role.query.filter_by(name=role_name).first()
+            if role:
+                user.roles.append(role)
+                roles_added.append(role_name)
+    
+    # If no roles were added, assign the default readonly role
+    if not roles_added:
+        role = Role.query.filter_by(name='readonly').first()
+        if role:
+            user.roles.append(role)
+            roles_added.append('readonly')
+    
+    # Save changes
+    db.session.commit()
+    
+    logger.info(f"Mapped AD groups to roles for user {user.username}: {roles_added}")
+    return roles_added
 
 def _authenticate_ldap(username, password):
     """Authenticate user against LDAP/Active Directory"""
@@ -188,25 +248,43 @@ def _authenticate_ldap(username, password):
         return False
     
     # Format the username to match expected LDAP format
-    ldap_username = username
-    if '@' not in ldap_username and '\\' not in ldap_username:
-        ldap_username = f"benton\\{username}"  # Format for Windows AD
+    user_principal = username
+    # Check if username already has domain format
+    if '@' not in user_principal and '\\' not in user_principal:
+        if LDAP_DOMAIN:
+            user_principal = f"{LDAP_DOMAIN}\\{username}"  # Format for Windows AD
+            # Alternative format: f"{username}@{LDAP_DOMAIN}.local"
     
     try:
         # Initialize connection to LDAP server
         ldap_client = ldap.initialize(LDAP_SERVER)
         ldap_client.set_option(ldap.OPT_REFERRALS, 0)
+        ldap_client.protocol_version = 3
         
-        # Bind with the username and password
-        ldap_client.simple_bind_s(ldap_username, password)
-        
-        # If we get here, the authentication was successful
+        # First, try to bind directly with the user credentials
+        try:
+            ldap_client.simple_bind_s(user_principal, password)
+            authenticated = True
+        except ldap.INVALID_CREDENTIALS:
+            authenticated = False
+            raise  # Re-raise to be caught by outer exception handler
+            
+        # If authentication failed and we have service account credentials, try that
+        if not authenticated and LDAP_BIND_USER and LDAP_BIND_PASSWORD:
+            ldap_client.simple_bind_s(LDAP_BIND_USER, LDAP_BIND_PASSWORD)
+            
+            # Use service account to verify user's password
+            # This technique depends on LDAP server capabilities
+            # Not all LDAP servers support password verification this way
+            # This is a simplified example; more complex implementations may be needed
+            logger.debug("Using service account to authenticate user")
         
         # Get user information from LDAP
         user_info = {}
         search_filter = f"(sAMAccountName={username})"
         if '@' in username:
-            search_filter = f"(userPrincipalName={username})"
+            username = username.split('@')[0]  # Extract username part
+            search_filter = f"(sAMAccountName={username})"
             
         try:
             # Search for the user to get their information
@@ -214,7 +292,7 @@ def _authenticate_ldap(username, password):
                 LDAP_BASE_DN,
                 ldap.SCOPE_SUBTREE,
                 search_filter,
-                ['displayName', 'mail', 'department', 'objectGUID']
+                ['displayName', 'mail', 'department', 'objectGUID', 'memberOf']
             )
             
             if results and len(results) > 0:
@@ -229,6 +307,18 @@ def _authenticate_ldap(username, password):
                     if 'objectGUID' in attributes and attributes['objectGUID']:
                         # Store object GUID for future reference
                         user_info['ad_object_id'] = attributes['objectGUID'][0].hex()
+                    
+                    # Get group memberships for role mapping
+                    if 'memberOf' in attributes and attributes['memberOf']:
+                        groups = []
+                        for group_dn in attributes['memberOf']:
+                            # Extract the CN part (common name) from the DN
+                            group_dn_decoded = group_dn.decode('utf-8')
+                            cn_match = group_dn_decoded.split(',')[0]
+                            if cn_match.startswith('CN='):
+                                groups.append(cn_match[3:])  # Remove 'CN=' prefix
+                        user_info['groups'] = groups
+                        logger.debug(f"User is member of groups: {groups}")
         except Exception as e:
             logger.warning(f"Error retrieving user info from LDAP: {str(e)}")
                 
@@ -258,7 +348,7 @@ def _authenticate_ldap(username, password):
     
     except Exception as e:
         # Only access LDAP exception types if we have the module
-        if isinstance(e, ldap.INVALID_CREDENTIALS):
+        if HAS_LDAP and isinstance(e, ldap.INVALID_CREDENTIALS):
             logger.warning(f"Invalid credentials for user: {username}")
             
             # Log failed login attempt
@@ -276,7 +366,7 @@ def _authenticate_ldap(username, password):
                 db.session.commit()
                 
             return False
-        elif isinstance(e, ldap.SERVER_DOWN):
+        elif HAS_LDAP and isinstance(e, ldap.SERVER_DOWN):
             logger.error("LDAP server unavailable")
             flash("Authentication service unavailable. Please try again later.", "danger")
             return False
