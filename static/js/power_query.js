@@ -48,6 +48,12 @@ function setupEventListeners() {
     
     // Transformations
     document.getElementById('btn-add-transformation').addEventListener('click', openTransformationModal);
+    
+    // Data source dropdown
+    document.getElementById('data-source-select').addEventListener('change', handleDataSourceChange);
+    
+    // Source type dropdown in add data source modal
+    document.getElementById('source-type').addEventListener('change', handleSourceTypeChange);
     document.getElementById('btn-save-transformation').addEventListener('click', addTransformation);
     
     // Export
@@ -64,23 +70,17 @@ function loadDataSources() {
     // Show loading state
     dataSourceList.innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm" role="status"></div> Loading...</div>';
     
-    // Make AJAX request to MCP API
-    fetch('/mcp/task', {
-        method: 'POST',
+    // Make AJAX request to the REST API
+    fetch('/api/data/sources', {
+        method: 'GET',
         headers: {
             'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            agent_id: 'power_query',
-            task_data: {
-                task_type: 'list_data_sources'
-            }
-        })
+        }
     })
     .then(response => response.json())
     .then(data => {
-        if (data.result && data.result.success) {
-            dataSources = data.result.data_sources || [];
+        if (data && data.sources) {
+            dataSources = data.sources || [];
             renderDataSources();
             populateDataSourceSelect();
         } else {
@@ -590,39 +590,37 @@ function runQuery() {
     resultsHeader.innerHTML = '';
     resultsBody.innerHTML = '';
     
-    // Make AJAX request to MCP API
-    fetch('/mcp/task', {
+    // Make AJAX request to the REST API
+    fetch('/api/data/query', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-            agent_id: 'power_query',
-            task_data: {
-                task_type: 'execute_query',
-                query: queryDefinition
-            }
+            type: 'sql',
+            source_id: dataSourceName,
+            query: queryDefinition.sql || 'SELECT * FROM users LIMIT 5' // Use SQL query or default
         })
     })
     .then(response => response.json())
     .then(data => {
-        if (data.result && data.result.success) {
+        if (data && data.data && data.columns) {
             // Store results
-            currentResults = data.result.data;
-            currentResultId = data.result.result_id;
-            totalRows = data.result.rows;
+            currentResults = data;
+            currentResultId = Date.now(); // Generate a unique ID for this result set
+            totalRows = data.data.length;
             
             // Show results
-            queryInfoAlert.innerHTML = `Query executed successfully. ${data.result.rows} rows returned.`;
-            if (data.result.truncated) {
+            queryInfoAlert.innerHTML = `Query executed successfully. ${data.data.length} rows returned.`;
+            if (data.truncated) {
                 queryInfoAlert.innerHTML += ' (Results truncated, showing first 1000 rows)';
             }
             
             // Render results
-            renderResults(data.result);
+            renderResults(data);
         } else {
-            showError('Failed to execute query: ' + (data.result?.error || 'Unknown error'));
-            queryInfoAlert.innerHTML = `<div class="alert alert-danger">Error: ${data.result?.error || 'Unknown error'}</div>`;
+            showError('Failed to execute query: ' + (data.error || 'Unknown error'));
+            queryInfoAlert.innerHTML = `<div class="alert alert-danger">Error: ${data.error || 'Unknown error'}</div>`;
             resultsHeader.innerHTML = '';
             resultsBody.innerHTML = '';
         }
@@ -718,24 +716,17 @@ function showTables() {
     const modal = new bootstrap.Modal(document.getElementById('tablesModal'));
     modal.show();
     
-    // Make AJAX request to MCP API
-    fetch('/mcp/task', {
-        method: 'POST',
+    // Make AJAX request to the REST API
+    fetch(`/api/data/sources/${encodeURIComponent(dataSourceName)}/tables`, {
+        method: 'GET',
         headers: {
             'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            agent_id: 'power_query',
-            task_data: {
-                task_type: 'get_sql_server_tables',
-                source_name: dataSourceName
-            }
-        })
+        }
     })
     .then(response => response.json())
     .then(data => {
-        if (data.result && data.result.success) {
-            const tables = data.result.tables || [];
+        if (data && data.tables) {
+            const tables = data.tables || [];
             
             if (tables.length === 0) {
                 document.getElementById('tables-list').innerHTML = `
@@ -772,7 +763,7 @@ function showTables() {
         } else {
             document.getElementById('tables-list').innerHTML = `
                 <div class="alert alert-danger">
-                    Failed to get tables: ${data.result?.error || 'Unknown error'}
+                    Failed to get tables: ${data.error || 'Unknown error'}
                 </div>
             `;
         }
@@ -1232,6 +1223,66 @@ function selectDataSource(sourceName) {
     // Trigger change event to update UI
     const event = new Event('change');
     document.getElementById('data-source-select').dispatchEvent(event);
+}
+
+// Handle when data source changes in the dropdown
+function handleDataSourceChange() {
+    const select = document.getElementById('data-source-select');
+    const sourceName = select.value;
+    const option = select.selectedOptions[0];
+    
+    if (!sourceName || !option) {
+        // Hide query-specific UI elements if no source selected
+        document.getElementById('sql-query-container').style.display = 'none';
+        document.getElementById('transformations-container').style.display = 'none';
+        return;
+    }
+    
+    // Get the data source type from the dataset
+    const dataSourceType = option.dataset.type?.toLowerCase() || '';
+    
+    // Show/hide UI elements based on data source type
+    if (dataSourceType === 'postgresql' || dataSourceType === 'sql_server' || dataSourceType === 'sqlite') {
+        // Show SQL query container for database sources
+        document.getElementById('sql-query-container').style.display = 'block';
+        document.getElementById('transformations-container').style.display = 'block';
+        
+        // Clear any existing SQL query
+        document.getElementById('sql-query').value = '';
+        
+        // Fetch and show tables for this source
+        showTables();
+    } else if (dataSourceType === 'csv' || dataSourceType === 'excel') {
+        // For CSV/Excel, we don't need SQL query but can use transformations
+        document.getElementById('sql-query-container').style.display = 'none';
+        document.getElementById('transformations-container').style.display = 'block';
+    } else {
+        // For unknown source types, hide everything
+        document.getElementById('sql-query-container').style.display = 'none';
+        document.getElementById('transformations-container').style.display = 'none';
+    }
+}
+
+// Handle source type changes in the add data source modal
+function handleSourceTypeChange() {
+    const sourceType = document.getElementById('source-type').value;
+    
+    // Hide all source-specific fields
+    document.getElementById('sql-server-fields').style.display = 'none';
+    document.getElementById('postgresql-fields').style.display = 'none';
+    document.getElementById('csv-fields').style.display = 'none';
+    document.getElementById('excel-fields').style.display = 'none';
+    
+    // Show the relevant fields based on source type
+    if (sourceType === 'sql_server') {
+        document.getElementById('sql-server-fields').style.display = 'block';
+    } else if (sourceType === 'postgresql') {
+        document.getElementById('postgresql-fields').style.display = 'block';
+    } else if (sourceType === 'csv') {
+        document.getElementById('csv-fields').style.display = 'block';
+    } else if (sourceType === 'excel') {
+        document.getElementById('excel-fields').style.display = 'block';
+    }
 }
 
 // Get available columns for transformations
