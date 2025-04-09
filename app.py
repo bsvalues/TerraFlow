@@ -95,6 +95,14 @@ with app.app_context():
     # Register MCP API blueprint
     app.register_blueprint(mcp_api, url_prefix='/mcp')
     
+    # Register Sync Service blueprint
+    try:
+        from sync_service import sync_bp
+        app.register_blueprint(sync_bp)
+        logger.info("Sync Service registered successfully")
+    except ImportError as e:
+        logger.warning(f"Could not load Sync Service module: {e}")
+    
     # Create database tables
     db.create_all()
     
