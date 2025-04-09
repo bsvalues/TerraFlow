@@ -14,9 +14,10 @@ from typing import List, Dict, Any, Tuple
 # Import OpenAI and LangChain
 from openai import OpenAI
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.document_loaders import TextLoader, PyPDFLoader, UnstructuredXMLLoader
-from langchain.embeddings import OpenAIEmbeddings
-from langchain.vectorstores import FAISS as LangchainFAISS
+# Updated imports for LangChain (fixes deprecation warnings)
+from langchain_community.document_loaders import TextLoader, PyPDFLoader, UnstructuredXMLLoader
+from langchain_community.embeddings import OpenAIEmbeddings
+from langchain_community.vectorstores import FAISS as LangchainFAISS
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +125,7 @@ def index_document(file_path: str, file_id: int, description: str = ""):
         
         # Add description as a separate document
         if description:
-            from langchain.schema import Document
+            from langchain.schema.document import Document
             desc_doc = Document(page_content=description, metadata={"source": file_path, "description": True})
             documents.append(desc_doc)
         
