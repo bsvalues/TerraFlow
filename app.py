@@ -46,7 +46,8 @@ app.config["UPLOAD_FOLDER"] = os.environ.get("UPLOAD_FOLDER", "uploads")
 app.config["MAX_CONTENT_LENGTH"] = 1024 * 1024 * 1024  # 1GB max upload size
 app.config["ALLOWED_EXTENSIONS"] = {
     'zip', 'shp', 'shx', 'dbf', 'prj', 'xml', 'json', 'geojson', 
-    'gpkg', 'kml', 'kmz', 'csv', 'xls', 'xlsx', 'pdf', 'txt'
+    'gpkg', 'kml', 'kmz', 'csv', 'xls', 'xlsx', 'pdf', 'txt',
+    'gdb', 'mdb', 'sdf', 'sqlite', 'db', 'geopackage'
 }
 
 # Make sure upload directory exists

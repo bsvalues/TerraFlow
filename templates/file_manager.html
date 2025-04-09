@@ -105,6 +105,13 @@
                             </div>
                         </li>
                         <li class="list-group-item d-flex align-items-center">
+                            <i class="fas fa-database text-primary me-3 fa-lg"></i>
+                            <div>
+                                <strong>Geodatabases</strong>
+                                <small class="d-block text-muted">GDB, SDF, SQLite Spatial</small>
+                            </div>
+                        </li>
+                        <li class="list-group-item d-flex align-items-center">
                             <i class="fas fa-file-archive text-warning me-3 fa-lg"></i>
                             <div>
                                 <strong>KML/KMZ</strong>
@@ -148,6 +155,7 @@
                     <option value="shp">Shapefile</option>
                     <option value="dbf">DBF</option>
                     <option value="xml">XML</option>
+                    <option value="gdb">GDB/SDF</option>
                     <option value="kml">KML/KMZ</option>
                     <option value="xlsx">Excel/CSV</option>
                     <option value="pdf">Documents</option>
@@ -171,6 +179,10 @@
                                     <i class="fas fa-file-code file-icon text-info"></i>
                                 {% elif file.filename.endswith('.dbf') %}
                                     <i class="fas fa-database file-icon text-secondary"></i>
+                                {% elif file.filename.endswith('.gdb') or file.filename.endswith('.mdb') %}
+                                    <i class="fas fa-database file-icon text-primary"></i>
+                                {% elif file.filename.endswith('.sdf') or file.filename.endswith('.sqlite') or file.filename.endswith('.db') %}
+                                    <i class="fas fa-server file-icon text-info"></i>
                                 {% elif file.filename.endswith('.kml') or file.filename.endswith('.kmz') %}
                                     <i class="fas fa-map-marker-alt file-icon text-warning"></i>
                                 {% elif file.filename.endswith('.csv') or file.filename.endswith('.xlsx') %}

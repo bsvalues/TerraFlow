@@ -76,7 +76,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const matchesSearch = fileName.includes(searchTerm);
             
             // Check if file matches type filter
-            const matchesType = fileType === 'all' || fileTypeText.includes(fileType);
+            let matchesType = fileType === 'all' || fileTypeText.includes(fileType);
+            
+            // Special case for geodatabases (gdb, sdf, sqlite, db)
+            if (fileType === 'gdb' && (
+                fileName.endsWith('.gdb') || 
+                fileName.endsWith('.mdb') || 
+                fileName.endsWith('.sdf') || 
+                fileName.endsWith('.sqlite') || 
+                fileName.endsWith('.db')
+            )) {
+                matchesType = true;
+            }
             
             // Show or hide card based on filters
             if (matchesSearch && matchesType) {
@@ -146,14 +157,31 @@ document.addEventListener('DOMContentLoaded', () => {
             if (metadata.hasOwnProperty(key)) {
                 let value = metadata[key];
                 
-                // Format value based on type
-                if (typeof value === 'object' && value !== null) {
+                // Skip file_path for security reasons
+                if (key === 'file_path') {
+                    continue;
+                }
+                
+                // Special handling for certain types of metadata
+                if (key === 'layer_details' && Array.isArray(value)) {
+                    // Create a more user-friendly display for layer details
+                    value = formatLayerDetails(value);
+                } else if (key === 'tables' && Array.isArray(value)) {
+                    // Format table names
+                    value = `<ul class="mb-0">
+                        ${value.map(table => `<li>${table}</li>`).join('')}
+                    </ul>`;
+                } else if (key === 'table_schemas' && typeof value === 'object') {
+                    // Format table schemas
+                    value = formatTableSchemas(value);
+                } else if (typeof value === 'object' && value !== null) {
+                    // Default formatting for other objects
                     value = `<pre class="mb-0"><code>${JSON.stringify(value, null, 2)}</code></pre>`;
                 }
                 
                 html += `
                 <tr>
-                    <th>${key}</th>
+                    <th>${formatKeyName(key)}</th>
                     <td>${value}</td>
                 </tr>`;
             }
@@ -161,5 +189,124 @@ document.addEventListener('DOMContentLoaded', () => {
         
         html += '</table>';
         return html;
+    }
+    
+    // Format layer details in a more readable way
+    function formatLayerDetails(layers) {
+        if (!layers || layers.length === 0) {
+            return '<p class="text-muted">No layer details available.</p>';
+        }
+        
+        let html = '<div class="accordion" id="layerAccordion">';
+        
+        layers.forEach((layer, index) => {
+            const layerId = `layer-${index}`;
+            html += `
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading-${layerId}">
+                    <button class="accordion-button collapsed" type="button" 
+                            data-bs-toggle="collapse" data-bs-target="#collapse-${layerId}" 
+                            aria-expanded="false" aria-controls="collapse-${layerId}">
+                        ${layer.name || `Layer ${index + 1}`}
+                        ${layer.feature_count ? ` (${layer.feature_count} features)` : ''}
+                    </button>
+                </h2>
+                <div id="collapse-${layerId}" class="accordion-collapse collapse" 
+                     aria-labelledby="heading-${layerId}" data-bs-parent="#layerAccordion">
+                    <div class="accordion-body">
+                        <table class="table table-sm">`;
+            
+            // Layer properties
+            for (const key in layer) {
+                if (layer.hasOwnProperty(key) && key !== 'name') {
+                    let value = layer[key];
+                    
+                    if (typeof value === 'object' && value !== null) {
+                        value = `<pre class="mb-0"><code>${JSON.stringify(value, null, 2)}</code></pre>`;
+                    }
+                    
+                    html += `
+                    <tr>
+                        <th>${formatKeyName(key)}</th>
+                        <td>${value}</td>
+                    </tr>`;
+                }
+            }
+            
+            html += `
+                        </table>
+                    </div>
+                </div>
+            </div>`;
+        });
+        
+        html += '</div>';
+        return html;
+    }
+    
+    // Format table schemas in a readable way
+    function formatTableSchemas(schemas) {
+        if (!schemas || Object.keys(schemas).length === 0) {
+            return '<p class="text-muted">No schema information available.</p>';
+        }
+        
+        let html = '<div class="accordion" id="schemaAccordion">';
+        
+        Object.keys(schemas).forEach((tableName, index) => {
+            const tableId = `table-${index}`;
+            const columns = schemas[tableName];
+            
+            html += `
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading-${tableId}">
+                    <button class="accordion-button collapsed" type="button" 
+                            data-bs-toggle="collapse" data-bs-target="#collapse-${tableId}" 
+                            aria-expanded="false" aria-controls="collapse-${tableId}">
+                        ${tableName} (${columns.length} columns)
+                    </button>
+                </h2>
+                <div id="collapse-${tableId}" class="accordion-collapse collapse" 
+                     aria-labelledby="heading-${tableId}" data-bs-parent="#schemaAccordion">
+                    <div class="accordion-body">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Column</th>
+                                    <th>Type</th>
+                                    <th>Constraints</th>
+                                </tr>
+                            </thead>
+                            <tbody>`;
+            
+            columns.forEach(column => {
+                let constraints = [];
+                if (column.pk) constraints.push('Primary Key');
+                if (column.notnull) constraints.push('Not Null');
+                
+                html += `
+                <tr>
+                    <td>${column.name}</td>
+                    <td>${column.type}</td>
+                    <td>${constraints.join(', ') || '-'}</td>
+                </tr>`;
+            });
+            
+            html += `
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>`;
+        });
+        
+        html += '</div>';
+        return html;
+    }
+    
+    // Format the key name to be more readable
+    function formatKeyName(key) {
+        return key
+            .replace(/_/g, ' ')
+            .replace(/\b\w/g, l => l.toUpperCase());
     }
 });

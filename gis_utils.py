@@ -37,6 +37,8 @@ def extract_gis_metadata(file_path: str, file_type: str) -> Optional[Dict[str, A
             return extract_kml_metadata(file_path)
         elif file_type in ['gpkg'] and HAS_GIS_LIBS:
             return extract_geopackage_metadata(file_path)
+        elif file_type in ['gdb', 'mdb', 'sdf', 'sqlite', 'db', 'geopackage'] and HAS_GIS_LIBS:
+            return extract_geodatabase_metadata(file_path, file_type)
     except Exception as e:
         logger.error(f"Error extracting metadata from {file_path}: {str(e)}")
     
@@ -388,3 +390,129 @@ def get_shapefile_info(file_path: str) -> Dict[str, Any]:
         }
     except Exception as e:
         return {"error": str(e)}
+
+def extract_geodatabase_metadata(file_path: str, file_type: str) -> Dict[str, Any]:
+    """Extract metadata from various geodatabase formats (File Geodatabase, SDF, etc.)"""
+    if not HAS_GIS_LIBS:
+        return {"type": f"{file_type.upper()} Geodatabase", "note": "GIS libraries not available for detailed metadata"}
+    
+    try:
+        # Map file types to their proper names for display
+        geodatabase_types = {
+            'gdb': 'ESRI File Geodatabase',
+            'mdb': 'ESRI Personal Geodatabase',
+            'sdf': 'ESRI Spatial Data File',
+            'sqlite': 'SQLite Spatial Database',
+            'db': 'Database File',
+            'geopackage': 'OGC GeoPackage'
+        }
+        
+        db_type = geodatabase_types.get(file_type, f"{file_type.upper()} Database")
+        
+        metadata = {
+            "type": db_type,
+            "file_path": file_path,
+            "file_size_bytes": os.path.getsize(file_path)
+        }
+        
+        try:
+            # Try to list layers with fiona
+            driver_mapping = {
+                'gdb': 'FileGDB',
+                'sqlite': 'SQLite',
+                'geopackage': 'GPKG',
+                'db': 'SQLite'
+            }
+            
+            driver = driver_mapping.get(file_type)
+            
+            if driver:
+                try:
+                    layers = fiona.listlayers(file_path, driver=driver)
+                    metadata["layers"] = layers
+                    metadata["layer_count"] = len(layers)
+                except Exception as e:
+                    logger.warning(f"Could not list layers with fiona: {str(e)}")
+            
+            # Try with geopandas for more detailed information if layers were found
+            if "layers" in metadata and metadata["layers"]:
+                layer_details = []
+                
+                for layer_name in metadata["layers"]:
+                    try:
+                        # Try to read the layer with geopandas
+                        layer_driver = driver_mapping.get(file_type)
+                        if layer_driver:
+                            gdf = gpd.read_file(file_path, layer=layer_name, driver=layer_driver)
+                        else:
+                            gdf = gpd.read_file(file_path, layer=layer_name)
+                            
+                        layer_info = {
+                            "name": layer_name,
+                            "feature_count": len(gdf),
+                            "columns": gdf.columns.tolist(),
+                            "crs": str(gdf.crs)
+                        }
+                        
+                        # Add geometry types if present
+                        if 'geometry' in gdf.columns:
+                            layer_info["geometry_types"] = gdf.geom_type.unique().tolist()
+                            
+                            # Calculate bounding box if there are geometries
+                            try:
+                                bounds = gdf.total_bounds
+                                layer_info['bounds'] = {
+                                    'minx': bounds[0],
+                                    'miny': bounds[1],
+                                    'maxx': bounds[2],
+                                    'maxy': bounds[3]
+                                }
+                            except Exception as e:
+                                logger.warning(f"Could not calculate bounds for layer {layer_name}: {str(e)}")
+                        
+                        layer_details.append(layer_info)
+                    except Exception as e:
+                        layer_details.append({"name": layer_name, "error": str(e)})
+                        
+                metadata["layer_details"] = layer_details
+        
+        except Exception as e:
+            metadata["layer_error"] = str(e)
+        
+        # For SQLite/SDF/DB files, try to get table information using SQLAlchemy
+        if file_type in ['sqlite', 'db', 'sdf']:
+            try:
+                import sqlite3
+                conn = sqlite3.connect(file_path)
+                cursor = conn.cursor()
+                
+                # Get list of tables
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+                tables = [table[0] for table in cursor.fetchall()]
+                
+                metadata["tables"] = tables
+                
+                # Get schema for each table
+                table_schemas = {}
+                for table in tables:
+                    cursor.execute(f"PRAGMA table_info({table});")
+                    columns = cursor.fetchall()
+                    table_schemas[table] = [
+                        {"name": col[1], "type": col[2], "notnull": col[3], "pk": col[5]} 
+                        for col in columns
+                    ]
+                
+                metadata["table_schemas"] = table_schemas
+                conn.close()
+            except Exception as e:
+                metadata["sqlite_error"] = str(e)
+        
+        return metadata
+        
+    except Exception as e:
+        logger.error(f"Error extracting geodatabase metadata: {str(e)}")
+        return {
+            "type": f"{file_type.upper()} Geodatabase", 
+            "error": str(e),
+            "file_size_bytes": os.path.getsize(file_path) if os.path.exists(file_path) else 0
+        }
