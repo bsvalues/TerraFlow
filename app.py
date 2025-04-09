@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import logging
+import shutil
 from flask import Flask, render_template, redirect, url_for, flash, request, session, jsonify, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
@@ -65,7 +66,7 @@ with app.app_context():
     from auth import login_required, is_authenticated, authenticate_user, logout_user
     from file_handlers import allowed_file, process_file_upload, get_user_files, delete_file
     from rag import process_query, index_document
-    from gis_utils import validate_geojson, get_shapefile_info
+    from gis_utils import validate_geojson, get_shapefile_info, extract_gis_metadata
     from mcp_api import mcp_api
     
     # Import API blueprints
@@ -361,30 +362,55 @@ def import_test_data():
             flash('Test data file not found', 'danger')
             return redirect(url_for('api_test_setup'))
         
-        # Read the file
-        with open(test_file_path, 'rb') as f:
-            file_content = f.read()
+        # Create the project
+        project = GISProject.query.filter_by(name=project_name, user_id=session['user']['id']).first()
+        if not project:
+            project = GISProject(name=project_name, description=f"Project for {project_name}", user_id=session['user']['id'])
+            db.session.add(project)
+            db.session.commit()
+            
+        # Create uploads directory if it doesn't exist
+        if 'UPLOAD_FOLDER' not in app.config:
+            app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'uploads')
+        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
         
-        # Create a file-like object from the content
-        from io import BytesIO
-        from werkzeug.datastructures import FileStorage
-        
-        # Create a proper FileStorage object which has a filename attribute
-        file_obj = FileStorage(
-            stream=BytesIO(file_content),
-            filename='test_geo.geojson',
-            content_type='application/geo+json',
+        # Create file record
+        filename = 'test_geo.geojson'
+        file_record = File(
+            filename=filename,
+            original_filename=filename,
+            file_type='geojson',
+            upload_date=datetime.datetime.now(),
+            user_id=session['user']['id'],
+            project_id=project.id,
+            description=description
         )
         
-        # Process the file
-        file_record = process_file_upload(
-            file_obj, 
-            'test_geo.geojson', 
-            session['user']['id'], 
-            project_name, 
-            description
-        )
+        # Save the file record to get an ID
+        db.session.add(file_record)
+        db.session.commit()
         
+        # Create directory for the file using its ID
+        file_dir = os.path.join(app.config['UPLOAD_FOLDER'], str(file_record.id))
+        os.makedirs(file_dir, exist_ok=True)
+        
+        # Copy the test file to the uploads directory
+        destination_path = os.path.join(file_dir, filename)
+        shutil.copy2(test_file_path, destination_path)
+        
+        # Update the file record with path and size
+        file_record.file_path = destination_path
+        file_record.file_size = os.path.getsize(destination_path)
+        
+        # Extract and save metadata if it's a GIS file
+        try:
+            metadata = extract_gis_metadata(destination_path, file_record.file_type)
+            if metadata:
+                file_record.file_metadata = metadata
+        except Exception as e:
+            app.logger.error(f"Error extracting metadata: {str(e)}")
+        
+        db.session.commit()
         flash('Test data imported successfully', 'success')
         
     except Exception as e:

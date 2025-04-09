@@ -15,6 +15,8 @@ def allowed_file(filename):
 
 def process_file_upload(file, filename, user_id, project_name, description):
     """Process an uploaded file and save it to the system"""
+    import logging
+    logger = logging.getLogger(__name__)
     # Get or create the project
     project = GISProject.query.filter_by(name=project_name, user_id=user_id).first()
     if not project:
