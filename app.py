@@ -74,6 +74,17 @@ with app.app_context():
     # Create database tables
     db.create_all()
     
+    # Create a development user if it doesn't exist
+    try:
+        dev_user = User.query.filter_by(username='dev_user').first()
+        if not dev_user and os.environ.get('BYPASS_LDAP', 'True').lower() == 'true':
+            dev_user = User(id=1, username='dev_user', email='dev_user@example.com', full_name='Development User', department='IT')
+            db.session.add(dev_user)
+            db.session.commit()
+            logger.info("Created development user for testing")
+    except Exception as e:
+        logger.warning(f"Could not create development user: {str(e)}")
+    
     # Initialize MCP system
     from mcp.core import mcp_instance
     

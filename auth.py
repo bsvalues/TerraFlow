@@ -33,6 +33,15 @@ def login_required(f):
 
 def is_authenticated():
     """Check if user is authenticated"""
+    # For development, create a test user in session if bypass is enabled
+    if BYPASS_LDAP and 'user' not in session:
+        session['user'] = {
+            'id': 1,
+            'username': 'dev_user',
+            'email': 'dev_user@example.com'
+        }
+        logger.warning("Using development test user for authentication bypass")
+        
     return 'user' in session
 
 def authenticate_user(username, password):
