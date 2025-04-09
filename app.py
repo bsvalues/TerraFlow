@@ -374,11 +374,24 @@ def import_test_data():
             app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'uploads')
         os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
         
-        # Create file record
+        # Create directory for the file
+        uploads_dir = os.path.join(app.root_path, 'uploads')
+        os.makedirs(uploads_dir, exist_ok=True)
+        
+        test_dir = os.path.join(uploads_dir, 'test_data')
+        os.makedirs(test_dir, exist_ok=True)
+        
+        # Copy the file to the uploads directory
         filename = 'test_geo.geojson'
+        destination_path = os.path.join(test_dir, filename)
+        shutil.copy2(test_file_path, destination_path)
+        
+        # Create file record with the paths already set
         file_record = File(
             filename=filename,
             original_filename=filename,
+            file_path=destination_path,
+            file_size=os.path.getsize(destination_path),
             file_type='geojson',
             upload_date=datetime.datetime.now(),
             user_id=session['user']['id'],
@@ -386,21 +399,9 @@ def import_test_data():
             description=description
         )
         
-        # Save the file record to get an ID
+        # Save the file record
         db.session.add(file_record)
         db.session.commit()
-        
-        # Create directory for the file using its ID
-        file_dir = os.path.join(app.config['UPLOAD_FOLDER'], str(file_record.id))
-        os.makedirs(file_dir, exist_ok=True)
-        
-        # Copy the test file to the uploads directory
-        destination_path = os.path.join(file_dir, filename)
-        shutil.copy2(test_file_path, destination_path)
-        
-        # Update the file record with path and size
-        file_record.file_path = destination_path
-        file_record.file_size = os.path.getsize(destination_path)
         
         # Extract and save metadata if it's a GIS file
         try:
