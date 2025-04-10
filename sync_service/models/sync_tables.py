@@ -50,12 +50,17 @@ class TableConfiguration(SyncBase, db.Model):
     """Configuration for tables to be synchronized."""
 
     name = db.Column(db.String(128), unique=True, nullable=False)
-    display_name = db.Column(db.String(128))
     
-    # Using property decorator for source_name to ensure backward compatibility
+    # Using property decorators for columns that might not exist in the database
+    # to ensure backward compatibility
     @property
     def source_name(self):
         """Get the source name or default to the table name if not set."""
+        return self.name
+        
+    @property
+    def display_name(self):
+        """Get the display name or default to the table name if not set."""
         return self.name
     description = db.Column(db.Text)
     join_table = db.Column(db.String(128))
