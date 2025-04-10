@@ -114,6 +114,22 @@
                                     </ul>
                                 </div>
                             </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="d-grid">
+                                        <button id="run-pre-deployment-tests" class="btn btn-info mb-2">
+                                            <i class="fas fa-vial me-2"></i>Pre-Deployment Tests
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="d-grid">
+                                        <button id="run-post-deployment-tests" class="btn btn-secondary mb-2">
+                                            <i class="fas fa-clipboard-check me-2"></i>Post-Deployment Tests
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-md-4">
                             <div class="d-grid gap-2 h-100">
@@ -1179,6 +1195,324 @@
                     }, 2000);
                 }, 2000);
             }
+        });
+        
+        // Pre-deployment Tests Button
+        $('#run-pre-deployment-tests').click(function() {
+            const button = $(this);
+            const targetEnv = $('#deployment-environment').val();
+            const version = $('#deployment-version').val();
+            
+            // Disable button during test execution
+            button.prop('disabled', true);
+            button.html('<i class="fas fa-spinner fa-spin me-2"></i>Running...');
+            
+            // Show deployment status panel
+            $('#deployment-status').removeClass('d-none');
+            $('#deployment-message').html(`Running pre-deployment tests for version ${version} on ${targetEnv} environment...`);
+            $('#deployment-progress').css('width', '25%');
+            
+            // Log the test initiation
+            addLogEntry({
+                timestamp: new Date().toISOString(),
+                level: 'INFO',
+                component: 'Deployment',
+                message: `Starting pre-deployment tests for version ${version} on ${targetEnv}`
+            });
+            
+            // Call the pre-deployment tests API
+            $.ajax({
+                url: "{{ url_for('verification.pre_deployment_tests') }}",
+                type: "GET",
+                data: {
+                    environment: targetEnv,
+                    version: version
+                },
+                success: function(response) {
+                    // Update progress
+                    $('#deployment-progress').css('width', '100%');
+                    
+                    // Display results
+                    let resultHtml = '';
+                    const statusClass = response.summary.overall_status === 'passed' ? 'success' : 
+                                       response.summary.overall_status === 'warning' ? 'warning' : 'danger';
+                    
+                    if (response.summary.deployment_ready) {
+                        resultHtml = `
+                            <div class="alert alert-${statusClass} mb-3">
+                                <h5 class="alert-heading"><i class="fas fa-check-circle me-2"></i>Deployment Ready</h5>
+                                <p>${response.summary.passed}/${response.summary.total_tests} tests passed. System is ready for deployment to ${targetEnv}.</p>
+                                <p>Total execution time: ${(response.summary.execution_time_ms / 1000).toFixed(2)} seconds</p>
+                                
+                                <div class="mt-3">
+                                    <h6>Test Categories:</h6>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        ${Object.entries(response.summary.categories || {}).map(([category, stats]) => 
+                                            `<span class="badge ${stats.success_rate === 100 ? 'bg-success' : stats.success_rate >= 80 ? 'bg-warning' : 'bg-danger'}">
+                                                ${category}: ${stats.passed}/${stats.total} (${stats.success_rate}%)
+                                            </span>`
+                                        ).join('')}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        
+                        // Enable the execute deployment button
+                        $('#execute-deployment').prop('disabled', false);
+                    } else {
+                        resultHtml = `
+                            <div class="alert alert-${statusClass} mb-3">
+                                <h5 class="alert-heading"><i class="fas fa-exclamation-triangle me-2"></i>Deployment Blocked</h5>
+                                <p>${response.summary.failed}/${response.summary.total_tests} tests failed (${response.summary.failed_critical} critical). System is not ready for deployment.</p>
+                                <p>Total execution time: ${(response.summary.execution_time_ms / 1000).toFixed(2)} seconds</p>
+                                
+                                <div class="mt-3">
+                                    <h6>Failed Critical Tests:</h6>
+                                    <ul class="mb-2">
+                                        ${response.tests.filter(t => !t.success && t.critical).map(test => 
+                                            `<li>${test.name}: ${test.message}</li>`
+                                        ).join('')}
+                                    </ul>
+                                </div>
+                                
+                                <div class="mt-3">
+                                    <h6>Test Categories:</h6>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        ${Object.entries(response.summary.categories || {}).map(([category, stats]) => 
+                                            `<span class="badge ${stats.success_rate === 100 ? 'bg-success' : stats.success_rate >= 80 ? 'bg-warning' : 'bg-danger'}">
+                                                ${category}: ${stats.passed}/${stats.total} (${stats.success_rate}%)
+                                            </span>`
+                                        ).join('')}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        
+                        // Keep the execute deployment button disabled
+                        $('#execute-deployment').prop('disabled', true);
+                    }
+                    
+                    $('#deployment-message').html(resultHtml);
+                    
+                    // Format the full test results for the user
+                    const testTable = `
+                        <div class="mt-4">
+                            <h6>Detailed Test Results:</h6>
+                            <table class="table table-sm table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Test</th>
+                                        <th>Category</th>
+                                        <th>Status</th>
+                                        <th>Message</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${response.tests.map(test => `
+                                        <tr class="${test.success ? '' : 'table-danger'}">
+                                            <td>${test.name}</td>
+                                            <td>${test.category}</td>
+                                            <td><span class="badge ${test.success ? 'bg-success' : 'bg-danger'}">${test.success ? 'PASS' : 'FAIL'}</span></td>
+                                            <td>${test.message}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+                    
+                    $('#deployment-message').append(testTable);
+                    
+                    // Log test results
+                    addLogEntry({
+                        timestamp: new Date().toISOString(),
+                        level: response.summary.deployment_ready ? 'SUCCESS' : 'ERROR',
+                        component: 'Deployment',
+                        message: `Pre-deployment tests ${response.summary.deployment_ready ? 'passed' : 'failed'}: ${response.summary.passed}/${response.summary.total_tests} tests passed`
+                    });
+                    
+                    // Re-enable the button
+                    button.prop('disabled', false);
+                    button.html('<i class="fas fa-vial me-2"></i>Pre-Deployment Tests');
+                },
+                error: function(error) {
+                    // Update progress and show error
+                    $('#deployment-progress').css('width', '100%');
+                    $('#deployment-message').html(`
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-circle me-2"></i>Error running pre-deployment tests. Please check the logs for details.
+                        </div>
+                    `);
+                    
+                    // Log the error
+                    addLogEntry({
+                        timestamp: new Date().toISOString(),
+                        level: 'ERROR',
+                        component: 'Deployment',
+                        message: `Error running pre-deployment tests: ${error.statusText || 'Unknown error'}`
+                    });
+                    
+                    // Re-enable the button
+                    button.prop('disabled', false);
+                    button.html('<i class="fas fa-vial me-2"></i>Pre-Deployment Tests');
+                }
+            });
+        });
+        
+        // Post-deployment Tests Button
+        $('#run-post-deployment-tests').click(function() {
+            const button = $(this);
+            const targetEnv = $('#deployment-environment').val();
+            const version = $('#deployment-version').val();
+            
+            // Disable button during test execution
+            button.prop('disabled', true);
+            button.html('<i class="fas fa-spinner fa-spin me-2"></i>Running...');
+            
+            // Show deployment status panel
+            $('#deployment-status').removeClass('d-none');
+            $('#deployment-message').html(`Running post-deployment tests for version ${version} on ${targetEnv} environment...`);
+            $('#deployment-progress').css('width', '25%');
+            
+            // Log the test initiation
+            addLogEntry({
+                timestamp: new Date().toISOString(),
+                level: 'INFO',
+                component: 'Deployment',
+                message: `Starting post-deployment tests for version ${version} on ${targetEnv}`
+            });
+            
+            // Call the post-deployment tests API
+            $.ajax({
+                url: "{{ url_for('verification.post_deployment_tests') }}",
+                type: "GET",
+                data: {
+                    environment: targetEnv,
+                    version: version
+                },
+                success: function(response) {
+                    // Update progress
+                    $('#deployment-progress').css('width', '100%');
+                    
+                    // Display results
+                    let resultHtml = '';
+                    const statusClass = response.summary.overall_status === 'passed' ? 'success' : 
+                                       response.summary.overall_status === 'warning' ? 'warning' : 'danger';
+                    
+                    if (response.summary.deployment_successful) {
+                        resultHtml = `
+                            <div class="alert alert-${statusClass} mb-3">
+                                <h5 class="alert-heading"><i class="fas fa-check-circle me-2"></i>Deployment Successful</h5>
+                                <p>${response.summary.passed}/${response.summary.total_tests} tests passed. System has been successfully deployed to ${targetEnv}.</p>
+                                <p>Total execution time: ${(response.summary.execution_time_ms / 1000).toFixed(2)} seconds</p>
+                                
+                                <div class="mt-3">
+                                    <h6>Test Categories:</h6>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        ${Object.entries(response.summary.categories || {}).map(([category, stats]) => 
+                                            `<span class="badge ${stats.success_rate === 100 ? 'bg-success' : stats.success_rate >= 80 ? 'bg-warning' : 'bg-danger'}">
+                                                ${category}: ${stats.passed}/${stats.total} (${stats.success_rate}%)
+                                            </span>`
+                                        ).join('')}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        resultHtml = `
+                            <div class="alert alert-${statusClass} mb-3">
+                                <h5 class="alert-heading"><i class="fas fa-exclamation-triangle me-2"></i>Deployment Issues Detected</h5>
+                                <p>${response.summary.failed}/${response.summary.total_tests} tests failed (${response.summary.failed_critical} critical). Review the deployment status immediately.</p>
+                                <p>Total execution time: ${(response.summary.execution_time_ms / 1000).toFixed(2)} seconds</p>
+                                
+                                <div class="mt-3">
+                                    <h6>Failed Critical Tests:</h6>
+                                    <ul class="mb-2">
+                                        ${response.tests.filter(t => !t.success && t.critical).map(test => 
+                                            `<li>${test.name}: ${test.message}</li>`
+                                        ).join('')}
+                                    </ul>
+                                </div>
+                                
+                                <div class="mt-3">
+                                    <h6>Test Categories:</h6>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        ${Object.entries(response.summary.categories || {}).map(([category, stats]) => 
+                                            `<span class="badge ${stats.success_rate === 100 ? 'bg-success' : stats.success_rate >= 80 ? 'bg-warning' : 'bg-danger'}">
+                                                ${category}: ${stats.passed}/${stats.total} (${stats.success_rate}%)
+                                            </span>`
+                                        ).join('')}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
+                    $('#deployment-message').html(resultHtml);
+                    
+                    // Format the full test results for the user
+                    const testTable = `
+                        <div class="mt-4">
+                            <h6>Detailed Test Results:</h6>
+                            <table class="table table-sm table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Test</th>
+                                        <th>Category</th>
+                                        <th>Status</th>
+                                        <th>Message</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${response.tests.map(test => `
+                                        <tr class="${test.success ? '' : 'table-danger'}">
+                                            <td>${test.name}</td>
+                                            <td>${test.category}</td>
+                                            <td><span class="badge ${test.success ? 'bg-success' : 'bg-danger'}">${test.success ? 'PASS' : 'FAIL'}</span></td>
+                                            <td>${test.message}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+                    
+                    $('#deployment-message').append(testTable);
+                    
+                    // Log test results
+                    addLogEntry({
+                        timestamp: new Date().toISOString(),
+                        level: response.summary.deployment_successful ? 'SUCCESS' : 'ERROR',
+                        component: 'Deployment',
+                        message: `Post-deployment tests ${response.summary.deployment_successful ? 'passed' : 'failed'}: ${response.summary.passed}/${response.summary.total_tests} tests passed`
+                    });
+                    
+                    // Re-enable the button
+                    button.prop('disabled', false);
+                    button.html('<i class="fas fa-clipboard-check me-2"></i>Post-Deployment Tests');
+                },
+                error: function(error) {
+                    // Update progress and show error
+                    $('#deployment-progress').css('width', '100%');
+                    $('#deployment-message').html(`
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-circle me-2"></i>Error running post-deployment tests. Please check the logs for details.
+                        </div>
+                    `);
+                    
+                    // Log the error
+                    addLogEntry({
+                        timestamp: new Date().toISOString(),
+                        level: 'ERROR',
+                        component: 'Deployment',
+                        message: `Error running post-deployment tests: ${error.statusText || 'Unknown error'}`
+                    });
+                    
+                    // Re-enable the button
+                    button.prop('disabled', false);
+                    button.html('<i class="fas fa-clipboard-check me-2"></i>Post-Deployment Tests');
+                }
+            });
         });
     });
 </script>
