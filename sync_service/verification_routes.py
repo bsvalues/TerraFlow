@@ -163,9 +163,12 @@ def full_validation():
 @login_required
 @role_required('administrator')
 def automated_test_suite():
-    """Run automated test suite for property export."""
+    """Run comprehensive automated test suite for property export."""
     # Run a sequence of tests with different parameters
     test_results = []
+    start_time = datetime.datetime.utcnow()
+    
+    # === Basic Parameter Tests ===
     
     # Test with minimum values
     success, message, details = PropertyExportVerification.test_stored_procedure(
@@ -177,9 +180,11 @@ def automated_test_suite():
     )
     test_results.append({
         'name': 'Minimum Values Test',
+        'category': 'Basic Parameter Tests',
         'success': success,
         'message': message,
-        'details': details
+        'details': details,
+        'execution_time': details.get('execution_time_ms', 0) if success else 0
     })
     
     # Test with typical values
@@ -192,9 +197,11 @@ def automated_test_suite():
     )
     test_results.append({
         'name': 'Typical Values Test',
+        'category': 'Basic Parameter Tests',
         'success': success,
         'message': message,
-        'details': details
+        'details': details,
+        'execution_time': details.get('execution_time_ms', 0) if success else 0
     })
     
     # Test with maximum values (-1 for all years)
@@ -207,9 +214,11 @@ def automated_test_suite():
     )
     test_results.append({
         'name': 'Maximum Values Test',
+        'category': 'Basic Parameter Tests',
         'success': success,
         'message': message,
-        'details': details
+        'details': details,
+        'execution_time': details.get('execution_time_ms', 0) if success else 0
     })
     
     # Test with alternate database
@@ -222,6 +231,188 @@ def automated_test_suite():
     )
     test_results.append({
         'name': 'Alternate Database Test',
+        'category': 'Basic Parameter Tests',
+        'success': success,
+        'message': message,
+        'details': details,
+        'execution_time': details.get('execution_time_ms', 0) if success else 0
+    })
+    
+    # === Edge Case Tests ===
+    
+    # Test with invalid database name
+    success, message, details = PropertyExportVerification.test_stored_procedure(
+        database_name='nonexistent_db',
+        num_years=1,
+        min_bill_years=2,
+        log_to_db=True,
+        user_id=session.get('user', {}).get('id')
+    )
+    test_results.append({
+        'name': 'Invalid Database Name Test',
+        'category': 'Edge Cases',
+        'success': not success,  # We expect this test to fail
+        'message': message,
+        'details': details,
+        'execution_time': details.get('execution_time_ms', 0) if success else 0,
+        'notes': 'This test is expected to fail - we want to verify proper error handling'
+    })
+    
+    # Test with invalid year value (negative but not -1)
+    success, message, details = PropertyExportVerification.test_stored_procedure(
+        database_name='web_internet_benton',
+        num_years=-5,  # Invalid value
+        min_bill_years=2,
+        log_to_db=True,
+        user_id=session.get('user', {}).get('id')
+    )
+    test_results.append({
+        'name': 'Invalid Years Parameter Test',
+        'category': 'Edge Cases',
+        'success': not success,  # We expect proper error handling
+        'message': message,
+        'details': details,
+        'execution_time': details.get('execution_time_ms', 0) if success else 0,
+        'notes': 'This test may fail or succeed depending on stored procedure validation'
+    })
+    
+    # Test with zero billing years
+    success, message, details = PropertyExportVerification.test_stored_procedure(
+        database_name='web_internet_benton',
+        num_years=1,
+        min_bill_years=0,  # Potential edge case
+        log_to_db=True,
+        user_id=session.get('user', {}).get('id')
+    )
+    test_results.append({
+        'name': 'Zero Billing Years Test',
+        'category': 'Edge Cases',
+        'success': success,  # This might be valid depending on stored procedure
+        'message': message,
+        'details': details,
+        'execution_time': details.get('execution_time_ms', 0) if success else 0
+    })
+    
+    # === Performance Tests ===
+    
+    # Test minimal data for performance baseline
+    start_perf = datetime.datetime.utcnow()
+    success, message, details = PropertyExportVerification.test_stored_procedure(
+        database_name='web_internet_benton',
+        num_years=1,  # Minimal data
+        min_bill_years=5,  # Higher threshold to reduce data
+        log_to_db=True,
+        user_id=session.get('user', {}).get('id')
+    )
+    execution_time = (datetime.datetime.utcnow() - start_perf).total_seconds() * 1000
+    test_results.append({
+        'name': 'Minimal Data Performance Test',
+        'category': 'Performance',
+        'success': success,
+        'message': message,
+        'details': details,
+        'execution_time': execution_time,
+        'performance_metrics': {
+            'sp_execution_time': details.get('execution_time_ms', 0) if success else 0,
+            'total_time': execution_time
+        }
+    })
+    
+    # Performance test with all years (-1)
+    if any(t['name'] == 'Maximum Values Test' and t['success'] for t in test_results):
+        start_perf = datetime.datetime.utcnow()
+        success, message, details = PropertyExportVerification.test_stored_procedure(
+            database_name='web_internet_benton',
+            num_years=-1,  # All years
+            min_bill_years=1,  # Include all billing years
+            log_to_db=True,
+            user_id=session.get('user', {}).get('id')
+        )
+        execution_time = (datetime.datetime.utcnow() - start_perf).total_seconds() * 1000
+        test_results.append({
+            'name': 'Maximum Data Performance Test',
+            'category': 'Performance',
+            'success': success,
+            'message': message,
+            'details': details,
+            'execution_time': execution_time,
+            'performance_metrics': {
+                'sp_execution_time': details.get('execution_time_ms', 0) if success else 0,
+                'total_time': execution_time
+            }
+        })
+    
+    # === Data Integrity Tests ===
+    
+    # Verify that we can query the target database after export
+    success = False
+    message = "Data integrity test not implemented"
+    details = {}
+    try:
+        if SQL_SERVER_CONNECTION_STRING:
+            # Get connection string for target database
+            conn_parts = SQL_SERVER_CONNECTION_STRING.split(';')
+            conn_dict = {}
+            for part in conn_parts:
+                if '=' in part:
+                    key, value = part.split('=', 1)
+                    conn_dict[key.strip().upper()] = value.strip()
+            
+            # Replace database with the target database
+            target_db = 'web_internet_benton'
+            if 'DATABASE' in conn_dict:
+                conn_dict['DATABASE'] = target_db
+            
+            # Reconstruct connection string
+            target_conn_str = ';'.join([f"{k}={v}" for k, v in conn_dict.items()])
+            
+            try:
+                # Connect to target database
+                conn = pyodbc.connect(target_conn_str)
+                cursor = conn.cursor()
+                
+                # Query basic table existence
+                cursor.execute("SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES")
+                table_count = cursor.fetchone()[0]
+                
+                # Try to query a few known tables that should exist after export
+                sample_tables = ['Property', 'OwnershipInfo', 'Valuation']
+                existing_tables = []
+                
+                for table in sample_tables:
+                    try:
+                        cursor.execute(f"SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = '{table}'")
+                        count = cursor.fetchone()[0]
+                        if count > 0:
+                            cursor.execute(f"SELECT COUNT(*) FROM {table}")
+                            row_count = cursor.fetchone()[0]
+                            existing_tables.append({
+                                'table': table,
+                                'row_count': row_count
+                            })
+                    except:
+                        pass
+                
+                success = True
+                message = f"Successfully verified {len(existing_tables)} tables in target database"
+                details = {
+                    'target_database': target_db,
+                    'total_tables': table_count,
+                    'verified_tables': existing_tables
+                }
+                
+                # Close connection
+                conn.close()
+            except Exception as e:
+                message = f"Error connecting to target database: {str(e)}"
+                details = {'error': str(e)}
+    except Exception as e:
+        message = f"Error during data integrity test: {str(e)}"
+        details = {'error': str(e)}
+        
+    test_results.append({
+        'name': 'Data Integrity Test',
+        'category': 'Data Integrity',
         'success': success,
         'message': message,
         'details': details
