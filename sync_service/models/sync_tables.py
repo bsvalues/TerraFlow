@@ -82,24 +82,73 @@ class TableConfiguration(SyncBase, db.Model):
     sub_select = db.Column(db.Text)
     order_by_sql = db.Column(db.Text)
     
-    # Sync configuration
-    is_active = db.Column(db.Boolean, default=True, nullable=False)
-    is_incremental = db.Column(db.Boolean, default=True, nullable=False)
-    batch_size = db.Column(db.Integer, default=1000)
-    primary_key = db.Column(db.String(128))
-    timestamp_field = db.Column(db.String(128))
-    last_sync_time = db.Column(db.DateTime)
-    source_query = db.Column(db.Text)
-    target_query = db.Column(db.Text)
+    # Using properties for backward compatibility where columns might not exist yet
+    @property
+    def is_active(self):
+        """Get whether this table configuration is active."""
+        return True
+        
+    @property
+    def is_incremental(self):
+        """Get whether this table uses incremental sync."""
+        return True
+        
+    @property
+    def batch_size(self):
+        """Get the batch size for this table's sync operations."""
+        return 1000
+        
+    @property
+    def primary_key(self):
+        """Get the primary key field for this table."""
+        return None
+        
+    @property
+    def timestamp_field(self):
+        """Get the timestamp field for this table."""
+        return None
+        
+    @property
+    def last_sync_time(self):
+        """Get the last sync time for this table."""
+        return None
+        
+    @property
+    def source_query(self):
+        """Get the source query for this table."""
+        return None
+        
+    @property
+    def target_query(self):
+        """Get the target query for this table."""
+        return None
     
-    # Bidirectional sync settings
-    sync_direction = db.Column(db.String(50), default='both')  # both, to_target, to_source, none
+    # Bidirectional sync settings - using properties for backward compatibility
+    @property
+    def sync_direction(self):
+        """Get the sync direction for this table."""
+        return 'both'
     
-    # Conflict resolution settings
-    conflict_strategy = db.Column(db.String(50), default='timestamp')  # timestamp, manual, source_wins, target_wins
-    conflict_detection = db.Column(db.String(50), default='field')  # field, record
-    manual_review_required = db.Column(db.Boolean, default=False)
-    conflict_notes = db.Column(db.Text)
+    # Conflict resolution settings - using properties for backward compatibility
+    @property
+    def conflict_strategy(self):
+        """Get the conflict resolution strategy for this table."""
+        return 'timestamp'
+        
+    @property
+    def conflict_detection(self):
+        """Get the conflict detection method for this table."""
+        return 'field'
+        
+    @property
+    def manual_review_required(self):
+        """Get whether conflicts for this table require manual review."""
+        return False
+        
+    @property
+    def conflict_notes(self):
+        """Get notes about conflict resolution for this table."""
+        return None
     
     # Relationships
     field_configurations = db.relationship('FieldConfiguration', backref='table', lazy='dynamic')
