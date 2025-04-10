@@ -445,17 +445,16 @@ def register_sync_routes(bp):
         """Add a new sanitization rule."""
         try:
             # Create a new rule
-            rule = FieldSanitizationRule(
-                table_name=request.form.get('table_name'),
-                field_name=request.form.get('field_name'),
-                field_type=request.form.get('field_type'),
-                strategy=request.form.get('strategy'),
-                description=request.form.get('description'),
-                is_active=True,
-                created_by=session['user']['id'] if is_authenticated() else None,
-                created_at=datetime.datetime.utcnow(),
-                updated_at=datetime.datetime.utcnow()
-            )
+            rule = FieldSanitizationRule()
+            rule.table_name = request.form.get('table_name')
+            rule.field_name = request.form.get('field_name')
+            rule.field_type = request.form.get('field_type')
+            rule.strategy = request.form.get('strategy')
+            rule.description = request.form.get('description')
+            rule.is_active = True
+            rule.created_by = session['user']['id'] if is_authenticated() else None
+            rule.created_at = datetime.datetime.utcnow()
+            rule.updated_at = datetime.datetime.utcnow()
             
             # Add and commit to database
             db.session.add(rule)
@@ -548,14 +547,13 @@ def register_sync_routes(bp):
             # Get or create email configuration
             email_config = NotificationConfig.query.filter_by(channel_type='email').first()
             if not email_config:
-                email_config = NotificationConfig(
-                    channel_type='email',
-                    enabled=False,
-                    config={},
-                    created_at=datetime.datetime.utcnow(),
-                    updated_at=datetime.datetime.utcnow(),
-                    updated_by=session['user']['id'] if is_authenticated() else None
-                )
+                email_config = NotificationConfig()
+                email_config.channel_type = 'email'
+                email_config.enabled = False
+                email_config.config = {}
+                email_config.created_at = datetime.datetime.utcnow()
+                email_config.updated_at = datetime.datetime.utcnow()
+                email_config.updated_by = session['user']['id'] if is_authenticated() else None
                 db.session.add(email_config)
             
             # Update configuration
@@ -604,14 +602,13 @@ def register_sync_routes(bp):
             # Get or create Slack configuration
             slack_config = NotificationConfig.query.filter_by(channel_type='slack').first()
             if not slack_config:
-                slack_config = NotificationConfig(
-                    channel_type='slack',
-                    enabled=False,
-                    config={},
-                    created_at=datetime.datetime.utcnow(),
-                    updated_at=datetime.datetime.utcnow(),
-                    updated_by=session['user']['id'] if is_authenticated() else None
-                )
+                slack_config = NotificationConfig()
+                slack_config.channel_type = 'slack'
+                slack_config.enabled = False
+                slack_config.config = {}
+                slack_config.created_at = datetime.datetime.utcnow()
+                slack_config.updated_at = datetime.datetime.utcnow()
+                slack_config.updated_by = session['user']['id'] if is_authenticated() else None
                 db.session.add(slack_config)
             
             # Update configuration
@@ -785,9 +782,6 @@ def register_sync_routes(bp):
         } for log in logs]
         
         return jsonify({'logs': log_list})
-        
-        # GET request - show edit form
-        return render_template('sync/edit_schedule.html', schedule=schedule)
     
     @bp.route('/schedules/<int:schedule_id>/delete')
     @login_required
