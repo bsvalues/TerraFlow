@@ -178,10 +178,33 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Get pending changes count (to be implemented with actual API call)
-        setTimeout(function() {
-            document.getElementById('pending-changes-count').innerText = 'No pending changes detected.';
-        }, 1000);
+        // Function to load pending changes count
+        function loadPendingChangesCount() {
+            fetch('/sync/api/pending-changes-count')
+                .then(response => response.json())
+                .then(data => {
+                    const pendingChangesElement = document.getElementById('pending-changes-count');
+                    if (data.count > 0) {
+                        pendingChangesElement.innerHTML = `<strong>${data.count}</strong> pending change${data.count !== 1 ? 's' : ''} ready to be synchronized to production.`;
+                        pendingChangesElement.classList.add('text-success');
+                        pendingChangesElement.classList.remove('text-muted');
+                    } else {
+                        pendingChangesElement.innerText = 'No pending changes detected.';
+                        pendingChangesElement.classList.add('text-muted');
+                        pendingChangesElement.classList.remove('text-success');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching pending changes count:', error);
+                    document.getElementById('pending-changes-count').innerText = 'Error checking for pending changes.';
+                });
+        }
+        
+        // Load pending changes count on page load
+        loadPendingChangesCount();
+        
+        // Refresh every 30 seconds
+        setInterval(loadPendingChangesCount, 30000);
     });
 </script>
 {% endblock %}

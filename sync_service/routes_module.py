@@ -4,6 +4,7 @@ Routes for the Sync Service module.
 These routes provide API endpoints for configuring, controlling, and monitoring
 the synchronization process.
 """
+import datetime
 from flask import render_template, request, jsonify, session, flash, redirect, url_for
 from app import db
 from sync_service.models import (
@@ -12,95 +13,6 @@ from sync_service.models import (
 from sync_service.sync_engine import SyncEngine
 from sync_service.bidirectional_sync import DataSynchronizer
 from auth import login_required, permission_required, role_required
-
-# Helper class for API response consistency
-class DataSynchronizer:
-    """Helper class for synchronization operations through the API."""
-    
-    @staticmethod
-    def get_job_status(job_id):
-        """Get the status of a job."""
-        job = SyncJob.query.filter_by(job_id=job_id).first()
-        if not job:
-            return {"status": "not_found", "message": "Job not found"}
-        
-        return {
-            "status": job.status,
-            "job_id": job.job_id,
-            "name": job.name,
-            "start_time": job.start_time.isoformat() if job.start_time else None,
-            "end_time": job.end_time.isoformat() if job.end_time else None,
-            "total_records": job.total_records,
-            "processed_records": job.processed_records,
-            "error_records": job.error_records,
-            "error_details": job.error_details,
-            "progress": (job.processed_records / job.total_records * 100) if job.total_records > 0 else 0
-        }
-    
-    @staticmethod
-    def get_job_logs(job_id, level=None, limit=100):
-        """Get logs for a job."""
-        query = SyncLog.query.filter_by(job_id=job_id)
-        
-        if level:
-            query = query.filter_by(level=level.upper())
-            
-        logs = query.order_by(SyncLog.created_at.desc()).limit(limit).all()
-        
-        return [{
-            "timestamp": log.created_at.isoformat(),
-            "level": log.level,
-            "message": log.message,
-            "component": log.component,
-            "table_name": log.table_name,
-            "record_count": log.record_count,
-            "duration_ms": log.duration_ms
-        } for log in logs]
-    
-    @staticmethod
-    def start_incremental_sync(user_id):
-        """Start an incremental sync job."""
-        engine = SyncEngine(user_id=user_id)
-        engine.job.job_type = 'incremental'
-        db.session.commit()
-        
-        engine.start_sync()
-        return engine.job_id
-    
-    @staticmethod
-    def start_full_sync(user_id):
-        """Start a full sync job."""
-        engine = SyncEngine(user_id=user_id)
-        engine.job.job_type = 'full'
-        db.session.commit()
-        
-        engine.start_sync()
-        return engine.job_id
-    
-    @staticmethod
-    def start_property_export(user_id, database_name, num_years, min_bill_years):
-        """Start a property export job."""
-        engine = SyncEngine(user_id=user_id)
-        engine.job.job_type = 'property_export'
-        engine.job.name = f"Property Export to {database_name}"
-        db.session.commit()
-        
-        # TODO: Implement property export functionality
-        # This will be part of another implementation
-        
-        return engine.job_id
-    
-    @staticmethod
-    def start_up_sync(user_id):
-        """Start an up-sync job (training to production)."""
-        # This will be implemented in the bidirectional sync feature
-        return "up_sync_job_id"
-    
-    @staticmethod
-    def start_down_sync(user_id):
-        """Start a down-sync job (production to training)."""
-        # This will be implemented in the bidirectional sync feature
-        return "down_sync_job_id"
 
 def register_sync_routes(bp):
     """Register routes with the provided blueprint."""
@@ -296,7 +208,21 @@ def register_sync_routes(bp):
     @role_required('administrator')
     def bidirectional_sync():
         """Bi-directional sync dashboard."""
-        return render_template('sync/bidirectional_sync.html')
+        # Get recent bidirectional sync jobs
+        recent_jobs = SyncJob.query.filter(
+            SyncJob.job_type.in_(['up_sync', 'down_sync'])
+        ).order_by(SyncJob.created_at.desc()).limit(10).all()
+        
+        # Get global settings
+        global_settings = GlobalSetting.query.first()
+        
+        # Get current time for calculating "hours ago"
+        now = datetime.datetime.utcnow()
+        
+        return render_template('sync/bidirectional_sync.html', 
+                              recent_jobs=recent_jobs,
+                              global_settings=global_settings,
+                              now=now)
         
     @bp.route('/run/up-sync')
     @login_required
@@ -342,4 +268,17 @@ def register_sync_routes(bp):
             'job_id': job_id,
             'status': 'started',
             'message': "Down-sync job started successfully."
+        })
+        
+    @bp.route('/api/pending-changes-count')
+    @login_required
+    @role_required('administrator')
+    def api_pending_changes_count():
+        """Get the count of pending changes for up-sync."""
+        from sync_service.bidirectional_sync import DataSynchronizer
+        count = DataSynchronizer.get_pending_changes_count()
+        
+        return jsonify({
+            'count': count,
+            'message': f"{count} pending change{'s' if count != 1 else ''} found"
         })
