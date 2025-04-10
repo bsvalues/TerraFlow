@@ -12,7 +12,7 @@ import time
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from app import db, app
-from models import Role, Permission, User, RolePermission, UserRole
+from models import Role, Permission, User
 
 def populate_roles():
     """Populate the database with initial roles and permissions"""
@@ -94,7 +94,7 @@ def populate_roles():
         # Administrator gets all permissions
         all_permissions = Permission.query.all()
         for perm in all_permissions:
-            if not RolePermission.query.filter_by(role_id=administrator.id, permission_id=perm.id).first():
+            if perm not in administrator.permissions:
                 administrator.permissions.append(perm)
         
         # Assessor permissions
@@ -104,7 +104,7 @@ def populate_roles():
         
         for perm_name in assessor_perms:
             perm = Permission.query.filter_by(name=perm_name).first()
-            if perm and not RolePermission.query.filter_by(role_id=assessor.id, permission_id=perm.id).first():
+            if perm and perm not in assessor.permissions:
                 assessor.permissions.append(perm)
         
         # IT Staff permissions
@@ -115,7 +115,7 @@ def populate_roles():
                    
         for perm_name in it_perms:
             perm = Permission.query.filter_by(name=perm_name).first()
-            if perm and not RolePermission.query.filter_by(role_id=it_staff.id, permission_id=perm.id).first():
+            if perm and perm not in it_staff.permissions:
                 it_staff.permissions.append(perm)
                 
         # GIS Analyst permissions
@@ -126,7 +126,7 @@ def populate_roles():
                     
         for perm_name in gis_perms:
             perm = Permission.query.filter_by(name=perm_name).first()
-            if perm and not RolePermission.query.filter_by(role_id=gis_analyst.id, permission_id=perm.id).first():
+            if perm and perm not in gis_analyst.permissions:
                 gis_analyst.permissions.append(perm)
         
         # Read-only permissions
@@ -134,7 +134,7 @@ def populate_roles():
         
         for perm_name in readonly_perms:
             perm = Permission.query.filter_by(name=perm_name).first()
-            if perm and not RolePermission.query.filter_by(role_id=readonly.id, permission_id=perm.id).first():
+            if perm and perm not in readonly.permissions:
                 readonly.permissions.append(perm)
         
         # Commit all role-permission mappings
@@ -153,7 +153,7 @@ def populate_roles():
             db.session.commit()
             
             # Assign administrator role
-            if not UserRole.query.filter_by(user_id=dev_user.id, role_id=administrator.id).first():
+            if administrator not in dev_user.roles:
                 dev_user.roles.append(administrator)
                 db.session.commit()
                 print(f"Created development user with administrator role: {dev_user.username}")
