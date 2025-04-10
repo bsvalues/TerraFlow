@@ -34,8 +34,44 @@ def verification_dashboard():
     except:
         pass
     
+    # Get deployment information
+    version = "1.0.0"
+    build_id = "c4fd8ba"
+    environment = "Development"
+    last_deployment = "2025-04-10 08:15 AM"
+    
+    # Get the 5 most recent jobs to determine system status
+    recent_jobs = SyncJob.query.order_by(SyncJob.created_at.desc()).limit(5).all()
+    
+    # Get system version from database if available
+    try:
+        from sync_service.models import GlobalSetting
+        version_setting = GlobalSetting.query.filter_by(setting_key='system_version').first()
+        if version_setting:
+            version = version_setting.setting_value
+            
+        build_setting = GlobalSetting.query.filter_by(setting_key='build_id').first()
+        if build_setting:
+            build_id = build_setting.setting_value
+            
+        env_setting = GlobalSetting.query.filter_by(setting_key='environment').first()
+        if env_setting:
+            environment = env_setting.setting_value
+            
+        deploy_setting = GlobalSetting.query.filter_by(setting_key='last_deployment_date').first()
+        if deploy_setting:
+            last_deployment = deploy_setting.setting_value
+    except:
+        # If we can't get version info from database, use defaults
+        pass
+    
     return render_template('verification/dashboard.html', 
-                          sql_server_status=sql_server_status)
+                          sql_server_status=sql_server_status,
+                          version=version,
+                          build_id=build_id,
+                          environment=environment,
+                          last_deployment=last_deployment,
+                          now=datetime.datetime.utcnow().strftime('%Y-%m-%d'))
 
 @verification_bp.route('/verify-sql-connection')
 @login_required
