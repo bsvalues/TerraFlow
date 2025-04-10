@@ -143,83 +143,8 @@ class FieldConfiguration(db.Model):
     def __repr__(self):
         return f"<FieldConfiguration {self.table_name}.{self.field_name}>"
 
-class GlobalSetting(db.Model):
-    """Global settings for synchronization"""
-    __tablename__ = 'global_settings'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    is_sync_enabled = db.Column(db.Boolean, default=True)
-    last_sync_time = db.Column(db.DateTime)
-    last_sync_job_id = db.Column(db.String(50))
-    sync_frequency_hours = db.Column(db.Integer, default=24)
-    
-    is_property_export_enabled = db.Column(db.Boolean, default=True)
-    last_property_export_time = db.Column(db.DateTime)
-    last_property_export_job_id = db.Column(db.String(50))
-    
-    last_up_sync_time = db.Column(db.DateTime)
-    last_up_sync_job_id = db.Column(db.String(50))
-    
-    last_down_sync_time = db.Column(db.DateTime)
-    last_down_sync_job_id = db.Column(db.String(50))
-    
-    # Conflict resolution settings
-    default_conflict_strategy = db.Column(db.String(50), default='timestamp')  # timestamp, manual
-    default_conflict_winner = db.Column(db.String(50), default='source')  # source, target
-    conflict_resolution_enabled = db.Column(db.Boolean, default=True)
-    
-    # Automatic conflict detection and resolution for timestamp-based conflicts
-    field_level_conflict_detection = db.Column(db.Boolean, default=True)
-    auto_resolve_timestamp_conflicts = db.Column(db.Boolean, default=True)
-    manual_resolution_threshold = db.Column(db.Integer, default=10)  # Number of conflicts before switching to manual mode
-    
-    # Data sanitization settings
-    data_sanitization_enabled = db.Column(db.Boolean, default=True)
-    sanitize_personal_data = db.Column(db.Boolean, default=True)
-    sanitize_financial_data = db.Column(db.Boolean, default=True)
-    sanitize_credentials = db.Column(db.Boolean, default=True)
-    custom_sanitization_rules = db.Column(db.JSON, default={})
-    
-    # Notification settings
-    notifications_enabled = db.Column(db.Boolean, default=True)
-    
-    # Email notification settings
-    notification_email = db.Column(db.String(255))
-    smtp_server = db.Column(db.String(255), default='localhost')
-    smtp_port = db.Column(db.Integer, default=587)
-    smtp_username = db.Column(db.String(255))
-    smtp_password = db.Column(db.String(255))
-    notification_from_email = db.Column(db.String(255), default='sync-service@example.com')
-    
-    # SMS notification settings
-    sms_notifications_enabled = db.Column(db.Boolean, default=False)
-    sms_api_url = db.Column(db.String(255))
-    sms_api_key = db.Column(db.String(255))
-    sms_api_secret = db.Column(db.String(255))
-    sms_from_number = db.Column(db.String(50))
-    sms_to_numbers = db.Column(db.JSON, default=[])
-    
-    # Slack notification settings
-    slack_notifications_enabled = db.Column(db.Boolean, default=False)
-    slack_webhook_url = db.Column(db.String(255))
-    slack_channel = db.Column(db.String(50))
-    slack_username = db.Column(db.String(50), default='Sync Service')
-    
-    # Notification severity routing
-    notification_severity_routing = db.Column(db.JSON, default={
-        'info': ['log'],
-        'warning': ['log', 'email'],
-        'error': ['log', 'email', 'slack'],
-        'critical': ['log', 'email', 'slack', 'sms']
-    })
-    
-    system_user_id = db.Column(db.Integer)
-    
-    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, nullable=False)
-    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
-    
-    def __repr__(self):
-        return f"<GlobalSetting {self.id}>"
+# Note: GlobalSetting has been moved to models/sync_tables.py
+# Avoid directly importing this model from models.py, use the one in models/__init__.py instead
 
 class UpSyncDataChange(db.Model):
     """A record of data changes for up-sync operations (training to production)"""

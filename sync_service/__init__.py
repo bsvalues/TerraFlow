@@ -115,8 +115,9 @@ def register_blueprints(app):
         
         # Initialize models
         with app.app_context():
+            # Import the models from the correct modules
             from sync_service.models import (
-                SyncJob, SyncLog, TableConfiguration, FieldConfiguration, 
+                SyncJob, SyncLog, TableConfiguration, FieldConfiguration,
                 GlobalSetting, SyncConflict, SyncSchedule
             )
             from sync_service.data_sanitization import SanitizationLog
