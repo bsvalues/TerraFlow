@@ -298,6 +298,7 @@ class ParcelChangeIndexLog(SyncBase, db.Model):
 
 class GlobalSetting(SyncBase, db.Model):
     """Global settings for the sync process."""
+    __tablename__ = 'global_setting'  # Explicitly set the table name to match existing table
 
     cama_cloud_state = db.Column(db.String(128), nullable=False)
     last_sync_job_id = db.Column(db.String(36))
@@ -326,27 +327,93 @@ class GlobalSetting(SyncBase, db.Model):
     last_clean_data_job_id = db.Column(db.String(36))
     clean_data_run_id = db.Column(db.Integer)
     
-    # Data sanitization settings
-    sanitization_enabled = db.Column(db.Boolean, default=True, nullable=False)
-    sanitization_level = db.Column(db.String(50), default='standard')  # minimal, standard, strict
-    sanitization_rules = db.Column(JSON, default={})
-    sanitization_exclude_tables = db.Column(db.String(1024))  # CSV list of tables to exclude
-    sanitization_include_tables = db.Column(db.String(1024))  # CSV list of tables to include
-    
-    # Notification settings
-    notification_enabled = db.Column(db.Boolean, default=True, nullable=False)
-    email_notifications = db.Column(db.Boolean, default=True, nullable=False)
-    sms_notifications = db.Column(db.Boolean, default=False, nullable=False)
-    webhook_notifications = db.Column(db.Boolean, default=False, nullable=False)
-    email_recipients = db.Column(db.String(1024))  # CSV list of email addresses
-    sms_recipients = db.Column(db.String(1024))  # CSV list of phone numbers
-    webhook_urls = db.Column(db.String(1024))  # CSV list of webhook URLs
-    
-    # Severity routing
-    critical_notification_channels = db.Column(db.String(255), default='email,log')  # CSV list of channels
-    error_notification_channels = db.Column(db.String(255), default='email,log')  # CSV list of channels
-    warning_notification_channels = db.Column(db.String(255), default='log')  # CSV list of channels
-    info_notification_channels = db.Column(db.String(255), default='log')  # CSV list of channels
+    # These properties will be added to the actual database in a controlled migration
+    # For now they are defined as @property methods to avoid errors with missing columns
+
+    @property
+    def system_user_id(self):
+        """Default system user ID for scheduled jobs."""
+        return 1
+        
+    @property
+    def sanitization_enabled(self):
+        """Whether data sanitization is enabled."""
+        return True
+        
+    @property
+    def sanitization_level(self):
+        """Level of data sanitization (minimal, standard, strict)."""
+        return 'standard'
+        
+    @property
+    def sanitization_rules(self):
+        """Custom sanitization rules."""
+        return {}
+        
+    @property
+    def sanitization_exclude_tables(self):
+        """Tables to exclude from sanitization."""
+        return ''
+        
+    @property
+    def sanitization_include_tables(self):
+        """Tables to include in sanitization."""
+        return ''
+        
+    @property
+    def notification_enabled(self):
+        """Whether notifications are enabled."""
+        return True
+        
+    @property
+    def email_notifications(self):
+        """Whether email notifications are enabled."""
+        return True
+        
+    @property
+    def sms_notifications(self):
+        """Whether SMS notifications are enabled."""
+        return False
+        
+    @property
+    def webhook_notifications(self):
+        """Whether webhook notifications are enabled."""
+        return False
+        
+    @property
+    def email_recipients(self):
+        """Email recipients for notifications."""
+        return ''
+        
+    @property
+    def sms_recipients(self):
+        """SMS recipients for notifications."""
+        return ''
+        
+    @property
+    def webhook_urls(self):
+        """Webhook URLs for notifications."""
+        return ''
+        
+    @property
+    def critical_notification_channels(self):
+        """Channels for critical notifications."""
+        return 'email,log'
+        
+    @property
+    def error_notification_channels(self):
+        """Channels for error notifications."""
+        return 'email,log'
+        
+    @property
+    def warning_notification_channels(self):
+        """Channels for warning notifications."""
+        return 'log'
+        
+    @property
+    def info_notification_channels(self):
+        """Channels for info notifications."""
+        return 'log'
     
     def __repr__(self):
         return f"<GlobalSetting id={self.id} state={self.cama_cloud_state}>"
