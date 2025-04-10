@@ -1,0 +1,341 @@
+{% extends "layout.html" %}
+
+{% block title %}Property Export Verification{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <h1 class="mb-4">
+        <i class="fas fa-check-circle me-2"></i>Property Export Verification Dashboard
+    </h1>
+    
+    <div class="row">
+        <div class="col-lg-4">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-database me-2"></i>SQL Server Connection
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Status: 
+                        <span id="sql-status-badge" class="badge {% if sql_server_status == 'Verified' %}bg-success{% elif sql_server_status == 'Not Configured' %}bg-danger{% else %}bg-warning{% endif %}">
+                            {{ sql_server_status }}
+                        </span>
+                    </p>
+                    <div id="sql-connection-details" class="mt-3 d-none">
+                        <h6>Connection Details:</h6>
+                        <pre id="sql-connection-json" class="p-3 bg-light rounded"><code>Waiting for verification...</code></pre>
+                    </div>
+                    <div class="d-grid gap-2 mt-3">
+                        <button id="verify-sql-connection" class="btn btn-primary">
+                            <i class="fas fa-sync-alt me-2"></i>Verify Connection
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-code me-2"></i>Stored Procedure Test
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form id="stored-procedure-form">
+                        <div class="mb-3">
+                            <label for="database-name" class="form-label">Database Name</label>
+                            <input type="text" class="form-control" id="database-name" value="web_internet_benton">
+                        </div>
+                        <div class="mb-3">
+                            <label for="num-years" class="form-label">Number of Years</label>
+                            <input type="number" class="form-control" id="num-years" value="1">
+                            <small class="text-muted">Use 1 for minimal testing, -1 for all years</small>
+                        </div>
+                        <div class="mb-3">
+                            <label for="min-bill-years" class="form-label">Minimum Billing Years</label>
+                            <input type="number" class="form-control" id="min-bill-years" value="2">
+                        </div>
+                    </form>
+                    
+                    <div id="stored-procedure-results" class="mt-3 d-none">
+                        <h6>Test Results:</h6>
+                        <div id="sp-status-badge" class="mb-2"></div>
+                        <pre id="sp-results-json" class="p-3 bg-light rounded"><code>Waiting for test results...</code></pre>
+                    </div>
+                    
+                    <div class="d-grid gap-2 mt-3">
+                        <button id="test-stored-procedure" class="btn btn-primary">
+                            <i class="fas fa-vial me-2"></i>Test Stored Procedure
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-link me-2"></i>API Endpoints Validation
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Validate that all API endpoints required for property export are correctly configured.
+                    </p>
+                    
+                    <div id="api-validation-results" class="mt-3 d-none">
+                        <h6>Validation Results:</h6>
+                        <div id="api-status-badge" class="mb-2"></div>
+                        <pre id="api-results-json" class="p-3 bg-light rounded"><code>Waiting for validation results...</code></pre>
+                    </div>
+                    
+                    <div class="d-grid gap-2 mt-3">
+                        <button id="validate-api-endpoints" class="btn btn-primary">
+                            <i class="fas fa-check me-2"></i>Validate API Endpoints
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-lg-6">
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-tasks me-2"></i>Pre-Deployment Validation
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Run a complete validation suite to ensure all components are ready for deployment.
+                    </p>
+                    
+                    <div id="full-validation-results" class="mt-3 d-none">
+                        <h6>Validation Results:</h6>
+                        <div id="full-status-badge" class="mb-2"></div>
+                        <pre id="full-results-json" class="p-3 bg-light rounded"><code>Waiting for validation results...</code></pre>
+                    </div>
+                    
+                    <div class="d-grid gap-2 mt-3">
+                        <button id="run-full-validation" class="btn btn-success">
+                            <i class="fas fa-check-double me-2"></i>Run Full Validation
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-6">
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-flask me-2"></i>Automated Test Suite
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Run an automated test suite with multiple scenarios to thoroughly test the property export functionality.
+                    </p>
+                    
+                    <div id="test-suite-results" class="mt-3 d-none">
+                        <h6>Test Suite Results:</h6>
+                        <div id="test-suite-status" class="mb-2"></div>
+                        <div id="test-suite-summary" class="alert alert-info"></div>
+                        <pre id="test-suite-json" class="p-3 bg-light rounded"><code>Waiting for test results...</code></pre>
+                    </div>
+                    
+                    <div class="d-grid gap-2 mt-3">
+                        <button id="run-test-suite" class="btn btn-info text-white">
+                            <i class="fas fa-vials me-2"></i>Run Test Suite
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $(document).ready(function() {
+        // Verify SQL Server connection
+        $('#verify-sql-connection').click(function() {
+            const button = $(this);
+            button.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Verifying...');
+            
+            $.ajax({
+                url: "{{ url_for('verification.verify_sql_connection') }}",
+                type: "GET",
+                success: function(response) {
+                    button.prop('disabled', false).html('<i class="fas fa-sync-alt me-2"></i>Verify Connection');
+                    
+                    // Update the status badge
+                    const statusBadge = $('#sql-status-badge');
+                    if (response.success) {
+                        statusBadge.removeClass('bg-warning bg-danger').addClass('bg-success').text('Verified');
+                    } else {
+                        statusBadge.removeClass('bg-success bg-warning').addClass('bg-danger').text('Failed');
+                    }
+                    
+                    // Show the details
+                    $('#sql-connection-details').removeClass('d-none');
+                    $('#sql-connection-json').html('<code>' + JSON.stringify(response, null, 2) + '</code>');
+                },
+                error: function() {
+                    button.prop('disabled', false).html('<i class="fas fa-sync-alt me-2"></i>Verify Connection');
+                    alert('Error verifying SQL Server connection');
+                }
+            });
+        });
+        
+        // Test stored procedure
+        $('#test-stored-procedure').click(function() {
+            const button = $(this);
+            button.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Testing...');
+            
+            const databaseName = $('#database-name').val();
+            const numYears = $('#num-years').val();
+            const minBillYears = $('#min-bill-years').val();
+            
+            $.ajax({
+                url: "{{ url_for('verification.test_stored_procedure') }}",
+                type: "GET",
+                data: {
+                    database_name: databaseName,
+                    num_years: numYears,
+                    min_bill_years: minBillYears
+                },
+                success: function(response) {
+                    button.prop('disabled', false).html('<i class="fas fa-vial me-2"></i>Test Stored Procedure');
+                    
+                    // Show the results
+                    $('#stored-procedure-results').removeClass('d-none');
+                    
+                    // Update the status badge
+                    const statusBadge = $('#sp-status-badge');
+                    statusBadge.html('');
+                    if (response.success) {
+                        statusBadge.append('<span class="badge bg-success">Success</span>');
+                    } else {
+                        statusBadge.append('<span class="badge bg-danger">Failed</span>');
+                    }
+                    
+                    $('#sp-results-json').html('<code>' + JSON.stringify(response, null, 2) + '</code>');
+                },
+                error: function() {
+                    button.prop('disabled', false).html('<i class="fas fa-vial me-2"></i>Test Stored Procedure');
+                    alert('Error testing stored procedure');
+                }
+            });
+        });
+        
+        // Validate API endpoints
+        $('#validate-api-endpoints').click(function() {
+            const button = $(this);
+            button.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Validating...');
+            
+            $.ajax({
+                url: "{{ url_for('verification.validate_api_endpoints') }}",
+                type: "GET",
+                success: function(response) {
+                    button.prop('disabled', false).html('<i class="fas fa-check me-2"></i>Validate API Endpoints');
+                    
+                    // Show the results
+                    $('#api-validation-results').removeClass('d-none');
+                    
+                    // Update the status badge
+                    const statusBadge = $('#api-status-badge');
+                    statusBadge.html('');
+                    if (response.success) {
+                        statusBadge.append('<span class="badge bg-success">All Endpoints Valid</span>');
+                    } else {
+                        statusBadge.append('<span class="badge bg-danger">Some Endpoints Missing</span>');
+                    }
+                    
+                    $('#api-results-json').html('<code>' + JSON.stringify(response, null, 2) + '</code>');
+                },
+                error: function() {
+                    button.prop('disabled', false).html('<i class="fas fa-check me-2"></i>Validate API Endpoints');
+                    alert('Error validating API endpoints');
+                }
+            });
+        });
+        
+        // Run full validation
+        $('#run-full-validation').click(function() {
+            const button = $(this);
+            button.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Validating...');
+            
+            $.ajax({
+                url: "{{ url_for('verification.full_validation') }}",
+                type: "GET",
+                success: function(response) {
+                    button.prop('disabled', false).html('<i class="fas fa-check-double me-2"></i>Run Full Validation');
+                    
+                    // Show the results
+                    $('#full-validation-results').removeClass('d-none');
+                    
+                    // Update the status badge
+                    const statusBadge = $('#full-status-badge');
+                    statusBadge.html('');
+                    if (response.overall_status === 'passed') {
+                        statusBadge.append('<span class="badge bg-success">All Checks Passed</span>');
+                    } else {
+                        statusBadge.append('<span class="badge bg-danger">Some Checks Failed</span>');
+                    }
+                    
+                    $('#full-results-json').html('<code>' + JSON.stringify(response, null, 2) + '</code>');
+                },
+                error: function() {
+                    button.prop('disabled', false).html('<i class="fas fa-check-double me-2"></i>Run Full Validation');
+                    alert('Error running full validation');
+                }
+            });
+        });
+        
+        // Run test suite
+        $('#run-test-suite').click(function() {
+            const button = $(this);
+            button.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Running Tests...');
+            
+            $.ajax({
+                url: "{{ url_for('verification.automated_test_suite') }}",
+                type: "GET",
+                success: function(response) {
+                    button.prop('disabled', false).html('<i class="fas fa-vials me-2"></i>Run Test Suite');
+                    
+                    // Show the results
+                    $('#test-suite-results').removeClass('d-none');
+                    
+                    // Update the status badge
+                    const statusBadge = $('#test-suite-status');
+                    statusBadge.html('');
+                    if (response.summary.overall_status === 'passed') {
+                        statusBadge.append('<span class="badge bg-success">All Tests Passed</span>');
+                    } else {
+                        statusBadge.append('<span class="badge bg-danger">Some Tests Failed</span>');
+                    }
+                    
+                    // Update the summary
+                    $('#test-suite-summary').html(`
+                        <strong>Summary:</strong> ${response.summary.passed}/${response.summary.total_tests} tests passed
+                    `);
+                    
+                    $('#test-suite-json').html('<code>' + JSON.stringify(response, null, 2) + '</code>');
+                },
+                error: function() {
+                    button.prop('disabled', false).html('<i class="fas fa-vials me-2"></i>Run Test Suite');
+                    alert('Error running test suite');
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}
