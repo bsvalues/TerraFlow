@@ -61,19 +61,18 @@ class ConflictResolutionStrategy:
             return
             
         # Create conflict log entry
-        log_entry = SyncLog(
-            job_id=self.job_id,
-            level="warning",
-            message=f"Conflict in {table_name}.{field_name} for record {record_id}",
-            details={
-                "table": table_name,
-                "record_id": str(record_id),
-                "field": field_name,
-                "source_value": str(source_value),
-                "target_value": str(target_value),
-                "resolution": resolution
-            }
-        )
+        log_entry = SyncLog()
+        log_entry.job_id = self.job_id
+        log_entry.level = "warning"
+        log_entry.message = f"Conflict in {table_name}.{field_name} for record {record_id}"
+        log_entry.details = {
+            "table": table_name,
+            "record_id": str(record_id),
+            "field": field_name,
+            "source_value": str(source_value),
+            "target_value": str(target_value),
+            "resolution": resolution
+        }
         
         # Add to session and commit
         db.session.add(log_entry)

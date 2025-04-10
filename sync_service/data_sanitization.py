@@ -381,28 +381,26 @@ class DataSanitizer:
             return
         
         # Create sanitization log entry
-        log_entry = SanitizationLog(
-            job_id=self.job_id,
-            table_name=table_name,
-            field_name=field_name,
-            record_id=str(record_id) if record_id is not None else 'unknown',
-            sanitization_type=sanitization_type,
-            was_modified=was_modified,
-            context=context or {}
-        )
+        log_entry = SanitizationLog()
+        log_entry.job_id = self.job_id
+        log_entry.table_name = table_name
+        log_entry.field_name = field_name
+        log_entry.record_id = str(record_id) if record_id is not None else 'unknown'
+        log_entry.sanitization_type = sanitization_type
+        log_entry.was_modified = was_modified
+        log_entry.context_data = context or {}  # Note: Using context_data here instead of context
         
         # Add to session and commit
         db.session.add(log_entry)
         db.session.commit()
         
         # Also log to sync log
-        sync_log = SyncLog(
-            job_id=self.job_id,
-            level='INFO' if was_modified else 'DEBUG',
-            message=f"Sanitized {table_name}.{field_name} using {sanitization_type}",
-            component='DataSanitizer',
-            table_name=table_name
-        )
+        sync_log = SyncLog()
+        sync_log.job_id = self.job_id
+        sync_log.level = 'INFO' if was_modified else 'DEBUG'
+        sync_log.message = f"Sanitized {table_name}.{field_name} using {sanitization_type}"
+        sync_log.component = 'DataSanitizer'
+        sync_log.table_name = table_name
         
         db.session.add(sync_log)
         db.session.commit()
