@@ -29,4 +29,5 @@ dependencies = [
     "pandas>=2.2.3",
     "openpyxl>=3.1.5",
     "simpledbf>=0.2.6",
+    "apscheduler>=3.11.0",
 ]

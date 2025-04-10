@@ -5,7 +5,17 @@ This module provides functionality for synchronizing data between
 production databases and the training environment through the Data Hub API Gateway.
 It also includes property export functionality for executing the ExportPropertyAccess
 stored procedure against SQL Server.
+
+Scheduled synchronization is supported through the APScheduler library,
+allowing automatic execution of sync jobs at regular intervals or according to
+cron expressions.
 """
+import logging
+import threading
+
+# Set up logging
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 # Basic imports that don't cause circular dependencies
 import os
@@ -25,6 +35,21 @@ def create_routes():
     
     # Register the routes with the blueprint
     register_sync_routes(sync_bp)
+    
+    # Initialize scheduler (threading.Thread is used to avoid blocking the main thread)
+    def init_scheduler_in_thread():
+        try:
+            from sync_service.scheduler import init_scheduler
+            scheduler = init_scheduler()
+            logger.info(f"Scheduler initialized with {len(scheduler.get_jobs())} jobs")
+        except Exception as e:
+            logger.error(f"Error initializing scheduler: {str(e)}")
+    
+    # Start the scheduler in a separate thread after a short delay
+    # to ensure the database is fully initialized
+    thread = threading.Timer(5.0, init_scheduler_in_thread)
+    thread.daemon = True
+    thread.start()
     
 def register_blueprints(app):
     """

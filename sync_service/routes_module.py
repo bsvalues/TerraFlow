@@ -282,3 +282,241 @@ def register_sync_routes(bp):
             'count': count,
             'message': f"{count} pending change{'s' if count != 1 else ''} found"
         })
+        
+    # Scheduler management routes
+    @bp.route('/schedules')
+    @login_required
+    @role_required('administrator')
+    def schedules():
+        """List all sync schedules."""
+        from sync_service.scheduler import get_job_next_run
+        
+        # Get all schedules
+        schedules = SyncSchedule.query.order_by(SyncSchedule.created_at.desc()).all()
+        
+        # Add next run time to each schedule
+        for schedule in schedules:
+            if schedule.job_id:
+                schedule.next_run = get_job_next_run(schedule.job_id)
+            else:
+                schedule.next_run = None
+                
+        return render_template('sync/schedules.html', schedules=schedules)
+    
+    @bp.route('/schedules/add', methods=['POST'])
+    @login_required
+    @role_required('administrator')
+    def add_schedule():
+        """Add a new sync schedule."""
+        from sync_service.scheduler import add_job_from_schedule
+        
+        try:
+            # Create new schedule from form data
+            schedule = SyncSchedule(
+                name=request.form.get('name'),
+                description=request.form.get('description'),
+                job_type=request.form.get('job_type'),
+                schedule_type=request.form.get('schedule_type'),
+                created_by=session['user']['id']
+            )
+            
+            # Set schedule details based on type
+            if schedule.schedule_type == 'cron':
+                schedule.cron_expression = request.form.get('cron_expression')
+            else:  # interval
+                schedule.interval_hours = int(request.form.get('interval_hours', 24))
+            
+            # For property export, add additional parameters
+            if schedule.job_type == 'property_export':
+                schedule.parameters = {
+                    'database_name': request.form.get('database_name', 'web_internet_benton'),
+                    'num_years': request.form.get('num_years', -1),
+                    'min_bill_years': request.form.get('min_bill_years', 2)
+                }
+            
+            # Save to database
+            db.session.add(schedule)
+            db.session.commit()
+            
+            # Add to scheduler
+            if add_job_from_schedule(schedule):
+                flash(f"Schedule '{schedule.name}' created successfully.", 'success')
+            else:
+                flash(f"Schedule saved but could not be activated.", 'warning')
+                
+            return redirect(url_for('sync.schedules'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Error creating schedule: {str(e)}", 'danger')
+            return redirect(url_for('sync.schedules'))
+    
+    @bp.route('/schedules/<int:schedule_id>/edit', methods=['GET', 'POST'])
+    @login_required
+    @role_required('administrator')
+    def edit_schedule(schedule_id):
+        """Edit an existing sync schedule."""
+        from sync_service.scheduler import update_job_schedule
+        
+        schedule = SyncSchedule.query.get_or_404(schedule_id)
+        
+        if request.method == 'POST':
+            try:
+                # Update schedule from form data
+                schedule.name = request.form.get('name')
+                schedule.description = request.form.get('description')
+                schedule.job_type = request.form.get('job_type')
+                schedule.schedule_type = request.form.get('schedule_type')
+                
+                # Set schedule details based on type
+                if schedule.schedule_type == 'cron':
+                    schedule.cron_expression = request.form.get('cron_expression')
+                    schedule.interval_hours = None
+                else:  # interval
+                    schedule.interval_hours = int(request.form.get('interval_hours', 24))
+                    schedule.cron_expression = None
+                
+                # For property export, add additional parameters
+                if schedule.job_type == 'property_export':
+                    schedule.parameters = {
+                        'database_name': request.form.get('database_name', 'web_internet_benton'),
+                        'num_years': request.form.get('num_years', -1),
+                        'min_bill_years': request.form.get('min_bill_years', 2)
+                    }
+                else:
+                    schedule.parameters = {}
+                
+                # Update last_updated timestamp
+                schedule.last_updated = datetime.datetime.utcnow()
+                
+                # Save to database
+                db.session.commit()
+                
+                # Update in scheduler
+                if update_job_schedule(schedule):
+                    flash(f"Schedule '{schedule.name}' updated successfully.", 'success')
+                else:
+                    flash(f"Schedule saved but could not be updated in the scheduler.", 'warning')
+                    
+                return redirect(url_for('sync.schedules'))
+                
+            except Exception as e:
+                db.session.rollback()
+                flash(f"Error updating schedule: {str(e)}", 'danger')
+                return redirect(url_for('sync.schedules'))
+        
+        # GET request - show edit form
+        return render_template('sync/edit_schedule.html', schedule=schedule)
+    
+    @bp.route('/schedules/<int:schedule_id>/delete')
+    @login_required
+    @role_required('administrator')
+    def delete_schedule(schedule_id):
+        """Delete a sync schedule."""
+        from sync_service.scheduler import remove_scheduled_job
+        
+        try:
+            schedule = SyncSchedule.query.get_or_404(schedule_id)
+            
+            # Remove from scheduler if active
+            if schedule.is_active and schedule.job_id:
+                remove_scheduled_job(schedule_id)
+            
+            # Get the name before deleting
+            schedule_name = schedule.name
+            
+            # Remove from database
+            db.session.delete(schedule)
+            db.session.commit()
+            
+            flash(f"Schedule '{schedule_name}' deleted successfully.", 'success')
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Error deleting schedule: {str(e)}", 'danger')
+            
+        return redirect(url_for('sync.schedules'))
+    
+    @bp.route('/schedules/<int:schedule_id>/pause')
+    @login_required
+    @role_required('administrator')
+    def pause_schedule(schedule_id):
+        """Pause a sync schedule."""
+        from sync_service.scheduler import pause_scheduled_job
+        
+        try:
+            if pause_scheduled_job(schedule_id):
+                flash("Schedule paused successfully.", 'success')
+            else:
+                flash("Could not pause schedule.", 'warning')
+                
+        except Exception as e:
+            flash(f"Error pausing schedule: {str(e)}", 'danger')
+            
+        return redirect(url_for('sync.schedules'))
+    
+    @bp.route('/schedules/<int:schedule_id>/resume')
+    @login_required
+    @role_required('administrator')
+    def resume_schedule(schedule_id):
+        """Resume a paused sync schedule."""
+        from sync_service.scheduler import resume_scheduled_job
+        
+        try:
+            if resume_scheduled_job(schedule_id):
+                flash("Schedule resumed successfully.", 'success')
+            else:
+                flash("Could not resume schedule.", 'warning')
+                
+        except Exception as e:
+            flash(f"Error resuming schedule: {str(e)}", 'danger')
+            
+        return redirect(url_for('sync.schedules'))
+    
+    @bp.route('/schedules/<int:schedule_id>/run-now')
+    @login_required
+    @role_required('administrator')
+    def run_schedule_now(schedule_id):
+        """Run a schedule immediately."""
+        try:
+            schedule = SyncSchedule.query.get_or_404(schedule_id)
+            
+            # Get the user ID
+            user_id = session['user']['id']
+            
+            # Run the appropriate job based on job type
+            if schedule.job_type == 'up_sync':
+                job_id = DataSynchronizer.start_up_sync(user_id)
+            elif schedule.job_type == 'down_sync':
+                job_id = DataSynchronizer.start_down_sync(user_id)
+            elif schedule.job_type == 'full_sync':
+                job_id = DataSynchronizer.start_full_sync(user_id)
+            elif schedule.job_type == 'incremental_sync':
+                job_id = DataSynchronizer.start_incremental_sync(user_id)
+            elif schedule.job_type == 'property_export':
+                params = schedule.parameters or {}
+                database_name = params.get('database_name', 'web_internet_benton')
+                num_years = int(params.get('num_years', -1))
+                min_bill_years = int(params.get('min_bill_years', 2))
+                
+                job_id = DataSynchronizer.start_property_export(
+                    user_id,
+                    database_name,
+                    num_years,
+                    min_bill_years
+                )
+            else:
+                flash(f"Unknown job type: {schedule.job_type}", 'danger')
+                return redirect(url_for('sync.schedules'))
+            
+            # Update the schedule with the last run information
+            schedule.last_run = datetime.datetime.utcnow()
+            schedule.last_job_id = job_id
+            db.session.commit()
+            
+            flash(f"Schedule '{schedule.name}' run initiated successfully. Job ID: {job_id}", 'success')
+            return redirect(url_for('sync.job_details', job_id=job_id))
+            
+        except Exception as e:
+            flash(f"Error running schedule: {str(e)}", 'danger')
+            return redirect(url_for('sync.schedules'))
