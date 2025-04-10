@@ -16,8 +16,40 @@ from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.executors.pool import ThreadPoolExecutor
 
 from app import db
-from sync_service.models import SyncSchedule, GlobalSetting, SyncJob, SyncLog
+from sync_service.models import GlobalSetting, SyncJob, SyncLog
 from sync_service.bidirectional_sync import DataSynchronizer
+
+# Create SyncSchedule model here to avoid import issues
+class SyncSchedule(db.Model):
+    """Schedule for automated sync jobs"""
+    __tablename__ = 'sync_schedules'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(255), nullable=False)
+    description = db.Column(db.Text)
+    
+    # Schedule configuration
+    job_type = db.Column(db.String(50), nullable=False)  # up_sync, down_sync, full_sync, incremental_sync, property_export
+    schedule_type = db.Column(db.String(20), nullable=False)  # cron, interval
+    cron_expression = db.Column(db.String(100))  # For cron-based schedules
+    interval_hours = db.Column(db.Integer)  # For interval-based schedules
+    
+    # Additional parameters for the job (stored as JSON)
+    parameters = db.Column(db.JSON, default={})
+    
+    # Status and tracking
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, nullable=False)
+    last_updated = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
+    last_run = db.Column(db.DateTime)
+    last_job_id = db.Column(db.String(50))
+    job_id = db.Column(db.String(100))  # ID of the scheduled job in the APScheduler
+    
+    # User who created the schedule
+    created_by = db.Column(db.Integer)
+    
+    def __repr__(self):
+        return f"<SyncSchedule {self.id} {self.name} [{self.job_type}]>"
 
 # Set up logging
 logger = logging.getLogger(__name__)

@@ -12,6 +12,7 @@ from sync_service.models import (
 )
 from sync_service.sync_engine import SyncEngine
 from sync_service.bidirectional_sync import DataSynchronizer
+from sync_service.scheduler import SyncSchedule
 from auth import login_required, permission_required, role_required
 
 def register_sync_routes(bp):
