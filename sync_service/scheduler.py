@@ -83,12 +83,28 @@ def init_scheduler():
     
     # Load existing schedules from database
     try:
-        schedules = SyncSchedule.query.filter_by(is_active=True).all()
-        for schedule in schedules:
-            add_job_from_schedule(schedule)
-            logger.info(f"Loaded scheduled job: {schedule.name} ({schedule.job_type})")
+        # Create a new session to avoid transaction issues
+        with db.session.begin():
+            # Get active schedules
+            schedules = SyncSchedule.query.filter_by(is_active=True).all()
+            # Clone the data to avoid using session objects outside of the transaction
+            schedule_data = [(s.id, s.name, s.job_type) for s in schedules]
+        
+        # Now add the jobs using the collected data
+        for schedule_id, name, job_type in schedule_data:
+            # Get a fresh instance of the schedule
+            with db.session.begin():
+                schedule = SyncSchedule.query.get(schedule_id)
+                if schedule:
+                    add_job_from_schedule(schedule)
+                    logger.info(f"Loaded scheduled job: {name} ({job_type})")
     except Exception as e:
         logger.error(f"Error loading scheduled jobs: {str(e)}")
+        # Make sure to rollback any active transaction
+        try:
+            db.session.rollback()
+        except:
+            pass
     
     logger.info(f"Scheduler initialized with {len(scheduler.get_jobs())} jobs")
     
@@ -133,9 +149,23 @@ def add_job_from_schedule(schedule: SyncSchedule) -> Optional[str]:
             replace_existing=True
         )
         
-        # Update the schedule with the job ID
-        schedule.job_id = job.id
-        db.session.commit()
+        # Update the schedule with the job ID using a fresh transaction
+        try:
+            with db.session.begin():
+                # Get a fresh copy of the schedule to avoid transaction issues
+                fresh_schedule = SyncSchedule.query.get(schedule.id)
+                if fresh_schedule:
+                    fresh_schedule.job_id = job.id
+                    fresh_schedule.last_updated = datetime.datetime.utcnow()
+                else:
+                    logger.warning(f"Could not find schedule {schedule.id} to update job ID")
+        except Exception as e:
+            logger.error(f"Error updating schedule job ID: {str(e)}")
+            # Try to rollback explicitly
+            try:
+                db.session.rollback()
+            except:
+                pass
         
         logger.info(f"Added scheduled job: {schedule.name} ({schedule.job_type})")
         return job.id
@@ -257,32 +287,62 @@ def scheduled_up_sync(schedule_id: int):
     """Run a scheduled up-sync job with proper application context."""
     job_id = None
     try:
-        schedule = SyncSchedule.query.get(schedule_id)
-        if not schedule:
-            logger.error(f"Schedule {schedule_id} not found")
-            return
+        # Start a fresh transaction to get the schedule
+        with db.session.begin():
+            schedule = SyncSchedule.query.get(schedule_id)
+            if not schedule:
+                logger.error(f"Schedule {schedule_id} not found")
+                return
+            
+            # Store the name for logging outside the transaction
+            schedule_name = schedule.name
+            
+        logger.info(f"Running scheduled up-sync job: {schedule_name}")
         
-        logger.info(f"Running scheduled up-sync job: {schedule.name}")
-        
-        # Get the system user ID or use a default
-        global_settings = GlobalSetting.query.first()
-        user_id = global_settings.system_user_id if global_settings and global_settings.system_user_id else 1
+        # Get the system user ID in a separate transaction
+        user_id = 1  # Default
+        try:
+            with db.session.begin():
+                global_settings = GlobalSetting.query.first()
+                if global_settings and global_settings.system_user_id:
+                    user_id = global_settings.system_user_id
+        except Exception as e:
+            logger.warning(f"Could not get system user ID: {str(e)}")
         
         # Run the up-sync job
         job_id = DataSynchronizer.start_up_sync(user_id)
         
-        # Update the schedule with the last run information
-        schedule.last_run = datetime.datetime.utcnow()
-        schedule.last_job_id = job_id
-        db.session.commit()
+        # Update the schedule with the last run information in a separate transaction
+        try:
+            with db.session.begin():
+                # Get a fresh copy of the schedule
+                fresh_schedule = SyncSchedule.query.get(schedule_id)
+                if fresh_schedule:
+                    fresh_schedule.last_run = datetime.datetime.utcnow()
+                    fresh_schedule.last_job_id = job_id
+                    fresh_schedule.last_updated = datetime.datetime.utcnow()
+                else:
+                    logger.warning(f"Could not find schedule {schedule_id} to update last run info")
+        except Exception as e:
+            logger.error(f"Error updating schedule last run info: {str(e)}")
+            # Try to rollback explicitly
+            try:
+                db.session.rollback()
+            except:
+                pass
         
-        logger.info(f"Completed scheduled up-sync job: {schedule.name}, Job ID: {job_id}")
+        logger.info(f"Completed scheduled up-sync job: {schedule_name}, Job ID: {job_id}")
         
     except Exception as e:
         error_msg = f"Error in scheduled up-sync job: {str(e)}"
         logger.error(error_msg)
         if job_id:
             handle_job_exception(job_id, e)
+        # Make sure to rollback any active transaction
+        try:
+            db.session.rollback()
+        except:
+            pass
 
 @with_app_context
 def scheduled_down_sync(schedule_id: int):

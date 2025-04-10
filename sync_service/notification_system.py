@@ -25,7 +25,7 @@ logger.setLevel(logging.INFO)
 class NotificationChannel:
     """Base class for notification channels"""
     
-    def __init__(self, name: str, config: Dict[str, Any] = None):
+    def __init__(self, name: str, config: Optional[Dict[str, Any]] = None):
         """Initialize a notification channel
         
         Args:
@@ -39,7 +39,7 @@ class NotificationChannel:
            subject: str, 
            message: str, 
            severity: str = 'info',
-           metadata: Dict[str, Any] = None) -> bool:
+           metadata: Optional[Dict[str, Any]] = None) -> bool:
         """Send a notification message
         
         Args:
@@ -57,7 +57,7 @@ class NotificationChannel:
                      subject: str, 
                      message: str, 
                      severity: str,
-                     metadata: Dict[str, Any]) -> str:
+                     metadata: Optional[Dict[str, Any]]) -> str:
         """Format a message for this channel
         
         Args:
