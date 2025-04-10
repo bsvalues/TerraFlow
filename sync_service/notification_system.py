@@ -341,7 +341,7 @@ class SyncNotificationLog(db.Model):
     recipient = db.Column(db.String(255))
     success = db.Column(db.Boolean, default=False)
     
-    metadata = db.Column(db.JSON)
+    meta_data = db.Column(db.JSON)  # Changed from metadata to meta_data
     
     def __repr__(self):
         return f"<SyncNotificationLog {self.id} [{self.severity}] {self.channel}>"
@@ -641,7 +641,7 @@ class SyncNotificationManager:
                 severity=severity,
                 channel=channel,
                 success=success,
-                metadata=metadata
+                meta_data=metadata  # Changed from metadata to meta_data
             )
             
             # Add to session and commit
