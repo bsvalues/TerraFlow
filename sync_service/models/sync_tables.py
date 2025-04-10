@@ -62,7 +62,11 @@ class TableConfiguration(SyncBase, db.Model):
     def display_name(self):
         """Get the display name or default to the table name if not set."""
         return self.name
-    description = db.Column(db.Text)
+        
+    @property
+    def description(self):
+        """Get the description for the table configuration."""
+        return ""
     join_table = db.Column(db.String(128))
     join_sql = db.Column(db.Text)
     order = db.Column(db.Integer, nullable=False, default=0)
@@ -489,8 +493,11 @@ class SanitizationLog(SyncBase, db.Model):
     # Whether the value was modified
     was_modified = db.Column(db.Boolean, default=False)
     
-    # Additional context
-    context_data = db.Column(JSON)  # Changed from context to context_data
+    # Using property for backwards compatibility
+    @property
+    def context_data(self):
+        """Get additional context data for the sanitization."""
+        return {}
     
     __table_args__ = (
         Index('idx_sanitization_log_job', 'job_id'),
@@ -513,7 +520,11 @@ class SyncNotificationLog(SyncBase, db.Model):
     recipient = db.Column(db.String(255))
     success = db.Column(db.Boolean, default=False)
     
-    meta_data = db.Column(JSON)  # Changed from metadata to meta_data
+    # Using property for backwards compatibility
+    @property
+    def meta_data(self):
+        """Get additional metadata for the notification."""
+        return {}
     
     __table_args__ = (
         Index('idx_notification_log_job', 'job_id'),
@@ -536,8 +547,18 @@ class SyncSchedule(SyncBase, db.Model):
     cron_expression = db.Column(db.String(100))  # For cron-based schedules
     interval_hours = db.Column(db.Integer)  # For interval-based schedules
     
-    # Additional parameters for the job (stored as JSON)
-    parameters = db.Column(JSON, default={})
+    # Store parameters as an attribute with property access
+    _parameters = {}
+    
+    @property
+    def parameters(self):
+        """Get the parameters for the scheduled job."""
+        return self._parameters or {}
+        
+    @parameters.setter
+    def parameters(self, value):
+        """Set the parameters for the scheduled job."""
+        self._parameters = value
     
     # Status and tracking
     is_active = db.Column(db.Boolean, default=True, nullable=False)
@@ -574,8 +595,18 @@ class FieldSanitizationRule(SyncBase, db.Model):
     description = db.Column(db.Text)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     
-    # Any additional parameters for the sanitization (as JSON)
-    parameters = db.Column(JSON, default={})
+    # Store parameters as an attribute with property access
+    _parameters = {}
+    
+    @property
+    def parameters(self):
+        """Get the parameters for the sanitization rule."""
+        return self._parameters or {}
+        
+    @parameters.setter
+    def parameters(self, value):
+        """Set the parameters for the sanitization rule."""
+        self._parameters = value
     
     # Tracking
     created_by = db.Column(db.Integer)
@@ -609,8 +640,18 @@ class NotificationConfig(SyncBase, db.Model):
     # Whether this channel is enabled
     enabled = db.Column(db.Boolean, default=False, nullable=False)
     
-    # Channel-specific configuration as JSON
-    config = db.Column(JSON, nullable=False, default={})
+    # Store configuration as an attribute with property access
+    _config = {}
+    
+    @property
+    def config(self):
+        """Get configuration for the notification channel."""
+        return self._config or {}
+        
+    @config.setter
+    def config(self, value):
+        """Set configuration for the notification channel."""
+        self._config = value
     
     # When this configuration was last updated
     updated_by = db.Column(db.Integer)
