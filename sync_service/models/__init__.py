@@ -18,5 +18,10 @@ from sync_service.models.sync_tables import (
     UpSyncDataChange,
     UpSyncDataChangeArchive,
     ParcelChangeIndexLog,
-    GlobalSetting
+    GlobalSetting,
+    # Add the new models
+    SyncConflict,
+    SyncSchedule,
+    SanitizationLog,
+    SyncNotificationLog
 )

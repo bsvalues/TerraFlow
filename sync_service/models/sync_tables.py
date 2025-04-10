@@ -4,6 +4,9 @@ Sync service table models
 This module contains the database models for the sync service tables.
 """
 import datetime
+import uuid
+from typing import Dict, Any, List, Optional
+
 from app import db
 from sqlalchemy import Index, ForeignKey, UniqueConstraint
 from sqlalchemy.ext.declarative import declared_attr
@@ -47,6 +50,9 @@ class TableConfiguration(SyncBase, db.Model):
     """Configuration for tables to be synchronized."""
 
     name = db.Column(db.String(128), unique=True, nullable=False)
+    source_name = db.Column(db.String(128))
+    display_name = db.Column(db.String(128))
+    description = db.Column(db.Text)
     join_table = db.Column(db.String(128))
     join_sql = db.Column(db.Text)
     order = db.Column(db.Integer, nullable=False, default=0)
@@ -61,6 +67,25 @@ class TableConfiguration(SyncBase, db.Model):
     is_controller = db.Column(db.Boolean, default=False)
     sub_select = db.Column(db.Text)
     order_by_sql = db.Column(db.Text)
+    
+    # Sync configuration
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    is_incremental = db.Column(db.Boolean, default=True, nullable=False)
+    batch_size = db.Column(db.Integer, default=1000)
+    primary_key = db.Column(db.String(128))
+    timestamp_field = db.Column(db.String(128))
+    last_sync_time = db.Column(db.DateTime)
+    source_query = db.Column(db.Text)
+    target_query = db.Column(db.Text)
+    
+    # Bidirectional sync settings
+    sync_direction = db.Column(db.String(50), default='both')  # both, to_target, to_source, none
+    
+    # Conflict resolution settings
+    conflict_strategy = db.Column(db.String(50), default='timestamp')  # timestamp, manual, source_wins, target_wins
+    conflict_detection = db.Column(db.String(50), default='field')  # field, record
+    manual_review_required = db.Column(db.Boolean, default=False)
+    conflict_notes = db.Column(db.Text)
     
     # Relationships
     field_configurations = db.relationship('FieldConfiguration', backref='table', lazy='dynamic')
@@ -77,13 +102,35 @@ class FieldConfiguration(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     table_name = db.Column(db.String(128), db.ForeignKey('table_configuration.name', ondelete='CASCADE'), nullable=False)
     name = db.Column(db.String(128), nullable=False)
+    field_name = db.Column(db.String(128))  # To maintain compatibility with the UI and existing code
     policy_type = db.Column(db.Integer, nullable=False)
     label = db.Column(db.String(256))
     cama_cloud_id = db.Column(db.String(256))
     type = db.Column(db.String(64), nullable=False)
+    data_type = db.Column(db.String(50))  # Added for sanitization and conflict detection
     length = db.Column(db.Integer)
     precision = db.Column(db.Integer)
     scale = db.Column(db.Integer)
+    
+    # Properties for primary keys and timestamps
+    is_primary_key = db.Column(db.Boolean, default=False)
+    is_timestamp = db.Column(db.Boolean, default=False)
+    is_inherited = db.Column(db.Boolean, default=False)
+    is_nullable = db.Column(db.Boolean, default=True)
+    
+    # Direction and synchronization settings
+    sync_direction = db.Column(db.String(50), default='both')  # both, to_target, to_source, none
+    
+    # Conflict resolution settings
+    conflict_resolution = db.Column(db.String(50), default='newer_wins')  # newer_wins, source_wins, target_wins, manual
+    conflict_notes = db.Column(db.Text)
+    
+    # Transform and default value settings
+    transform_sql = db.Column(db.Text)
+    default_value = db.Column(db.String(255))
+    
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
     
     def __repr__(self):
         return f"<FieldConfiguration {self.table_name}.{self.name}>"
@@ -279,6 +326,28 @@ class GlobalSetting(SyncBase, db.Model):
     last_clean_data_job_id = db.Column(db.String(36))
     clean_data_run_id = db.Column(db.Integer)
     
+    # Data sanitization settings
+    sanitization_enabled = db.Column(db.Boolean, default=True, nullable=False)
+    sanitization_level = db.Column(db.String(50), default='standard')  # minimal, standard, strict
+    sanitization_rules = db.Column(JSON, default={})
+    sanitization_exclude_tables = db.Column(db.String(1024))  # CSV list of tables to exclude
+    sanitization_include_tables = db.Column(db.String(1024))  # CSV list of tables to include
+    
+    # Notification settings
+    notification_enabled = db.Column(db.Boolean, default=True, nullable=False)
+    email_notifications = db.Column(db.Boolean, default=True, nullable=False)
+    sms_notifications = db.Column(db.Boolean, default=False, nullable=False)
+    webhook_notifications = db.Column(db.Boolean, default=False, nullable=False)
+    email_recipients = db.Column(db.String(1024))  # CSV list of email addresses
+    sms_recipients = db.Column(db.String(1024))  # CSV list of phone numbers
+    webhook_urls = db.Column(db.String(1024))  # CSV list of webhook URLs
+    
+    # Severity routing
+    critical_notification_channels = db.Column(db.String(255), default='email,log')  # CSV list of channels
+    error_notification_channels = db.Column(db.String(255), default='email,log')  # CSV list of channels
+    warning_notification_channels = db.Column(db.String(255), default='log')  # CSV list of channels
+    info_notification_channels = db.Column(db.String(255), default='log')  # CSV list of channels
+    
     def __repr__(self):
         return f"<GlobalSetting id={self.id} state={self.cama_cloud_state}>"
         
@@ -299,3 +368,113 @@ class SyncLog(SyncBase, db.Model):
     
     def __repr__(self):
         return f"<SyncLog {self.job_id} {self.level}: {self.message[:50]}>"
+
+class SyncConflict(SyncBase, db.Model):
+    """Record of a synchronization conflict requiring resolution"""
+    
+    job_id = db.Column(db.String(50), nullable=False, index=True)
+    table_name = db.Column(db.String(100), nullable=False, index=True)
+    record_id = db.Column(db.String(100), nullable=False)
+    
+    # The data from source and target systems
+    source_data = db.Column(JSON, nullable=False)
+    target_data = db.Column(JSON, nullable=False)
+    
+    # Status tracking
+    resolution_status = db.Column(db.String(50), default='pending', nullable=False, index=True)  # pending, resolved, ignored
+    resolution_type = db.Column(db.String(50))  # source_wins, target_wins, manual, merged
+    resolved_by = db.Column(db.Integer)
+    resolved_at = db.Column(db.DateTime)
+    resolution_notes = db.Column(db.Text)
+    
+    # The resolved data (for manual resolution)
+    resolved_data = db.Column(JSON)
+    
+    __table_args__ = (
+        Index('idx_sync_conflict_job_table', 'job_id', 'table_name'),
+        Index('idx_sync_conflict_status', 'resolution_status'),
+    )
+    
+    def __repr__(self):
+        return f"<SyncConflict {self.id} {self.table_name} record {self.record_id} [{self.resolution_status}]>"
+
+class SanitizationLog(SyncBase, db.Model):
+    """Log of sanitization actions for audit purposes"""
+    
+    job_id = db.Column(db.String(50), nullable=False, index=True)
+    table_name = db.Column(db.String(100), nullable=False)
+    field_name = db.Column(db.String(100), nullable=False)
+    record_id = db.Column(db.String(100), nullable=False)
+    
+    # The type of sanitization applied
+    sanitization_type = db.Column(db.String(50), nullable=False)
+    
+    # Whether the value was modified
+    was_modified = db.Column(db.Boolean, default=False)
+    
+    # Additional context
+    context_data = db.Column(JSON)  # Changed from context to context_data
+    
+    __table_args__ = (
+        Index('idx_sanitization_log_job', 'job_id'),
+        Index('idx_sanitization_log_table_field', 'table_name', 'field_name'),
+    )
+    
+    def __repr__(self):
+        return f"<SanitizationLog {self.id} {self.table_name}.{self.field_name} [{self.sanitization_type}]>"
+
+class SyncNotificationLog(SyncBase, db.Model):
+    """Log of notifications sent"""
+    
+    job_id = db.Column(db.String(50), nullable=True, index=True)
+    
+    subject = db.Column(db.String(255), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    severity = db.Column(db.String(50), nullable=False)
+    
+    channel = db.Column(db.String(50), nullable=False)
+    recipient = db.Column(db.String(255))
+    success = db.Column(db.Boolean, default=False)
+    
+    meta_data = db.Column(JSON)  # Changed from metadata to meta_data
+    
+    __table_args__ = (
+        Index('idx_notification_log_job', 'job_id'),
+        Index('idx_notification_log_channel', 'channel'),
+        Index('idx_notification_log_severity', 'severity'),
+    )
+    
+    def __repr__(self):
+        return f"<SyncNotificationLog {self.id} [{self.severity}] {self.channel}>"
+
+class SyncSchedule(SyncBase, db.Model):
+    """Schedule for automated sync jobs"""
+    
+    name = db.Column(db.String(255), nullable=False)
+    description = db.Column(db.Text)
+    
+    # Schedule configuration
+    job_type = db.Column(db.String(50), nullable=False)  # up_sync, down_sync, full_sync, incremental_sync, property_export
+    schedule_type = db.Column(db.String(20), nullable=False)  # cron, interval
+    cron_expression = db.Column(db.String(100))  # For cron-based schedules
+    interval_hours = db.Column(db.Integer)  # For interval-based schedules
+    
+    # Additional parameters for the job (stored as JSON)
+    parameters = db.Column(JSON, default={})
+    
+    # Status and tracking
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    last_run = db.Column(db.DateTime)
+    last_job_id = db.Column(db.String(50))
+    job_id = db.Column(db.String(100))  # ID of the scheduled job in the APScheduler
+    
+    # User who created the schedule
+    created_by = db.Column(db.Integer)
+    
+    __table_args__ = (
+        Index('idx_sync_schedule_is_active', 'is_active'),
+        Index('idx_sync_schedule_job_type', 'job_type'),
+    )
+    
+    def __repr__(self):
+        return f"<SyncSchedule {self.id} {self.name} [{self.job_type}]>"
