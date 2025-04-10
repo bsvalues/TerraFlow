@@ -6,9 +6,12 @@ production databases and the training environment through the Data Hub API Gatew
 It also includes property export functionality for executing the ExportPropertyAccess
 stored procedure against SQL Server.
 
-Scheduled synchronization is supported through the APScheduler library,
-allowing automatic execution of sync jobs at regular intervals or according to
-cron expressions.
+Features include:
+- Scheduled synchronization through APScheduler
+- Bidirectional sync capabilities
+- Conflict detection and resolution
+- Data sanitization for protecting sensitive information
+- Enhanced notification/alerting system for monitoring sync operations
 """
 import logging
 import threading
@@ -36,27 +39,35 @@ def create_routes():
     # Register the routes with the blueprint
     register_sync_routes(sync_bp)
     
-    # Initialize scheduler (threading.Thread is used to avoid blocking the main thread)
-    def init_scheduler_in_thread():
+    # Initialize scheduler and other components
+    def init_services_in_thread():
         try:
             from sync_service.app_context import with_app_context
             from sync_service.scheduler import init_scheduler
+            from sync_service.notification_system import configure_notification_manager, notification_manager
             
-            # Make sure we run the scheduler in an app context
+            # Make sure we run initialization in an app context
             @with_app_context
             def initialize_with_context():
+                # Initialize notification manager
+                logger.info("Configuring notification manager...")
+                configure_notification_manager()
+                logger.info(f"Notification manager configured with {len(notification_manager.channels)} channels")
+                
+                # Initialize scheduler
                 scheduler = init_scheduler()
                 logger.info(f"Scheduler initialized with {len(scheduler.get_jobs())} jobs")
+                
                 return scheduler
             
             # Run the initialization with context
             scheduler = initialize_with_context()
         except Exception as e:
-            logger.error(f"Error initializing scheduler: {str(e)}")
+            logger.error(f"Error initializing services: {str(e)}")
     
-    # Start the scheduler in a separate thread after a short delay
+    # Start initialization in a separate thread after a short delay
     # to ensure the database is fully initialized
-    thread = threading.Timer(5.0, init_scheduler_in_thread)
+    thread = threading.Timer(5.0, init_services_in_thread)
     thread.daemon = True
     thread.start()
     
@@ -75,6 +86,22 @@ def register_blueprints(app):
         # Register the blueprints
         app.register_blueprint(sync_bp)
         app.register_blueprint(verification_bp)
+        
+        # Initialize models
+        with app.app_context():
+            from sync_service.models import (
+                SyncJob, SyncLog, TableConfiguration, FieldConfiguration, 
+                GlobalSetting, SyncConflict, SyncSchedule
+            )
+            from sync_service.data_sanitization import SanitizationLog
+            from sync_service.notification_system import SyncNotificationLog
+            
+            # Create tables if they don't exist
+            from app import db
+            db.create_all()
+            
+            # Log initialization
+            logger.info("Sync service database tables initialized")
         
         return True
     except Exception as e:

@@ -87,11 +87,21 @@ class TableConfiguration(db.Model):
     batch_size = db.Column(db.Integer, default=1000)
     order = db.Column(db.Integer, default=0)
     
+    # Sync configuration
     primary_key = db.Column(db.String(100))
     timestamp_field = db.Column(db.String(100))
     last_sync_time = db.Column(db.DateTime)
     source_query = db.Column(db.Text)
     target_query = db.Column(db.Text)
+    
+    # Bidirectional sync settings
+    sync_direction = db.Column(db.String(50), default='both')  # both, to_target, to_source, none
+    
+    # Conflict resolution settings
+    conflict_strategy = db.Column(db.String(50), default='timestamp')  # timestamp, manual, source_wins, target_wins
+    conflict_detection = db.Column(db.String(50), default='field')  # field, record
+    manual_review_required = db.Column(db.Boolean, default=False)
+    conflict_notes = db.Column(db.Text)
     
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
@@ -105,6 +115,7 @@ class FieldConfiguration(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     table_name = db.Column(db.String(100), nullable=False, index=True)
+    field_name = db.Column(db.String(100), nullable=False)
     name = db.Column(db.String(100), nullable=False)
     source_name = db.Column(db.String(100))
     display_name = db.Column(db.String(100))
@@ -116,6 +127,13 @@ class FieldConfiguration(db.Model):
     is_timestamp = db.Column(db.Boolean, default=False)
     is_inherited = db.Column(db.Boolean, default=False)
     
+    # Direction and synchronization settings
+    sync_direction = db.Column(db.String(50), default='both')  # both, to_target, to_source, none
+    
+    # Conflict resolution settings
+    conflict_resolution = db.Column(db.String(50), default='newer_wins')  # newer_wins, source_wins, target_wins, manual
+    conflict_notes = db.Column(db.Text)
+    
     transform_sql = db.Column(db.Text)
     default_value = db.Column(db.String(255))
     
@@ -123,7 +141,7 @@ class FieldConfiguration(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
     
     def __repr__(self):
-        return f"<FieldConfiguration {self.table_name}.{self.name}>"
+        return f"<FieldConfiguration {self.table_name}.{self.field_name}>"
 
 class GlobalSetting(db.Model):
     """Global settings for synchronization"""
@@ -145,8 +163,57 @@ class GlobalSetting(db.Model):
     last_down_sync_time = db.Column(db.DateTime)
     last_down_sync_job_id = db.Column(db.String(50))
     
-    system_user_id = db.Column(db.Integer)
+    # Conflict resolution settings
+    default_conflict_strategy = db.Column(db.String(50), default='timestamp')  # timestamp, manual
+    default_conflict_winner = db.Column(db.String(50), default='source')  # source, target
+    conflict_resolution_enabled = db.Column(db.Boolean, default=True)
+    
+    # Automatic conflict detection and resolution for timestamp-based conflicts
+    field_level_conflict_detection = db.Column(db.Boolean, default=True)
+    auto_resolve_timestamp_conflicts = db.Column(db.Boolean, default=True)
+    manual_resolution_threshold = db.Column(db.Integer, default=10)  # Number of conflicts before switching to manual mode
+    
+    # Data sanitization settings
+    data_sanitization_enabled = db.Column(db.Boolean, default=True)
+    sanitize_personal_data = db.Column(db.Boolean, default=True)
+    sanitize_financial_data = db.Column(db.Boolean, default=True)
+    sanitize_credentials = db.Column(db.Boolean, default=True)
+    custom_sanitization_rules = db.Column(db.JSON, default={})
+    
+    # Notification settings
+    notifications_enabled = db.Column(db.Boolean, default=True)
+    
+    # Email notification settings
     notification_email = db.Column(db.String(255))
+    smtp_server = db.Column(db.String(255), default='localhost')
+    smtp_port = db.Column(db.Integer, default=587)
+    smtp_username = db.Column(db.String(255))
+    smtp_password = db.Column(db.String(255))
+    notification_from_email = db.Column(db.String(255), default='sync-service@example.com')
+    
+    # SMS notification settings
+    sms_notifications_enabled = db.Column(db.Boolean, default=False)
+    sms_api_url = db.Column(db.String(255))
+    sms_api_key = db.Column(db.String(255))
+    sms_api_secret = db.Column(db.String(255))
+    sms_from_number = db.Column(db.String(50))
+    sms_to_numbers = db.Column(db.JSON, default=[])
+    
+    # Slack notification settings
+    slack_notifications_enabled = db.Column(db.Boolean, default=False)
+    slack_webhook_url = db.Column(db.String(255))
+    slack_channel = db.Column(db.String(50))
+    slack_username = db.Column(db.String(50), default='Sync Service')
+    
+    # Notification severity routing
+    notification_severity_routing = db.Column(db.JSON, default={
+        'info': ['log'],
+        'warning': ['log', 'email'],
+        'error': ['log', 'email', 'slack'],
+        'critical': ['log', 'email', 'slack', 'sms']
+    })
+    
+    system_user_id = db.Column(db.Integer)
     
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
@@ -229,6 +296,36 @@ class UpSyncDataChangeArchive(db.Model):
     
     def __repr__(self):
         return f"<UpSyncDataChangeArchive {self.id} {self.table_name}.{self.field_name} [{self.action}]>"
+
+class SyncConflict(db.Model):
+    """Record of a synchronization conflict requiring resolution"""
+    __tablename__ = 'sync_conflicts'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    job_id = db.Column(db.String(50), nullable=False, index=True)
+    table_name = db.Column(db.String(100), nullable=False, index=True)
+    record_id = db.Column(db.String(100), nullable=False)
+    
+    # The data from source and target systems
+    source_data = db.Column(JSON, nullable=False)
+    target_data = db.Column(JSON, nullable=False)
+    
+    # Status tracking
+    resolution_status = db.Column(db.String(50), default='pending', nullable=False, index=True)  # pending, resolved, ignored
+    resolution_type = db.Column(db.String(50))  # source_wins, target_wins, manual, merged
+    resolved_by = db.Column(db.Integer)
+    resolved_at = db.Column(db.DateTime)
+    resolution_notes = db.Column(db.Text)
+    
+    # The resolved data (for manual resolution)
+    resolved_data = db.Column(JSON)
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, nullable=False)
+    
+    def __repr__(self):
+        return f"<SyncConflict {self.id} {self.table_name} record {self.record_id} [{self.resolution_status}]>"
+
 
 class SyncSchedule(db.Model):
     """Schedule for automated sync jobs"""
