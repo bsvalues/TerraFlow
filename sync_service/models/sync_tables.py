@@ -493,11 +493,18 @@ class SanitizationLog(SyncBase, db.Model):
     # Whether the value was modified
     was_modified = db.Column(db.Boolean, default=False)
     
-    # Using property for backwards compatibility
+    # Store context data as an attribute with property access
+    _context_data = {}
+    
     @property
     def context_data(self):
         """Get additional context data for the sanitization."""
-        return {}
+        return self._context_data or {}
+        
+    @context_data.setter
+    def context_data(self, value):
+        """Set additional context data for the sanitization."""
+        self._context_data = value
     
     __table_args__ = (
         Index('idx_sanitization_log_job', 'job_id'),
@@ -520,11 +527,18 @@ class SyncNotificationLog(SyncBase, db.Model):
     recipient = db.Column(db.String(255))
     success = db.Column(db.Boolean, default=False)
     
-    # Using property for backwards compatibility
+    # Store meta data as an attribute with property access
+    _meta_data = {}
+    
     @property
     def meta_data(self):
         """Get additional metadata for the notification."""
-        return {}
+        return self._meta_data or {}
+        
+    @meta_data.setter
+    def meta_data(self, value):
+        """Set additional metadata for the notification."""
+        self._meta_data = value
     
     __table_args__ = (
         Index('idx_notification_log_job', 'job_id'),
