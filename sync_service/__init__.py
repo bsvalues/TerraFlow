@@ -118,10 +118,11 @@ def register_blueprints(app):
             # Import the models from the correct modules
             from sync_service.models import (
                 SyncJob, SyncLog, TableConfiguration, FieldConfiguration,
-                GlobalSetting, SyncConflict, SyncSchedule
+                GlobalSetting, SyncConflict, SyncSchedule, 
+                FieldSanitizationRule, NotificationConfig
             )
-            from sync_service.data_sanitization import SanitizationLog
-            from sync_service.notification_system import SyncNotificationLog
+            # These models are defined in their respective modules but registered through models/__init__.py
+            from sync_service.models import SanitizationLog, SyncNotificationLog
             
             # Create tables if they don't exist
             from app import db

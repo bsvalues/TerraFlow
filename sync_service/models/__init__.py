@@ -23,5 +23,7 @@ from sync_service.models.sync_tables import (
     SyncConflict,
     SyncSchedule,
     SanitizationLog,
-    SyncNotificationLog
+    SyncNotificationLog,
+    FieldSanitizationRule,
+    NotificationConfig
 )

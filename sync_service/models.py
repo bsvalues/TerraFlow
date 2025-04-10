@@ -7,6 +7,7 @@ from typing import Dict, Any, List, Optional
 
 from sqlalchemy.dialects.postgresql import JSON
 from app import db
+from sqlalchemy import event
 
 class SyncJob(db.Model):
     """A synchronization job record"""
@@ -282,3 +283,67 @@ class SyncSchedule(db.Model):
     
     def __repr__(self):
         return f"<SyncSchedule {self.id} {self.name} [{self.job_type}]>"
+
+
+class FieldSanitizationRule(db.Model):
+    """Configuration for field-level data sanitization rules"""
+    __tablename__ = 'field_sanitization_rules'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    table_name = db.Column(db.String(100), nullable=False, index=True)
+    field_name = db.Column(db.String(100), nullable=False)
+    
+    # The type of data in this field (used to determine appropriate sanitization)
+    field_type = db.Column(db.String(50), nullable=False, index=True)
+    
+    # The sanitization strategy to apply
+    strategy = db.Column(db.String(50), nullable=False)  # mask, hash, nullify, randomize, approximate, etc.
+    
+    # Description and metadata
+    description = db.Column(db.Text)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    
+    # Any additional parameters for the sanitization (as JSON)
+    parameters = db.Column(JSON, default={})
+    
+    # Tracking
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
+    created_by = db.Column(db.Integer)
+    
+    def __repr__(self):
+        return f"<FieldSanitizationRule {self.id} {self.table_name}.{self.field_name} [{self.strategy}]>"
+    
+    def get_strategy_badge(self):
+        """Return the appropriate badge class for the strategy"""
+        strategy_badges = {
+            'mask': 'info',
+            'hash': 'primary',
+            'nullify': 'danger',
+            'randomize': 'warning',
+            'approximate': 'success',
+            'full_mask': 'secondary'
+        }
+        return strategy_badges.get(self.strategy.lower(), 'secondary')
+
+
+class NotificationConfig(db.Model):
+    """Configuration for notification channels"""
+    __tablename__ = 'notification_configs'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    channel_type = db.Column(db.String(50), nullable=False, unique=True, index=True)  # email, sms, slack
+    
+    # Whether this channel is enabled
+    enabled = db.Column(db.Boolean, default=False, nullable=False)
+    
+    # Channel-specific configuration as JSON
+    config = db.Column(JSON, nullable=False, default={})
+    
+    # When this configuration was last updated
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
+    updated_by = db.Column(db.Integer)
+    
+    def __repr__(self):
+        return f"<NotificationConfig {self.channel_type} [{'enabled' if self.enabled else 'disabled'}]>"

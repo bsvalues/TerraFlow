@@ -5,15 +5,19 @@ These routes provide API endpoints for configuring, controlling, and monitoring
 the synchronization process.
 """
 import datetime
+import json
 from flask import render_template, request, jsonify, session, flash, redirect, url_for
 from app import db
 from sync_service.models import (
-    SyncJob, TableConfiguration, FieldConfiguration, SyncLog, GlobalSetting
+    SyncJob, TableConfiguration, FieldConfiguration, SyncLog, GlobalSetting,
+    FieldSanitizationRule, NotificationConfig
 )
+from sync_service.data_sanitization import SanitizationLog, DataSanitizer
+from sync_service.notification_system import SyncNotificationManager, SyncNotificationLog
 from sync_service.sync_engine import SyncEngine
 from sync_service.bidirectional_sync import DataSynchronizer
 from sync_service.scheduler import SyncSchedule
-from auth import login_required, permission_required, role_required
+from auth import login_required, permission_required, role_required, is_authenticated
 
 def register_sync_routes(bp):
     """Register routes with the provided blueprint."""
@@ -403,8 +407,384 @@ def register_sync_routes(bp):
                 
             except Exception as e:
                 db.session.rollback()
-                flash(f"Error updating schedule: {str(e)}", 'danger')
-                return redirect(url_for('sync.schedules'))
+                
+    # Data Sanitization routes
+    @bp.route('/data-sanitization')
+    @login_required
+    @role_required('administrator')
+    def data_sanitization():
+        """Configure and monitor data sanitization."""
+        # Get all sanitization rules
+        rules = FieldSanitizationRule.query.order_by(FieldSanitizationRule.table_name, FieldSanitizationRule.field_name).all()
+        
+        # Get tables for configuration
+        tables = TableConfiguration.query.order_by(TableConfiguration.name).all()
+        
+        # Get recent sanitization logs
+        logs = SanitizationLog.query.order_by(SanitizationLog.created_at.desc()).limit(50).all()
+        
+        return render_template('sync/data_sanitization_config.html', 
+                              table_sanitization_rules=rules,
+                              tables=tables,
+                              sanitization_logs=logs)
+    
+    @bp.route('/get_table_fields/<table_name>')
+    @login_required
+    @role_required('administrator')
+    def get_table_fields(table_name):
+        """Get fields for a specific table."""
+        fields = FieldConfiguration.query.filter_by(table_name=table_name).all()
+        field_list = [{'name': field.name, 'type': field.data_type or field.type} for field in fields]
+        
+        return jsonify({'fields': field_list})
+    
+    @bp.route('/add_sanitization_rule', methods=['POST'])
+    @login_required
+    @role_required('administrator')
+    def add_sanitization_rule():
+        """Add a new sanitization rule."""
+        try:
+            # Create a new rule
+            rule = FieldSanitizationRule(
+                table_name=request.form.get('table_name'),
+                field_name=request.form.get('field_name'),
+                field_type=request.form.get('field_type'),
+                strategy=request.form.get('strategy'),
+                description=request.form.get('description'),
+                is_active=True,
+                created_by=session['user']['id'] if is_authenticated() else None,
+                created_at=datetime.datetime.utcnow(),
+                updated_at=datetime.datetime.utcnow()
+            )
+            
+            # Add and commit to database
+            db.session.add(rule)
+            db.session.commit()
+            
+            flash(f"Sanitization rule for {rule.table_name}.{rule.field_name} added successfully.", 'success')
+            return redirect(url_for('sync.data_sanitization'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Error adding sanitization rule: {str(e)}", 'danger')
+            return redirect(url_for('sync.data_sanitization'))
+    
+    @bp.route('/delete_sanitization_rule/<int:rule_id>', methods=['POST'])
+    @login_required
+    @role_required('administrator')
+    def delete_sanitization_rule(rule_id):
+        """Delete a sanitization rule."""
+        try:
+            rule = FieldSanitizationRule.query.get_or_404(rule_id)
+            db.session.delete(rule)
+            db.session.commit()
+            
+            return jsonify({'success': True})
+            
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'message': str(e)})
+    
+    @bp.route('/sanitization_logs')
+    @login_required
+    @role_required('administrator')
+    def get_sanitization_logs():
+        """Get recent sanitization logs as JSON."""
+        logs = SanitizationLog.query.order_by(SanitizationLog.created_at.desc()).limit(50).all()
+        
+        log_list = [{
+            'id': log.id,
+            'job_id': log.job_id,
+            'table_name': log.table_name,
+            'field_name': log.field_name,
+            'record_id': log.record_id,
+            'sanitization_type': log.sanitization_type,
+            'was_modified': log.was_modified,
+            'created_at': log.created_at.strftime('%Y-%m-%d %H:%M:%S')
+        } for log in logs]
+        
+        return jsonify({'logs': log_list})
+    
+    # Notification Configuration routes
+    @bp.route('/notification-config')
+    @login_required
+    @role_required('administrator')
+    def notification_config():
+        """Configure notification settings."""
+        # Get email configuration
+        email_config = NotificationConfig.query.filter_by(channel_type='email').first()
+        
+        # Get slack configuration
+        slack_config = NotificationConfig.query.filter_by(channel_type='slack').first()
+        
+        # Get notification routing configuration
+        routing_config = {}
+        for severity in ['info', 'warning', 'error', 'critical']:
+            routing_config[severity] = []
+            for channel in ['email', 'slack', 'sms']:
+                channel_config = NotificationConfig.query.filter_by(channel_type=channel).first()
+                if channel_config and channel_config.enabled:
+                    # Check if this channel is enabled for this severity
+                    channel_config_json = channel_config.config or {}
+                    severity_routes = channel_config_json.get('severity_routes', {})
+                    if severity_routes.get(severity, False):
+                        routing_config[severity].append(channel)
+        
+        # Get recent notification logs
+        notification_logs = SyncNotificationLog.query.order_by(SyncNotificationLog.created_at.desc()).limit(50).all()
+        
+        return render_template('sync/notification_config.html',
+                              email_config=email_config.config if email_config else None,
+                              slack_config=slack_config.config if slack_config else None,
+                              routing_config=routing_config,
+                              notification_logs=notification_logs)
+    
+    @bp.route('/configure_email_notifications', methods=['POST'])
+    @login_required
+    @role_required('administrator')
+    def configure_email_notifications():
+        """Configure email notification settings."""
+        try:
+            # Get or create email configuration
+            email_config = NotificationConfig.query.filter_by(channel_type='email').first()
+            if not email_config:
+                email_config = NotificationConfig(
+                    channel_type='email',
+                    enabled=False,
+                    config={},
+                    created_at=datetime.datetime.utcnow(),
+                    updated_at=datetime.datetime.utcnow(),
+                    updated_by=session['user']['id'] if is_authenticated() else None
+                )
+                db.session.add(email_config)
+            
+            # Update configuration
+            email_config.enabled = 'email_enabled' in request.form
+            
+            # Build config dictionary
+            config = {
+                'smtp_server': request.form.get('smtp_server', ''),
+                'smtp_port': request.form.get('smtp_port', '587'),
+                'smtp_security': request.form.get('smtp_security', 'tls'),
+                'smtp_username': request.form.get('smtp_username', ''),
+                'from_address': request.form.get('from_address', ''),
+                'default_recipients': request.form.get('default_recipients', '')
+            }
+            
+            # Only update password if provided
+            if request.form.get('smtp_password'):
+                config['smtp_password'] = request.form.get('smtp_password')
+            elif email_config.config and 'smtp_password' in email_config.config:
+                config['smtp_password'] = email_config.config['smtp_password']
+            
+            email_config.config = config
+            email_config.updated_at = datetime.datetime.utcnow()
+            email_config.updated_by = session['user']['id'] if is_authenticated() else None
+            
+            db.session.commit()
+            
+            # Update notification manager
+            from sync_service.notification_system import notification_manager, configure_notification_manager
+            configure_notification_manager()
+            
+            flash("Email notification settings updated successfully.", 'success')
+            return redirect(url_for('sync.notification_config'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Error updating email notification settings: {str(e)}", 'danger')
+            return redirect(url_for('sync.notification_config'))
+    
+    @bp.route('/configure_slack_notifications', methods=['POST'])
+    @login_required
+    @role_required('administrator')
+    def configure_slack_notifications():
+        """Configure Slack notification settings."""
+        try:
+            # Get or create Slack configuration
+            slack_config = NotificationConfig.query.filter_by(channel_type='slack').first()
+            if not slack_config:
+                slack_config = NotificationConfig(
+                    channel_type='slack',
+                    enabled=False,
+                    config={},
+                    created_at=datetime.datetime.utcnow(),
+                    updated_at=datetime.datetime.utcnow(),
+                    updated_by=session['user']['id'] if is_authenticated() else None
+                )
+                db.session.add(slack_config)
+            
+            # Update configuration
+            slack_config.enabled = 'slack_enabled' in request.form
+            
+            # Build config dictionary
+            config = {
+                'webhook_url': request.form.get('webhook_url', ''),
+                'default_channel': request.form.get('default_channel', '#sync-notifications'),
+                'username': request.form.get('username', 'Sync Bot'),
+                'icon_emoji': request.form.get('icon_emoji', ':sync:')
+            }
+            
+            slack_config.config = config
+            slack_config.updated_at = datetime.datetime.utcnow()
+            slack_config.updated_by = session['user']['id'] if is_authenticated() else None
+            
+            db.session.commit()
+            
+            # Update notification manager
+            from sync_service.notification_system import notification_manager, configure_notification_manager
+            configure_notification_manager()
+            
+            flash("Slack notification settings updated successfully.", 'success')
+            return redirect(url_for('sync.notification_config'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Error updating Slack notification settings: {str(e)}", 'danger')
+            return redirect(url_for('sync.notification_config'))
+    
+    @bp.route('/configure_notification_routing', methods=['POST'])
+    @login_required
+    @role_required('administrator')
+    def configure_notification_routing():
+        """Configure notification routing by severity."""
+        try:
+            # Process each notification channel
+            for channel_type in ['email', 'slack', 'sms']:
+                channel_config = NotificationConfig.query.filter_by(channel_type=channel_type).first()
+                if not channel_config:
+                    continue
+                
+                # Get the current config
+                config = channel_config.config or {}
+                
+                # Update severity routing
+                severity_routes = {}
+                for severity in ['info', 'warning', 'error', 'critical']:
+                    route_key = f'route_{severity}_{channel_type}'
+                    severity_routes[severity] = route_key in request.form
+                
+                # Update config
+                config['severity_routes'] = severity_routes
+                channel_config.config = config
+                channel_config.updated_at = datetime.datetime.utcnow()
+                channel_config.updated_by = session['user']['id'] if is_authenticated() else None
+            
+            db.session.commit()
+            
+            # Update notification manager
+            from sync_service.notification_system import notification_manager, configure_notification_manager
+            configure_notification_manager()
+            
+            flash("Notification routing settings updated successfully.", 'success')
+            return redirect(url_for('sync.notification_config'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Error updating notification routing: {str(e)}", 'danger')
+            return redirect(url_for('sync.notification_config'))
+    
+    @bp.route('/test_email_notification', methods=['POST'])
+    @login_required
+    @role_required('administrator')
+    def test_email_notification():
+        """Send a test email notification."""
+        try:
+            from sync_service.notification_system import notification_manager
+            
+            # Get form data
+            recipient = request.form.get('recipient')
+            subject = request.form.get('subject')
+            message = request.form.get('message')
+            
+            # Create a test metadata dictionary
+            metadata = {
+                'test': True,
+                'recipient': recipient
+            }
+            
+            # Send through notification manager
+            result = notification_manager.notify(
+                subject=subject,
+                message=message,
+                severity='info',
+                job_id=None,
+                metadata=metadata,
+                channel='email',
+                recipient=recipient
+            )
+            
+            if result:
+                flash("Test email sent successfully!", 'success')
+            else:
+                flash("Failed to send test email. Check email configuration and logs.", 'danger')
+                
+            return redirect(url_for('sync.notification_config'))
+            
+        except Exception as e:
+            flash(f"Error sending test email: {str(e)}", 'danger')
+            return redirect(url_for('sync.notification_config'))
+    
+    @bp.route('/test_slack_notification', methods=['POST'])
+    @login_required
+    @role_required('administrator')
+    def test_slack_notification():
+        """Send a test Slack notification."""
+        try:
+            from sync_service.notification_system import notification_manager
+            
+            # Get form data
+            channel = request.form.get('channel')
+            message = request.form.get('message')
+            
+            # Create a test metadata dictionary
+            metadata = {
+                'test': True,
+                'channel': channel
+            }
+            
+            # Send through notification manager
+            result = notification_manager.notify(
+                subject="Test Notification",
+                message=message,
+                severity='info',
+                job_id=None,
+                metadata=metadata,
+                channel='slack',
+                slack_channel=channel
+            )
+            
+            if result:
+                flash("Test Slack message sent successfully!", 'success')
+            else:
+                flash("Failed to send test Slack message. Check Slack configuration and logs.", 'danger')
+                
+            return redirect(url_for('sync.notification_config'))
+            
+        except Exception as e:
+            flash(f"Error sending test Slack message: {str(e)}", 'danger')
+            return redirect(url_for('sync.notification_config'))
+    
+    @bp.route('/notification_logs')
+    @login_required
+    @role_required('administrator')
+    def get_notification_logs():
+        """Get recent notification logs as JSON."""
+        logs = SyncNotificationLog.query.order_by(SyncNotificationLog.created_at.desc()).limit(50).all()
+        
+        log_list = [{
+            'id': log.id,
+            'job_id': log.job_id,
+            'subject': log.subject,
+            'message': log.message[:50] + '...' if len(log.message) > 50 else log.message,
+            'severity': log.severity,
+            'channel': log.channel,
+            'recipient': log.recipient,
+            'success': log.success,
+            'created_at': log.created_at.strftime('%Y-%m-%d %H:%M:%S')
+        } for log in logs]
+        
+        return jsonify({'logs': log_list})
         
         # GET request - show edit form
         return render_template('sync/edit_schedule.html', schedule=schedule)
