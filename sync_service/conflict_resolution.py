@@ -277,15 +277,14 @@ class ManualResolution(ConflictResolutionStrategy):
         from sync_service.models import SyncConflict
         
         # Store conflict data for later resolution
-        conflict = SyncConflict(
-            job_id=self.job_id,
-            table_name=table_name,
-            record_id=str(record_id),
-            source_data=source_data,
-            target_data=target_data,
-            resolution_status="pending",
-            created_at=datetime.datetime.utcnow()
-        )
+        conflict = SyncConflict()
+        conflict.job_id = self.job_id
+        conflict.table_name = table_name
+        conflict.record_id = str(record_id)
+        conflict.source_data = source_data
+        conflict.target_data = target_data
+        conflict.resolution_status = "pending"
+        conflict.created_at = datetime.datetime.utcnow()
         
         db.session.add(conflict)
         db.session.commit()

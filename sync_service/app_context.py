@@ -73,12 +73,11 @@ def handle_job_exception(job_id: str, exception: Exception) -> None:
                 job.error_details = str(exception)
                 
                 # Create error log
-                log = SyncLog(
-                    job_id=job_id,
-                    level='error',
-                    message=f"Job failed: {str(exception)}",
-                    details={'traceback': str(exception)}
-                )
+                log = SyncLog()
+                log.job_id = job_id
+                log.level = 'error'
+                log.message = f"Job failed: {str(exception)}"
+                log.details = {'traceback': str(exception)}
                 db.session.add(log)
                 db.session.commit()
                 

@@ -641,7 +641,7 @@ class SyncNotificationManager:
                 severity=severity,
                 channel=channel,
                 success=success,
-                meta_data=metadata  # Changed from metadata to meta_data
+                meta_data=metadata
             )
             
             # Add to session and commit
@@ -650,12 +650,12 @@ class SyncNotificationManager:
             
             # Also add to sync log if job ID is provided
             if job_id:
-                sync_log = SyncLog(
-                    job_id=job_id,
-                    level='INFO',
-                    message=f"Notification sent via {channel}: {subject}",
-                    component='NotificationManager'
-                )
+                # Create a new SyncLog instance
+                sync_log = SyncLog()
+                sync_log.job_id = job_id
+                sync_log.level = 'INFO'
+                sync_log.message = f"Notification sent via {channel}: {subject}"
+                sync_log.component = 'NotificationManager'
                 
                 db.session.add(sync_log)
                 db.session.commit()

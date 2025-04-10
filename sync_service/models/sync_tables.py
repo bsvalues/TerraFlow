@@ -465,6 +465,7 @@ class SyncSchedule(SyncBase, db.Model):
     # Status and tracking
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     last_run = db.Column(db.DateTime)
+    last_updated = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
     last_job_id = db.Column(db.String(50))
     job_id = db.Column(db.String(100))  # ID of the scheduled job in the APScheduler
     
