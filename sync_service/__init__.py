@@ -39,9 +39,18 @@ def create_routes():
     # Initialize scheduler (threading.Thread is used to avoid blocking the main thread)
     def init_scheduler_in_thread():
         try:
+            from sync_service.app_context import with_app_context
             from sync_service.scheduler import init_scheduler
-            scheduler = init_scheduler()
-            logger.info(f"Scheduler initialized with {len(scheduler.get_jobs())} jobs")
+            
+            # Make sure we run the scheduler in an app context
+            @with_app_context
+            def initialize_with_context():
+                scheduler = init_scheduler()
+                logger.info(f"Scheduler initialized with {len(scheduler.get_jobs())} jobs")
+                return scheduler
+            
+            # Run the initialization with context
+            scheduler = initialize_with_context()
         except Exception as e:
             logger.error(f"Error initializing scheduler: {str(e)}")
     

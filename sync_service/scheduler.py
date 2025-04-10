@@ -18,6 +18,7 @@ from apscheduler.executors.pool import ThreadPoolExecutor
 from app import db
 from sync_service.models import GlobalSetting, SyncJob, SyncLog
 from sync_service.bidirectional_sync import DataSynchronizer
+from sync_service.app_context import with_app_context, handle_job_exception
 
 # Create SyncSchedule model here to avoid import issues
 class SyncSchedule(db.Model):
@@ -71,12 +72,14 @@ scheduler = BackgroundScheduler(
     job_defaults=job_defaults
 )
 
+@with_app_context
 def init_scheduler():
-    """Initialize the scheduler and load existing schedules."""
+    """Initialize the scheduler and load existing schedules with proper application context."""
     logger.info("Initializing sync job scheduler")
     
-    # Start the scheduler
-    scheduler.start()
+    # Start the scheduler if it's not already running
+    if not scheduler.running:
+        scheduler.start()
     
     # Load existing schedules from database
     try:
@@ -247,8 +250,12 @@ def update_job_schedule(schedule: SyncSchedule) -> bool:
 
 # Scheduled job functions
 
+# Scheduled job functions
+
+@with_app_context
 def scheduled_up_sync(schedule_id: int):
-    """Run a scheduled up-sync job."""
+    """Run a scheduled up-sync job with proper application context."""
+    job_id = None
     try:
         schedule = SyncSchedule.query.get(schedule_id)
         if not schedule:
@@ -272,10 +279,15 @@ def scheduled_up_sync(schedule_id: int):
         logger.info(f"Completed scheduled up-sync job: {schedule.name}, Job ID: {job_id}")
         
     except Exception as e:
-        logger.error(f"Error in scheduled up-sync job: {str(e)}")
+        error_msg = f"Error in scheduled up-sync job: {str(e)}"
+        logger.error(error_msg)
+        if job_id:
+            handle_job_exception(job_id, e)
 
+@with_app_context
 def scheduled_down_sync(schedule_id: int):
-    """Run a scheduled down-sync job."""
+    """Run a scheduled down-sync job with proper application context."""
+    job_id = None
     try:
         schedule = SyncSchedule.query.get(schedule_id)
         if not schedule:
@@ -299,10 +311,15 @@ def scheduled_down_sync(schedule_id: int):
         logger.info(f"Completed scheduled down-sync job: {schedule.name}, Job ID: {job_id}")
         
     except Exception as e:
-        logger.error(f"Error in scheduled down-sync job: {str(e)}")
+        error_msg = f"Error in scheduled down-sync job: {str(e)}"
+        logger.error(error_msg)
+        if job_id:
+            handle_job_exception(job_id, e)
 
+@with_app_context
 def scheduled_full_sync(schedule_id: int):
-    """Run a scheduled full sync job."""
+    """Run a scheduled full sync job with proper application context."""
+    job_id = None
     try:
         schedule = SyncSchedule.query.get(schedule_id)
         if not schedule:
@@ -326,10 +343,15 @@ def scheduled_full_sync(schedule_id: int):
         logger.info(f"Completed scheduled full sync job: {schedule.name}, Job ID: {job_id}")
         
     except Exception as e:
-        logger.error(f"Error in scheduled full sync job: {str(e)}")
+        error_msg = f"Error in scheduled full sync job: {str(e)}"
+        logger.error(error_msg)
+        if job_id:
+            handle_job_exception(job_id, e)
 
+@with_app_context
 def scheduled_incremental_sync(schedule_id: int):
-    """Run a scheduled incremental sync job."""
+    """Run a scheduled incremental sync job with proper application context."""
+    job_id = None
     try:
         schedule = SyncSchedule.query.get(schedule_id)
         if not schedule:
@@ -353,10 +375,15 @@ def scheduled_incremental_sync(schedule_id: int):
         logger.info(f"Completed scheduled incremental sync job: {schedule.name}, Job ID: {job_id}")
         
     except Exception as e:
-        logger.error(f"Error in scheduled incremental sync job: {str(e)}")
+        error_msg = f"Error in scheduled incremental sync job: {str(e)}"
+        logger.error(error_msg)
+        if job_id:
+            handle_job_exception(job_id, e)
 
+@with_app_context
 def scheduled_property_export(schedule_id: int):
-    """Run a scheduled property export job."""
+    """Run a scheduled property export job with proper application context."""
+    job_id = None
     try:
         schedule = SyncSchedule.query.get(schedule_id)
         if not schedule:
@@ -391,4 +418,7 @@ def scheduled_property_export(schedule_id: int):
         logger.info(f"Completed scheduled property export job: {schedule.name}, Job ID: {job_id}")
         
     except Exception as e:
-        logger.error(f"Error in scheduled property export job: {str(e)}")
+        error_msg = f"Error in scheduled property export job: {str(e)}"
+        logger.error(error_msg)
+        if job_id:
+            handle_job_exception(job_id, e)
