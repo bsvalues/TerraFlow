@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Benton County GIS Data Management System</title>
+    <title>{% block title %}Benton County GIS Data Management System{% endblock %}</title>
     
     <!-- Bootstrap CSS -->
     <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
@@ -19,6 +19,9 @@
     
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
+    
+    <!-- Additional CSS -->
+    {% block additionalcss %}{% endblock %}
 </head>
 <body>
     <!-- Navbar -->
