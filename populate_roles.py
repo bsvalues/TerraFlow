@@ -1,227 +1,164 @@
 """
-Role and Permission Population Script
+Populate the database with initial roles and permissions
 
-This script sets up the initial roles and permissions for the Benton County
-Data Hub application. It creates the following roles:
-- administrator: Has all permissions
-- assessor: County assessor staff with data modification permissions
-- gis_analyst: GIS specialists with data visualization permissions
-- it_staff: IT staff with system maintenance permissions
-- readonly: Basic users with read-only access
-
-Run this script when setting up a new environment or when roles need to be reset.
+This script creates the default roles and permissions for the application.
 """
 
-import os
 import sys
-import datetime
+import os
+import time
+
+# Add the current directory to the path to allow importing app
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 from app import db, app
-from models import Role, Permission, User
+from models import Role, Permission, User, RolePermission, UserRole
 
-# Define all permissions
-PERMISSIONS = [
-    # File Management Permissions
-    {'name': 'file_upload', 'description': 'Can upload files'},
-    {'name': 'file_download', 'description': 'Can download files'},
-    {'name': 'file_delete', 'description': 'Can delete files'},
-    {'name': 'file_metadata_view', 'description': 'Can view file metadata'},
-    {'name': 'file_metadata_edit', 'description': 'Can edit file metadata'},
+def populate_roles():
+    """Populate the database with initial roles and permissions"""
     
-    # Map Permissions
-    {'name': 'map_view', 'description': 'Can view maps'},
-    {'name': 'map_create', 'description': 'Can create maps'},
-    {'name': 'map_export', 'description': 'Can export maps'},
-    {'name': 'map_share', 'description': 'Can share maps with others'},
-    
-    # Search Permissions
-    {'name': 'search_basic', 'description': 'Can perform basic searches'},
-    {'name': 'search_advanced', 'description': 'Can perform advanced searches'},
-    {'name': 'search_export', 'description': 'Can export search results'},
-    
-    # MCP Permissions
-    {'name': 'mcp_task_submit', 'description': 'Can submit tasks to MCP agents'},
-    {'name': 'mcp_agent_view', 'description': 'Can view MCP agent details'},
-    {'name': 'mcp_agent_manage', 'description': 'Can manage MCP agents'},
-    
-    # Power Query Permissions
-    {'name': 'power_query_run', 'description': 'Can run Power Queries'},
-    {'name': 'power_query_create', 'description': 'Can create Power Queries'},
-    {'name': 'power_query_save', 'description': 'Can save Power Queries'},
-    {'name': 'power_query_export', 'description': 'Can export Power Query results'},
-    
-    # API Permissions
-    {'name': 'api_access', 'description': 'Can access the API'},
-    {'name': 'api_token_create', 'description': 'Can create API tokens'},
-    {'name': 'api_token_revoke', 'description': 'Can revoke API tokens'},
-    {'name': 'api_create_endpoint', 'description': 'Can create new API endpoints'},
-    
-    # User Management Permissions
-    {'name': 'user_view', 'description': 'Can view user details'},
-    {'name': 'user_create', 'description': 'Can create users'},
-    {'name': 'user_edit', 'description': 'Can edit users'},
-    {'name': 'user_delete', 'description': 'Can delete users'},
-    {'name': 'role_assign', 'description': 'Can assign roles to users'},
-    
-    # System Permissions
-    {'name': 'system_config', 'description': 'Can configure system settings'},
-    {'name': 'system_logs', 'description': 'Can view system logs'},
-    {'name': 'system_backup', 'description': 'Can perform system backups'},
-    {'name': 'system_restore', 'description': 'Can restore system from backups'},
-]
-
-# Define roles and their permissions
-ROLES = [
-    {
-        'name': 'administrator',
-        'description': 'System administrator with full access',
-        'permissions': [p['name'] for p in PERMISSIONS]  # All permissions
-    },
-    {
-        'name': 'assessor',
-        'description': 'County assessor staff with data editing privileges',
-        'permissions': [
-            'file_upload', 'file_download', 'file_delete', 'file_metadata_view', 'file_metadata_edit',
-            'map_view', 'map_create', 'map_export', 'map_share',
-            'search_basic', 'search_advanced', 'search_export',
-            'power_query_run', 'power_query_create', 'power_query_save', 'power_query_export',
-            'mcp_task_submit', 'mcp_agent_view',
-            'api_access'
-        ]
-    },
-    {
-        'name': 'gis_analyst',
-        'description': 'GIS specialist with analysis capabilities',
-        'permissions': [
-            'file_upload', 'file_download', 'file_metadata_view',
-            'map_view', 'map_create', 'map_export',
-            'search_basic', 'search_advanced', 'search_export',
-            'power_query_run', 'power_query_create', 'power_query_export',
-            'mcp_task_submit', 'mcp_agent_view',
-            'api_access'
-        ]
-    },
-    {
-        'name': 'it_staff',
-        'description': 'IT staff with system maintenance access',
-        'permissions': [
-            'file_download', 'file_metadata_view',
-            'map_view',
-            'search_basic',
-            'mcp_agent_view',
-            'system_logs', 'system_backup',
-            'api_access'
-        ]
-    },
-    {
-        'name': 'readonly',
-        'description': 'Basic user with read-only access',
-        'permissions': [
-            'file_download', 'file_metadata_view',
-            'map_view',
-            'search_basic',
-            'mcp_agent_view',
-            'api_access'
-        ]
-    }
-]
-
-def create_permissions():
-    """Create all permissions in the database"""
-    print("Creating permissions...")
-    for perm_data in PERMISSIONS:
-        # Check if permission already exists
-        perm = Permission.query.filter_by(name=perm_data['name']).first()
-        if not perm:
-            perm = Permission(name=perm_data['name'], description=perm_data['description'])
-            db.session.add(perm)
-            print(f"Created permission: {perm_data['name']}")
-    
-    db.session.commit()
-    print(f"Created {len(PERMISSIONS)} permissions")
-
-def create_roles():
-    """Create all roles with their permissions"""
-    print("Creating roles...")
-    for role_data in ROLES:
-        # Check if role already exists
-        role = Role.query.filter_by(name=role_data['name']).first()
-        if not role:
-            role = Role(name=role_data['name'], description=role_data['description'])
-            db.session.add(role)
-            db.session.flush()  # Flush to get the role ID
-            
-        # Assign permissions to the role
-        for perm_name in role_data['permissions']:
-            perm = Permission.query.filter_by(name=perm_name).first()
-            if perm and perm not in role.permissions:
-                role.permissions.append(perm)
-        
-        print(f"Created/updated role: {role_data['name']} with {len(role_data['permissions'])} permissions")
-    
-    db.session.commit()
-    print(f"Created {len(ROLES)} roles")
-
-def create_admin_user():
-    """Create an admin user if none exists"""
-    admin = User.query.filter_by(username='admin').first()
-    if not admin:
-        print("Creating admin user...")
-        admin = User(
-            username='admin',
-            email='admin@co.benton.wa.us',
-            full_name='System Administrator',
-            department='IT Department',
-            last_login=datetime.datetime.utcnow(),
-            active=True
-        )
-        db.session.add(admin)
-        db.session.flush()
-        
-        # Assign administrator role
-        admin_role = Role.query.filter_by(name='administrator').first()
-        if admin_role:
-            admin.roles.append(admin_role)
-            print(f"Assigned administrator role to admin user")
-        
-        db.session.commit()
-        print("Admin user created successfully")
-    else:
-        print("Admin user already exists")
-        
-    # Create dev_user for testing
-    dev_user = User.query.filter_by(username='dev_user').first()
-    if not dev_user:
-        print("Creating development test user...")
-        dev_user = User(
-            username='dev_user',
-            email='dev@co.benton.wa.us',
-            full_name='Development Test User',
-            department='Development',
-            last_login=datetime.datetime.utcnow(),
-            active=True
-        )
-        db.session.add(dev_user)
-        db.session.flush()
-        
-        # Assign administrator role
-        admin_role = Role.query.filter_by(name='administrator').first()
-        if admin_role:
-            dev_user.roles.append(admin_role)
-            print(f"Assigned administrator role to dev_user")
-        
-        db.session.commit()
-        print("Development test user created successfully")
-    else:
-        print("Development test user already exists")
-
-def main():
-    """Main function to set up roles and permissions"""
     with app.app_context():
-        print("Setting up roles and permissions...")
-        create_permissions()
-        create_roles()
-        create_admin_user()
-        print("Setup completed successfully")
+        # Create default roles
+        administrator = Role.query.filter_by(name='administrator').first()
+        if not administrator:
+            administrator = Role(name='administrator', description='System Administrator')
+            db.session.add(administrator)
+            
+        assessor = Role.query.filter_by(name='assessor').first()
+        if not assessor:
+            assessor = Role(name='assessor', description='Assessor Staff')
+            db.session.add(assessor)
+            
+        it_staff = Role.query.filter_by(name='it_staff').first()
+        if not it_staff:
+            it_staff = Role(name='it_staff', description='IT Staff')
+            db.session.add(it_staff)
+            
+        gis_analyst = Role.query.filter_by(name='gis_analyst').first()
+        if not gis_analyst:
+            gis_analyst = Role(name='gis_analyst', description='GIS Analyst')
+            db.session.add(gis_analyst)
+            
+        readonly = Role.query.filter_by(name='readonly').first()
+        if not readonly:
+            readonly = Role(name='readonly', description='Read-only User')
+            db.session.add(readonly)
+        
+        # Define permissions
+        permissions = [
+            # File management permissions
+            ('upload_files', 'Can upload files'),
+            ('download_files', 'Can download files'),
+            ('delete_files', 'Can delete files'),
+            ('view_files', 'Can view files'),
+            
+            # Map viewer permissions
+            ('view_maps', 'Can view maps'),
+            ('edit_maps', 'Can edit maps'),
+            ('export_maps', 'Can export maps'),
+            
+            # User management permissions
+            ('manage_users', 'Can manage users'),
+            ('manage_roles', 'Can manage roles'),
+            
+            # API permissions
+            ('use_api', 'Can use the API'),
+            ('manage_api_tokens', 'Can manage API tokens'),
+            
+            # Sync permissions
+            ('run_sync', 'Can run sync jobs'),
+            ('configure_sync', 'Can configure sync settings'),
+            ('view_sync_logs', 'Can view sync logs'),
+            
+            # System permissions
+            ('view_system_info', 'Can view system information'),
+            ('manage_system', 'Can manage system settings'),
+            
+            # Search permissions
+            ('search_basic', 'Can perform basic searches'),
+            ('search_advanced', 'Can perform advanced searches')
+        ]
+        
+        # Create permissions if they don't exist
+        for name, description in permissions:
+            perm = Permission.query.filter_by(name=name).first()
+            if not perm:
+                perm = Permission(name=name, description=description)
+                db.session.add(perm)
+                
+        # Commit to get IDs for the permissions
+        db.session.commit()
+        
+        # Map permissions to roles
+        
+        # Administrator gets all permissions
+        all_permissions = Permission.query.all()
+        for perm in all_permissions:
+            if not RolePermission.query.filter_by(role_id=administrator.id, permission_id=perm.id).first():
+                administrator.permissions.append(perm)
+        
+        # Assessor permissions
+        assessor_perms = ['upload_files', 'download_files', 'view_files', 'view_maps', 
+                         'edit_maps', 'export_maps', 'view_sync_logs', 'search_basic', 
+                         'search_advanced', 'run_sync']
+        
+        for perm_name in assessor_perms:
+            perm = Permission.query.filter_by(name=perm_name).first()
+            if perm and not RolePermission.query.filter_by(role_id=assessor.id, permission_id=perm.id).first():
+                assessor.permissions.append(perm)
+        
+        # IT Staff permissions
+        it_perms = ['upload_files', 'download_files', 'view_files', 'delete_files', 
+                   'view_maps', 'export_maps', 'manage_users', 'manage_api_tokens', 
+                   'view_sync_logs', 'view_system_info', 'search_basic', 'search_advanced',
+                   'run_sync', 'configure_sync']
+                   
+        for perm_name in it_perms:
+            perm = Permission.query.filter_by(name=perm_name).first()
+            if perm and not RolePermission.query.filter_by(role_id=it_staff.id, permission_id=perm.id).first():
+                it_staff.permissions.append(perm)
+                
+        # GIS Analyst permissions
+        gis_perms = ['upload_files', 'download_files', 'view_files', 
+                    'view_maps', 'edit_maps', 'export_maps', 
+                    'view_sync_logs', 'search_basic', 'search_advanced',
+                    'use_api']
+                    
+        for perm_name in gis_perms:
+            perm = Permission.query.filter_by(name=perm_name).first()
+            if perm and not RolePermission.query.filter_by(role_id=gis_analyst.id, permission_id=perm.id).first():
+                gis_analyst.permissions.append(perm)
+        
+        # Read-only permissions
+        readonly_perms = ['view_files', 'view_maps', 'search_basic', 'view_sync_logs']
+        
+        for perm_name in readonly_perms:
+            perm = Permission.query.filter_by(name=perm_name).first()
+            if perm and not RolePermission.query.filter_by(role_id=readonly.id, permission_id=perm.id).first():
+                readonly.permissions.append(perm)
+        
+        # Commit all role-permission mappings
+        db.session.commit()
+        
+        # Create a development user with administrator role if it doesn't exist
+        dev_user = User.query.filter_by(username='dev_user').first()
+        if not dev_user:
+            dev_user = User(
+                username='dev_user',
+                email='dev@example.com',
+                full_name='Development User',
+                department='IT'
+            )
+            db.session.add(dev_user)
+            db.session.commit()
+            
+            # Assign administrator role
+            if not UserRole.query.filter_by(user_id=dev_user.id, role_id=administrator.id).first():
+                dev_user.roles.append(administrator)
+                db.session.commit()
+                print(f"Created development user with administrator role: {dev_user.username}")
+        
+        print("Roles and permissions created successfully")
 
 if __name__ == '__main__':
-    main()
+    populate_roles()
