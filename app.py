@@ -97,10 +97,11 @@ with app.app_context():
     
     # Register Sync Service blueprint
     try:
-        from sync_service import sync_bp, verification_bp
-        app.register_blueprint(sync_bp)
-        app.register_blueprint(verification_bp)
-        logger.info("Sync Service and Verification blueprints registered successfully")
+        # Import the register_blueprints function from sync_service
+        from sync_service import register_blueprints
+        # Use the new register_blueprints function to avoid circular imports
+        if register_blueprints(app):
+            logger.info("Sync Service and Verification blueprints registered successfully")
     except ImportError as e:
         logger.warning(f"Could not load Sync Service module: {e}")
     
