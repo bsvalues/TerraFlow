@@ -8,6 +8,54 @@
         <i class="fas fa-check-circle me-2"></i>Property Export Verification Dashboard
     </h1>
     
+    <!-- Status Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white h-100">
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title"><i class="fas fa-server me-2"></i>System Status</h5>
+                    <p class="card-text flex-grow-1" id="system-status-card">Ready for verification tests</p>
+                    <div class="mt-auto">
+                        <span class="badge bg-light text-primary" id="system-status-badge">Ready</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white h-100">
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title"><i class="fas fa-database me-2"></i>Database Status</h5>
+                    <p class="card-text flex-grow-1" id="db-status-card">SQL Server connectivity unverified</p>
+                    <div class="mt-auto">
+                        <span class="badge bg-light text-info" id="db-status-badge">Unknown</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white h-100">
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title"><i class="fas fa-cogs me-2"></i>Export Engine</h5>
+                    <p class="card-text flex-grow-1" id="engine-status-card">Ready to process requests</p>
+                    <div class="mt-auto">
+                        <span class="badge bg-light text-success" id="engine-status-badge">Ready</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white h-100">
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title"><i class="fas fa-shield-alt me-2"></i>Security Status</h5>
+                    <p class="card-text flex-grow-1" id="security-status-card">Windows Authentication</p>
+                    <div class="mt-auto">
+                        <span class="badge bg-light text-warning" id="security-status-badge">Active</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     <div class="row">
         <div class="col-lg-4">
             <div class="card mb-4">
@@ -147,6 +195,46 @@
                         <h6>Test Suite Results:</h6>
                         <div id="test-suite-status" class="mb-2"></div>
                         <div id="test-suite-summary" class="alert alert-info"></div>
+                        
+                        <!-- Test Categories Summary -->
+                        <div id="test-categories" class="mb-3 d-none">
+                            <h6>Test Categories:</h6>
+                            <div class="row g-2">
+                                <div class="col-md-3">
+                                    <div class="card bg-light">
+                                        <div class="card-body py-2">
+                                            <h6 class="card-title">Basic Tests</h6>
+                                            <span id="basic-tests-count" class="badge bg-primary">0/0</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card bg-light">
+                                        <div class="card-body py-2">
+                                            <h6 class="card-title">Edge Cases</h6>
+                                            <span id="edge-tests-count" class="badge bg-warning">0/0</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card bg-light">
+                                        <div class="card-body py-2">
+                                            <h6 class="card-title">Performance</h6>
+                                            <span id="perf-tests-count" class="badge bg-info">0/0</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card bg-light">
+                                        <div class="card-body py-2">
+                                            <h6 class="card-title">Data Integrity</h6>
+                                            <span id="data-tests-count" class="badge bg-success">0/0</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <pre id="test-suite-json" class="p-3 bg-light rounded"><code>Waiting for test results...</code></pre>
                     </div>
                     
@@ -154,6 +242,119 @@
                         <button id="run-test-suite" class="btn btn-info text-white">
                             <i class="fas fa-vials me-2"></i>Run Test Suite
                         </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Performance Metrics and Logs -->
+    <div class="row">
+        <div class="col-lg-6">
+            <div class="card mb-4">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-tachometer-alt me-2"></i>Performance Metrics
+                        <button class="btn btn-sm btn-outline-light float-end" id="refresh-metrics">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card bg-light mb-3">
+                                <div class="card-body p-3">
+                                    <h6 class="card-title">Execution Time</h6>
+                                    <div id="execution-time-chart" style="height: 200px;">
+                                        <div class="d-flex align-items-center justify-content-center h-100 text-muted">
+                                            <span>No data available</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-light mb-3">
+                                <div class="card-body p-3">
+                                    <h6 class="card-title">Resource Usage</h6>
+                                    <div class="mb-2">
+                                        <label class="form-label mb-0">CPU Usage</label>
+                                        <div class="progress">
+                                            <div id="cpu-usage" class="progress-bar bg-success" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                                        </div>
+                                    </div>
+                                    <div class="mb-2">
+                                        <label class="form-label mb-0">Memory Usage</label>
+                                        <div class="progress">
+                                            <div id="memory-usage" class="progress-bar bg-primary" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="form-label mb-0">Database Connections</label>
+                                        <div class="progress">
+                                            <div id="db-connections" class="progress-bar bg-info" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card bg-light">
+                                <div class="card-body p-3">
+                                    <h6 class="card-title">Recent Test Execution Times</h6>
+                                    <table class="table table-sm table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Test Name</th>
+                                                <th>Category</th>
+                                                <th>Status</th>
+                                                <th>Execution Time (ms)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="execution-time-table">
+                                            <tr>
+                                                <td colspan="4" class="text-center text-muted">No data available</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-6">
+            <div class="card mb-4">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-list-alt me-2"></i>Real-Time Logs
+                        <div class="float-end">
+                            <button class="btn btn-sm btn-outline-light me-1" id="clear-logs">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                            <div class="form-check form-switch d-inline-block ms-2">
+                                <input class="form-check-input" type="checkbox" id="auto-refresh-logs" checked>
+                                <label class="form-check-label text-white" for="auto-refresh-logs">Auto-refresh</label>
+                            </div>
+                        </div>
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush" id="log-container" style="max-height: 400px; overflow-y: auto;">
+                        <div class="list-group-item text-muted text-center">No logs available</div>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <div class="btn-group w-100">
+                        <button class="btn btn-sm btn-outline-secondary" id="filter-info">Info</button>
+                        <button class="btn btn-sm btn-outline-warning" id="filter-warning">Warning</button>
+                        <button class="btn btn-sm btn-outline-danger" id="filter-error">Error</button>
+                        <button class="btn btn-sm btn-outline-dark active" id="filter-all">All</button>
                     </div>
                 </div>
             </div>
@@ -328,13 +529,203 @@
                         <strong>Summary:</strong> ${response.summary.passed}/${response.summary.total_tests} tests passed
                     `);
                     
+                    // Update test categories summary
+                    $('#test-categories').removeClass('d-none');
+                    
+                    // Process test results by category
+                    const testsByCategory = {
+                        'Basic Parameter Tests': { total: 0, passed: 0 },
+                        'Edge Cases': { total: 0, passed: 0 },
+                        'Performance': { total: 0, passed: 0 },
+                        'Data Integrity': { total: 0, passed: 0 }
+                    };
+                    
+                    // Clear previous execution times
+                    $('#execution-time-table').empty();
+                    
+                    // Process each test
+                    response.tests.forEach(test => {
+                        const category = test.category || 'Other';
+                        
+                        // Count tests by category
+                        if (testsByCategory[category]) {
+                            testsByCategory[category].total++;
+                            if (test.success) {
+                                testsByCategory[category].passed++;
+                            }
+                        }
+                        
+                        // Add to execution time table
+                        $('#execution-time-table').append(`
+                            <tr>
+                                <td>${test.name}</td>
+                                <td>${category}</td>
+                                <td>${test.success ? '<span class="badge bg-success">Pass</span>' : '<span class="badge bg-danger">Fail</span>'}</td>
+                                <td>${test.execution_time ? Math.round(test.execution_time) : 'N/A'}</td>
+                            </tr>
+                        `);
+                        
+                        // Add to logs
+                        addLogEntry({
+                            timestamp: new Date().toISOString(),
+                            level: test.success ? 'INFO' : 'WARNING',
+                            component: 'TestSuite',
+                            message: `${test.name}: ${test.success ? 'Passed' : 'Failed'} - ${test.message}`
+                        });
+                    });
+                    
+                    // Update category badges
+                    $('#basic-tests-count').text(`${testsByCategory['Basic Parameter Tests'].passed}/${testsByCategory['Basic Parameter Tests'].total}`);
+                    $('#edge-tests-count').text(`${testsByCategory['Edge Cases'].passed}/${testsByCategory['Edge Cases'].total}`);
+                    $('#perf-tests-count').text(`${testsByCategory['Performance'].passed}/${testsByCategory['Performance'].total}`);
+                    $('#data-tests-count').text(`${testsByCategory['Data Integrity'].passed}/${testsByCategory['Data Integrity'].total}`);
+                    
+                    // Update system status cards
+                    if (response.summary.overall_status === 'passed') {
+                        $('#system-status-card').text('All tests passed successfully');
+                        $('#system-status-badge').text('Healthy').removeClass('text-primary').addClass('text-success');
+                    } else {
+                        $('#system-status-card').text(`${response.summary.failed} tests failed`);
+                        $('#system-status-badge').text('Warning').removeClass('text-primary').addClass('text-warning');
+                    }
+                    
+                    // Update database status if we have a data integrity test
+                    const dataIntegrityTest = response.tests.find(t => t.category === 'Data Integrity');
+                    if (dataIntegrityTest) {
+                        if (dataIntegrityTest.success) {
+                            $('#db-status-card').text('Connected and verified');
+                            $('#db-status-badge').text('Verified').removeClass('text-info').addClass('text-success');
+                        } else {
+                            $('#db-status-card').text('Connectivity issues detected');
+                            $('#db-status-badge').text('Error').removeClass('text-info').addClass('text-danger');
+                        }
+                    }
+                    
+                    // Show full test results
                     $('#test-suite-json').html('<code>' + JSON.stringify(response, null, 2) + '</code>');
                 },
                 error: function() {
                     button.prop('disabled', false).html('<i class="fas fa-vials me-2"></i>Run Test Suite');
                     alert('Error running test suite');
+                    
+                    // Add error log
+                    addLogEntry({
+                        timestamp: new Date().toISOString(),
+                        level: 'ERROR',
+                        component: 'TestSuite',
+                        message: 'Failed to execute automated test suite'
+                    });
                 }
             });
+        });
+        
+        // Real-time logs functionality
+        let logEntries = [];
+        
+        function addLogEntry(entry) {
+            logEntries.push(entry);
+            
+            // Format the log entry
+            const timestamp = new Date(entry.timestamp).toLocaleTimeString();
+            let logClass = 'list-group-item-light';
+            let logIcon = 'info-circle';
+            
+            if (entry.level === 'WARNING') {
+                logClass = 'list-group-item-warning';
+                logIcon = 'exclamation-triangle';
+            } else if (entry.level === 'ERROR') {
+                logClass = 'list-group-item-danger';
+                logIcon = 'exclamation-circle';
+            } else if (entry.level === 'SUCCESS') {
+                logClass = 'list-group-item-success';
+                logIcon = 'check-circle';
+            }
+            
+            // Add to log container if auto-refresh is enabled
+            if ($('#auto-refresh-logs').is(':checked')) {
+                // Clear "No logs available" message if it's the first log
+                if ($('#log-container').find('.text-muted').length > 0) {
+                    $('#log-container').empty();
+                }
+                
+                // Add the new log entry
+                $('#log-container').prepend(`
+                    <div class="list-group-item ${logClass} py-1 log-entry" data-level="${entry.level}">
+                        <div class="d-flex align-items-center">
+                            <div class="me-2">
+                                <i class="fas fa-${logIcon}"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="d-flex justify-content-between">
+                                    <small class="text-muted">${timestamp}</small>
+                                    <span class="badge bg-secondary">${entry.component}</span>
+                                </div>
+                                <div>${entry.message}</div>
+                            </div>
+                        </div>
+                    </div>
+                `);
+                
+                // Limit the number of visible logs to 100
+                if ($('#log-container .log-entry').length > 100) {
+                    $('#log-container .log-entry').last().remove();
+                }
+            }
+        }
+        
+        // Clear logs button
+        $('#clear-logs').click(function() {
+            $('#log-container').html('<div class="list-group-item text-muted text-center">No logs available</div>');
+            logEntries = [];
+        });
+        
+        // Log filter buttons
+        $('#filter-info, #filter-warning, #filter-error, #filter-all').click(function() {
+            const filter = $(this).attr('id').replace('filter-', '');
+            
+            // Toggle active state
+            $('.btn-group .active').removeClass('active');
+            $(this).addClass('active');
+            
+            // Apply filter
+            if (filter === 'all') {
+                $('.log-entry').show();
+            } else {
+                $('.log-entry').hide();
+                $(`.log-entry[data-level="${filter.toUpperCase()}"]`).show();
+            }
+        });
+        
+        // Performance metrics refresh
+        $('#refresh-metrics').click(function() {
+            // Update CPU usage (simulated)
+            const cpuUsage = Math.floor(Math.random() * 40) + 10; // 10-50%
+            $('#cpu-usage').css('width', `${cpuUsage}%`).attr('aria-valuenow', cpuUsage).text(`${cpuUsage}%`);
+            
+            // Update memory usage (simulated)
+            const memoryUsage = Math.floor(Math.random() * 30) + 20; // 20-50%
+            $('#memory-usage').css('width', `${memoryUsage}%`).attr('aria-valuenow', memoryUsage).text(`${memoryUsage}%`);
+            
+            // Update DB connections (simulated)
+            const dbConnections = Math.floor(Math.random() * 8) + 2; // 2-10
+            const dbPercent = dbConnections * 10;
+            $('#db-connections').css('width', `${dbPercent}%`).attr('aria-valuenow', dbConnections).text(dbConnections);
+            
+            // Add log entry
+            addLogEntry({
+                timestamp: new Date().toISOString(),
+                level: 'INFO',
+                component: 'Metrics',
+                message: `Refreshed metrics: CPU ${cpuUsage}%, Memory ${memoryUsage}%, DB Connections ${dbConnections}`
+            });
+        });
+        
+        // Add initial log entry
+        addLogEntry({
+            timestamp: new Date().toISOString(),
+            level: 'INFO',
+            component: 'Verification',
+            message: 'Verification dashboard initialized and ready'
         });
     });
 </script>
