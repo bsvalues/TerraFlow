@@ -45,23 +45,49 @@ def create_routes():
             from sync_service.app_context import with_app_context
             from sync_service.scheduler import init_scheduler
             from sync_service.notification_system import configure_notification_manager, notification_manager
+            from app import db
             
             # Make sure we run initialization in an app context
             @with_app_context
-            def initialize_with_context():
-                # Initialize notification manager
-                logger.info("Configuring notification manager...")
-                configure_notification_manager()
-                logger.info(f"Notification manager configured with {len(notification_manager.channels)} channels")
-                
-                # Initialize scheduler
-                scheduler = init_scheduler()
-                logger.info(f"Scheduler initialized with {len(scheduler.get_jobs())} jobs")
-                
-                return scheduler
+            def initialize_notification_manager():
+                try:
+                    # Initialize notification manager first in its own transaction
+                    logger.info("Configuring notification manager...")
+                    configure_notification_manager()
+                    logger.info(f"Notification manager configured with {len(notification_manager.channels)} channels")
+                    # Explicitly commit and close the session
+                    db.session.commit()
+                except Exception as e:
+                    logger.error(f"Error initializing notification manager: {str(e)}")
+                    # Make sure to rollback
+                    try:
+                        db.session.rollback()
+                    except:
+                        pass
             
-            # Run the initialization with context
-            scheduler = initialize_with_context()
+            @with_app_context
+            def initialize_scheduler():
+                try:
+                    # Then initialize scheduler in a separate transaction
+                    logger.info("Initializing scheduler...")
+                    scheduler = init_scheduler()
+                    logger.info(f"Scheduler initialized with {len(scheduler.get_jobs())} jobs")
+                    # Explicitly commit and close the session
+                    db.session.commit()
+                    return scheduler
+                except Exception as e:
+                    logger.error(f"Error initializing scheduler: {str(e)}")
+                    # Make sure to rollback
+                    try:
+                        db.session.rollback()
+                    except:
+                        pass
+                    return None
+            
+            # Run each initialization separately with clean transaction state
+            initialize_notification_manager()
+            scheduler = initialize_scheduler()
+            
         except Exception as e:
             logger.error(f"Error initializing services: {str(e)}")
     

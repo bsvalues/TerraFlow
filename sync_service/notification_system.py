@@ -89,7 +89,7 @@ class EmailChannel(NotificationChannel):
            subject: str, 
            message: str, 
            severity: str = 'info',
-           metadata: Dict[str, Any] = None) -> bool:
+           metadata: Optional[Dict[str, Any]] = None) -> bool:
         """Send a notification via email
         
         Args:
