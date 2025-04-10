@@ -190,6 +190,41 @@
             <a href="{{ url_for('sync.table_configurations') }}" class="btn btn-outline-primary">Manage Tables</a>
         </div>
     </div>
+    
+    <!-- Advanced Features Card -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="card-title mb-0">Advanced Features</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <i class="fas fa-shield-alt fa-3x mb-3 text-primary"></i>
+                            <h5>Data Sanitization</h5>
+                            <p>Configure rules for sanitizing sensitive data during the synchronization process.</p>
+                            <a href="{{ url_for('sync.data_sanitization') }}" class="btn btn-outline-primary">
+                                <i class="fas fa-cogs me-1"></i> Configure Data Sanitization
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <i class="fas fa-bell fa-3x mb-3 text-primary"></i>
+                            <h5>Notification System</h5>
+                            <p>Set up email and Slack notifications for sync job events and system alerts.</p>
+                            <a href="{{ url_for('sync.notification_config') }}" class="btn btn-outline-primary">
+                                <i class="fas fa-envelope me-1"></i> Configure Notifications
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
