@@ -496,8 +496,22 @@ class DataQualityNotificationManager:
 notification_manager = DataQualityNotificationManager()
 
 def check_data_quality_alerts():
-    """Check all data quality alerts"""
-    notification_manager.check_alerts()
+    """
+    Check all data quality alerts.
+    This function is called by the scheduler and needs to handle its own app context.
+    """
+    try:
+        # Use a fresh instance when called by scheduler to avoid serialization issues
+        from app import app
+        with app.app_context():
+            logger.info("Running scheduled data quality alert check")
+            # Create a new instance here to avoid any potential stale state issues
+            manager = DataQualityNotificationManager()
+            manager.check_alerts()
+            logger.info("Data quality alert check completed successfully")
+    except Exception as e:
+        logger.error(f"Error in scheduled data quality alert check: {str(e)}")
+        # Ensure error doesn't propagate and crash the scheduler
 
 def send_data_quality_alert(alert_id: int, title: str, message: str, severity: str = 'warning'):
     """

@@ -88,32 +88,34 @@ def create_routes():
             @with_app_context
             def schedule_data_quality_alerts():
                 try:
-                    # Schedule alert checks every 15 minutes
-                    from apscheduler.triggers.interval import IntervalTrigger
+                    # Add a scheduled job to run manually without the pickle serialization 
+                    # This is a workaround for pickle/serialization issues with scheduler
+                    # We will manually check alerts every 15 minutes using cron-like syntax
                     logger.info("Setting up data quality alert checking schedule...")
-                    scheduler = init_scheduler()
                     
-                    # Add job to check data quality alerts
-                    @with_app_context
-                    def run_data_quality_check():
-                        try:
-                            logger.info("Running scheduled data quality alert check")
-                            check_data_quality_alerts()
-                        except Exception as e:
-                            logger.error(f"Error in scheduled data quality alert check: {str(e)}")
+                    # Run the check manually on startup
+                    from sync_service.data_quality_notifications import check_data_quality_alerts
+                    logger.info("Running initial data quality alert check...")
+                    check_data_quality_alerts()
+                    logger.info("Initial data quality alert check completed")
                     
-                    # Add job to scheduler if it doesn't exist
-                    if not any(job.id == 'check_data_quality_alerts' for job in scheduler.get_jobs()):
-                        scheduler.add_job(
-                            run_data_quality_check,
-                            IntervalTrigger(minutes=15),
-                            id='check_data_quality_alerts',
-                            name='Check Data Quality Alerts',
-                            replace_existing=True
-                        )
-                        logger.info("Data quality alert check scheduled to run every 15 minutes")
-                    
+                    # Note: We're not using scheduler due to pickle serialization issues
+                    # Instead, we'll rely on server.py custom scheduler code
                     db.session.commit()
+                    
+                    # Store scheduling info in global settings
+                    from sync_service.models import GlobalSetting
+                    setting = GlobalSetting.query.filter_by(key='data_quality_alert_check_interval').first()
+                    if not setting:
+                        setting = GlobalSetting(
+                            key='data_quality_alert_check_interval',
+                            value='15',  # minutes
+                            description='Interval in minutes for data quality alert checks'
+                        )
+                        db.session.add(setting)
+                        db.session.commit()
+                        
+                    logger.info("Data quality alert check interval set to 15 minutes")
                 except Exception as e:
                     logger.error(f"Error scheduling data quality alerts: {str(e)}")
                     try:
