@@ -7,7 +7,14 @@ This module defines the database models for data quality monitoring and validati
 import datetime
 import json
 from app import db
+from sqlalchemy import JSON
 from sqlalchemy.dialects.postgresql import JSONB
+
+# Use JSONB for PostgreSQL, fallback to JSON for other databases
+try:
+    JsonType = JSONB
+except:
+    JsonType = JSON
 
 class DataQualityRule(db.Model):
     """
@@ -19,7 +26,7 @@ class DataQualityRule(db.Model):
     table_name = db.Column(db.String(128), nullable=False)
     field_name = db.Column(db.String(128), nullable=True)  # Null for table-level rules
     rule_type = db.Column(db.String(64), nullable=False)  # required, format, range, referential, etc.
-    rule_config = db.Column(JSONB, nullable=False)  # JSON configuration for the rule
+    rule_config = db.Column(JsonType, nullable=False)  # JSON configuration for the rule
     description = db.Column(db.Text)
     severity = db.Column(db.String(32), default='warning')  # info, warning, error, critical
     is_active = db.Column(db.Boolean, default=True)
@@ -51,7 +58,7 @@ class DataQualityIssue(db.Model):
     field_name = db.Column(db.String(128), nullable=True)
     record_id = db.Column(db.String(128), nullable=True)  # ID of the record with the issue
     issue_type = db.Column(db.String(64), nullable=False)  # missing_value, invalid_format, out_of_range, etc.
-    issue_details = db.Column(JSONB, nullable=True)  # JSON with issue details
+    issue_details = db.Column(JsonType, nullable=True)  # JSON with issue details
     issue_value = db.Column(db.Text, nullable=True)  # String representation of the problematic value
     severity = db.Column(db.String(32), default='warning')  # info, warning, error, critical
     status = db.Column(db.String(32), default='open')  # open, resolved, ignored
@@ -75,9 +82,9 @@ class DataQualityReport(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     report_name = db.Column(db.String(128), nullable=False)
-    tables_checked = db.Column(JSONB, nullable=False)  # List of tables included in the report
+    tables_checked = db.Column(JsonType, nullable=False)  # List of tables included in the report
     overall_score = db.Column(db.Float, nullable=True)  # Overall quality score (0-100)
-    report_data = db.Column(JSONB, nullable=False)  # Full report data
+    report_data = db.Column(JsonType, nullable=False)  # Full report data
     critical_issues = db.Column(db.Integer, default=0)  # Number of critical issues
     high_issues = db.Column(db.Integer, default=0)  # Number of high severity issues
     medium_issues = db.Column(db.Integer, default=0)  # Number of medium severity issues
@@ -102,7 +109,7 @@ class AnomalyDetectionConfig(db.Model):
     table_name = db.Column(db.String(128), nullable=False)
     field_name = db.Column(db.String(128), nullable=True)  # Null for table-level config
     detection_type = db.Column(db.String(64), nullable=False)  # value_change, outlier, z_score, etc.
-    config = db.Column(JSONB, nullable=False)  # JSON configuration for detection
+    config = db.Column(JsonType, nullable=False)  # JSON configuration for detection
     description = db.Column(db.Text)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
@@ -124,7 +131,7 @@ class DataAnomaly(db.Model):
     field_name = db.Column(db.String(128), nullable=True)
     record_id = db.Column(db.String(128), nullable=True)  # ID of the record with the anomaly
     anomaly_type = db.Column(db.String(64), nullable=False)  # value_change, outlier, etc.
-    anomaly_details = db.Column(JSONB, nullable=True)  # JSON with anomaly details
+    anomaly_details = db.Column(JsonType, nullable=True)  # JSON with anomaly details
     anomaly_score = db.Column(db.Float, nullable=True)  # Anomaly score or confidence
     current_value = db.Column(db.Text, nullable=True)  # String representation of current value
     previous_value = db.Column(db.Text, nullable=True)  # String representation of previous value
