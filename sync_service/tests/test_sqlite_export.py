@@ -111,12 +111,13 @@ class TestSQLiteExporter(unittest.TestCase):
         db_path = self.exporter.create_and_load_working_db(self.working_df)
         
         # Create new data to merge (with one updated record and one new record)
+        now = datetime.now()
         merge_data = pd.DataFrame({
             'id': [2, 4],
             'owner': ['Jane Smith-Updated', 'New Owner'],
             'use_code': ['R', 'I'],
             'parcel_id': ['234-56-789', '456-78-901'],
-            'last_update': [datetime.now(), datetime.now()]
+            'last_update': [now, now]
         })
         
         # Merge the new data
@@ -138,12 +139,13 @@ class TestSQLiteExporter(unittest.TestCase):
         db_path = self.exporter.create_and_load_stats_db(self.stats_df)
         
         # Create new data to merge (with one updated record and one new record)
+        now = datetime.now()
         merge_data = pd.DataFrame({
             'id': [2, 4],
             'use_code': ['C-Updated', 'R'],
             'acres': [3.0, 1.2],
             'assessed_value': [300000, 120000],
-            'last_update': [datetime.now(), datetime.now()]
+            'last_update': [now, now]
         })
         
         # Merge the new data

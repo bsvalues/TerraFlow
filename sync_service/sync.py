@@ -129,7 +129,7 @@ class CountyDataSyncETL:
     
     def load_stats_data(self, df: pd.DataFrame, 
                        incremental: bool = True,
-                       key_columns: Optional[List[str]] = None) -> str:
+                       key_columns: Optional[List[str]] = None) -> Optional[str]:
         """Load statistics data into a SQLite database.
         
         Args:
@@ -158,7 +158,7 @@ class CountyDataSyncETL:
     
     def load_working_data(self, df: pd.DataFrame, 
                          incremental: bool = True,
-                         key_columns: Optional[List[str]] = None) -> str:
+                         key_columns: Optional[List[str]] = None) -> Optional[str]:
         """Load working data into a SQLite database.
         
         Args:

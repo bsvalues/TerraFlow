@@ -57,12 +57,25 @@ class IncrementalSyncManager:
     
     def _save_metadata(self, metadata: Dict[str, Any]) -> None:
         """Save metadata to file."""
-        # Ensure the last_sync_time is serializable
-        if metadata.get('last_sync_time') and isinstance(metadata['last_sync_time'], datetime.datetime):
-            metadata['last_sync_time'] = metadata['last_sync_time'].isoformat()
-            
+        # Create a copy of the metadata to avoid modifying the original
+        metadata_copy = metadata.copy()
+        
+        # Convert all datetime objects to ISO format strings for JSON serialization
+        metadata_copy = self._convert_datetimes_to_strings(metadata_copy)
+        
         with open(self.sync_metadata_path, 'w') as f:
-            json.dump(metadata, f, indent=2)
+            json.dump(metadata_copy, f, indent=2)
+    
+    def _convert_datetimes_to_strings(self, obj):
+        """Recursively convert all datetime objects in a nested structure to strings."""
+        if isinstance(obj, dict):
+            return {k: self._convert_datetimes_to_strings(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self._convert_datetimes_to_strings(item) for item in obj]
+        elif isinstance(obj, datetime.datetime):
+            return obj.isoformat()
+        else:
+            return obj
     
     def get_last_sync_time(self, table_name: Optional[str] = None) -> Optional[datetime.datetime]:
         """Get the timestamp of the last successful sync.

@@ -11,6 +11,9 @@ import sqlite3
 import datetime
 from typing import Dict, Any, Optional, Union, List
 
+# Configure pandas to display all columns
+pd.set_option('display.max_columns', None)
+
 # Set up logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -213,7 +216,7 @@ class SQLiteExporter:
                 # Convert any datetime objects to strings for SQLite compatibility
                 row_dict = {}
                 for col in df_working.columns:
-                    if pd.api.types.is_datetime64_any_dtype(row[col]):
+                    if isinstance(row[col], (pd.Timestamp, datetime.datetime)):
                         row_dict[col] = row[col].strftime('%Y-%m-%d %H:%M:%S')
                     else:
                         row_dict[col] = row[col]
@@ -279,7 +282,7 @@ class SQLiteExporter:
                 # Convert any datetime objects to strings for SQLite compatibility
                 row_dict = {}
                 for col in df_stats.columns:
-                    if pd.api.types.is_datetime64_any_dtype(row[col]):
+                    if isinstance(row[col], (pd.Timestamp, datetime.datetime)):
                         row_dict[col] = row[col].strftime('%Y-%m-%d %H:%M:%S')
                     else:
                         row_dict[col] = row[col]
