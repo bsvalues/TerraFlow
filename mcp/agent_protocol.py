@@ -13,8 +13,11 @@ import json
 import uuid
 import logging
 import datetime
+import time
+import queue
+import threading
 from enum import Enum
-from typing import Dict, Any, Optional, List, Union
+from typing import Dict, Any, Optional, List, Union, Callable, Set
 
 logger = logging.getLogger(__name__)
 
@@ -213,16 +216,51 @@ class AgentCommunicationProtocol:
     def __init__(self, mcp_instance):
         """Initialize the protocol handler with reference to MCP"""
         self.mcp = mcp_instance
-        self.handlers = {}
+        self.agent_handlers = {}  # Map of agent_id -> message_type -> handler
+        self.response_waiters = {}  # Map of correlation_id -> Event, response
+        self.conversations = {}  # Map of conversation_id -> conversation data
         self.logger = logging.getLogger(__name__)
+        self.is_running = False
+        self.message_processor_thread = None
+        
+        # Connect to the message broker
+        if hasattr(mcp_instance, 'message_broker'):
+            self.message_broker = mcp_instance.message_broker
+            # Set up a message handler for all incoming messages
+            import threading
+            import queue
+            self.message_queue = self.message_broker.subscribe('protocol_handler')
+            self.is_running = True
+            
+            # Start message processor thread
+            self.message_processor_thread = threading.Thread(
+                target=self._process_incoming_messages,
+                daemon=True
+            )
+            self.message_processor_thread.start()
+            
+            self.logger.info("Agent Communication Protocol connected to Message Broker")
+        else:
+            self.logger.warning("MCP instance does not have a message broker")
         
     def register_handler(self, message_type: Union[MessageType, str], handler_func):
-        """Register a handler function for a specific message type"""
-        if isinstance(message_type, MessageType):
-            self.handlers[message_type.value] = handler_func
-        else:
-            self.handlers[message_type] = handler_func
+        """Register a global handler function for a specific message type"""
+        message_type_str = message_type.value if isinstance(message_type, MessageType) else message_type
+        if 'global' not in self.agent_handlers:
+            self.agent_handlers['global'] = {}
+        self.agent_handlers['global'][message_type_str] = handler_func
+        self.logger.debug(f"Registered global handler for message type: {message_type_str}")
+    
+    def register_message_handler(self, agent_id: str, message_type: Union[MessageType, str], handler_func):
+        """Register a handler function for a specific agent and message type"""
+        message_type_str = message_type.value if isinstance(message_type, MessageType) else message_type
+        
+        if agent_id not in self.agent_handlers:
+            self.agent_handlers[agent_id] = {}
             
+        self.agent_handlers[agent_id][message_type_str] = handler_func
+        self.logger.debug(f"Registered handler for agent {agent_id}, message type: {message_type_str}")
+        
     def process_message(self, message: Message) -> Optional[Message]:
         """
         Process an incoming message and route it to the appropriate handler
@@ -237,8 +275,24 @@ class AgentCommunicationProtocol:
                 "Message validation failed"
             )
         
-        # Find the appropriate handler based on message type
-        handler = self.handlers.get(message.message_type)
+        # Check if this is a response to a waiting request
+        if message.correlation_id and message.correlation_id in self.response_waiters:
+            event, response_holder = self.response_waiters[message.correlation_id]
+            response_holder.append(message)
+            event.set()
+            return None
+        
+        # Find the appropriate handler based on target agent and message type
+        target_agent = message.target_agent_id
+        handler = None
+        
+        # Check for agent-specific handler
+        if target_agent in self.agent_handlers and message.message_type in self.agent_handlers[target_agent]:
+            handler = self.agent_handlers[target_agent][message.message_type]
+        # Check for global handler as fallback
+        elif 'global' in self.agent_handlers and message.message_type in self.agent_handlers['global']:
+            handler = self.agent_handlers['global'][message.message_type]
+            
         if handler:
             try:
                 return handler(message)
@@ -250,33 +304,126 @@ class AgentCommunicationProtocol:
                     f"Error processing message: {str(e)}"
                 )
         else:
-            self.logger.warning(f"No handler for message type: {message.message_type}")
+            self.logger.warning(f"No handler for agent {target_agent}, message type: {message.message_type}")
             return self._create_error_response(
                 message, 
                 "UNSUPPORTED_TYPE", 
                 f"No handler for message type: {message.message_type}"
             )
     
-    def send_message(self, message: Message) -> bool:
-        """Send a message to its target agent"""
+    def send_message(self, message: Message, wait_for_response: bool = False, timeout: float = 30.0) -> Union[bool, Message]:
+        """
+        Send a message through the message broker
+        
+        Args:
+            message: The message to send
+            wait_for_response: Whether to wait for a response
+            timeout: Timeout in seconds when waiting for a response
+            
+        Returns:
+            If wait_for_response is True, returns the response Message, otherwise returns True on success, False on failure
+        """
         if not message.is_valid():
             self.logger.warning(f"Attempted to send invalid message: {message}")
             return False
         
-        target = message.target_agent_id
-        if target == "broadcast":
-            # Handle broadcast messages
-            self.logger.info(f"Broadcasting message: {message}")
-            # Implementation depends on MCP's broadcast capability
-            # For now, just log it
+        # If waiting for response, set up the wait structure
+        if wait_for_response:
+            import threading
+            event = threading.Event()
+            response_holder = []
+            self.response_waiters[message.message_id] = (event, response_holder)
+            
+        # Publish message to the broker
+        success = self.mcp.message_broker.publish(message)
+        
+        if not success:
+            if wait_for_response:
+                del self.response_waiters[message.message_id]
+            return False
+            
+        # If not waiting for response, return success
+        if not wait_for_response:
             return True
+            
+        # Wait for response
+        got_response = event.wait(timeout=timeout)
+        
+        # Clean up
+        if message.message_id in self.response_waiters:
+            del self.response_waiters[message.message_id]
+            
+        # Return response or None on timeout
+        if got_response and response_holder:
+            return response_holder[0]
         else:
-            # Send to specific agent
-            self.logger.debug(f"Sending message to {target}: {message}")
-            # Actual implementation depends on how agents receive messages
-            # For now, just log it
-            return True
+            self.logger.warning(f"Timeout waiting for response to message {message.message_id}")
+            return None
     
+    def _process_incoming_messages(self):
+        """Process messages from the queue in a background thread"""
+        self.logger.info("Message processor thread started")
+        while self.is_running:
+            try:
+                # Get next message from the queue (non-blocking with timeout)
+                try:
+                    message = self.message_queue.get(block=True, timeout=0.1)
+                except Exception as empty_error:
+                    # Queue is empty, just continue
+                    continue
+                    
+                # Process the message
+                if isinstance(message, Message):
+                    response = self.process_message(message)
+                    
+                    # If there's a response, send it back
+                    if response:
+                        self.message_broker.publish(response)
+                else:
+                    self.logger.warning(f"Received non-Message object: {message}")
+                    
+            except Exception as e:
+                self.logger.error(f"Error in message processor thread: {str(e)}")
+                
+        self.logger.info("Message processor thread terminated")
+        
+    def create_conversation(self, initiator_id: str, responder_id: str, topic: str) -> str:
+        """
+        Create a new conversation between two agents
+        
+        Args:
+            initiator_id: ID of the initiating agent
+            responder_id: ID of the responding agent
+            topic: Topic of the conversation
+            
+        Returns:
+            Conversation ID
+        """
+        conversation_id = str(uuid.uuid4())
+        self.conversations[conversation_id] = {
+            "id": conversation_id,
+            "initiator": initiator_id,
+            "responder": responder_id,
+            "topic": topic,
+            "created_at": time.time(),
+            "messages": [],
+            "status": "active"
+        }
+        return conversation_id
+        
+    def get_conversation(self, conversation_id: str) -> Optional[Dict]:
+        """Get a conversation by its ID"""
+        return self.conversations.get(conversation_id)
+        
+    def stop(self):
+        """Stop the message processor thread"""
+        if self.is_running:
+            self.logger.info("Stopping Agent Communication Protocol")
+            self.is_running = False
+            if self.message_processor_thread and self.message_processor_thread.is_alive():
+                self.message_processor_thread.join(timeout=2.0)
+            self.logger.info("Agent Communication Protocol stopped")
+        
     def _create_error_response(self, original_message: Message, 
                               error_code: str, error_message: str) -> Message:
         """Create an error response message"""

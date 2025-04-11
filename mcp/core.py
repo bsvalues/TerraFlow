@@ -140,11 +140,20 @@ class MCP:
         return self.task_results[task_id]
     
     def start(self) -> bool:
-        """Start the MCP worker thread"""
+        """Start the MCP worker thread and its components"""
         if self.running:
             logger.warning("MCP already running")
             return False
         
+        # Start message broker
+        self.message_broker.start()
+        logger.info("Message broker started")
+        
+        # Start experience buffer
+        self.experience_buffer.start()
+        logger.info("Experience buffer started")
+        
+        # Start MCP worker thread
         self.running = True
         self.worker_thread = threading.Thread(target=self._worker_loop)
         self.worker_thread.daemon = True
@@ -153,15 +162,25 @@ class MCP:
         return True
     
     def stop(self) -> bool:
-        """Stop the MCP worker thread"""
+        """Stop the MCP worker thread and its components"""
         if not self.running:
             logger.warning("MCP not running")
             return False
         
+        # Stop MCP worker thread
         self.running = False
         if self.worker_thread:
             self.worker_thread.join(timeout=5.0)
         logger.info("MCP worker thread stopped")
+        
+        # Stop experience buffer
+        self.experience_buffer.stop()
+        logger.info("Experience buffer stopped")
+        
+        # Stop message broker
+        self.message_broker.stop()
+        logger.info("Message broker stopped")
+        
         return True
     
     def _worker_loop(self):
@@ -376,8 +395,8 @@ class MCP:
         self,
         sender_id: str,
         receiver_id: str,
-        message_type: str,
-        content: Any,
+        message_type: Union[str, MessageType],
+        content: Dict[str, Any],
         wait_for_response: bool = False,
         timeout: float = 30.0
     ) -> Optional[Any]:
@@ -388,7 +407,7 @@ class MCP:
             sender_id: ID of the sending agent
             receiver_id: ID of the receiving agent
             message_type: Type of message to send
-            content: Content of the message
+            content: Content of the message (should be a dictionary)
             wait_for_response: Whether to wait for a response
             timeout: Timeout in seconds when waiting for response
             
@@ -399,16 +418,22 @@ class MCP:
             logger.error(f"Unknown sending agent {sender_id}")
             return None
         
-        if receiver_id not in self.agents:
+        if receiver_id not in self.agents and receiver_id != "broadcast":
             logger.error(f"Unknown receiving agent {receiver_id}")
             return None
         
         try:
-            result = self.protocol_handler.send_message(
+            # Create the message
+            message = Message(
+                source_agent_id=sender_id,
+                target_agent_id=receiver_id,
                 message_type=message_type,
-                content=content,
-                sender_id=sender_id,
-                receiver_id=receiver_id,
+                payload=content
+            )
+            
+            # Send through the protocol handler
+            result = self.protocol_handler.send_message(
+                message=message,
                 wait_for_response=wait_for_response,
                 timeout=timeout
             )
