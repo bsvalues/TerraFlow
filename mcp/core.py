@@ -7,6 +7,7 @@ The MCP is designed as a central intelligence that delegates tasks to appropriat
 
 The enhanced version now supports the Agent-to-Agent communication protocol,
 enabling specialized agents to collaborate effectively on complex assessment workflows.
+It also provides a centralized experience buffer for agent learning and improvement.
 """
 
 import logging
@@ -17,9 +18,12 @@ import importlib
 import os
 import sys
 import json
+import uuid
 
 # Agent-to-Agent protocol support
-from mcp.agent_protocol import AgentCommunicationProtocol, MessageType
+from mcp.agent_protocol import AgentCommunicationProtocol, MessageType, Message
+from mcp.message_broker import MessageBroker
+from mcp.experience_buffer import ExperienceBuffer, Experience
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, 
@@ -44,6 +48,13 @@ class MCP:
         self.running = False
         self.worker_thread = None
         self.task_id_counter = 0
+        self.conversations = {}  # Storage for agent conversations
+        
+        # Initialize message broker
+        self.message_broker = MessageBroker()
+        
+        # Initialize experience buffer
+        self.experience_buffer = ExperienceBuffer(max_size=10000, cleanup_interval=3600)
         
         # Agent-to-Agent communication protocol
         self.protocol_handler = AgentCommunicationProtocol(self)
@@ -56,7 +67,7 @@ class MCP:
             "property_types": ["residential", "commercial", "agricultural", "industrial"]
         }
         
-        logger.info("MCP initialized with Agent-to-Agent protocol support")
+        logger.info("MCP initialized with Agent-to-Agent protocol and experience buffer support")
     
     def register_agent(self, agent_id: str, agent_instance) -> bool:
         """Register an agent with the MCP"""
