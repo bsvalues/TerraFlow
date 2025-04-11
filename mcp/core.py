@@ -24,6 +24,7 @@ import uuid
 from mcp.agent_protocol import AgentCommunicationProtocol, MessageType, Message
 from mcp.message_broker import MessageBroker
 from mcp.experience_buffer import ExperienceBuffer, Experience
+from mcp.master_prompt import MasterPromptManager, MasterPrompt
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, 
@@ -57,7 +58,10 @@ class MCP:
         self.experience_buffer = ExperienceBuffer(max_size=10000, cleanup_interval=3600)
         
         # Agent-to-Agent communication protocol
-        self.protocol_handler = AgentCommunicationProtocol(self)
+        self.protocol = AgentCommunicationProtocol(self)
+        
+        # Master Prompt Manager
+        self.master_prompt_manager = MasterPromptManager(self)
         
         # Assessment domain customization
         self.assessment_context = {
@@ -66,6 +70,9 @@ class MCP:
             "current_assessment_year": time.strftime("%Y"),
             "property_types": ["residential", "commercial", "agricultural", "industrial"]
         }
+        
+        # Initialize the default system master prompt
+        self.default_master_prompt = self.master_prompt_manager.get_default_system_prompt()
         
         logger.info("MCP initialized with Agent-to-Agent protocol and experience buffer support")
     
@@ -330,29 +337,29 @@ class MCP:
             # Add protocol handler to agent if it has the proper interface
             if hasattr(agent, 'send_query') and hasattr(agent, 'send_inform') and hasattr(agent, 'send_request'):
                 # Inject the protocol handler into the agent's methods
-                agent.send_query.__defaults__ = agent.send_query.__defaults__[:-1] + (self.protocol_handler,)
-                agent.send_inform.__defaults__ = agent.send_inform.__defaults__[:-1] + (self.protocol_handler,)
-                agent.send_request.__defaults__ = agent.send_request.__defaults__[:-1] + (self.protocol_handler,)
+                agent.send_query.__defaults__ = agent.send_query.__defaults__[:-1] + (self.protocol,)
+                agent.send_inform.__defaults__ = agent.send_inform.__defaults__[:-1] + (self.protocol,)
+                agent.send_request.__defaults__ = agent.send_request.__defaults__[:-1] + (self.protocol,)
                 
                 logger.info(f"Injected protocol handler into agent {agent_id}")
                 
                 # Register default message handlers if they exist
                 if hasattr(agent, '_handle_query'):
-                    self.protocol_handler.register_message_handler(
+                    self.protocol.register_message_handler(
                         agent_id,
                         MessageType.QUERY,
                         agent._handle_query
                     )
                 
                 if hasattr(agent, '_handle_inform'):
-                    self.protocol_handler.register_message_handler(
+                    self.protocol.register_message_handler(
                         agent_id,
                         MessageType.INFORM,
                         agent._handle_inform
                     )
                 
                 if hasattr(agent, '_handle_request'):
-                    self.protocol_handler.register_message_handler(
+                    self.protocol.register_message_handler(
                         agent_id,
                         MessageType.REQUEST,
                         agent._handle_request
@@ -387,7 +394,7 @@ class MCP:
                 logger.error(f"Invalid message type: {message_type}")
                 return False
         
-        self.protocol_handler.register_message_handler(agent_id, message_type, handler)
+        self.protocol.register_message_handler(agent_id, message_type, handler)
         logger.info(f"Registered {message_type.value if isinstance(message_type, MessageType) else message_type} handler for agent {agent_id}")
         return True
     
@@ -432,7 +439,7 @@ class MCP:
             )
             
             # Send through the protocol handler
-            result = self.protocol_handler.send_message(
+            result = self.protocol.send_message(
                 message=message,
                 wait_for_response=wait_for_response,
                 timeout=timeout
