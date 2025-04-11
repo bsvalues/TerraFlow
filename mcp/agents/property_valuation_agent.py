@@ -725,50 +725,131 @@ class PropertyValuationAgent(BaseAgent):
     
     def _income_approach(self, property_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Implement the income approach for property valuation
+        Implement the income approach for property valuation following Washington standards
+        
+        Washington State emphasizes the income approach for income-producing properties
+        per WAC 458-53-130, which aligns with standard valuation practices but includes
+        specific requirements for demonstration of market-based cap rates and rental data.
         
         Args:
             property_data: Subject property data
             
         Returns:
-            Valuation result with income parameters
+            Valuation result with income parameters following Washington standards
         """
-        # For now, use placeholder logic as skeleton
-        # In a real implementation, we would:
-        # 1. Estimate potential gross income
-        # 2. Deduct for vacancy and collection loss
-        # 3. Calculate effective gross income
-        # 4. Deduct operating expenses
-        # 5. Calculate net operating income
-        # 6. Apply capitalization rate
+        # Check if this is an income-producing property - if not, return low confidence
+        property_type = property_data.get("property_type", "").lower()
+        is_income_property = property_type in [
+            "commercial", "office", "retail", "industrial", "multi_family", 
+            "apartment", "mixed_use", "warehouse", "hotel", "senior_housing"
+        ]
         
-        # Placeholder implementation
-        cap_rate = 0.08  # Example capitalization rate
-        
-        # Income parameters would come from the property_data or be estimated
-        est_annual_income = property_data.get("estimated_annual_income", 0)
-        est_expenses = property_data.get("estimated_expenses", 0)
-        
-        if est_annual_income > 0:
-            # Simple income calculation
-            noi = est_annual_income - est_expenses
-            value = noi / cap_rate if cap_rate > 0 else 0
-            
-            return {
-                "approach": "income_approach",
-                "value": value,
-                "annual_income": est_annual_income,
-                "expenses": est_expenses,
-                "net_operating_income": noi,
-                "capitalization_rate": cap_rate
-            }
-        else:
-            # Fallback if no income data available
+        if not is_income_property:
             return {
                 "approach": "income_approach",
                 "value": 0,
-                "error": "Insufficient income data available"
+                "message": "Income approach not applicable - not an income-producing property",
+                "confidence_score": 0.1
             }
+            
+        # Extract key property characteristics
+        building_area = property_data.get("building_area", 0)
+        location = property_data.get("location", "")
+        condition = property_data.get("condition", "average")
+        year_built = property_data.get("year_built", 2000)
+        quality = property_data.get("quality_grade", "average")
+        
+        # Get subtype for more specific analysis
+        subtype = property_data.get("subtype", "")
+        if not subtype and property_type == "commercial":
+            subtype = "general_commercial"
+        if not subtype and property_type == "multi_family":
+            subtype = "apartment"
+            
+        # 1. Determine market rent based on property type ($/sq ft/year in WA terms)
+        market_rent_psf = self._get_market_rent(property_type, subtype, location, quality, year_built)
+        
+        # Total potential gross income (PGI)
+        if building_area > 0:
+            potential_gross_income = market_rent_psf * building_area
+        else:
+            # Fallback if building area not available - use total income if available
+            potential_gross_income = property_data.get("annual_income", 0)
+            
+        if potential_gross_income <= 0:
+            return {
+                "approach": "income_approach",
+                "value": 0,
+                "message": "Insufficient income data for valuation",
+                "confidence_score": 0.0
+            }
+        
+        # 2. Apply vacancy and collection loss based on WA submarket standards
+        # In WA, this varies significantly by region and property type
+        vacancy_rate = self._get_vacancy_rate(property_type, subtype, location)
+        collection_loss_rate = 0.01  # Typical for WA markets
+        
+        effective_gross_income = potential_gross_income * (1 - vacancy_rate - collection_loss_rate)
+        
+        # 3. Estimate operating expenses based on WA standards
+        # In Eastern WA, expense ratios are typically standardized by property type
+        expense_ratio = self._get_expense_ratio(property_type, subtype, location)
+        operating_expenses = effective_gross_income * expense_ratio
+        
+        # 4. Calculate net operating income (NOI)
+        net_operating_income = effective_gross_income - operating_expenses
+        
+        # 5. Apply capitalization rate based on WA region and property type
+        # WA assessors are required to document market-derived cap rates
+        cap_rate = self._get_capitalization_rate(property_type, subtype, location, year_built)
+        
+        # Calculate value using direct capitalization (standard method in WA)
+        if cap_rate > 0:
+            income_value = net_operating_income / cap_rate
+        else:
+            income_value = 0
+            
+        # 6. Apply gross income multiplier (often used in WA for apartments)
+        # WA assessors often verify income approach with GIM analysis
+        gross_income_multiplier = self._get_gross_income_multiplier(
+            property_type, subtype, location
+        )
+        gim_value = potential_gross_income * gross_income_multiplier
+        
+        # 7. Calculate confidence score based on data quality and Washington standards
+        confidence_score = self._calculate_income_confidence_score(
+            property_data, market_rent_psf, cap_rate, 
+            property_type, subtype, location
+        )
+        
+        # 8. Reconcile direct cap and GIM values per WA guidelines
+        # WA typically favors direct cap for most properties
+        final_value = income_value
+        if property_type == "multi_family" and gim_value > 0:
+            # For apartments, WA often uses a weighted blend
+            final_value = (income_value * 0.7) + (gim_value * 0.3)
+            
+        # Round to nearest hundred per WA assessment practice
+        final_value = round(final_value / 100) * 100
+        
+        # Return comprehensive result with all income parameters
+        return {
+            "approach": "income_approach",
+            "value": final_value,
+            "potential_gross_income": potential_gross_income,
+            "vacancy_rate": vacancy_rate,
+            "collection_loss_rate": collection_loss_rate,
+            "effective_gross_income": effective_gross_income,
+            "expense_ratio": expense_ratio,
+            "operating_expenses": operating_expenses,
+            "net_operating_income": net_operating_income,
+            "cap_rate": cap_rate,
+            "capitalized_value": income_value,
+            "gross_income_multiplier": gross_income_multiplier,
+            "gim_value": gim_value,
+            "confidence_score": confidence_score,
+            "market_rent_psf": market_rent_psf
+        }
     
     def _cost_approach(self, property_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -913,6 +994,431 @@ class PropertyValuationAgent(BaseAgent):
         # For now, returning an empty dictionary as a placeholder
         return {}
     
+    def _get_market_rent(
+        self, 
+        property_type: str, 
+        subtype: str, 
+        location: str, 
+        quality: str, 
+        year_built: int
+    ) -> float:
+        """
+        Get market rent per square foot based on property characteristics
+        
+        Uses Washington-specific market standards and data
+        
+        Args:
+            property_type: Type of property
+            subtype: Specific subtype of property
+            location: Property location
+            quality: Property quality
+            year_built: Year property was built
+            
+        Returns:
+            Market rent per square foot per year
+        """
+        # In production, this would query a market data system or database
+        # For now, using a knowledge base with WA-specific rental rates
+        
+        # Default rates for Benton County (Eastern Washington)
+        # These rates would be regularly updated from market surveys in a real system
+        
+        # Get base rent from knowledge base if available
+        base_rent = 0.0
+        
+        if property_type == "office":
+            base_rent = self.get_knowledge("wa_market_rents", "office", 18.0)
+            
+            # Further refinement by subtype
+            if subtype == "class_a":
+                base_rent *= 1.3
+            elif subtype == "class_b":
+                base_rent *= 1.0
+            elif subtype == "class_c":
+                base_rent *= 0.8
+            elif subtype == "medical":
+                base_rent *= 1.4
+                
+        elif property_type == "retail":
+            base_rent = self.get_knowledge("wa_market_rents", "retail", 20.0)
+            
+            # Further refinement by subtype
+            if subtype == "anchor":
+                base_rent *= 0.8
+            elif subtype == "strip_center":
+                base_rent *= 1.0
+            elif subtype == "freestanding":
+                base_rent *= 1.2
+            elif subtype == "mall":
+                base_rent *= 1.5
+                
+        elif property_type == "industrial":
+            base_rent = self.get_knowledge("wa_market_rents", "industrial", 9.0)
+            
+            # Further refinement by subtype
+            if subtype == "warehouse":
+                base_rent *= 0.9
+            elif subtype == "flex":
+                base_rent *= 1.2
+            elif subtype == "manufacturing":
+                base_rent *= 1.0
+            elif subtype == "distribution":
+                base_rent *= 1.1
+                
+        elif property_type == "multi_family" or property_type == "apartment":
+            # Multifamily typically calculated per unit, but we'll convert to SF
+            # Average unit size in Eastern WA is ~900 SF
+            unit_rent = self.get_knowledge("wa_market_rents", "apartment_unit", 1200.0)
+            avg_unit_size = self.get_knowledge("wa_standards", "avg_unit_size", 900)
+            base_rent = (unit_rent * 12) / avg_unit_size  # Annual rent per SF
+            
+            # Further refinement by subtype
+            if subtype == "luxury":
+                base_rent *= 1.3
+            elif subtype == "standard":
+                base_rent *= 1.0
+            elif subtype == "affordable":
+                base_rent *= 0.8
+            elif subtype == "senior":
+                base_rent *= 1.2
+                
+        elif property_type == "mixed_use":
+            # Mixed use typically calculated by weighting component uses
+            office_pct = 0.4  # Default components if not specified
+            retail_pct = 0.4
+            residential_pct = 0.2
+            
+            office_rent = self.get_knowledge("wa_market_rents", "office", 18.0)
+            retail_rent = self.get_knowledge("wa_market_rents", "retail", 20.0)
+            residential_rent = self.get_knowledge("wa_market_rents", "apartment", 15.0)
+            
+            base_rent = (office_rent * office_pct) + (retail_rent * retail_pct) + (residential_rent * residential_pct)
+        
+        else:
+            # Default commercial rent for Eastern WA
+            base_rent = self.get_knowledge("wa_market_rents", "commercial", 15.0)
+        
+        # Apply quality adjustments (Washington standards)
+        quality_factors = {
+            "excellent": 1.25,
+            "good": 1.1,
+            "average": 1.0,
+            "fair": 0.9,
+            "poor": 0.75
+        }
+        quality_factor = quality_factors.get(quality.lower(), 1.0)
+        
+        # Apply age/condition adjustment
+        current_year = datetime.datetime.now().year
+        age = max(0, current_year - year_built)
+        
+        # Age factor based on Washington assessment standards
+        if age < 5:
+            age_factor = 1.1
+        elif age < 10:
+            age_factor = 1.05
+        elif age < 20:
+            age_factor = 1.0
+        elif age < 30:
+            age_factor = 0.95
+        elif age < 40:
+            age_factor = 0.9
+        else:
+            age_factor = 0.85
+            
+        # Apply location adjustment
+        # In Eastern WA, location factors vary by city/market area
+        location_factor = 1.0
+        if "kennewick" in location.lower():
+            location_factor = 1.05
+        elif "richland" in location.lower():
+            location_factor = 1.1
+        elif "pasco" in location.lower():
+            location_factor = 0.95
+        elif "west richland" in location.lower():
+            location_factor = 1.0
+        elif "benton city" in location.lower():
+            location_factor = 0.9
+            
+        # Calculate final market rent
+        adjusted_rent = base_rent * quality_factor * age_factor * location_factor
+        
+        return adjusted_rent
+        
+    def _get_vacancy_rate(self, property_type: str, subtype: str, location: str) -> float:
+        """
+        Get market vacancy rate based on property type and location
+        
+        Args:
+            property_type: Type of property
+            subtype: Specific subtype of property
+            location: Property location
+            
+        Returns:
+            Vacancy rate (as a decimal)
+        """
+        # In a production system, this would query current market data
+        # For now, use typical Eastern WA vacancy rates by property type
+        
+        # Base vacancy rates for Benton County
+        vacancy_rates = {
+            "office": 0.10,
+            "retail": 0.08,
+            "industrial": 0.06,
+            "multi_family": 0.05,
+            "apartment": 0.05,
+            "warehouse": 0.07,
+            "mixed_use": 0.08
+        }
+        
+        # Get base rate from dictionary or use commercial as default
+        base_rate = vacancy_rates.get(property_type, 0.09)
+        
+        # Location adjustments
+        location_factor = 1.0
+        if "downtown" in location.lower():
+            location_factor = 0.9  # Lower vacancy in downtown
+        elif "suburban" in location.lower():
+            location_factor = 1.0  # Average vacancy in suburbs
+        elif "rural" in location.lower():
+            location_factor = 1.2  # Higher vacancy in rural areas
+            
+        # Subtype adjustments
+        subtype_factor = 1.0
+        if property_type == "office":
+            if subtype == "class_a":
+                subtype_factor = 0.9
+            elif subtype == "class_c":
+                subtype_factor = 1.2
+                
+        elif property_type == "retail":
+            if subtype == "mall":
+                subtype_factor = 1.3
+            elif subtype == "freestanding":
+                subtype_factor = 0.8
+                
+        return base_rate * location_factor * subtype_factor
+        
+    def _get_expense_ratio(self, property_type: str, subtype: str, location: str) -> float:
+        """
+        Get operating expense ratio based on property type and location
+        
+        Args:
+            property_type: Type of property
+            subtype: Specific subtype of property
+            location: Property location
+            
+        Returns:
+            Expense ratio (as a decimal of EGI)
+        """
+        # Standard expense ratios for Eastern WA commercial properties
+        # These are ranges commonly used in assessment models
+        
+        expense_ratios = {
+            "office": 0.45,
+            "retail": 0.35,
+            "industrial": 0.30,
+            "multi_family": 0.40,
+            "apartment": 0.40,
+            "warehouse": 0.25,
+            "mixed_use": 0.42
+        }
+        
+        base_ratio = expense_ratios.get(property_type, 0.40)
+        
+        # Adjust for property size (economies of scale)
+        # Note: In a real implementation, this would use the actual property data
+        # For this example we'll use default adjustments
+        size_factor = 1.0
+        age_factor = 1.0
+        
+        # For real implementation using actual property data
+        # Unit count, building size would typically be used for more precise adjustments
+                
+        return base_ratio * size_factor * age_factor
+        
+    def _get_capitalization_rate(
+        self, 
+        property_type: str, 
+        subtype: str, 
+        location: str, 
+        year_built: int
+    ) -> float:
+        """
+        Get capitalization rate based on property characteristics
+        
+        Washington assessors typically derive cap rates from market sales and
+        publish them as part of ratio studies.
+        
+        Args:
+            property_type: Type of property
+            subtype: Specific subtype of property
+            location: Property location
+            year_built: Year property was built
+            
+        Returns:
+            Capitalization rate (as a decimal)
+        """
+        # Base cap rates from knowledge base (specific to Washington markets)
+        cap_rates = self.get_knowledge("methodologies", "income_approach", {}).get("wa_cap_rates", {})
+        
+        # Get base rate from cap rates dictionary
+        base_rate = cap_rates.get(property_type, 0.075)
+        
+        # Age adjustments (older properties have higher cap rates)
+        current_year = datetime.datetime.now().year
+        age = max(0, current_year - year_built)
+        
+        age_factor = 0.0
+        if age > 40:
+            age_factor = 0.010
+        elif age > 30:
+            age_factor = 0.008
+        elif age > 20:
+            age_factor = 0.005
+        elif age > 10:
+            age_factor = 0.002
+        else:
+            age_factor = 0.0
+            
+        # Location adjustments
+        location_factor = 0.0
+        if "prime" in location.lower() or "downtown" in location.lower():
+            location_factor = -0.005
+        elif "suburban" in location.lower():
+            location_factor = 0.0
+        elif "rural" in location.lower():
+            location_factor = 0.005
+            
+        # Quality adjustments - in a real implementation this would use the property's actual quality
+        quality_factor = 0.0
+            
+        # Calculate final cap rate
+        final_cap_rate = base_rate + age_factor + location_factor + quality_factor
+        
+        # Ensure cap rate is within reasonable bounds
+        final_cap_rate = min(max(final_cap_rate, 0.04), 0.12)
+        
+        return final_cap_rate
+        
+    def _get_gross_income_multiplier(
+        self, 
+        property_type: str, 
+        subtype: str, 
+        location: str
+    ) -> float:
+        """
+        Get gross income multiplier based on property characteristics
+        
+        Args:
+            property_type: Type of property
+            subtype: Specific subtype of property
+            location: Property location
+            
+        Returns:
+            Gross income multiplier
+        """
+        # Base multipliers from knowledge base (specific to Washington markets)
+        income_multipliers = self.get_knowledge("methodologies", "income_approach", {}).get("wa_income_multipliers", {})
+        
+        # Get base multiplier from dictionary
+        base_multiplier = income_multipliers.get(property_type, 7.5)
+        
+        # Location adjustments
+        location_factor = 1.0
+        if "prime" in location.lower() or "downtown" in location.lower():
+            location_factor = 1.1
+        elif "suburban" in location.lower():
+            location_factor = 1.0
+        elif "rural" in location.lower():
+            location_factor = 0.9
+            
+        # Subtype adjustments
+        subtype_factor = 1.0
+        if property_type == "multi_family" or property_type == "apartment":
+            if subtype == "luxury":
+                subtype_factor = 1.1
+            elif subtype == "affordable":
+                subtype_factor = 0.9
+        
+        # Calculate final multiplier
+        final_multiplier = base_multiplier * location_factor * subtype_factor
+        
+        return final_multiplier
+        
+    def _calculate_income_confidence_score(
+        self,
+        property_data: Dict[str, Any],
+        market_rent: float,
+        cap_rate: float,
+        property_type: str,
+        subtype: str,
+        location: str
+    ) -> float:
+        """
+        Calculate confidence score for income approach valuation
+        
+        Args:
+            property_data: Property data
+            market_rent: Market rent per square foot
+            cap_rate: Capitalization rate
+            property_type: Type of property
+            subtype: Specific subtype of property
+            location: Property location
+            
+        Returns:
+            Confidence score between 0 and 1
+        """
+        # Base confidence score
+        score = 0.5
+        
+        # 1. Appropriateness of method for property type
+        if property_type in ["office", "retail", "industrial", "multi_family", "apartment"]:
+            score += 0.2  # Income approach highly appropriate
+        elif property_type in ["mixed_use", "hotel", "senior_housing"]:
+            score += 0.1  # Income approach appropriate but complex
+        else:
+            score -= 0.2  # Less appropriate for non-income properties
+            
+        # 2. Data quality factors
+        building_area = property_data.get("building_area", 0)
+        if building_area > 0:
+            score += 0.1  # Building area available
+        else:
+            score -= 0.1  # Missing critical data
+            
+        # Check if market rent is realistic
+        if market_rent > 0:
+            score += 0.1
+        else:
+            score -= 0.2
+            
+        # Check if cap rate is realistic
+        if 0.04 <= cap_rate <= 0.12:
+            score += 0.1
+        else:
+            score -= 0.1
+            
+        # 3. Property age appropriateness
+        year_built = property_data.get("year_built", 0)
+        current_year = datetime.datetime.now().year
+        
+        if year_built > 0:
+            age = current_year - year_built
+            if age <= 50:  # Income approach works best for newer properties
+                score += 0.05
+        
+        # 4. Market data availability adjustment
+        # In a real implementation, this would check for market data availability
+        # For now, assume good data availability in major markets
+        if "kennewick" in location.lower() or "richland" in location.lower() or "pasco" in location.lower():
+            score += 0.05
+            
+        # Normalize score to 0-1 range
+        final_score = min(max(score, 0.0), 1.0)
+        
+        return final_score
+        
     def _find_comparable_properties(self, subject_property: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
         Find comparable properties using Washington's assessment standards
