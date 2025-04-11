@@ -34,7 +34,8 @@ class QualityReportGenerator:
     def generate_pdf_report(self, report_id: Optional[int] = None, 
                           start_date: Optional[datetime.datetime] = None,
                           end_date: Optional[datetime.datetime] = None,
-                          save_to_db: bool = True) -> Tuple[bytes, str, Optional[int]]:
+                          save_to_db: bool = True,
+                          options: Optional[Dict[str, Any]] = None) -> Tuple[bytes, str, Optional[int]]:
         """
         Generate a PDF report for the specified time period or report ID.
         
@@ -43,13 +44,23 @@ class QualityReportGenerator:
             start_date: Optional start date for the report period
             end_date: Optional end date for the report period
             save_to_db: Whether to save the report metadata to the database
+            options: Optional dictionary of report generation options like include_anomalies,
+                    include_issues, include_recommendations
             
         Returns:
             Tuple of (PDF bytes, filename, report_id)
         """
+        # Set default options if none provided
+        if options is None:
+            options = {
+                'include_anomalies': True,
+                'include_issues': True,
+                'include_recommendations': True
+            }
+            
         # Get report data
         summary, anomaly_summary, recent_anomalies, table_metrics, recommendations = self._get_report_data(
-            report_id, start_date, end_date
+            report_id, start_date, end_date, options
         )
         
         # Generate report ID and date
@@ -65,7 +76,8 @@ class QualityReportGenerator:
             anomaly_summary=anomaly_summary,
             recent_anomalies=recent_anomalies,
             table_metrics=table_metrics,
-            recommendations=recommendations
+            recommendations=recommendations,
+            options=options
         )
         
         # Convert HTML to PDF
@@ -124,7 +136,8 @@ class QualityReportGenerator:
     
     def _get_report_data(self, report_id: Optional[int] = None,
                         start_date: Optional[datetime.datetime] = None,
-                        end_date: Optional[datetime.datetime] = None) -> Tuple[Dict, List, List, List, List]:
+                        end_date: Optional[datetime.datetime] = None,
+                        options: Optional[Dict[str, Any]] = None) -> Tuple[Dict, List, List, List, List]:
         """
         Get data for the report from the database.
         
@@ -160,19 +173,33 @@ class QualityReportGenerator:
         # Create summary data
         summary = self._create_summary(latest_report, prev_report)
         
-        # Get anomaly summary data grouped by table
-        anomaly_summary = self._get_anomaly_summary(start_date, end_date)
+        # Set default options if not provided
+        if options is None:
+            options = {
+                'include_anomalies': True,
+                'include_issues': True,
+                'include_recommendations': True
+            }
+
+        # Get anomaly summary data grouped by table (if requested)
+        anomaly_summary = []
+        if options.get('include_anomalies', True):
+            anomaly_summary = self._get_anomaly_summary(start_date, end_date)
         
-        # Get recent anomalies
-        recent_anomalies = self._get_recent_anomalies(start_date, end_date)
+        # Get recent anomalies (if requested)
+        recent_anomalies = []
+        if options.get('include_anomalies', True):
+            recent_anomalies = self._get_recent_anomalies(start_date, end_date)
         
         # Get table-specific metrics
         table_metrics = self._get_table_metrics(latest_report)
         
-        # Generate recommendations based on the data
-        recommendations = self._generate_recommendations(
-            summary, anomaly_summary, recent_anomalies, table_metrics
-        )
+        # Generate recommendations based on the data (if requested)
+        recommendations = []
+        if options.get('include_recommendations', True):
+            recommendations = self._generate_recommendations(
+                summary, anomaly_summary, recent_anomalies, table_metrics
+            )
         
         return summary, anomaly_summary, recent_anomalies, table_metrics, recommendations
     

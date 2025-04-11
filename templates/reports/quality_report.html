@@ -197,7 +197,9 @@
     </div>
   </div>
   
+  {% if options.include_anomalies %}
   <h2>Anomaly Summary</h2>
+  {% if anomaly_summary|length > 0 %}
   <table>
     <thead>
       <tr>
@@ -218,8 +220,12 @@
       {% endfor %}
     </tbody>
   </table>
+  {% else %}
+  <p>No anomalies found in the selected time period.</p>
+  {% endif %}
   
   <h2>Recent Anomalies</h2>
+  {% if recent_anomalies|length > 0 %}
   <table>
     <thead>
       <tr>
@@ -244,6 +250,10 @@
       {% endfor %}
     </tbody>
   </table>
+  {% else %}
+  <p>No recent anomalies found in the selected time period.</p>
+  {% endif %}
+  {% endif %}
   
   <h2>Data Quality Issues by Table</h2>
   <table>
