@@ -1,210 +1,161 @@
-/* Verification Dashboard Styles */
+/* Verification Dashboard Styles - Matching Standard Benton County Styling */
 
-/* Base theme */
-body {
-    background-color: #1e1e1e !important;
-    color: #ffffff !important;
-}
-
-/* Main container and headers */
+/* Main container spacing */
 .container-fluid {
-    background-color: #1e1e1e !important;
-    padding: 20px !important;
+    padding: 20px;
 }
 
-h1, h2, h3, .lead {
-    color: #ffffff !important;
+/* Status Cards - Light backgrounds with colored headers */
+.status-card {
+    border: 1px solid #d9d9d9;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+    border-radius: 4px;
 }
 
-/* Navbar - Benton County blue */
-.navbar {
-    background-color: #005288 !important;
-}
-
-/* Status Cards - Dark backgrounds with colored headers */
-.card {
-    background-color: #333333 !important;
-    color: #ffffff !important;
-    border: none !important;
-    margin-bottom: 20px !important;
-    border-radius: 0 !important;
-}
-
-.card-header {
-    padding: 10px 15px !important;
-    font-weight: bold !important;
-    color: white !important;
-    border-radius: 0 !important;
-    border: none !important;
-}
-
-.card-body {
-    background-color: #2d2d2d !important;
-    color: white !important;
-    padding: 15px !important;
-    border: none !important;
-}
-
-/* Card titles and text */
-.card-title {
-    color: white !important;
-    font-weight: bold !important;
-}
-
-.card-text {
-    color: white !important;
-}
-
-/* Status Card Headers - Colors matching the image */
+/* Status Card Headers - Colors for different status types */
 .sql-server-card .card-header, #sql-server-card .card-header {
-    background-color: #d9534f !important; /* Red */
+    background-color: #d9534f; /* Red for error/not configured */
 }
 
 .stored-procedure-card .card-header, #stored-procedure-card .card-header {
-    background-color: #f0ad4e !important; /* Orange/Yellow */
+    background-color: #f0ad4e; /* Orange/Yellow for warning/needs attention */
 }
 
 .api-endpoints-card .card-header, #api-endpoints-card .card-header {
-    background-color: #4e73df !important; /* Blue */
+    background-color: #005288; /* Benton County blue */
 }
 
 .overall-status-card .card-header, #overall-status-card .card-header {
-    background-color: #d9534f !important; /* Red */
+    background-color: #d9534f; /* Red for error/not ready */
 }
 
-/* Section Headers - All blue background */
+/* Success state for cards */
+.status-success .card-header {
+    background-color: #28a745 !important; /* Green for success */
+}
+
+/* Section Headers - All using Benton County blue */
 #advanced-verification-section .card-header,
 #verification-results-section .card-header,
 #logs-section .card-header,
-#jobs-section .card-header {
-    background-color: #005288 !important; /* Benton County blue */
+#jobs-section .card-header,
+.verification-section-header {
+    background-color: #005288; /* Benton County blue */
+    color: white;
+    padding: 10px 15px;
+    font-weight: bold;
 }
 
 /* Button styles */
 .btn-primary {
-    background-color: #4e73df !important;
-    border-color: #4e73df !important;
+    background-color: #005288; /* Benton County blue */
+    border-color: #005288;
 }
 
 .btn-primary:hover {
-    background-color: #2653d4 !important;
-    border-color: #2653d4 !important;
+    background-color: #003d66; /* Darker blue */
+    border-color: #003d66;
 }
 
 .btn-outline-primary {
-    color: white !important;
-    border-color: #4e73df !important;
-    background-color: transparent !important;
+    color: #005288;
+    border-color: #005288;
+    background-color: transparent;
 }
 
 .btn-outline-primary:hover {
-    background-color: #4e73df !important;
-    color: white !important;
+    background-color: #005288;
+    color: white;
 }
 
 .test-btn {
-    margin: 5px !important;
-}
-
-/* Tables */
-.table {
-    color: white !important;
-}
-
-.table thead th {
-    background-color: #2d2d2d !important;
-    color: white !important;
-    border-color: #444444 !important;
-}
-
-.table-striped tbody tr:nth-of-type(odd) {
-    background-color: #2d2d2d !important;
-}
-
-.alert-info {
-    background-color: #2d2d2d !important;
-    color: white !important;
-    border-color: #444444 !important;
-}
-
-/* Footer */
-.footer {
-    background-color: #005288 !important;
-    color: white !important;
-    padding: 15px 0 !important;
-}
-
-/* Ensure dark theme for modals */
-.modal-content {
-    background-color: #333333 !important;
-    color: white !important;
-}
-
-.modal-header, .modal-footer {
-    background-color: #2d2d2d !important;
-    border-color: #444444 !important;
-}
-
-/* Add section header class for direct targeting */
-.verification-section-header {
-    background-color: #005288 !important;
-    color: white !important;
-    padding: 10px 15px !important;
-    font-weight: bold !important;
-}
-
-/* Override any light theme elements */
-.bg-light, .bg-white {
-    background-color: #333333 !important;
-}
-
-.text-dark {
-    color: white !important;
-}
-
-/* Clear button styling */
-#clear-results-btn {
-    background-color: transparent !important;
-    border-color: #6c757d !important;
-    color: white !important;
-}
-
-#clear-results-btn:hover {
-    background-color: #6c757d !important;
+    margin: 5px;
 }
 
 /* Results containers */
 .result-item {
-    background-color: #2d2d2d !important;
-    color: white !important;
-    padding: 15px !important;
-    margin-bottom: 10px !important;
-    border-radius: 4px !important;
+    padding: 15px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+    border: 1px solid #d9d9d9;
+    background-color: #ffffff;
+}
+
+.result-success {
+    border-left: 5px solid #28a745; /* Green for success */
+}
+
+.result-error {
+    border-left: 5px solid #dc3545; /* Red for error */
 }
 
 pre, code {
-    background-color: #2d2d2d !important;
-    color: #d1d1d1 !important;
-    border: 1px solid #444444 !important;
+    background-color: #f5f5f5;
+    color: #333333;
+    border: 1px solid #d9d9d9;
+    padding: 10px;
+    border-radius: 4px;
 }
 
-/* Badge colors */
+/* Log entries styling */
+.log-entry {
+    padding: 8px;
+    margin-bottom: 5px;
+    border-radius: 4px;
+    background-color: #f9f9f9;
+}
+
+.log-error {
+    border-left: 4px solid #dc3545;
+    background-color: #fff5f5;
+}
+
+.log-warning {
+    border-left: 4px solid #f0ad4e;
+    background-color: #fff9f0;
+}
+
+.log-info {
+    border-left: 4px solid #17a2b8;
+    background-color: #f0fafc;
+}
+
+.log-debug {
+    border-left: 4px solid #6c757d;
+    background-color: #f7f7f7;
+}
+
+/* Badge colors - using Bootstrap defaults */
 .badge-success {
-    background-color: #28a745 !important;
+    background-color: #28a745;
 }
 
 .badge-danger {
-    background-color: #dc3545 !important;
+    background-color: #dc3545;
 }
 
 .badge-primary {
-    background-color: #4e73df !important;
+    background-color: #005288; /* Benton County blue */
 }
 
 .badge-info {
-    background-color: #17a2b8 !important;
+    background-color: #17a2b8;
 }
 
 .badge-secondary {
-    background-color: #6c757d !important;
+    background-color: #6c757d;
+}
+
+/* Clear button styling */
+#clear-results-btn {
+    background-color: transparent;
+    border-color: #6c757d;
+    color: #333333;
+}
+
+#clear-results-btn:hover {
+    background-color: #f0f0f0;
+    color: #333333;
+    border-color: #6c757d;
 }
