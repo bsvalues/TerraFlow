@@ -27,3 +27,16 @@ from sync_service.models.sync_tables import (
     FieldSanitizationRule,
     NotificationConfig
 )
+
+# Import Data Quality models if available
+try:
+    from sync_service.models.data_quality import (
+        DataQualityRule,
+        DataQualityIssue,
+        DataQualityReport,
+        AnomalyDetectionConfig,
+        DataAnomaly
+    )
+except ImportError:
+    # Data Quality models not available
+    pass

@@ -106,12 +106,25 @@ def register_blueprints(app):
         # Create routes before registering the blueprints
         create_routes()
         
-        # Import verification blueprint
+        # Import verification and data quality blueprints
         from sync_service.verification_routes import verification_bp
+        
+        # Try to import data quality routes
+        try:
+            from sync_service.data_quality_routes import data_quality_bp, register_data_quality_blueprint
+            has_data_quality = True
+            logger.info("Data Quality module loaded successfully")
+        except ImportError as e:
+            logger.warning(f"Could not load Data Quality module: {e}")
+            has_data_quality = False
         
         # Register the blueprints
         app.register_blueprint(sync_bp)
         app.register_blueprint(verification_bp)
+        
+        # Register data quality blueprint if available
+        if has_data_quality:
+            register_data_quality_blueprint(app)
         
         # Initialize models
         with app.app_context():

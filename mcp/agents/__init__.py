@@ -1,3 +1,5 @@
-# MCP Agents Package
-# This package contains the specialized agent implementations
-# for the Master Control Program architecture.
+"""
+MCP Agents Module
+
+This package contains all the specialized agents used in the MCP system.
+"""
