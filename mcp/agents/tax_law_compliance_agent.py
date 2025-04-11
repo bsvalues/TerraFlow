@@ -173,6 +173,7 @@ class TaxLawComplianceAgent(BaseAgent):
                 "assessment_ratio": self._check_assessment_ratio(property_data),
                 "classification": self._check_property_classification(property_data),
                 "exemptions": self._check_exemption_compliance(property_data),
+                "annual_revaluation": self._check_annual_revaluation_compliance(property_data),
                 "documentation": self._check_documentation_compliance(property_data),
                 "notification": self._check_notification_compliance(property_data)
             }
@@ -855,83 +856,460 @@ class TaxLawComplianceAgent(BaseAgent):
     
     def _check_assessment_ratio(self, property_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Check if property is assessed at required ratio
+        Check if property is assessed at required ratio per Washington State RCW 84.40.030
+        
+        Washington requires all property to be valued at 100% of its true and fair value
+        in money (market value). This implements a comprehensive check of the assessment
+        ratio including property type-specific considerations.
         
         Args:
             property_data: Property data to check
             
         Returns:
-            Compliance check result
+            Compliance check result with detailed analysis
         """
         # Washington requires 100% true and fair value assessment
         required_ratio = 1.0
         
         assessed_value = property_data.get("assessed_value", 0)
         market_value = property_data.get("market_value", 0)
+        property_type = property_data.get("property_type", "unknown")
+        valuation_method = property_data.get("valuation_method", "unknown")
+        assessment_year = property_data.get("assessment_year", datetime.datetime.now().year)
         
+        # Additional checks for data completeness
         if market_value == 0:
-            # Can't determine ratio
+            # Can't determine ratio - critical issue
             return {
                 "compliant": False,
                 "issue": "Cannot determine assessment ratio due to missing market value",
-                "severity": "medium",
+                "severity": "high",
                 "regulation": "RCW 84.40.030",
-                "recommendation": "Establish market value for property"
+                "recommendation": "Establish market value for property",
+                "rcw_reference": "https://app.leg.wa.gov/RCW/default.aspx?cite=84.40.030",
+                "priority": "high"
             }
         
         actual_ratio = assessed_value / market_value
         
-        # Allow small tolerance in ratio
-        tolerance = 0.05
+        # Apply appropriate tolerance based on property type
+        # Residential properties need tighter tolerance than commercial or agricultural
+        if property_type.lower() in ["residential", "single_family", "multi_family"]:
+            tolerance = 0.03  # 3% tolerance for residential
+        elif property_type.lower() in ["commercial", "industrial"]:
+            tolerance = 0.05  # 5% tolerance for commercial/industrial
+        elif property_type.lower() in ["agricultural", "farm", "timber"]:
+            tolerance = 0.07  # 7% tolerance for agricultural/resource lands
+        else:
+            tolerance = 0.05  # Default tolerance
         
+        # Check ratio within tolerance
         if abs(actual_ratio - required_ratio) > tolerance:
+            # Check for special valuation methods that might be exempt from standard ratio
+            if valuation_method.lower() in ["current_use", "designated_forest", "open_space"]:
+                # Special valuation methods allowed by RCW 84.34
+                return {
+                    "compliant": True,
+                    "actual_ratio": actual_ratio,
+                    "required_ratio": required_ratio,
+                    "note": f"Property uses special valuation method: {valuation_method}",
+                    "regulation": "RCW 84.34"
+                }
+            
+            # Standard assessment ratio issue
+            severity = "high" if abs(actual_ratio - required_ratio) > (2 * tolerance) else "medium"
+            
             return {
                 "compliant": False,
                 "issue": f"Assessment ratio ({actual_ratio:.2f}) does not meet required ratio (1.00 ± {tolerance})",
-                "severity": "high",
+                "severity": severity,
                 "regulation": "RCW 84.40.030",
                 "recommendation": "Adjust assessed value to match market value",
+                "details": {
+                    "assessed_value": assessed_value,
+                    "market_value": market_value,
+                    "property_type": property_type,
+                    "discrepancy_percentage": abs((actual_ratio - required_ratio) * 100),
+                    "assessment_year": assessment_year
+                },
+                "rcw_reference": "https://app.leg.wa.gov/RCW/default.aspx?cite=84.40.030",
                 "priority": "high"
             }
         
+        # Additional check for valuation date compliance
+        # Washington requires January 1 valuation date
+        valuation_date = property_data.get("valuation_date")
+        current_year = datetime.datetime.now().year
+        
+        if valuation_date:
+            try:
+                if isinstance(valuation_date, str):
+                    valuation_date = datetime.datetime.strptime(valuation_date, "%Y-%m-%d").date()
+                
+                # Check if valuation is for correct assessment year (Jan 1)
+                if valuation_date.year != assessment_year or valuation_date.month != 1 or valuation_date.day != 1:
+                    return {
+                        "compliant": False,
+                        "actual_ratio": actual_ratio,
+                        "required_ratio": required_ratio,
+                        "issue": f"Valuation date ({valuation_date}) is not January 1 of assessment year ({assessment_year})",
+                        "severity": "medium",
+                        "regulation": "RCW 84.40.020",
+                        "recommendation": "Update valuation to reflect January 1 value",
+                        "rcw_reference": "https://app.leg.wa.gov/RCW/default.aspx?cite=84.40.020"
+                    }
+            except (ValueError, AttributeError):
+                # Couldn't parse date or other issue
+                pass
+        
+        # Compliance check passes
         return {
             "compliant": True,
             "actual_ratio": actual_ratio,
-            "required_ratio": required_ratio
+            "required_ratio": required_ratio,
+            "property_type": property_type,
+            "tolerance_applied": tolerance,
+            "regulation": "RCW 84.40.030",
+            "rcw_reference": "https://app.leg.wa.gov/RCW/default.aspx?cite=84.40.030"
         }
     
     def _check_property_classification(self, property_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Check if property classification is correct
+        Check if property classification is correct per Washington State RCW 84.41
+        
+        Washington requires proper classification of all properties to ensure 
+        fair and uniform assessment. This implements comprehensive classification
+        checks based on property characteristics as defined in WA statutes.
         
         Args:
             property_data: Property data to check
             
         Returns:
-            Compliance check result
+            Compliance check result with detailed classification analysis
         """
-        # In a real implementation, this would check classification against property characteristics
-        # Simplified placeholder implementation
+        property_class = property_data.get("classification", "unknown")
+        current_use = property_data.get("current_use", False)
+        land_area = property_data.get("land_area", 0)
+        land_area_unit = property_data.get("land_area_unit", "sqft")  # or acres
+        building_area = property_data.get("building_area", 0)
+        building_type = property_data.get("building_type", "")
+        zoning = property_data.get("zoning", "")
+        use_code = property_data.get("use_code", "")
+        improvements = property_data.get("improvements", [])
+        has_residence = property_data.get("has_residence", False)
+        agricultural_use = property_data.get("agricultural_use", False)
+        timber_use = property_data.get("timber_use", False)
+        historic_designation = property_data.get("historic_designation", False)
+        
+        # Convert acres to square feet if needed
+        if land_area_unit.lower() == "acres":
+            land_area_sqft = land_area * 43560
+        else:
+            land_area_sqft = land_area
+        
+        # Check if current classification appears to match the property characteristics
+        expected_classification = None
+        classification_issues = []
+        
+        # Residential checks
+        if building_type and building_type.lower() in ["single_family", "duplex", "triplex", "apartment"]:
+            if "residential" not in property_class.lower():
+                classification_issues.append({
+                    "issue": f"Building type ({building_type}) indicates residential use, but classification is {property_class}",
+                    "expected": "Residential"
+                })
+                expected_classification = "Residential"
+        
+        # Commercial checks
+        if building_type and building_type.lower() in ["office", "retail", "warehouse", "hotel", "restaurant"]:
+            if "commercial" not in property_class.lower():
+                classification_issues.append({
+                    "issue": f"Building type ({building_type}) indicates commercial use, but classification is {property_class}",
+                    "expected": "Commercial"
+                })
+                expected_classification = "Commercial"
+                
+        # Industrial checks
+        if building_type and building_type.lower() in ["manufacturing", "processing", "industrial"]:
+            if "industrial" not in property_class.lower():
+                classification_issues.append({
+                    "issue": f"Building type ({building_type}) indicates industrial use, but classification is {property_class}",
+                    "expected": "Industrial"
+                })
+                expected_classification = "Industrial"
+                
+        # Agricultural checks
+        if agricultural_use or (current_use and "farm" in property_class.lower()):
+            # Check that land area meets minimum for agricultural classification
+            min_farm_area_sqft = 5 * 43560  # 5 acres in sqft
+            
+            if land_area_sqft < min_farm_area_sqft and "agricultural" in property_class.lower():
+                classification_issues.append({
+                    "issue": f"Property classified as agricultural but does not meet minimum size requirement (5 acres)",
+                    "expected": "Non-agricultural",
+                    "details": {
+                        "actual_size": f"{land_area} {land_area_unit}",
+                        "minimum_size": "5 acres",
+                        "regulation": "RCW 84.34.020"
+                    }
+                })
+            elif land_area_sqft >= min_farm_area_sqft and agricultural_use and "agricultural" not in property_class.lower():
+                classification_issues.append({
+                    "issue": f"Property appears to be agricultural but is classified as {property_class}",
+                    "expected": "Agricultural",
+                    "details": {
+                        "actual_size": f"{land_area} {land_area_unit}",
+                        "minimum_size": "5 acres",
+                        "regulation": "RCW 84.34.020"
+                    }
+                })
+                expected_classification = "Agricultural"
+        
+        # Open space checks
+        if current_use and "open" in property_class.lower():
+            # Verify open space has been approved under RCW 84.34
+            has_open_space_approval = property_data.get("open_space_approval", False)
+            
+            if not has_open_space_approval:
+                classification_issues.append({
+                    "issue": "Property classified as open space but lacks required approval",
+                    "expected": "Standard classification unless approval documented",
+                    "regulation": "RCW 84.34.037"
+                })
+        
+        # Historic property checks
+        if historic_designation:
+            has_historic_approval = property_data.get("historic_approval", False)
+            
+            if not has_historic_approval and "historic" in property_class.lower():
+                classification_issues.append({
+                    "issue": "Property has historic designation but lacks formal historic approval required for special valuation",
+                    "regulation": "RCW 84.26.040"
+                })
+        
+        # Timber land checks
+        if timber_use or "timber" in property_class.lower():
+            has_forest_mgmt_plan = property_data.get("forest_management_plan", False)
+            min_timber_area_sqft = 5 * 43560  # 5 acres
+            
+            if "timber" in property_class.lower() and not has_forest_mgmt_plan:
+                classification_issues.append({
+                    "issue": "Property classified as timber land but lacks required forest management plan",
+                    "regulation": "RCW 84.34.041"
+                })
+                
+            if land_area_sqft < min_timber_area_sqft and "timber" in property_class.lower():
+                classification_issues.append({
+                    "issue": f"Property classified as timber land but does not meet minimum size requirement (5 acres)",
+                    "expected": "Non-timber", 
+                    "regulation": "RCW 84.34.020"
+                })
+        
+        # Check if exempt properties are properly classified
+        is_exempt = property_data.get("exempt", False)
+        exempt_reason = property_data.get("exempt_reason", "")
+        
+        if is_exempt and "exempt" not in property_class.lower():
+            classification_issues.append({
+                "issue": f"Property is exempt ({exempt_reason}) but not classified as exempt",
+                "expected": "Exempt",
+                "regulation": "RCW 84.36"
+            })
+        
+        # Result construction
+        if classification_issues:
+            return {
+                "compliant": False,
+                "classification": property_class,
+                "expected_classification": expected_classification,
+                "issues": classification_issues,
+                "severity": "medium" if len(classification_issues) > 1 else "low",
+                "regulation": "RCW 84.41.030",
+                "rcw_reference": "https://app.leg.wa.gov/RCW/default.aspx?cite=84.41.030",
+                "recommendation": f"Review property characteristics and update classification to {expected_classification if expected_classification else 'appropriate category'}"
+            }
+        
+        # If we reach this point, no classification issues found
         return {
             "compliant": True,
-            "classification": property_data.get("classification", "unknown")
+            "classification": property_class,
+            "property_characteristics": {
+                "land_area": land_area,
+                "land_area_unit": land_area_unit,
+                "building_type": building_type,
+                "current_use": current_use
+            },
+            "regulation": "RCW 84.41.030",
+            "rcw_reference": "https://app.leg.wa.gov/RCW/default.aspx?cite=84.41.030"
         }
     
     def _check_exemption_compliance(self, property_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Check if exemptions are properly applied
+        Check if exemptions are properly applied per Washington State regulations
+        
+        Washington has numerous property tax exemptions with specific eligibility 
+        requirements codified in RCW 84.36. This method validates that exemptions
+        are properly applied according to state law and all required documentation
+        is present.
         
         Args:
             property_data: Property data to check
             
         Returns:
-            Compliance check result
+            Compliance check result with detailed analysis of exemption validity
         """
-        # In a real implementation, this would validate each exemption against criteria
-        # Simplified placeholder implementation
+        exemptions = property_data.get("exemptions", [])
+        if not exemptions:
+            # No exemptions to check
+            return {
+                "compliant": True,
+                "exemptions": [],
+                "note": "No exemptions applied to property"
+            }
+        
+        # Track issues with exemptions
+        exemption_issues = []
+        valid_exemptions = []
+        
+        # Common Washington state exemption types with requirements
+        wa_exemption_types = {
+            "senior_disabled": {
+                "rcw": "84.36.381",
+                "requirements": [
+                    {"type": "owner_age", "operator": ">=", "value": 61},
+                    {"type": "income", "operator": "<=", "value": 40000},  # Updated threshold
+                    {"type": "primary_residence", "operator": "==", "value": True},
+                    {"type": "ownership_years", "operator": ">=", "value": 1}
+                ],
+                "documentation": ["income_verification", "age_verification", "residence_declaration"]
+            },
+            "nonprofit_religious": {
+                "rcw": "84.36.020",
+                "requirements": [
+                    {"type": "ownership", "operator": "==", "value": "religious_org"},
+                    {"type": "used_for_religious_purposes", "operator": "==", "value": True}
+                ],
+                "documentation": ["nonprofit_status", "use_verification"]
+            },
+            "nonprofit_educational": {
+                "rcw": "84.36.050",
+                "requirements": [
+                    {"type": "ownership", "operator": "==", "value": "educational_org"},
+                    {"type": "used_for_education", "operator": "==", "value": True}
+                ],
+                "documentation": ["nonprofit_status", "use_verification"]
+            },
+            "government_property": {
+                "rcw": "84.36.010",
+                "requirements": [
+                    {"type": "ownership", "operator": "in", "value": ["federal", "state", "county", "city", "tribal"]}
+                ],
+                "documentation": ["ownership_verification"]
+            },
+            "agricultural_equipment": {
+                "rcw": "84.36.630",
+                "requirements": [
+                    {"type": "property_type", "operator": "==", "value": "farm_equipment"},
+                    {"type": "used_for_farming", "operator": "==", "value": True}
+                ],
+                "documentation": ["equipment_inventory", "farming_declaration"]
+            },
+            "historical_property": {
+                "rcw": "84.26",
+                "requirements": [
+                    {"type": "historic_designation", "operator": "==", "value": True},
+                    {"type": "historic_preservation_plan", "operator": "==", "value": True}
+                ],
+                "documentation": ["historic_designation_certificate", "preservation_agreement"]
+            }
+        }
+        
+        # Check each exemption on the property
+        for exemption in exemptions:
+            exemption_type = exemption.get("type", "")
+            exemption_year = exemption.get("year", datetime.datetime.now().year)
+            exemption_amount = exemption.get("amount", 0)
+            exemption_documents = exemption.get("documents", [])
+            
+            # Skip if no type defined
+            if not exemption_type:
+                exemption_issues.append({
+                    "exemption": exemption,
+                    "issue": "Exemption type not specified",
+                    "severity": "high"
+                })
+                continue
+                
+            # Check if this is a recognized Washington exemption type
+            wa_exemption = wa_exemption_types.get(exemption_type)
+            if not wa_exemption:
+                # Not a standard WA exemption, note as warning
+                exemption_issues.append({
+                    "exemption": exemption,
+                    "issue": f"Non-standard exemption type: {exemption_type}",
+                    "severity": "medium",
+                    "recommendation": "Verify exemption is valid under Washington law"
+                })
+                continue
+                
+            # Check requirements
+            requirements_met = True
+            missing_requirements = []
+            
+            for requirement in wa_exemption.get("requirements", []):
+                if not self._check_exemption_criterion(property_data, requirement):
+                    requirements_met = False
+                    missing_requirements.append(requirement)
+            
+            # Check documentation
+            required_docs = wa_exemption.get("documentation", [])
+            missing_docs = [doc for doc in required_docs if doc not in exemption_documents]
+            
+            # Evaluate exemption validity
+            if not requirements_met or missing_docs:
+                issue_details = {
+                    "exemption_type": exemption_type,
+                    "rcw": wa_exemption.get("rcw"),
+                    "missing_requirements": missing_requirements if missing_requirements else None,
+                    "missing_documentation": missing_docs if missing_docs else None,
+                    "severity": "high" if not requirements_met else "medium"
+                }
+                
+                exemption_issues.append({
+                    "exemption": exemption,
+                    "issue": "Exemption requirements not fully met",
+                    "details": issue_details,
+                    "recommendation": "Review exemption eligibility and documentation"
+                })
+            else:
+                # Exemption appears valid
+                valid_exemptions.append({
+                    "exemption_type": exemption_type,
+                    "exemption_amount": exemption_amount,
+                    "exemption_year": exemption_year,
+                    "rcw": wa_exemption.get("rcw")
+                })
+        
+        # Overall exemption compliance status
+        if exemption_issues:
+            return {
+                "compliant": False,
+                "exemptions": exemptions,
+                "valid_exemptions": valid_exemptions,
+                "issues": exemption_issues,
+                "severity": "high" if any(issue.get("severity") == "high" for issue in exemption_issues) else "medium",
+                "regulation": "RCW 84.36",
+                "rcw_reference": "https://app.leg.wa.gov/RCW/default.aspx?cite=84.36",
+                "recommendation": "Review and correct exemption issues identified"
+            }
+        
+        # All exemptions valid
         return {
             "compliant": True,
-            "exemptions": property_data.get("exemptions", [])
+            "exemptions": exemptions,
+            "valid_exemptions": valid_exemptions,
+            "regulation": "RCW 84.36",
+            "rcw_reference": "https://app.leg.wa.gov/RCW/default.aspx?cite=84.36"
         }
     
     def _check_documentation_compliance(self, property_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -949,6 +1327,183 @@ class TaxLawComplianceAgent(BaseAgent):
         return {
             "compliant": True,
             "documentation": property_data.get("documentation", [])
+        }
+    
+    def _check_annual_revaluation_compliance(self, property_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Check compliance with Washington State's annual revaluation requirement (RCW 36.21.080)
+        
+        Washington requires annual revaluation of all property in the county.
+        This method checks that properties have been revalued within the required timeframe.
+        
+        Args:
+            property_data: Property data to check
+            
+        Returns:
+            Compliance check result with detailed revaluation analysis
+        """
+        current_date = datetime.datetime.now().date()
+        current_year = current_date.year
+        
+        # Get last valuation date
+        last_valuation_date = property_data.get("last_valuation_date")
+        last_valuation_timestamp = property_data.get("last_valuation_timestamp")
+        last_inspection_date = property_data.get("last_inspection_date")
+        
+        # Handle the case where last valuation is stored as string
+        if isinstance(last_valuation_date, str):
+            try:
+                last_valuation_date = datetime.datetime.strptime(
+                    last_valuation_date, "%Y-%m-%d"
+                ).date()
+            except ValueError:
+                # Could not parse date, continue with other checks
+                last_valuation_date = None
+        
+        # Try using timestamp if date not available
+        if not last_valuation_date and last_valuation_timestamp:
+            try:
+                if isinstance(last_valuation_timestamp, str):
+                    last_valuation_timestamp = float(last_valuation_timestamp)
+                last_valuation_date = datetime.datetime.fromtimestamp(
+                    last_valuation_timestamp
+                ).date()
+            except (ValueError, TypeError):
+                # Could not convert timestamp
+                pass
+        
+        # Try inspection date if no valuation date
+        if not last_valuation_date and last_inspection_date:
+            try:
+                if isinstance(last_inspection_date, str):
+                    last_inspection_date = datetime.datetime.strptime(
+                        last_inspection_date, "%Y-%m-%d"
+                    ).date()
+                # Use inspection date as a proxy for valuation
+                last_valuation_date = last_inspection_date
+            except ValueError:
+                # Could not parse date
+                pass
+        
+        # If we still don't have a valuation date, that's a compliance issue
+        if not last_valuation_date:
+            return {
+                "compliant": False,
+                "issue": "No record of property valuation date",
+                "severity": "high",
+                "regulation": "RCW 36.21.080",
+                "rcw_reference": "https://app.leg.wa.gov/RCW/default.aspx?cite=36.21.080",
+                "recommendation": "Schedule property for immediate revaluation",
+                "priority": "high"
+            }
+        
+        # Check if valuation is from current assessment year (Jan 1 valuation date)
+        assessment_year = property_data.get("assessment_year", current_year)
+        
+        # Per WA law, properties should be revalued annually
+        # For counties on annual revaluation cycles, check that the property was revalued for the current assessment year
+        years_since_valuation = assessment_year - last_valuation_date.year
+        
+        cyclical_revaluation = property_data.get("cyclical_revaluation", False)
+        revaluation_cycle = property_data.get("revaluation_cycle", 1)  # Default to annual
+        
+        # For counties using cyclical revaluation (allowed under certain conditions), 
+        # check that the property was revalued within the appropriate cycle
+        if cyclical_revaluation:
+            if years_since_valuation > revaluation_cycle:
+                return {
+                    "compliant": False,
+                    "issue": f"Property has not been revalued within the {revaluation_cycle}-year cycle",
+                    "severity": "high",
+                    "last_valuation": last_valuation_date.isoformat(),
+                    "assessment_year": assessment_year,
+                    "years_since_valuation": years_since_valuation,
+                    "revaluation_cycle": revaluation_cycle,
+                    "regulation": "RCW 36.21.080",
+                    "rcw_reference": "https://app.leg.wa.gov/RCW/default.aspx?cite=36.21.080",
+                    "recommendation": "Schedule property for revaluation immediately",
+                    "priority": "high",
+                    "details": {
+                        "cyclical_revaluation": True,
+                        "revaluation_due_year": last_valuation_date.year + revaluation_cycle
+                    }
+                }
+        else:
+            # Annual revaluation requirement (standard)
+            if years_since_valuation > 1:
+                return {
+                    "compliant": False,
+                    "issue": "Property has not been revalued annually as required",
+                    "severity": "high",
+                    "last_valuation": last_valuation_date.isoformat(),
+                    "assessment_year": assessment_year,
+                    "years_since_valuation": years_since_valuation,
+                    "regulation": "RCW 36.21.080",
+                    "rcw_reference": "https://app.leg.wa.gov/RCW/default.aspx?cite=36.21.080",
+                    "recommendation": "Schedule property for revaluation immediately",
+                    "priority": "high"
+                }
+        
+        # Physical inspection compliance (at least once every 6 years) per RCW 84.41.041
+        physical_inspection_required = True
+        
+        if last_inspection_date:
+            try:
+                if isinstance(last_inspection_date, str):
+                    last_inspection_date = datetime.datetime.strptime(
+                        last_inspection_date, "%Y-%m-%d"
+                    ).date()
+                
+                years_since_inspection = current_year - last_inspection_date.year
+                
+                if years_since_inspection > 6:
+                    return {
+                        "compliant": False,
+                        "issue": "Physical inspection has not been conducted within the required 6-year period",
+                        "severity": "medium",
+                        "last_inspection": last_inspection_date.isoformat(),
+                        "years_since_inspection": years_since_inspection,
+                        "regulation": "RCW 84.41.041",
+                        "rcw_reference": "https://app.leg.wa.gov/RCW/default.aspx?cite=84.41.041",
+                        "recommendation": "Schedule physical inspection",
+                        "priority": "medium"
+                    }
+            except (ValueError, TypeError):
+                # Could not determine inspection date
+                return {
+                    "compliant": False,
+                    "issue": "Cannot determine last physical inspection date",
+                    "severity": "medium",
+                    "regulation": "RCW 84.41.041",
+                    "rcw_reference": "https://app.leg.wa.gov/RCW/default.aspx?cite=84.41.041",
+                    "recommendation": "Schedule physical inspection and improve record keeping",
+                    "priority": "medium"
+                }
+        else:
+            # No record of physical inspection
+            return {
+                "compliant": False,
+                "issue": "No record of physical inspection",
+                "severity": "medium",
+                "regulation": "RCW 84.41.041",
+                "rcw_reference": "https://app.leg.wa.gov/RCW/default.aspx?cite=84.41.041",
+                "recommendation": "Schedule physical inspection and improve record keeping",
+                "priority": "medium"
+            }
+        
+        # All checks passed
+        return {
+            "compliant": True,
+            "last_valuation": last_valuation_date.isoformat(),
+            "last_inspection": last_inspection_date.isoformat() if last_inspection_date else None,
+            "assessment_year": assessment_year,
+            "years_since_valuation": years_since_valuation,
+            "years_since_inspection": current_year - last_inspection_date.year if last_inspection_date else None,
+            "regulation": "RCW 36.21.080, RCW 84.41.041",
+            "rcw_reference": [
+                "https://app.leg.wa.gov/RCW/default.aspx?cite=36.21.080",
+                "https://app.leg.wa.gov/RCW/default.aspx?cite=84.41.041"
+            ]
         }
     
     def _check_notification_compliance(self, property_data: Dict[str, Any]) -> Dict[str, Any]:
