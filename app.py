@@ -715,5 +715,13 @@ def mcp_task():
         logger.error(f"MCP task error: {str(e)}")
         return jsonify({'error': f'MCP task error: {str(e)}'}), 500
 
+# Register knowledge base blueprint
+try:
+    from knowledge_routes import knowledge_bp
+    app.register_blueprint(knowledge_bp)
+    app.logger.info("Knowledge base routes registered")
+except Exception as e:
+    app.logger.error(f"Error registering knowledge base routes: {str(e)}")
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

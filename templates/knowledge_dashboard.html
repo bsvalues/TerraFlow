@@ -1,0 +1,592 @@
+{% extends "layout.html" %}
+
+{% block title %}Knowledge Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid my-4">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Knowledge Base Insights</h5>
+                    <div>
+                        <button class="btn btn-sm btn-light" id="refresh-btn">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                        <div class="btn-group ms-2">
+                            <button type="button" class="btn btn-sm btn-light dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                                <span id="time-range-text">Last 30 Days</span>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><a class="dropdown-item time-range" href="#" data-days="7">Last 7 Days</a></li>
+                                <li><a class="dropdown-item time-range" href="#" data-days="30">Last 30 Days</a></li>
+                                <li><a class="dropdown-item time-range" href="#" data-days="90">Last 90 Days</a></li>
+                                <li><a class="dropdown-item time-range" href="#" data-days="365">Last Year</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item time-range" href="#" data-days="0">All Time</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="card mb-3 bg-light">
+                                <div class="card-body text-center">
+                                    <h3 class="mb-0" id="total-entries">-</h3>
+                                    <p class="text-muted mb-0">Total Entries</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card mb-3 bg-light">
+                                <div class="card-body text-center">
+                                    <h3 class="mb-0" id="avg-rating">-</h3>
+                                    <p class="text-muted mb-0">Average Rating</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card mb-3 bg-light">
+                                <div class="card-body text-center">
+                                    <h3 class="mb-0" id="total-feedback">-</h3>
+                                    <p class="text-muted mb-0">Total Feedback</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card mb-3 bg-light">
+                                <div class="card-body text-center">
+                                    <h3 class="mb-0" id="contributing-agents">-</h3>
+                                    <p class="text-muted mb-0">Contributing Agents</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">Entries by Type</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="entriesByTypeChart" height="280"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">Knowledge Growth</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="knowledgeGrowthChart" height="280"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">Top Tags</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="topTagsChart" height="280"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">Agent Contributions</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="agentContributionsChart" height="280"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">Rating Distribution</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="ratingDistributionChart" height="280"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Top Rated Entries</h5>
+                    <button class="btn btn-sm btn-light" id="view-all-btn">View All</button>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Title</th>
+                                    <th>Type</th>
+                                    <th>Agent</th>
+                                    <th>Rating</th>
+                                    <th>Created</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="top-entries-table">
+                                <tr>
+                                    <td colspan="6" class="text-center py-3">Loading entries...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Tag Relationships</h5>
+                </div>
+                <div class="card-body" style="height: 374px;">
+                    <canvas id="tagRelationshipsChart" height="330"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Knowledge Entry Modal -->
+<div class="modal fade" id="knowledgeEntryModal" tabindex="-1" aria-labelledby="knowledgeEntryModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title" id="knowledgeEntryModalLabel">Knowledge Entry</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="knowledge-entry-content">
+                <!-- Content will be populated dynamically -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <a href="#" id="view-full-entry-btn" class="btn btn-primary">View in Knowledge Base</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+$(document).ready(function() {
+    // Chart color scheme
+    const chartColors = [
+        '#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', 
+        '#6f42c1', '#fd7e14', '#20c9a6', '#5a5c69', '#858796',
+        '#5603ad', '#8367c7', '#b8c0ff', '#c8b6ff', '#e2afff'
+    ];
+    
+    // Global chart options
+    Chart.defaults.font.family = "'Nunito', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif";
+    Chart.defaults.font.size = 12;
+    Chart.defaults.plugins.legend.position = 'bottom';
+    
+    // Initialize charts with loading state
+    let entriesByTypeChart, knowledgeGrowthChart, topTagsChart, 
+        agentContributionsChart, ratingDistributionChart, tagRelationshipsChart;
+    
+    // Initialize with default 30 days
+    const defaultDays = 30;
+    loadDashboardData(defaultDays);
+    
+    // Handle time range changes
+    $('.time-range').click(function(e) {
+        e.preventDefault();
+        const days = $(this).data('days');
+        $('#time-range-text').text($(this).text());
+        loadDashboardData(days);
+    });
+    
+    // Handle refresh button
+    $('#refresh-btn').click(function() {
+        const days = $('.time-range.active').data('days') || defaultDays;
+        loadDashboardData(days);
+    });
+    
+    // Handle View All button
+    $('#view-all-btn').click(function() {
+        window.location.href = '/knowledge/';
+    });
+    
+    function loadDashboardData(days) {
+        // Show loading indicators
+        showLoading();
+        
+        // Fetch data from API
+        $.getJSON(`/knowledge/dashboard-data?days=${days}`, function(data) {
+            if (data.success) {
+                // Update summary metrics
+                updateSummaryMetrics(data.metrics);
+                
+                // Update charts
+                updateEntriesByTypeChart(data.entries_by_type);
+                updateKnowledgeGrowthChart(data.knowledge_growth);
+                updateTopTagsChart(data.top_tags);
+                updateAgentContributionsChart(data.agent_contributions);
+                updateRatingDistributionChart(data.rating_distribution);
+                updateTagRelationshipsChart(data.tag_relationships);
+                
+                // Update top entries table
+                updateTopEntriesTable(data.top_entries);
+            } else {
+                showError("Failed to load dashboard data: " + data.error);
+            }
+        }).fail(function() {
+            showError("Failed to connect to the server. Please try again later.");
+        });
+    }
+    
+    function showLoading() {
+        // Show loading indicators in charts
+        $('#top-entries-table').html('<tr><td colspan="6" class="text-center py-3">Loading entries...</td></tr>');
+    }
+    
+    function showError(message) {
+        // Display error message
+        alert(message);
+    }
+    
+    function updateSummaryMetrics(metrics) {
+        $('#total-entries').text(metrics.total_entries);
+        $('#avg-rating').text(metrics.avg_rating.toFixed(1));
+        $('#total-feedback').text(metrics.total_feedback);
+        $('#contributing-agents').text(metrics.contributing_agents);
+    }
+    
+    function updateEntriesByTypeChart(data) {
+        const ctx = document.getElementById('entriesByTypeChart').getContext('2d');
+        
+        if (entriesByTypeChart) {
+            entriesByTypeChart.destroy();
+        }
+        
+        entriesByTypeChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: data.labels,
+                datasets: [{
+                    data: data.values,
+                    backgroundColor: chartColors.slice(0, data.labels.length),
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            padding: 15
+                        }
+                    }
+                },
+                cutout: '65%'
+            }
+        });
+    }
+    
+    function updateKnowledgeGrowthChart(data) {
+        const ctx = document.getElementById('knowledgeGrowthChart').getContext('2d');
+        
+        if (knowledgeGrowthChart) {
+            knowledgeGrowthChart.destroy();
+        }
+        
+        knowledgeGrowthChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.labels,
+                datasets: [{
+                    label: 'Cumulative Entries',
+                    data: data.cumulative,
+                    borderColor: chartColors[0],
+                    backgroundColor: 'rgba(78, 115, 223, 0.05)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.1
+                }, {
+                    label: 'New Entries',
+                    data: data.new_entries,
+                    borderColor: chartColors[1],
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    fill: false,
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            drawBorder: false
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    function updateTopTagsChart(data) {
+        const ctx = document.getElementById('topTagsChart').getContext('2d');
+        
+        if (topTagsChart) {
+            topTagsChart.destroy();
+        }
+        
+        topTagsChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: data.labels,
+                datasets: [{
+                    label: 'Number of Entries',
+                    data: data.values,
+                    backgroundColor: chartColors.slice(0, data.labels.length),
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                },
+                indexAxis: 'y'
+            }
+        });
+    }
+    
+    function updateAgentContributionsChart(data) {
+        const ctx = document.getElementById('agentContributionsChart').getContext('2d');
+        
+        if (agentContributionsChart) {
+            agentContributionsChart.destroy();
+        }
+        
+        agentContributionsChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: data.labels,
+                datasets: [{
+                    data: data.values,
+                    backgroundColor: chartColors.slice(0, data.labels.length),
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false
+            }
+        });
+    }
+    
+    function updateRatingDistributionChart(data) {
+        const ctx = document.getElementById('ratingDistributionChart').getContext('2d');
+        
+        if (ratingDistributionChart) {
+            ratingDistributionChart.destroy();
+        }
+        
+        ratingDistributionChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: data.labels,
+                datasets: [{
+                    label: 'Number of Entries',
+                    data: data.values,
+                    backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+    
+    function updateTagRelationshipsChart(data) {
+        const ctx = document.getElementById('tagRelationshipsChart').getContext('2d');
+        
+        if (tagRelationshipsChart) {
+            tagRelationshipsChart.destroy();
+        }
+        
+        tagRelationshipsChart = new Chart(ctx, {
+            type: 'bubble',
+            data: {
+                datasets: data.datasets.map((dataset, i) => ({
+                    label: dataset.label,
+                    data: dataset.data,
+                    backgroundColor: chartColors[i % chartColors.length]
+                }))
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Co-occurrence'
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Usage Count'
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    function updateTopEntriesTable(entries) {
+        let html = '';
+        
+        if (entries.length === 0) {
+            html = '<tr><td colspan="6" class="text-center py-3">No entries found</td></tr>';
+        } else {
+            entries.forEach(entry => {
+                html += `
+                    <tr>
+                        <td><a href="#" class="entry-link" data-entry-id="${entry.id}">${entry.title}</a></td>
+                        <td><span class="badge bg-${entry.type_color}">${entry.entry_type}</span></td>
+                        <td>${entry.source_agent_id}</td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <span class="me-1">${entry.rating.toFixed(1)}</span>
+                                <div class="rating-stars">
+                                    ${getStarsHtml(entry.rating)}
+                                </div>
+                            </div>
+                        </td>
+                        <td>${entry.created_at}</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary view-btn" data-entry-id="${entry.id}">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+        
+        $('#top-entries-table').html(html);
+        
+        // Attach event handlers to view buttons
+        $('.view-btn, .entry-link').click(function(e) {
+            e.preventDefault();
+            const entryId = $(this).data('entry-id');
+            viewKnowledgeEntry(entryId);
+        });
+    }
+    
+    function getStarsHtml(rating) {
+        let html = '';
+        const fullStars = Math.floor(rating);
+        const halfStar = rating % 1 >= 0.5;
+        
+        for (let i = 1; i <= 5; i++) {
+            if (i <= fullStars) {
+                html += '<i class="fas fa-star text-warning"></i>';
+            } else if (i === fullStars + 1 && halfStar) {
+                html += '<i class="fas fa-star-half-alt text-warning"></i>';
+            } else {
+                html += '<i class="far fa-star text-warning"></i>';
+            }
+        }
+        
+        return html;
+    }
+    
+    function viewKnowledgeEntry(entryId) {
+        // Fetch entry details
+        $.getJSON(`/knowledge/entry/${entryId}`, function(data) {
+            if (data.success) {
+                const entry = data.entry;
+                
+                // Populate modal content
+                let html = `
+                    <div class="mb-2">
+                        <h4>${entry.title}</h4>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="badge bg-${entry.entry_type_color}">${entry.entry_type}</span>
+                                <small class="text-muted ms-2">Added by ${entry.source_agent_id}</small>
+                            </div>
+                            <div class="rating-display">
+                                ${getStarsHtml(entry.rating)} <small>(${entry.rating_count})</small>
+                            </div>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="mb-3">
+                        ${entry.content}
+                    </div>
+                    <div class="d-flex flex-wrap gap-1 mb-2">
+                        ${entry.tags.map(tag => `<span class="badge bg-light text-dark">${tag}</span>`).join('')}
+                    </div>
+                    <div class="text-muted">
+                        <small>Created: ${entry.created_at}</small>
+                        ${entry.updated_at !== entry.created_at ? `<small class="ms-2">Updated: ${entry.updated_at}</small>` : ''}
+                    </div>
+                `;
+                
+                $('#knowledge-entry-content').html(html);
+                $('#view-full-entry-btn').attr('href', `/knowledge/#entry-${entryId}`);
+                
+                // Show modal
+                $('#knowledgeEntryModal').modal('show');
+            } else {
+                showError("Failed to load entry details: " + data.error);
+            }
+        }).fail(function() {
+            showError("Failed to connect to the server. Please try again later.");
+        });
+    }
+});
+</script>
+{% endblock %}
