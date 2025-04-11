@@ -14,7 +14,7 @@ import numpy as np
 from typing import Dict, List, Any, Optional, Tuple
 from sqlalchemy import text, exc, inspect
 from app import db
-from mcp.base_agent import BaseAgent
+from mcp.agents.base_agent import BaseAgent
 from sync_service.notification_system import SyncNotificationManager
 from sync_service.data_sanitization import DataSanitizer
 

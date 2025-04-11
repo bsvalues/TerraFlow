@@ -6,7 +6,7 @@ This module integrates the Data Quality Agent with the MCP system.
 
 import logging
 import sys
-from mcp.core import BaseAgent
+from mcp.agents.base_agent import BaseAgent
 from mcp.agents.data_quality_agent import DataQualityAgent
 
 # Configure logging
