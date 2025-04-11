@@ -78,7 +78,7 @@ class MCP:
         # Initialize the default system master prompt
         self.default_master_prompt = self.master_prompt_manager.get_default_system_prompt()
         
-        logger.info("MCP initialized with Agent-to-Agent protocol, experience buffer, and master prompt system support")
+        logger.info("MCP initialized with Agent-to-Agent protocol, experience buffer, status reporting, and master prompt system support")
     
     def register_agent(self, agent_id: str, agent_instance) -> bool:
         """Register an agent with the MCP"""
@@ -87,6 +87,28 @@ class MCP:
             return False
         
         self.agents[agent_id] = agent_instance
+        
+        # Register agent with status reporter
+        self.status_reporter.register_agent(agent_id)
+        
+        # Set initial agent status - using 'normal' as the default valid status level
+        # Status options are typically: 'normal', 'warning', 'error', 'critical', 'blocked'
+        agent_status = getattr(agent_instance, 'status', 'normal')
+        # Ensure we're using a valid status level
+        if agent_status not in ['normal', 'warning', 'error', 'critical', 'blocked']:
+            agent_status = 'normal'
+            
+        self.status_reporter.set_agent_status(
+            agent_id=agent_id,
+            status=agent_status,
+            message=f"Agent {agent_id} initialized",
+            details={
+                'type': agent_instance.__class__.__name__,
+                'capabilities': getattr(agent_instance, 'capabilities', []),
+                'registered_at': time.time()
+            }
+        )
+        
         logger.info(f"Agent {agent_id} registered")
         return True
     
@@ -96,7 +118,22 @@ class MCP:
             logger.warning(f"Agent {agent_id} not registered")
             return False
         
+        # Remove from agents registry
         del self.agents[agent_id]
+        
+        # Update status reporter
+        try:
+            # Set a final status message before removing
+            # Using 'normal' as the status since 'deregistered' might not be a valid status level
+            self.status_reporter.set_agent_status(
+                agent_id=agent_id,
+                status="normal",
+                message=f"Agent {agent_id} was deregistered from the system",
+                details={"deregistered_at": time.time()}
+            )
+        except Exception as e:
+            logger.warning(f"Error updating status for deregistered agent {agent_id}: {str(e)}")
+        
         logger.info(f"Agent {agent_id} deregistered")
         return True
     
@@ -213,18 +250,45 @@ class MCP:
             # Get next task
             task_id = self.task_queue.pop(0)
             task = self.tasks[task_id]
+            agent_id = task['agent_id']
             
-            # Update status
+            # Update task status
             task['status'] = 'processing'
+            
+            # Update status reporter for task start
+            self.status_reporter.set_agent_status(
+                agent_id=agent_id,
+                status='normal',
+                message=f"Processing task {task_id}",
+                details={
+                    'task_id': task_id,
+                    'task_type': task['data'].get('type', 'unknown'),
+                    'started_at': time.time()
+                }
+            )
             
             try:
                 # Process task
-                agent = self.agents[task['agent_id']]
+                agent = self.agents[agent_id]
                 result = agent.process_task(task['data'])
                 
                 # Store result
                 self.task_results[task_id] = result
                 task['status'] = 'completed'
+                task['completed_at'] = time.time()
+                
+                # Update status reporter for task completion
+                self.status_reporter.set_agent_status(
+                    agent_id=agent_id,
+                    status='normal',
+                    message=f"Completed task {task_id}",
+                    details={
+                        'task_id': task_id,
+                        'task_type': task['data'].get('type', 'unknown'),
+                        'completed_at': task['completed_at'],
+                        'duration': task['completed_at'] - task['submitted_at']
+                    }
+                )
                 
                 # Call callback if provided
                 if task['callback']:
@@ -232,11 +296,37 @@ class MCP:
                         task['callback'](task_id, result)
                     except Exception as e:
                         logger.error(f"Error in task callback: {str(e)}")
+                        
+                        # Update status reporter for callback error
+                        self.status_reporter.set_agent_status(
+                            agent_id=agent_id,
+                            status='warning',
+                            message=f"Callback error for task {task_id}",
+                            details={
+                                'task_id': task_id,
+                                'error': str(e)
+                            }
+                        )
                 
             except Exception as e:
+                # Update task status
                 task['status'] = 'failed'
                 task['error'] = str(e)
+                task['failed_at'] = time.time()
+                
                 logger.error(f"Error processing task {task_id}: {str(e)}")
+                
+                # Update status reporter for task failure
+                self.status_reporter.set_agent_status(
+                    agent_id=agent_id,
+                    status='error',
+                    message=f"Failed to process task {task_id}",
+                    details={
+                        'task_id': task_id,
+                        'error': str(e),
+                        'failed_at': task['failed_at']
+                    }
+                )
         
         logger.info("Worker loop terminated")
     
@@ -245,6 +335,17 @@ class MCP:
         if agent_id in self.agents:
             return self.agents[agent_id]
         return None
+        
+    def has_agent(self, agent_id: str) -> bool:
+        """Check if an agent exists by ID
+        
+        Args:
+            agent_id: ID of the agent to check
+            
+        Returns:
+            True if the agent exists, False otherwise
+        """
+        return agent_id in self.agents
         
     def get_agent_info(self, agent_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """Get information about registered agents"""
@@ -268,6 +369,49 @@ class MCP:
                 }
                 for agent_id, agent in self.agents.items()
             }
+            
+    def get_agent_status_info(self, agent_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Get combined agent info and status information for agents
+        
+        Args:
+            agent_id: Optional agent ID to get information for. If None, returns info for all agents.
+            
+        Returns:
+            Dictionary with combined agent info and status information
+        """
+        result = {}
+        
+        # Determine which agents to include
+        agent_ids = [agent_id] if agent_id else self.agents.keys()
+        
+        for aid in agent_ids:
+            if aid not in self.agents:
+                continue
+                
+            # Get basic agent info
+            agent_info = self.get_agent_info(aid)
+            if not agent_info:
+                continue
+                
+            # Get status information
+            status_info = self.status_reporter.get_agent_status(aid)
+            
+            # Combine information
+            combined_info = {
+                **agent_info,
+                'status_info': status_info or {},
+                'blockers': (aid in self.status_reporter.blockers),
+                'tasks': {
+                    task_id: task
+                    for task_id, task in self.tasks.items()
+                    if task['agent_id'] == aid
+                }
+            }
+            
+            result[aid] = combined_info
+            
+        return result
     
     def discover_agents(self, agent_dir: str = 'agents') -> List[str]:
         """Automatically discover and register available agents"""
@@ -549,6 +693,21 @@ class MCP:
         except Exception as e:
             logger.error(f"Error distributing master prompt: {str(e)}")
             return False
+    
+    def delegate_task(self, agent_id: str, task_data: Dict[str, Any], 
+                  callback: Optional[Callable] = None) -> Optional[str]:
+        """
+        Delegate a task to a specific agent (alias for submit_task for backwards compatibility)
+        
+        Args:
+            agent_id: ID of the agent to delegate the task to
+            task_data: Data for the task
+            callback: Optional callback function to call when the task is complete
+            
+        Returns:
+            Task ID if the task was submitted successfully, None otherwise
+        """
+        return self.submit_task(agent_id, task_data, callback)
     
     def register_workflow_agent(self, agent_type: str) -> str:
         """
