@@ -20,7 +20,7 @@ from models import User, db
 logger = logging.getLogger(__name__)
 
 # Create the API blueprint
-api_bp = Blueprint('api', __name__, url_prefix='/api')
+api_gateway = Blueprint('api', __name__, url_prefix='/api')
 
 # API Token storage (in-memory for development, should use DB in production)
 api_tokens = {}
@@ -61,7 +61,7 @@ def api_login_required(f):
     return decorated_function
 
 # API Routes
-@api_bp.route('/')
+@api_gateway.route('/')
 def api_index():
     """API index route providing information about the API"""
     return jsonify({
@@ -82,7 +82,7 @@ def api_index():
         ]
     })
 
-@api_bp.route('/docs')
+@api_gateway.route('/docs')
 def api_docs():
     """API documentation endpoint"""
     return jsonify({
@@ -189,7 +189,7 @@ def api_docs():
         ]
     })
 
-@api_bp.route('/auth/token', methods=['POST'])
+@api_gateway.route('/auth/token', methods=['POST'])
 def create_api_token():
     """Create a new API token using username and password"""
     username = request.json.get('username')
@@ -223,7 +223,7 @@ def create_api_token():
     # For demo only
     return jsonify({'error': 'Authentication failed'}), 401
 
-@api_bp.route('/auth/refresh', methods=['POST'])
+@api_gateway.route('/auth/refresh', methods=['POST'])
 @api_login_required
 def refresh_api_token():
     """Refresh an existing API token"""
@@ -255,7 +255,7 @@ def refresh_api_token():
         'expires_at': expires_at.isoformat()
     })
 
-@api_bp.route('/auth/revoke', methods=['POST'])
+@api_gateway.route('/auth/revoke', methods=['POST'])
 @api_login_required
 def revoke_api_token():
     """Revoke an API token"""
@@ -275,7 +275,7 @@ def revoke_api_token():
     
     return jsonify({'message': 'Token revoked successfully'})
 
-@api_bp.route('/auth/user')
+@api_gateway.route('/auth/user')
 @api_login_required
 def get_api_user():
     """Get information about the authenticated user"""
@@ -302,19 +302,19 @@ def get_api_user():
         return jsonify({'error': 'Not authenticated'}), 401
 
 # API error handling
-@api_bp.errorhandler(400)
+@api_gateway.errorhandler(400)
 def bad_request(error):
     return jsonify({'error': 'Bad request'}), 400
 
-@api_bp.errorhandler(401)
+@api_gateway.errorhandler(401)
 def unauthorized(error):
     return jsonify({'error': 'Unauthorized'}), 401
 
-@api_bp.errorhandler(404)
+@api_gateway.errorhandler(404)
 def not_found(error):
     return jsonify({'error': 'Not found'}), 404
 
-@api_bp.errorhandler(500)
+@api_gateway.errorhandler(500)
 def server_error(error):
     return jsonify({'error': 'Server error'}), 500
 
@@ -327,11 +327,11 @@ def register_api_endpoint_modules(app):
         from api.data_query import data_bp
         
         # Register sub-blueprints to main API blueprint
-        api_bp.register_blueprint(spatial_bp)
-        api_bp.register_blueprint(data_bp)
+        api_gateway.register_blueprint(spatial_bp)
+        api_gateway.register_blueprint(data_bp)
         
         # Register the main API Blueprint with Flask app
-        app.register_blueprint(api_bp)
+        app.register_blueprint(api_gateway)
         
         logger.info("API Gateway registered successfully")
         return True
