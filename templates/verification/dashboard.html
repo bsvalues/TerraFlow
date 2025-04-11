@@ -1,1519 +1,407 @@
-{% extends "layout.html" %}
+{% extends 'base.html' %}
 
-{% block title %}Property Export Verification{% endblock %}
+{% block title %}Property Export Verification Dashboard{% endblock %}
+
+{% block styles %}
+<style>
+  .status-card {
+    border-radius: 8px;
+    margin-bottom: 20px;
+    transition: all 0.3s ease;
+  }
+  .status-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+  }
+  .card-header {
+    border-radius: 8px 8px 0 0;
+    font-weight: 600;
+  }
+  .status-success {
+    background-color: #d4edda;
+    color: #155724;
+    border-color: #c3e6cb;
+  }
+  .status-warning {
+    background-color: #fff3cd;
+    color: #856404;
+    border-color: #ffeeba;
+  }
+  .status-danger {
+    background-color: #f8d7da;
+    color: #721c24;
+    border-color: #f5c6cb;
+  }
+  .status-info {
+    background-color: #d1ecf1;
+    color: #0c5460;
+    border-color: #bee5eb;
+  }
+  .test-results {
+    max-height: 300px;
+    overflow-y: auto;
+  }
+  .result-item {
+    padding: 10px;
+    border-left: 4px solid #ccc;
+    margin-bottom: 10px;
+  }
+  .result-success {
+    border-left-color: #28a745;
+  }
+  .result-error {
+    border-left-color: #dc3545;
+  }
+  .result-warning {
+    border-left-color: #ffc107;
+  }
+  .verification-actions {
+    margin-bottom: 20px;
+  }
+  .log-entry {
+    font-family: monospace;
+    padding: 5px;
+    margin-bottom: 5px;
+    border-radius: 3px;
+  }
+  .log-INFO {
+    background-color: #f8f9fa;
+  }
+  .log-ERROR {
+    background-color: #f8d7da;
+  }
+  .log-WARNING {
+    background-color: #fff3cd;
+  }
+  pre {
+    background-color: #f8f9fa;
+    padding: 10px;
+    border-radius: 5px;
+    overflow-x: auto;
+  }
+  pre code {
+    white-space: pre-wrap;
+  }
+  .test-btn {
+    margin: 5px;
+  }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
-    <h1 class="mb-4">
-        <i class="fas fa-check-circle me-2"></i>Property Export Verification Dashboard
-    </h1>
-    
-    <!-- Environment Banner -->
-    <div class="alert alert-info d-flex align-items-center mb-4" role="alert">
-        <div class="me-3">
-            <i class="fas fa-code-branch fa-2x"></i>
-        </div>
-        <div class="flex-grow-1">
-            <div class="d-flex justify-content-between align-items-center">
-                <strong id="environment-name">Environment: {{ environment|default('Development') }}</strong>
-                <div>
-                    <span class="badge bg-secondary">Version: {{ version|default('1.0.0') }}</span>
-                    <span class="badge bg-dark ms-2">Build: {{ build_id|default('development') }}</span>
-                    <button class="btn btn-sm btn-outline-secondary ms-2" data-bs-toggle="modal" data-bs-target="#versionHistoryModal">
-                        <i class="fas fa-history me-1"></i>Version History
-                    </button>
-                </div>
-            </div>
-        </div>
+<div class="container-fluid">
+  <div class="row mb-4">
+    <div class="col-md-12">
+      <h1>Property Export Verification Dashboard</h1>
+      <p class="lead">Monitor and test the SQL Server connection and property export functionality.</p>
     </div>
-    
-    <!-- Status Cards -->
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="card bg-primary text-white h-100">
-                <div class="card-body d-flex flex-column">
-                    <h5 class="card-title"><i class="fas fa-server me-2"></i>System Status</h5>
-                    <p class="card-text flex-grow-1" id="system-status-card">Ready for verification tests</p>
-                    <div class="mt-auto">
-                        <span class="badge bg-light text-primary" id="system-status-badge">Ready</span>
-                    </div>
-                </div>
-            </div>
+  </div>
+
+  <!-- System Status Cards -->
+  <div class="row">
+    <div class="col-md-3">
+      <div class="card status-card {% if sql_server_status == 'Verified' %}status-success{% elif sql_server_status == 'Not Configured' %}status-danger{% else %}status-warning{% endif %}">
+        <div class="card-header">SQL Server Connection</div>
+        <div class="card-body">
+          <h5 class="card-title">{{ sql_server_status }}</h5>
+          <p class="card-text">{{ connection_details.message if connection_details else 'Connection status not verified' }}</p>
+          <button class="btn btn-sm btn-primary" id="test-connection-btn">Test Connection</button>
         </div>
-        <div class="col-md-3">
-            <div class="card bg-info text-white h-100">
-                <div class="card-body d-flex flex-column">
-                    <h5 class="card-title"><i class="fas fa-database me-2"></i>Database Status</h5>
-                    <p class="card-text flex-grow-1" id="db-status-card">SQL Server connectivity unverified</p>
-                    <div class="mt-auto">
-                        <span class="badge bg-light text-info" id="db-status-badge">Unknown</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card bg-success text-white h-100">
-                <div class="card-body d-flex flex-column">
-                    <h5 class="card-title"><i class="fas fa-cogs me-2"></i>Export Engine</h5>
-                    <p class="card-text flex-grow-1" id="engine-status-card">Ready to process requests</p>
-                    <div class="mt-auto">
-                        <span class="badge bg-light text-success" id="engine-status-badge">Ready</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card bg-warning text-white h-100">
-                <div class="card-body d-flex flex-column">
-                    <h5 class="card-title"><i class="fas fa-shield-alt me-2"></i>Security Status</h5>
-                    <p class="card-text flex-grow-1" id="security-status-card">Windows Authentication</p>
-                    <div class="mt-auto">
-                        <span class="badge bg-light text-warning" id="security-status-badge">Active</span>
-                    </div>
-                </div>
-            </div>
-        </div>
+      </div>
     </div>
-    
-    <!-- Deployment Controls -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card border-primary">
-                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-rocket me-2"></i>Deployment Controls
-                    </h5>
-                    <div>
-                        <span class="badge bg-light text-primary">Last Deployment: {{ last_deployment|default('Not Available') }}</span>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-8">
-                            <div class="mb-3">
-                                <label for="deployment-environment" class="form-label">Target Environment</label>
-                                <select class="form-select" id="deployment-environment">
-                                    <option selected>Development</option>
-                                    <option>Staging</option>
-                                    <option>Production</option>
-                                </select>
-                            </div>
-                            <div class="mb-3">
-                                <label for="deployment-version" class="form-label">Deploy Version</label>
-                                <div class="input-group">
-                                    <input type="text" class="form-control" id="deployment-version" value="{{ version|default('1.0.0') }}">
-                                    <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                        <i class="fas fa-tags"></i>
-                                    </button>
-                                    <ul class="dropdown-menu dropdown-menu-end">
-                                        <li><a class="dropdown-item" href="#">1.0.0 (Current)</a></li>
-                                        <li><a class="dropdown-item" href="#">0.9.5 (Previous)</a></li>
-                                        <li><a class="dropdown-item" href="#">0.9.0</a></li>
-                                        <li><hr class="dropdown-divider"></li>
-                                        <li><a class="dropdown-item" href="#">Show all versions</a></li>
-                                    </ul>
-                                </div>
-                            </div>
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="d-grid">
-                                        <button id="run-pre-deployment-tests" class="btn btn-info mb-2">
-                                            <i class="fas fa-vial me-2"></i>Pre-Deployment Tests
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="d-grid">
-                                        <button id="run-post-deployment-tests" class="btn btn-secondary mb-2">
-                                            <i class="fas fa-clipboard-check me-2"></i>Post-Deployment Tests
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="d-grid gap-2 h-100">
-                                <button id="validate-deployment" class="btn btn-primary btn-lg mb-2">
-                                    <i class="fas fa-check-circle me-2"></i>Validate Deployment
-                                </button>
-                                <button id="execute-deployment" class="btn btn-success btn-lg" disabled>
-                                    <i class="fas fa-rocket me-2"></i>Execute Deployment
-                                </button>
-                                <button id="rollback-deployment" class="btn btn-danger mt-2">
-                                    <i class="fas fa-undo-alt me-2"></i>Rollback Last Deployment
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    <div id="deployment-status" class="mt-3 d-none">
-                        <div class="alert alert-info">
-                            <div class="d-flex align-items-center">
-                                <div class="me-3">
-                                    <i class="fas fa-info-circle fa-2x"></i>
-                                </div>
-                                <div>
-                                    <h5 class="alert-heading">Deployment Status</h5>
-                                    <div id="deployment-message">Waiting for validation...</div>
-                                    <div class="progress mt-2">
-                                        <div id="deployment-progress" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    <div class="col-md-3">
+      <div class="card status-card {% if stored_procedure_status == 'Verified' %}status-success{% elif stored_procedure_status == 'Not Found' %}status-danger{% else %}status-warning{% endif %}">
+        <div class="card-header">Stored Procedure</div>
+        <div class="card-body">
+          <h5 class="card-title">{{ stored_procedure_status }}</h5>
+          <p class="card-text">{{ stored_procedure_details.message if stored_procedure_details else 'Stored procedure not verified' }}</p>
+          <button class="btn btn-sm btn-primary" id="test-sp-btn">Test Procedure</button>
         </div>
+      </div>
     </div>
-    
-    <div class="row">
-        <div class="col-lg-4">
-            <div class="card mb-4">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-database me-2"></i>SQL Server Connection
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">
-                        Status: 
-                        <span id="sql-status-badge" class="badge {% if sql_server_status == 'Verified' %}bg-success{% elif sql_server_status == 'Not Configured' %}bg-danger{% else %}bg-warning{% endif %}">
-                            {{ sql_server_status }}
-                        </span>
-                    </p>
-                    <div id="sql-connection-details" class="mt-3 d-none">
-                        <h6>Connection Details:</h6>
-                        <pre id="sql-connection-json" class="p-3 bg-light rounded"><code>Waiting for verification...</code></pre>
-                    </div>
-                    <div class="d-grid gap-2 mt-3">
-                        <button id="verify-sql-connection" class="btn btn-primary">
-                            <i class="fas fa-sync-alt me-2"></i>Verify Connection
-                        </button>
-                    </div>
-                </div>
-            </div>
+    <div class="col-md-3">
+      <div class="card status-card {% if api_status == 'All Available' %}status-success{% elif api_status == 'Not Configured' %}status-danger{% else %}status-warning{% endif %}">
+        <div class="card-header">API Endpoints</div>
+        <div class="card-body">
+          <h5 class="card-title">{{ api_status }}</h5>
+          <p class="card-text">{{ api_details.message if api_details else 'API endpoints not verified' }}</p>
+          <button class="btn btn-sm btn-primary" id="test-api-btn">Test Endpoints</button>
         </div>
-        
-        <div class="col-lg-4">
-            <div class="card mb-4">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-code me-2"></i>Stored Procedure Test
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <form id="stored-procedure-form">
-                        <div class="mb-3">
-                            <label for="database-name" class="form-label">Database Name</label>
-                            <input type="text" class="form-control" id="database-name" value="web_internet_benton">
-                        </div>
-                        <div class="mb-3">
-                            <label for="num-years" class="form-label">Number of Years</label>
-                            <input type="number" class="form-control" id="num-years" value="1">
-                            <small class="text-muted">Use 1 for minimal testing, -1 for all years</small>
-                        </div>
-                        <div class="mb-3">
-                            <label for="min-bill-years" class="form-label">Minimum Billing Years</label>
-                            <input type="number" class="form-control" id="min-bill-years" value="2">
-                        </div>
-                    </form>
-                    
-                    <div id="stored-procedure-results" class="mt-3 d-none">
-                        <h6>Test Results:</h6>
-                        <div id="sp-status-badge" class="mb-2"></div>
-                        <pre id="sp-results-json" class="p-3 bg-light rounded"><code>Waiting for test results...</code></pre>
-                    </div>
-                    
-                    <div class="d-grid gap-2 mt-3">
-                        <button id="test-stored-procedure" class="btn btn-primary">
-                            <i class="fas fa-vial me-2"></i>Test Stored Procedure
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-lg-4">
-            <div class="card mb-4">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-link me-2"></i>API Endpoints Validation
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">
-                        Validate that all API endpoints required for property export are correctly configured.
-                    </p>
-                    
-                    <div id="api-validation-results" class="mt-3 d-none">
-                        <h6>Validation Results:</h6>
-                        <div id="api-status-badge" class="mb-2"></div>
-                        <pre id="api-results-json" class="p-3 bg-light rounded"><code>Waiting for validation results...</code></pre>
-                    </div>
-                    
-                    <div class="d-grid gap-2 mt-3">
-                        <button id="validate-api-endpoints" class="btn btn-primary">
-                            <i class="fas fa-check me-2"></i>Validate API Endpoints
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
+      </div>
     </div>
-    
-    <div class="row">
-        <div class="col-lg-6">
-            <div class="card mb-4">
-                <div class="card-header bg-success text-white">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-tasks me-2"></i>Pre-Deployment Validation
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">
-                        Run a complete validation suite to ensure all components are ready for deployment.
-                    </p>
-                    
-                    <div id="full-validation-results" class="mt-3 d-none">
-                        <h6>Validation Results:</h6>
-                        <div id="full-status-badge" class="mb-2"></div>
-                        <pre id="full-results-json" class="p-3 bg-light rounded"><code>Waiting for validation results...</code></pre>
-                    </div>
-                    
-                    <div class="d-grid gap-2 mt-3">
-                        <button id="run-full-validation" class="btn btn-success">
-                            <i class="fas fa-check-double me-2"></i>Run Full Validation
-                        </button>
-                    </div>
-                </div>
-            </div>
+    <div class="col-md-3">
+      <div class="card status-card {% if overall_status == 'Ready' %}status-success{% elif overall_status == 'Not Ready' %}status-danger{% else %}status-warning{% endif %}">
+        <div class="card-header">Overall Status</div>
+        <div class="card-body">
+          <h5 class="card-title">{{ overall_status }}</h5>
+          <p class="card-text">{{ overall_message }}</p>
+          <button class="btn btn-sm btn-primary" id="run-all-tests-btn">Run All Tests</button>
         </div>
-        
-        <div class="col-lg-6">
-            <div class="card mb-4">
-                <div class="card-header bg-info text-white">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-flask me-2"></i>Automated Test Suite
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">
-                        Run an automated test suite with multiple scenarios to thoroughly test the property export functionality.
-                    </p>
-                    
-                    <div id="test-suite-results" class="mt-3 d-none">
-                        <h6>Test Suite Results:</h6>
-                        <div id="test-suite-status" class="mb-2"></div>
-                        <div id="test-suite-summary" class="alert alert-info"></div>
-                        
-                        <!-- Test Categories Summary -->
-                        <div id="test-categories" class="mb-3 d-none">
-                            <h6>Test Categories:</h6>
-                            <div class="row g-2">
-                                <div class="col-md-3">
-                                    <div class="card bg-light">
-                                        <div class="card-body py-2">
-                                            <h6 class="card-title">Basic Tests</h6>
-                                            <span id="basic-tests-count" class="badge bg-primary">0/0</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="card bg-light">
-                                        <div class="card-body py-2">
-                                            <h6 class="card-title">Edge Cases</h6>
-                                            <span id="edge-tests-count" class="badge bg-warning">0/0</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="card bg-light">
-                                        <div class="card-body py-2">
-                                            <h6 class="card-title">Performance</h6>
-                                            <span id="perf-tests-count" class="badge bg-info">0/0</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="card bg-light">
-                                        <div class="card-body py-2">
-                                            <h6 class="card-title">Data Integrity</h6>
-                                            <span id="data-tests-count" class="badge bg-success">0/0</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <pre id="test-suite-json" class="p-3 bg-light rounded"><code>Waiting for test results...</code></pre>
-                    </div>
-                    
-                    <div class="d-grid gap-2 mt-3">
-                        <button id="run-test-suite" class="btn btn-info text-white">
-                            <i class="fas fa-vials me-2"></i>Run Test Suite
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
+      </div>
     </div>
-    
-    <!-- Performance Metrics and Logs -->
-    <div class="row">
-        <div class="col-lg-6">
-            <div class="card mb-4">
-                <div class="card-header bg-dark text-white">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-tachometer-alt me-2"></i>Performance Metrics
-                        <button class="btn btn-sm btn-outline-light float-end" id="refresh-metrics">
-                            <i class="fas fa-sync-alt"></i>
-                        </button>
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="card bg-light mb-3">
-                                <div class="card-body p-3">
-                                    <h6 class="card-title">Execution Time</h6>
-                                    <div id="execution-time-chart" style="height: 200px;">
-                                        <div class="d-flex align-items-center justify-content-center h-100 text-muted">
-                                            <span>No data available</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="card bg-light mb-3">
-                                <div class="card-body p-3">
-                                    <h6 class="card-title">Resource Usage</h6>
-                                    <div class="mb-2">
-                                        <label class="form-label mb-0">CPU Usage</label>
-                                        <div class="progress">
-                                            <div id="cpu-usage" class="progress-bar bg-success" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
-                                        </div>
-                                    </div>
-                                    <div class="mb-2">
-                                        <label class="form-label mb-0">Memory Usage</label>
-                                        <div class="progress">
-                                            <div id="memory-usage" class="progress-bar bg-primary" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label class="form-label mb-0">Database Connections</label>
-                                        <div class="progress">
-                                            <div id="db-connections" class="progress-bar bg-info" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-12">
-                            <div class="card bg-light">
-                                <div class="card-body p-3">
-                                    <h6 class="card-title">Recent Test Execution Times</h6>
-                                    <table class="table table-sm table-striped">
-                                        <thead>
-                                            <tr>
-                                                <th>Test Name</th>
-                                                <th>Category</th>
-                                                <th>Status</th>
-                                                <th>Execution Time (ms)</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="execution-time-table">
-                                            <tr>
-                                                <td colspan="4" class="text-center text-muted">No data available</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+  </div>
+  
+  <!-- Verification Actions -->
+  <div class="row mt-4">
+    <div class="col-md-12">
+      <div class="card">
+        <div class="card-header">
+          Advanced Verification Tests
         </div>
-        
-        <div class="col-lg-6">
-            <div class="card mb-4">
-                <div class="card-header bg-dark text-white">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-list-alt me-2"></i>Real-Time Logs
-                        <div class="float-end">
-                            <button class="btn btn-sm btn-outline-light me-1" id="clear-logs">
-                                <i class="fas fa-trash-alt"></i>
-                            </button>
-                            <div class="form-check form-switch d-inline-block ms-2">
-                                <input class="form-check-input" type="checkbox" id="auto-refresh-logs" checked>
-                                <label class="form-check-label text-white" for="auto-refresh-logs">Auto-refresh</label>
-                            </div>
-                        </div>
-                    </h5>
-                </div>
-                <div class="card-body p-0">
-                    <div class="list-group list-group-flush" id="log-container" style="max-height: 400px; overflow-y: auto;">
-                        <div class="list-group-item text-muted text-center">No logs available</div>
-                    </div>
-                </div>
-                <div class="card-footer">
-                    <div class="btn-group w-100">
-                        <button class="btn btn-sm btn-outline-secondary" id="filter-info">Info</button>
-                        <button class="btn btn-sm btn-outline-warning" id="filter-warning">Warning</button>
-                        <button class="btn btn-sm btn-outline-danger" id="filter-error">Error</button>
-                        <button class="btn btn-sm btn-outline-dark active" id="filter-all">All</button>
-                    </div>
-                </div>
-            </div>
+        <div class="card-body verification-actions">
+          <div class="btn-group" role="group">
+            <button class="btn btn-outline-primary test-btn" id="test-pacs-oltp-btn">Test pacs_oltp Connection</button>
+            <button class="btn btn-outline-primary test-btn" id="test-pacs-training-btn">Test pacs_training Connection</button>
+            <button class="btn btn-outline-primary test-btn" id="test-web-internet-benton-btn">Test web_internet_benton Connection</button>
+            <button class="btn btn-outline-primary test-btn" id="test-property-access-btn">Test PropertyAccess Export</button>
+            <button class="btn btn-outline-primary test-btn" id="test-performance-btn">Test Performance (1000 records)</button>
+            <button class="btn btn-outline-primary test-btn" id="test-schema-comparison-btn">Compare Database Schemas</button>
+          </div>
         </div>
+      </div>
     </div>
+  </div>
+
+  <!-- Verification Results -->
+  <div class="row mt-4">
+    <div class="col-md-12">
+      <div class="card">
+        <div class="card-header">
+          Verification Results
+          <button class="btn btn-sm btn-outline-secondary float-right" id="clear-results-btn">Clear Results</button>
+        </div>
+        <div class="card-body">
+          <div class="test-results" id="test-results">
+            {% if last_test_results %}
+              {% for result in last_test_results %}
+                <div class="result-item {% if result.success %}result-success{% else %}result-error{% endif %}">
+                  <h5>{{ result.test_name }}</h5>
+                  <p><strong>Status:</strong> {% if result.success %}Success{% else %}Failed{% endif %}</p>
+                  <p><strong>Message:</strong> {{ result.message }}</p>
+                  {% if result.details %}
+                    <p><strong>Details:</strong></p>
+                    <pre><code>{{ result.details|tojson(indent=2) }}</code></pre>
+                  {% endif %}
+                  <p class="text-muted">{{ result.timestamp }}</p>
+                </div>
+              {% endfor %}
+            {% else %}
+              <div class="alert alert-info">No verification tests have been run yet.</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Logs -->
+  <div class="row mt-4">
+    <div class="col-md-12">
+      <div class="card">
+        <div class="card-header">
+          Recent Logs
+        </div>
+        <div class="card-body">
+          <div class="log-entries" id="log-entries">
+            {% if sync_logs %}
+              {% for log in sync_logs %}
+                <div class="log-entry log-{{ log.level }}">
+                  <strong>{{ log.timestamp }}</strong> [{{ log.level }}] {{ log.component }}: {{ log.message }}
+                </div>
+              {% endfor %}
+            {% else %}
+              <div class="alert alert-info">No logs available.</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Jobs -->
+  <div class="row mt-4 mb-5">
+    <div class="col-md-12">
+      <div class="card">
+        <div class="card-header">
+          Recent Verification Jobs
+        </div>
+        <div class="card-body">
+          <table class="table table-striped">
+            <thead>
+              <tr>
+                <th>Job ID</th>
+                <th>Name</th>
+                <th>Status</th>
+                <th>Start Time</th>
+                <th>End Time</th>
+                <th>Duration</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% if recent_jobs %}
+                {% for job in recent_jobs %}
+                  <tr>
+                    <td>{{ job.job_id[:8] }}</td>
+                    <td>{{ job.name }}</td>
+                    <td>
+                      <span class="badge 
+                        {% if job.status == 'completed' %}badge-success
+                        {% elif job.status == 'failed' %}badge-danger
+                        {% elif job.status == 'running' %}badge-primary
+                        {% elif job.status == 'testing' %}badge-info
+                        {% else %}badge-secondary{% endif %}">
+                        {{ job.status }}
+                      </span>
+                    </td>
+                    <td>{{ job.start_time.strftime('%Y-%m-%d %H:%M:%S') if job.start_time else 'N/A' }}</td>
+                    <td>{{ job.end_time.strftime('%Y-%m-%d %H:%M:%S') if job.end_time else 'N/A' }}</td>
+                    <td>
+                      {% if job.start_time and job.end_time %}
+                        {{ (job.end_time - job.start_time).total_seconds()|round(2) }}s
+                      {% else %}
+                        N/A
+                      {% endif %}
+                    </td>
+                    <td>
+                      <a href="{{ url_for('sync.job_details', job_id=job.job_id) }}" class="btn btn-sm btn-outline-info">Details</a>
+                    </td>
+                  </tr>
+                {% endfor %}
+              {% else %}
+                <tr>
+                  <td colspan="7" class="text-center">No verification jobs found</td>
+                </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
-<!-- Version History Modal -->
-<div class="modal fade" id="versionHistoryModal" tabindex="-1" aria-labelledby="versionHistoryModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title" id="versionHistoryModalLabel">
-                    <i class="fas fa-history me-2"></i>Version History
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div class="table-responsive">
-                    <table class="table table-striped table-hover">
-                        <thead>
-                            <tr>
-                                <th>Version</th>
-                                <th>Build ID</th>
-                                <th>Environment</th>
-                                <th>Deploy Date</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><strong>1.0.0</strong></td>
-                                <td><code>c4fd8ba</code></td>
-                                <td>
-                                    <span class="badge bg-success">Production</span>
-                                    <span class="badge bg-info">Staging</span>
-                                    <span class="badge bg-secondary">Development</span>
-                                </td>
-                                <td>{{ now|default('2025-04-10') }}</td>
-                                <td><span class="badge bg-success">Active</span></td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-primary" disabled>Current</button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>0.9.5</td>
-                                <td><code>a7e2c19</code></td>
-                                <td>
-                                    <span class="badge bg-info">Staging</span>
-                                    <span class="badge bg-secondary">Development</span>
-                                </td>
-                                <td>2025-04-05</td>
-                                <td><span class="badge bg-warning">Superseded</span></td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-secondary version-select" data-version="0.9.5">Select</button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>0.9.0</td>
-                                <td><code>3b8f6e2</code></td>
-                                <td>
-                                    <span class="badge bg-secondary">Development</span>
-                                </td>
-                                <td>2025-04-01</td>
-                                <td><span class="badge bg-danger">Deprecated</span></td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-secondary version-select" data-version="0.9.0">Select</button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                <div class="mt-3 p-3 bg-light rounded">
-                    <h6>1.0.0 Release Notes:</h6>
-                    <ul>
-                        <li>Enhanced verification dashboard with real-time monitoring</li>
-                        <li>Added comprehensive test suite for property export</li>
-                        <li>Integrated Windows Authentication for SQL Server</li>
-                        <li>Improved error handling and logging</li>
-                        <li>Fixed performance issues in large data export scenarios</li>
-                    </ul>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-            </div>
+<!-- Results Modal -->
+<div class="modal fade" id="test-results-modal" tabindex="-1" role="dialog" aria-labelledby="testResultsModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="testResultsModalLabel">Test Results</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div id="modal-results-content">
         </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+      </div>
     </div>
+  </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    $(document).ready(function() {
-        // Verify SQL Server connection
-        $('#verify-sql-connection').click(function() {
-            const button = $(this);
-            button.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Verifying...');
-            
-            $.ajax({
-                url: "{{ url_for('verification.verify_sql_connection') }}",
-                type: "GET",
-                success: function(response) {
-                    button.prop('disabled', false).html('<i class="fas fa-sync-alt me-2"></i>Verify Connection');
-                    
-                    // Update the status badge
-                    const statusBadge = $('#sql-status-badge');
-                    if (response.success) {
-                        statusBadge.removeClass('bg-warning bg-danger').addClass('bg-success').text('Verified');
-                    } else {
-                        statusBadge.removeClass('bg-success bg-warning').addClass('bg-danger').text('Failed');
-                    }
-                    
-                    // Show the details
-                    $('#sql-connection-details').removeClass('d-none');
-                    $('#sql-connection-json').html('<code>' + JSON.stringify(response, null, 2) + '</code>');
-                },
-                error: function() {
-                    button.prop('disabled', false).html('<i class="fas fa-sync-alt me-2"></i>Verify Connection');
-                    alert('Error verifying SQL Server connection');
-                }
-            });
-        });
-        
-        // Test stored procedure
-        $('#test-stored-procedure').click(function() {
-            const button = $(this);
-            button.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Testing...');
-            
-            const databaseName = $('#database-name').val();
-            const numYears = $('#num-years').val();
-            const minBillYears = $('#min-bill-years').val();
-            
-            $.ajax({
-                url: "{{ url_for('verification.test_stored_procedure') }}",
-                type: "GET",
-                data: {
-                    database_name: databaseName,
-                    num_years: numYears,
-                    min_bill_years: minBillYears
-                },
-                success: function(response) {
-                    button.prop('disabled', false).html('<i class="fas fa-vial me-2"></i>Test Stored Procedure');
-                    
-                    // Show the results
-                    $('#stored-procedure-results').removeClass('d-none');
-                    
-                    // Update the status badge
-                    const statusBadge = $('#sp-status-badge');
-                    statusBadge.html('');
-                    if (response.success) {
-                        statusBadge.append('<span class="badge bg-success">Success</span>');
-                    } else {
-                        statusBadge.append('<span class="badge bg-danger">Failed</span>');
-                    }
-                    
-                    $('#sp-results-json').html('<code>' + JSON.stringify(response, null, 2) + '</code>');
-                },
-                error: function() {
-                    button.prop('disabled', false).html('<i class="fas fa-vial me-2"></i>Test Stored Procedure');
-                    alert('Error testing stored procedure');
-                }
-            });
-        });
-        
-        // Validate API endpoints
-        $('#validate-api-endpoints').click(function() {
-            const button = $(this);
-            button.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Validating...');
-            
-            $.ajax({
-                url: "{{ url_for('verification.validate_api_endpoints') }}",
-                type: "GET",
-                success: function(response) {
-                    button.prop('disabled', false).html('<i class="fas fa-check me-2"></i>Validate API Endpoints');
-                    
-                    // Show the results
-                    $('#api-validation-results').removeClass('d-none');
-                    
-                    // Update the status badge
-                    const statusBadge = $('#api-status-badge');
-                    statusBadge.html('');
-                    if (response.success) {
-                        statusBadge.append('<span class="badge bg-success">All Endpoints Valid</span>');
-                    } else {
-                        statusBadge.append('<span class="badge bg-danger">Some Endpoints Missing</span>');
-                    }
-                    
-                    $('#api-results-json').html('<code>' + JSON.stringify(response, null, 2) + '</code>');
-                },
-                error: function() {
-                    button.prop('disabled', false).html('<i class="fas fa-check me-2"></i>Validate API Endpoints');
-                    alert('Error validating API endpoints');
-                }
-            });
-        });
-        
-        // Run full validation
-        $('#run-full-validation').click(function() {
-            const button = $(this);
-            button.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Validating...');
-            
-            $.ajax({
-                url: "{{ url_for('verification.full_validation') }}",
-                type: "GET",
-                success: function(response) {
-                    button.prop('disabled', false).html('<i class="fas fa-check-double me-2"></i>Run Full Validation');
-                    
-                    // Show the results
-                    $('#full-validation-results').removeClass('d-none');
-                    
-                    // Update the status badge
-                    const statusBadge = $('#full-status-badge');
-                    statusBadge.html('');
-                    if (response.overall_status === 'passed') {
-                        statusBadge.append('<span class="badge bg-success">All Checks Passed</span>');
-                    } else {
-                        statusBadge.append('<span class="badge bg-danger">Some Checks Failed</span>');
-                    }
-                    
-                    $('#full-results-json').html('<code>' + JSON.stringify(response, null, 2) + '</code>');
-                },
-                error: function() {
-                    button.prop('disabled', false).html('<i class="fas fa-check-double me-2"></i>Run Full Validation');
-                    alert('Error running full validation');
-                }
-            });
-        });
-        
-        // Run test suite
-        $('#run-test-suite').click(function() {
-            const button = $(this);
-            button.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Running Tests...');
-            
-            $.ajax({
-                url: "{{ url_for('verification.automated_test_suite') }}",
-                type: "GET",
-                success: function(response) {
-                    button.prop('disabled', false).html('<i class="fas fa-vials me-2"></i>Run Test Suite');
-                    
-                    // Show the results
-                    $('#test-suite-results').removeClass('d-none');
-                    
-                    // Update the status badge
-                    const statusBadge = $('#test-suite-status');
-                    statusBadge.html('');
-                    if (response.summary.overall_status === 'passed') {
-                        statusBadge.append('<span class="badge bg-success">All Tests Passed</span>');
-                    } else {
-                        statusBadge.append('<span class="badge bg-danger">Some Tests Failed</span>');
-                    }
-                    
-                    // Update the summary
-                    $('#test-suite-summary').html(`
-                        <strong>Summary:</strong> ${response.summary.passed}/${response.summary.total_tests} tests passed
-                    `);
-                    
-                    // Update test categories summary
-                    $('#test-categories').removeClass('d-none');
-                    
-                    // Process test results by category
-                    const testsByCategory = {
-                        'Basic Parameter Tests': { total: 0, passed: 0 },
-                        'Edge Cases': { total: 0, passed: 0 },
-                        'Performance': { total: 0, passed: 0 },
-                        'Data Integrity': { total: 0, passed: 0 }
-                    };
-                    
-                    // Clear previous execution times
-                    $('#execution-time-table').empty();
-                    
-                    // Process each test
-                    response.tests.forEach(test => {
-                        const category = test.category || 'Other';
-                        
-                        // Count tests by category
-                        if (testsByCategory[category]) {
-                            testsByCategory[category].total++;
-                            if (test.success) {
-                                testsByCategory[category].passed++;
-                            }
-                        }
-                        
-                        // Add to execution time table
-                        $('#execution-time-table').append(`
-                            <tr>
-                                <td>${test.name}</td>
-                                <td>${category}</td>
-                                <td>${test.success ? '<span class="badge bg-success">Pass</span>' : '<span class="badge bg-danger">Fail</span>'}</td>
-                                <td>${test.execution_time ? Math.round(test.execution_time) : 'N/A'}</td>
-                            </tr>
-                        `);
-                        
-                        // Add to logs
-                        addLogEntry({
-                            timestamp: new Date().toISOString(),
-                            level: test.success ? 'INFO' : 'WARNING',
-                            component: 'TestSuite',
-                            message: `${test.name}: ${test.success ? 'Passed' : 'Failed'} - ${test.message}`
-                        });
-                    });
-                    
-                    // Update category badges
-                    $('#basic-tests-count').text(`${testsByCategory['Basic Parameter Tests'].passed}/${testsByCategory['Basic Parameter Tests'].total}`);
-                    $('#edge-tests-count').text(`${testsByCategory['Edge Cases'].passed}/${testsByCategory['Edge Cases'].total}`);
-                    $('#perf-tests-count').text(`${testsByCategory['Performance'].passed}/${testsByCategory['Performance'].total}`);
-                    $('#data-tests-count').text(`${testsByCategory['Data Integrity'].passed}/${testsByCategory['Data Integrity'].total}`);
-                    
-                    // Update system status cards
-                    if (response.summary.overall_status === 'passed') {
-                        $('#system-status-card').text('All tests passed successfully');
-                        $('#system-status-badge').text('Healthy').removeClass('text-primary').addClass('text-success');
-                    } else {
-                        $('#system-status-card').text(`${response.summary.failed} tests failed`);
-                        $('#system-status-badge').text('Warning').removeClass('text-primary').addClass('text-warning');
-                    }
-                    
-                    // Update database status if we have a data integrity test
-                    const dataIntegrityTest = response.tests.find(t => t.category === 'Data Integrity');
-                    if (dataIntegrityTest) {
-                        if (dataIntegrityTest.success) {
-                            $('#db-status-card').text('Connected and verified');
-                            $('#db-status-badge').text('Verified').removeClass('text-info').addClass('text-success');
-                        } else {
-                            $('#db-status-card').text('Connectivity issues detected');
-                            $('#db-status-badge').text('Error').removeClass('text-info').addClass('text-danger');
-                        }
-                    }
-                    
-                    // Show full test results
-                    $('#test-suite-json').html('<code>' + JSON.stringify(response, null, 2) + '</code>');
-                },
-                error: function() {
-                    button.prop('disabled', false).html('<i class="fas fa-vials me-2"></i>Run Test Suite');
-                    alert('Error running test suite');
-                    
-                    // Add error log
-                    addLogEntry({
-                        timestamp: new Date().toISOString(),
-                        level: 'ERROR',
-                        component: 'TestSuite',
-                        message: 'Failed to execute automated test suite'
-                    });
-                }
-            });
-        });
-        
-        // Real-time logs functionality
-        let logEntries = [];
-        
-        function addLogEntry(entry) {
-            logEntries.push(entry);
-            
-            // Format the log entry
-            const timestamp = new Date(entry.timestamp).toLocaleTimeString();
-            let logClass = 'list-group-item-light';
-            let logIcon = 'info-circle';
-            
-            if (entry.level === 'WARNING') {
-                logClass = 'list-group-item-warning';
-                logIcon = 'exclamation-triangle';
-            } else if (entry.level === 'ERROR') {
-                logClass = 'list-group-item-danger';
-                logIcon = 'exclamation-circle';
-            } else if (entry.level === 'SUCCESS') {
-                logClass = 'list-group-item-success';
-                logIcon = 'check-circle';
-            }
-            
-            // Add to log container if auto-refresh is enabled
-            if ($('#auto-refresh-logs').is(':checked')) {
-                // Clear "No logs available" message if it's the first log
-                if ($('#log-container').find('.text-muted').length > 0) {
-                    $('#log-container').empty();
-                }
-                
-                // Add the new log entry
-                $('#log-container').prepend(`
-                    <div class="list-group-item ${logClass} py-1 log-entry" data-level="${entry.level}">
-                        <div class="d-flex align-items-center">
-                            <div class="me-2">
-                                <i class="fas fa-${logIcon}"></i>
-                            </div>
-                            <div class="flex-grow-1">
-                                <div class="d-flex justify-content-between">
-                                    <small class="text-muted">${timestamp}</small>
-                                    <span class="badge bg-secondary">${entry.component}</span>
-                                </div>
-                                <div>${entry.message}</div>
-                            </div>
-                        </div>
-                    </div>
-                `);
-                
-                // Limit the number of visible logs to 100
-                if ($('#log-container .log-entry').length > 100) {
-                    $('#log-container .log-entry').last().remove();
-                }
-            }
+$(document).ready(function() {
+  // Test Connection
+  $('#test-connection-btn').click(function() {
+    runTest('/verification/api/test-connection', 'Testing SQL Server Connection');
+  });
+  
+  // Test Stored Procedure
+  $('#test-sp-btn').click(function() {
+    runTest('/verification/api/test-stored-procedure', 'Testing ExportPropertyAccess Stored Procedure');
+  });
+  
+  // Test API Endpoints
+  $('#test-api-btn').click(function() {
+    runTest('/verification/api/test-api-endpoints', 'Testing API Endpoints');
+  });
+  
+  // Run All Tests
+  $('#run-all-tests-btn').click(function() {
+    runTest('/verification/api/run-all-tests', 'Running All Verification Tests');
+  });
+  
+  // Advanced Tests
+  $('#test-pacs-oltp-btn').click(function() {
+    runTest('/verification/api/test-database-connection?database=pacs_oltp', 'Testing pacs_oltp Connection');
+  });
+  
+  $('#test-pacs-training-btn').click(function() {
+    runTest('/verification/api/test-database-connection?database=pacs_training', 'Testing pacs_training Connection');
+  });
+  
+  $('#test-web-internet-benton-btn').click(function() {
+    runTest('/verification/api/test-database-connection?database=web_internet_benton', 'Testing web_internet_benton Connection');
+  });
+  
+  $('#test-property-access-btn').click(function() {
+    runTest('/verification/api/test-property-access', 'Testing PropertyAccess Export');
+  });
+  
+  $('#test-performance-btn').click(function() {
+    runTest('/verification/api/test-performance', 'Testing Export Performance');
+  });
+  
+  $('#test-schema-comparison-btn').click(function() {
+    runTest('/verification/api/compare-schemas', 'Comparing Database Schemas');
+  });
+  
+  // Clear Results
+  $('#clear-results-btn').click(function() {
+    $('#test-results').html('<div class="alert alert-info">Results cleared</div>');
+  });
+  
+  // Function to run a test and display results
+  function runTest(url, title) {
+    $('#modal-results-content').html('<div class="text-center"><div class="spinner-border" role="status"><span class="sr-only">Loading...</span></div><p class="mt-2">Running test...</p></div>');
+    $('#testResultsModalLabel').text(title);
+    $('#test-results-modal').modal('show');
+    
+    $.ajax({
+      url: url,
+      type: 'GET',
+      dataType: 'json',
+      success: function(response) {
+        let html = '';
+        if (response.success) {
+          html += '<div class="alert alert-success"><strong>Success!</strong> ' + response.message + '</div>';
+        } else {
+          html += '<div class="alert alert-danger"><strong>Error!</strong> ' + response.message + '</div>';
         }
         
-        // Clear logs button
-        $('#clear-logs').click(function() {
-            $('#log-container').html('<div class="list-group-item text-muted text-center">No logs available</div>');
-            logEntries = [];
-        });
+        if (response.details) {
+          html += '<h5>Details:</h5>';
+          html += '<pre><code>' + JSON.stringify(response.details, null, 2) + '</code></pre>';
+        }
         
-        // Log filter buttons
-        $('#filter-info, #filter-warning, #filter-error, #filter-all').click(function() {
-            const filter = $(this).attr('id').replace('filter-', '');
-            
-            // Toggle active state
-            $('.btn-group .active').removeClass('active');
-            $(this).addClass('active');
-            
-            // Apply filter
-            if (filter === 'all') {
-                $('.log-entry').show();
-            } else {
-                $('.log-entry').hide();
-                $(`.log-entry[data-level="${filter.toUpperCase()}"]`).show();
-            }
-        });
+        $('#modal-results-content').html(html);
         
-        // Performance metrics refresh
-        $('#refresh-metrics').click(function() {
-            // Update CPU usage (simulated)
-            const cpuUsage = Math.floor(Math.random() * 40) + 10; // 10-50%
-            $('#cpu-usage').css('width', `${cpuUsage}%`).attr('aria-valuenow', cpuUsage).text(`${cpuUsage}%`);
-            
-            // Update memory usage (simulated)
-            const memoryUsage = Math.floor(Math.random() * 30) + 20; // 20-50%
-            $('#memory-usage').css('width', `${memoryUsage}%`).attr('aria-valuenow', memoryUsage).text(`${memoryUsage}%`);
-            
-            // Update DB connections (simulated)
-            const dbConnections = Math.floor(Math.random() * 8) + 2; // 2-10
-            const dbPercent = dbConnections * 10;
-            $('#db-connections').css('width', `${dbPercent}%`).attr('aria-valuenow', dbConnections).text(dbConnections);
-            
-            // Add log entry
-            addLogEntry({
-                timestamp: new Date().toISOString(),
-                level: 'INFO',
-                component: 'Metrics',
-                message: `Refreshed metrics: CPU ${cpuUsage}%, Memory ${memoryUsage}%, DB Connections ${dbConnections}`
-            });
-        });
+        // Also add to the results section on the page
+        let resultItem = '<div class="result-item ' + (response.success ? 'result-success' : 'result-error') + '">';
+        resultItem += '<h5>' + title + '</h5>';
+        resultItem += '<p><strong>Status:</strong> ' + (response.success ? 'Success' : 'Failed') + '</p>';
+        resultItem += '<p><strong>Message:</strong> ' + response.message + '</p>';
         
-        // Add initial log entry
-        addLogEntry({
-            timestamp: new Date().toISOString(),
-            level: 'INFO',
-            component: 'Verification',
-            message: 'Verification dashboard initialized and ready'
-        });
+        if (response.details) {
+          resultItem += '<p><strong>Details:</strong></p>';
+          resultItem += '<pre><code>' + JSON.stringify(response.details, null, 2) + '</code></pre>';
+        }
         
-        // Deployment controls
-        $('.dropdown-item').click(function(e) {
-            e.preventDefault();
-            const version = $(this).text().split(' ')[0];
-            $('#deployment-version').val(version);
-        });
+        resultItem += '<p class="text-muted">' + new Date().toLocaleString() + '</p>';
+        resultItem += '</div>';
         
-        $('.version-select').click(function() {
-            const version = $(this).data('version');
-            $('#deployment-version').val(version);
-            $('#versionHistoryModal').modal('hide');
-        });
-        
-        $('#validate-deployment').click(function() {
-            const button = $(this);
-            const targetEnv = $('#deployment-environment').val();
-            const version = $('#deployment-version').val();
-            
-            // Show deployment status
-            $('#deployment-status').removeClass('d-none');
-            $('#deployment-message').html(`Validating deployment of version ${version} to ${targetEnv} environment...`);
-            $('#deployment-progress').css('width', '25%');
-            
-            // Disable button during validation
-            button.prop('disabled', true);
-            
-            // Log the validation attempt
-            addLogEntry({
-                timestamp: new Date().toISOString(),
-                level: 'INFO',
-                component: 'Deployment',
-                message: `Validating deployment of version ${version} to ${targetEnv} environment`
-            });
-            
-            // Simulate validation process
-            setTimeout(function() {
-                $('#deployment-progress').css('width', '50%');
-                $('#deployment-message').html(`Running pre-deployment checks...`);
-                
-                // Run the full validation suite
-                $.ajax({
-                    url: "{{ url_for('verification.full_validation') }}",
-                    type: "GET",
-                    success: function(response) {
-                        $('#deployment-progress').css('width', '100%');
-                        
-                        if (response.overall_status === 'passed') {
-                            $('#deployment-message').html(`
-                                <div class="alert alert-success mb-0">
-                                    <i class="fas fa-check-circle me-2"></i>Validation successful! Ready to deploy version ${version} to ${targetEnv}.
-                                </div>
-                            `);
-                            
-                            // Enable the execute deployment button
-                            $('#execute-deployment').prop('disabled', false);
-                            
-                            // Log the successful validation
-                            addLogEntry({
-                                timestamp: new Date().toISOString(),
-                                level: 'SUCCESS',
-                                component: 'Deployment',
-                                message: `Validation successful for version ${version} to ${targetEnv}`
-                            });
-                        } else {
-                            $('#deployment-message').html(`
-                                <div class="alert alert-danger mb-0">
-                                    <i class="fas fa-exclamation-circle me-2"></i>Validation failed! Cannot deploy version ${version} to ${targetEnv}.
-                                    <p>Reason: ${response.failed_tests} tests failed.</p>
-                                </div>
-                            `);
-                            
-                            // Keep the execute deployment button disabled
-                            $('#execute-deployment').prop('disabled', true);
-                            
-                            // Log the failed validation
-                            addLogEntry({
-                                timestamp: new Date().toISOString(),
-                                level: 'ERROR',
-                                component: 'Deployment',
-                                message: `Validation failed for version ${version} to ${targetEnv}: ${response.failed_tests} tests failed`
-                            });
-                        }
-                        
-                        // Re-enable the validate button
-                        button.prop('disabled', false);
-                    },
-                    error: function() {
-                        $('#deployment-progress').css('width', '100%');
-                        $('#deployment-message').html(`
-                            <div class="alert alert-danger mb-0">
-                                <i class="fas fa-exclamation-circle me-2"></i>Validation error! Could not validate deployment.
-                            </div>
-                        `);
-                        
-                        // Keep the execute deployment button disabled
-                        $('#execute-deployment').prop('disabled', true);
-                        
-                        // Re-enable the validate button
-                        button.prop('disabled', false);
-                        
-                        // Log the error
-                        addLogEntry({
-                            timestamp: new Date().toISOString(),
-                            level: 'ERROR',
-                            component: 'Deployment',
-                            message: `Validation error for version ${version} to ${targetEnv}`
-                        });
-                    }
-                });
-            }, 1500);
-        });
-        
-        $('#execute-deployment').click(function() {
-            const button = $(this);
-            const targetEnv = $('#deployment-environment').val();
-            const version = $('#deployment-version').val();
-            
-            // Confirm the deployment
-            if (confirm(`Are you sure you want to deploy version ${version} to ${targetEnv} environment?`)) {
-                // Show deployment status
-                $('#deployment-status').removeClass('d-none');
-                $('#deployment-message').html(`Starting deployment of version ${version} to ${targetEnv} environment...`);
-                $('#deployment-progress').css('width', '10%');
-                
-                // Disable buttons during deployment
-                button.prop('disabled', true);
-                $('#validate-deployment').prop('disabled', true);
-                $('#rollback-deployment').prop('disabled', true);
-                
-                // Log the deployment start
-                addLogEntry({
-                    timestamp: new Date().toISOString(),
-                    level: 'INFO',
-                    component: 'Deployment',
-                    message: `Starting deployment of version ${version} to ${targetEnv} environment`
-                });
-                
-                // Simulate deployment process
-                let progress = 10;
-                const deploymentSteps = [
-                    'Preparing deployment package...',
-                    'Copying files to target environment...',
-                    'Setting up database connections...',
-                    'Configuring environment variables...',
-                    'Starting application services...',
-                    'Running post-deployment tests...',
-                    'Updating service registry...',
-                    'Deployment completed successfully!'
-                ];
-                
-                function simulateDeploymentStep(step) {
-                    if (step >= deploymentSteps.length) {
-                        // Deployment complete
-                        $('#deployment-progress').css('width', '100%');
-                        $('#deployment-message').html(`
-                            <div class="alert alert-success mb-0">
-                                <i class="fas fa-check-circle me-2"></i>${deploymentSteps[deploymentSteps.length - 1]}
-                            </div>
-                        `);
-                        
-                        // Re-enable buttons
-                        $('#validate-deployment').prop('disabled', false);
-                        $('#rollback-deployment').prop('disabled', false);
-                        
-                        // Log the completed deployment
-                        addLogEntry({
-                            timestamp: new Date().toISOString(),
-                            level: 'SUCCESS',
-                            component: 'Deployment',
-                            message: `Deployment of version ${version} to ${targetEnv} completed successfully`
-                        });
-                        
-                        // Update environment banner
-                        if (targetEnv === 'Production') {
-                            $('#environment-name').html(`Environment: <span class="text-success">${targetEnv}</span>`);
-                        } else if (targetEnv === 'Staging') {
-                            $('#environment-name').html(`Environment: <span class="text-info">${targetEnv}</span>`);
-                        } else {
-                            $('#environment-name').html(`Environment: <span class="text-secondary">${targetEnv}</span>`);
-                        }
-                        
-                        return;
-                    }
-                    
-                    // Update progress
-                    progress += Math.floor(90 / deploymentSteps.length);
-                    $('#deployment-progress').css('width', `${progress}%`);
-                    
-                    // Update message
-                    $('#deployment-message').html(deploymentSteps[step]);
-                    
-                    // Log each deployment step
-                    addLogEntry({
-                        timestamp: new Date().toISOString(),
-                        level: 'INFO',
-                        component: 'Deployment',
-                        message: deploymentSteps[step]
-                    });
-                    
-                    // Schedule next step
-                    setTimeout(function() {
-                        simulateDeploymentStep(step + 1);
-                    }, 1500);
-                }
-                
-                // Start the deployment simulation
-                setTimeout(function() {
-                    simulateDeploymentStep(0);
-                }, 1000);
-            }
-        });
-        
-        $('#rollback-deployment').click(function() {
-            const button = $(this);
-            
-            // Confirm the rollback
-            if (confirm('Are you sure you want to roll back the last deployment? This will revert to the previous version.')) {
-                // Show deployment status
-                $('#deployment-status').removeClass('d-none');
-                $('#deployment-message').html('Starting rollback process...');
-                $('#deployment-progress').css('width', '20%');
-                
-                // Disable buttons during rollback
-                button.prop('disabled', true);
-                $('#validate-deployment').prop('disabled', true);
-                $('#execute-deployment').prop('disabled', true);
-                
-                // Log the rollback start
-                addLogEntry({
-                    timestamp: new Date().toISOString(),
-                    level: 'WARNING',
-                    component: 'Deployment',
-                    message: 'Starting rollback of the last deployment'
-                });
-                
-                // Simulate rollback process
-                setTimeout(function() {
-                    $('#deployment-progress').css('width', '60%');
-                    $('#deployment-message').html('Restoring previous version...');
-                    
-                    // Log rollback step
-                    addLogEntry({
-                        timestamp: new Date().toISOString(),
-                        level: 'INFO',
-                        component: 'Deployment',
-                        message: 'Restoring previous version...'
-                    });
-                    
-                    setTimeout(function() {
-                        $('#deployment-progress').css('width', '100%');
-                        $('#deployment-message').html(`
-                            <div class="alert alert-warning mb-0">
-                                <i class="fas fa-exclamation-triangle me-2"></i>Rollback completed successfully. System has been reverted to version 0.9.5.
-                            </div>
-                        `);
-                        
-                        // Re-enable buttons
-                        button.prop('disabled', false);
-                        $('#validate-deployment').prop('disabled', false);
-                        
-                        // Update version in UI
-                        $('#deployment-version').val('0.9.5');
-                        
-                        // Log rollback completion
-                        addLogEntry({
-                            timestamp: new Date().toISOString(),
-                            level: 'SUCCESS',
-                            component: 'Deployment',
-                            message: 'Rollback completed successfully. System has been reverted to version 0.9.5'
-                        });
-                    }, 2000);
-                }, 2000);
-            }
-        });
-        
-        // Pre-deployment Tests Button
-        $('#run-pre-deployment-tests').click(function() {
-            const button = $(this);
-            const targetEnv = $('#deployment-environment').val();
-            const version = $('#deployment-version').val();
-            
-            // Disable button during test execution
-            button.prop('disabled', true);
-            button.html('<i class="fas fa-spinner fa-spin me-2"></i>Running...');
-            
-            // Show deployment status panel
-            $('#deployment-status').removeClass('d-none');
-            $('#deployment-message').html(`Running pre-deployment tests for version ${version} on ${targetEnv} environment...`);
-            $('#deployment-progress').css('width', '25%');
-            
-            // Log the test initiation
-            addLogEntry({
-                timestamp: new Date().toISOString(),
-                level: 'INFO',
-                component: 'Deployment',
-                message: `Starting pre-deployment tests for version ${version} on ${targetEnv}`
-            });
-            
-            // Call the pre-deployment tests API
-            $.ajax({
-                url: "{{ url_for('verification.pre_deployment_tests') }}",
-                type: "GET",
-                data: {
-                    environment: targetEnv,
-                    version: version
-                },
-                success: function(response) {
-                    // Update progress
-                    $('#deployment-progress').css('width', '100%');
-                    
-                    // Display results
-                    let resultHtml = '';
-                    const statusClass = response.summary.overall_status === 'passed' ? 'success' : 
-                                       response.summary.overall_status === 'warning' ? 'warning' : 'danger';
-                    
-                    if (response.summary.deployment_ready) {
-                        resultHtml = `
-                            <div class="alert alert-${statusClass} mb-3">
-                                <h5 class="alert-heading"><i class="fas fa-check-circle me-2"></i>Deployment Ready</h5>
-                                <p>${response.summary.passed}/${response.summary.total_tests} tests passed. System is ready for deployment to ${targetEnv}.</p>
-                                <p>Total execution time: ${(response.summary.execution_time_ms / 1000).toFixed(2)} seconds</p>
-                                
-                                <div class="mt-3">
-                                    <h6>Test Categories:</h6>
-                                    <div class="d-flex flex-wrap gap-2">
-                                        ${Object.entries(response.summary.categories || {}).map(([category, stats]) => 
-                                            `<span class="badge ${stats.success_rate === 100 ? 'bg-success' : stats.success_rate >= 80 ? 'bg-warning' : 'bg-danger'}">
-                                                ${category}: ${stats.passed}/${stats.total} (${stats.success_rate}%)
-                                            </span>`
-                                        ).join('')}
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                        
-                        // Enable the execute deployment button
-                        $('#execute-deployment').prop('disabled', false);
-                    } else {
-                        resultHtml = `
-                            <div class="alert alert-${statusClass} mb-3">
-                                <h5 class="alert-heading"><i class="fas fa-exclamation-triangle me-2"></i>Deployment Blocked</h5>
-                                <p>${response.summary.failed}/${response.summary.total_tests} tests failed (${response.summary.failed_critical} critical). System is not ready for deployment.</p>
-                                <p>Total execution time: ${(response.summary.execution_time_ms / 1000).toFixed(2)} seconds</p>
-                                
-                                <div class="mt-3">
-                                    <h6>Failed Critical Tests:</h6>
-                                    <ul class="mb-2">
-                                        ${response.tests.filter(t => !t.success && t.critical).map(test => 
-                                            `<li>${test.name}: ${test.message}</li>`
-                                        ).join('')}
-                                    </ul>
-                                </div>
-                                
-                                <div class="mt-3">
-                                    <h6>Test Categories:</h6>
-                                    <div class="d-flex flex-wrap gap-2">
-                                        ${Object.entries(response.summary.categories || {}).map(([category, stats]) => 
-                                            `<span class="badge ${stats.success_rate === 100 ? 'bg-success' : stats.success_rate >= 80 ? 'bg-warning' : 'bg-danger'}">
-                                                ${category}: ${stats.passed}/${stats.total} (${stats.success_rate}%)
-                                            </span>`
-                                        ).join('')}
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                        
-                        // Keep the execute deployment button disabled
-                        $('#execute-deployment').prop('disabled', true);
-                    }
-                    
-                    $('#deployment-message').html(resultHtml);
-                    
-                    // Format the full test results for the user
-                    const testTable = `
-                        <div class="mt-4">
-                            <h6>Detailed Test Results:</h6>
-                            <table class="table table-sm table-striped table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Test</th>
-                                        <th>Category</th>
-                                        <th>Status</th>
-                                        <th>Message</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${response.tests.map(test => `
-                                        <tr class="${test.success ? '' : 'table-danger'}">
-                                            <td>${test.name}</td>
-                                            <td>${test.category}</td>
-                                            <td><span class="badge ${test.success ? 'bg-success' : 'bg-danger'}">${test.success ? 'PASS' : 'FAIL'}</span></td>
-                                            <td>${test.message}</td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                    `;
-                    
-                    $('#deployment-message').append(testTable);
-                    
-                    // Log test results
-                    addLogEntry({
-                        timestamp: new Date().toISOString(),
-                        level: response.summary.deployment_ready ? 'SUCCESS' : 'ERROR',
-                        component: 'Deployment',
-                        message: `Pre-deployment tests ${response.summary.deployment_ready ? 'passed' : 'failed'}: ${response.summary.passed}/${response.summary.total_tests} tests passed`
-                    });
-                    
-                    // Re-enable the button
-                    button.prop('disabled', false);
-                    button.html('<i class="fas fa-vial me-2"></i>Pre-Deployment Tests');
-                },
-                error: function(error) {
-                    // Update progress and show error
-                    $('#deployment-progress').css('width', '100%');
-                    $('#deployment-message').html(`
-                        <div class="alert alert-danger">
-                            <i class="fas fa-exclamation-circle me-2"></i>Error running pre-deployment tests. Please check the logs for details.
-                        </div>
-                    `);
-                    
-                    // Log the error
-                    addLogEntry({
-                        timestamp: new Date().toISOString(),
-                        level: 'ERROR',
-                        component: 'Deployment',
-                        message: `Error running pre-deployment tests: ${error.statusText || 'Unknown error'}`
-                    });
-                    
-                    // Re-enable the button
-                    button.prop('disabled', false);
-                    button.html('<i class="fas fa-vial me-2"></i>Pre-Deployment Tests');
-                }
-            });
-        });
-        
-        // Post-deployment Tests Button
-        $('#run-post-deployment-tests').click(function() {
-            const button = $(this);
-            const targetEnv = $('#deployment-environment').val();
-            const version = $('#deployment-version').val();
-            
-            // Disable button during test execution
-            button.prop('disabled', true);
-            button.html('<i class="fas fa-spinner fa-spin me-2"></i>Running...');
-            
-            // Show deployment status panel
-            $('#deployment-status').removeClass('d-none');
-            $('#deployment-message').html(`Running post-deployment tests for version ${version} on ${targetEnv} environment...`);
-            $('#deployment-progress').css('width', '25%');
-            
-            // Log the test initiation
-            addLogEntry({
-                timestamp: new Date().toISOString(),
-                level: 'INFO',
-                component: 'Deployment',
-                message: `Starting post-deployment tests for version ${version} on ${targetEnv}`
-            });
-            
-            // Call the post-deployment tests API
-            $.ajax({
-                url: "{{ url_for('verification.post_deployment_tests') }}",
-                type: "GET",
-                data: {
-                    environment: targetEnv,
-                    version: version
-                },
-                success: function(response) {
-                    // Update progress
-                    $('#deployment-progress').css('width', '100%');
-                    
-                    // Display results
-                    let resultHtml = '';
-                    const statusClass = response.summary.overall_status === 'passed' ? 'success' : 
-                                       response.summary.overall_status === 'warning' ? 'warning' : 'danger';
-                    
-                    if (response.summary.deployment_successful) {
-                        resultHtml = `
-                            <div class="alert alert-${statusClass} mb-3">
-                                <h5 class="alert-heading"><i class="fas fa-check-circle me-2"></i>Deployment Successful</h5>
-                                <p>${response.summary.passed}/${response.summary.total_tests} tests passed. System has been successfully deployed to ${targetEnv}.</p>
-                                <p>Total execution time: ${(response.summary.execution_time_ms / 1000).toFixed(2)} seconds</p>
-                                
-                                <div class="mt-3">
-                                    <h6>Test Categories:</h6>
-                                    <div class="d-flex flex-wrap gap-2">
-                                        ${Object.entries(response.summary.categories || {}).map(([category, stats]) => 
-                                            `<span class="badge ${stats.success_rate === 100 ? 'bg-success' : stats.success_rate >= 80 ? 'bg-warning' : 'bg-danger'}">
-                                                ${category}: ${stats.passed}/${stats.total} (${stats.success_rate}%)
-                                            </span>`
-                                        ).join('')}
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                    } else {
-                        resultHtml = `
-                            <div class="alert alert-${statusClass} mb-3">
-                                <h5 class="alert-heading"><i class="fas fa-exclamation-triangle me-2"></i>Deployment Issues Detected</h5>
-                                <p>${response.summary.failed}/${response.summary.total_tests} tests failed (${response.summary.failed_critical} critical). Review the deployment status immediately.</p>
-                                <p>Total execution time: ${(response.summary.execution_time_ms / 1000).toFixed(2)} seconds</p>
-                                
-                                <div class="mt-3">
-                                    <h6>Failed Critical Tests:</h6>
-                                    <ul class="mb-2">
-                                        ${response.tests.filter(t => !t.success && t.critical).map(test => 
-                                            `<li>${test.name}: ${test.message}</li>`
-                                        ).join('')}
-                                    </ul>
-                                </div>
-                                
-                                <div class="mt-3">
-                                    <h6>Test Categories:</h6>
-                                    <div class="d-flex flex-wrap gap-2">
-                                        ${Object.entries(response.summary.categories || {}).map(([category, stats]) => 
-                                            `<span class="badge ${stats.success_rate === 100 ? 'bg-success' : stats.success_rate >= 80 ? 'bg-warning' : 'bg-danger'}">
-                                                ${category}: ${stats.passed}/${stats.total} (${stats.success_rate}%)
-                                            </span>`
-                                        ).join('')}
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                    }
-                    
-                    $('#deployment-message').html(resultHtml);
-                    
-                    // Format the full test results for the user
-                    const testTable = `
-                        <div class="mt-4">
-                            <h6>Detailed Test Results:</h6>
-                            <table class="table table-sm table-striped table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Test</th>
-                                        <th>Category</th>
-                                        <th>Status</th>
-                                        <th>Message</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${response.tests.map(test => `
-                                        <tr class="${test.success ? '' : 'table-danger'}">
-                                            <td>${test.name}</td>
-                                            <td>${test.category}</td>
-                                            <td><span class="badge ${test.success ? 'bg-success' : 'bg-danger'}">${test.success ? 'PASS' : 'FAIL'}</span></td>
-                                            <td>${test.message}</td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                    `;
-                    
-                    $('#deployment-message').append(testTable);
-                    
-                    // Log test results
-                    addLogEntry({
-                        timestamp: new Date().toISOString(),
-                        level: response.summary.deployment_successful ? 'SUCCESS' : 'ERROR',
-                        component: 'Deployment',
-                        message: `Post-deployment tests ${response.summary.deployment_successful ? 'passed' : 'failed'}: ${response.summary.passed}/${response.summary.total_tests} tests passed`
-                    });
-                    
-                    // Re-enable the button
-                    button.prop('disabled', false);
-                    button.html('<i class="fas fa-clipboard-check me-2"></i>Post-Deployment Tests');
-                },
-                error: function(error) {
-                    // Update progress and show error
-                    $('#deployment-progress').css('width', '100%');
-                    $('#deployment-message').html(`
-                        <div class="alert alert-danger">
-                            <i class="fas fa-exclamation-circle me-2"></i>Error running post-deployment tests. Please check the logs for details.
-                        </div>
-                    `);
-                    
-                    // Log the error
-                    addLogEntry({
-                        timestamp: new Date().toISOString(),
-                        level: 'ERROR',
-                        component: 'Deployment',
-                        message: `Error running post-deployment tests: ${error.statusText || 'Unknown error'}`
-                    });
-                    
-                    // Re-enable the button
-                    button.prop('disabled', false);
-                    button.html('<i class="fas fa-clipboard-check me-2"></i>Post-Deployment Tests');
-                }
-            });
-        });
+        $('#test-results').prepend(resultItem);
+      },
+      error: function() {
+        $('#modal-results-content').html('<div class="alert alert-danger">An error occurred while running the test.</div>');
+      }
     });
+  }
+});
 </script>
 {% endblock %}

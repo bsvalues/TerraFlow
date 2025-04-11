@@ -19,6 +19,14 @@ verification_bp = Blueprint('verification', __name__, url_prefix='/verification'
 def verification_dashboard():
     """Verification dashboard for the property export functionality."""
     sql_server_status = "Not Verified"
+    stored_procedure_status = "Not Verified"
+    api_status = "Not Verified"
+    overall_status = "Not Ready"
+    overall_message = "System needs verification"
+    connection_details = None
+    stored_procedure_details = None
+    api_details = None
+    
     try:
         if SQL_SERVER_CONNECTION_STRING:
             # Check if we have a cached verification result
@@ -26,22 +34,73 @@ def verification_dashboard():
             sql_server_status = "Configured but not verified"
             
             if recent_job and recent_job.error_details:
-                details = recent_job.error_details.get('sql_server_connection', {})
-                if details.get('success', False):
+                conn_details = recent_job.error_details.get('sql_server_connection', {})
+                if conn_details.get('success', False):
                     sql_server_status = "Verified"
+                    connection_details = conn_details
+                
+                sp_details = recent_job.error_details.get('stored_procedure', {})
+                if sp_details:
+                    if sp_details.get('success', False):
+                        stored_procedure_status = "Verified"
+                    elif sp_details.get('stored_procedure_exists', False) is False:
+                        stored_procedure_status = "Not Found"
+                    else:
+                        stored_procedure_status = "Error"
+                    stored_procedure_details = sp_details
+                
+                api_endpoints = recent_job.error_details.get('api_endpoints', {})
+                if api_endpoints:
+                    if api_endpoints.get('success', False):
+                        api_status = "All Available"
+                    else:
+                        api_status = "Some Missing"
+                    api_details = api_endpoints
+                
+                # Determine overall status
+                if (sql_server_status == "Verified" and 
+                    stored_procedure_status == "Verified" and 
+                    api_status == "All Available"):
+                    overall_status = "Ready"
+                    overall_message = "All systems operational and verified"
+                else:
+                    missing_components = []
+                    if sql_server_status != "Verified":
+                        missing_components.append("SQL Server connection")
+                    if stored_procedure_status != "Verified":
+                        missing_components.append("Stored procedure")
+                    if api_status != "All Available":
+                        missing_components.append("API endpoints")
+                    
+                    overall_message = f"System needs verification: {', '.join(missing_components)}"
         else:
             sql_server_status = "Not Configured"
-    except:
-        pass
+            overall_message = "SQL Server connection string not configured"
+    except Exception as e:
+        overall_message = f"Error retrieving verification status: {str(e)}"
     
     # Get deployment information
     version = "1.0.0"
     build_id = "c4fd8ba"
     environment = "Development"
-    last_deployment = "2025-04-10 08:15 AM"
+    last_deployment = "2025-04-11 09:30 AM"
     
     # Get the 5 most recent jobs to determine system status
-    recent_jobs = SyncJob.query.order_by(SyncJob.created_at.desc()).limit(5).all()
+    recent_jobs = SyncJob.query.filter(SyncJob.job_type.in_(['verification', 'property_export', 'property_export_test'])).order_by(SyncJob.created_at.desc()).limit(5).all()
+    
+    # Get recent verification test results
+    last_test_results = []
+    try:
+        tests_job = SyncJob.query.filter_by(job_type='verification_test').order_by(SyncJob.created_at.desc()).first()
+        if tests_job and tests_job.error_details and 'test_results' in tests_job.error_details:
+            last_test_results = tests_job.error_details['test_results']
+    except:
+        pass
+    
+    # Get recent logs
+    sync_logs = SyncLog.query.filter(
+        SyncLog.component.in_(['PropertyExportTest', 'VerificationTest', 'PropertyExport'])
+    ).order_by(SyncLog.created_at.desc()).limit(20).all()
     
     # Get system version from database if available
     try:
@@ -67,6 +126,16 @@ def verification_dashboard():
     
     return render_template('verification/dashboard.html', 
                           sql_server_status=sql_server_status,
+                          stored_procedure_status=stored_procedure_status,
+                          api_status=api_status,
+                          overall_status=overall_status,
+                          overall_message=overall_message,
+                          connection_details=connection_details,
+                          stored_procedure_details=stored_procedure_details,
+                          api_details=api_details,
+                          recent_jobs=recent_jobs,
+                          last_test_results=last_test_results,
+                          sync_logs=sync_logs,
                           version=version,
                           build_id=build_id,
                           environment=environment,
@@ -196,6 +265,322 @@ def full_validation():
     db.session.commit()
     
     return jsonify(results)
+
+# API endpoints for the verification dashboard
+@verification_bp.route('/api/test-connection')
+@login_required
+@role_required('administrator')
+def api_test_connection():
+    """API endpoint for testing SQL Server connection."""
+    success, message, details = PropertyExportVerification.verify_sql_server_connection()
+    return jsonify({
+        'success': success,
+        'message': message,
+        'details': details
+    })
+
+@verification_bp.route('/api/test-stored-procedure')
+@login_required
+@role_required('administrator')
+def api_test_stored_procedure():
+    """API endpoint for testing the stored procedure."""
+    success, message, details = PropertyExportVerification.test_stored_procedure(
+        database_name='web_internet_benton',
+        num_years=1,
+        min_bill_years=2,
+        log_to_db=True,
+        user_id=session.get('user', {}).get('id')
+    )
+    return jsonify({
+        'success': success,
+        'message': message,
+        'details': details
+    })
+
+@verification_bp.route('/api/test-api-endpoints')
+@login_required
+@role_required('administrator')
+def api_test_api_endpoints():
+    """API endpoint for testing API endpoints."""
+    success, message, details = PropertyExportVerification.validate_api_endpoints()
+    return jsonify({
+        'success': success,
+        'message': message,
+        'details': details
+    })
+
+@verification_bp.route('/api/run-all-tests')
+@login_required
+@role_required('administrator')
+def api_run_all_tests():
+    """API endpoint for running all verification tests."""
+    results = PropertyExportVerification.run_pre_deployment_validation()
+    
+    return jsonify({
+        'success': results['overall_status'] == 'passed',
+        'message': f"Pre-deployment validation: {results['overall_status']}",
+        'details': results
+    })
+
+@verification_bp.route('/api/test-database-connection')
+@login_required
+@role_required('administrator')
+def api_test_database_connection():
+    """API endpoint for testing specific database connection."""
+    database = request.args.get('database', 'pacs_oltp')
+    
+    # Construct a connection string for the specific database
+    if SQL_SERVER_CONNECTION_STRING:
+        conn_parts = SQL_SERVER_CONNECTION_STRING.split(';')
+        modified_parts = []
+        
+        for part in conn_parts:
+            if part.upper().startswith('DATABASE='):
+                modified_parts.append(f"DATABASE={database}")
+            else:
+                modified_parts.append(part)
+        
+        modified_conn_string = ';'.join(modified_parts)
+        
+        try:
+            # Connect to SQL Server with the modified connection string
+            conn = pyodbc.connect(modified_conn_string)
+            cursor = conn.cursor()
+            
+            # Get database info
+            cursor.execute("SELECT DB_NAME()")
+            db_name = cursor.fetchone()[0]
+            
+            # Basic schema check if connected
+            if db_name.lower() == database.lower():
+                # Check for a few key tables
+                try:
+                    cursor.execute("""
+                    SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES
+                    WHERE TABLE_TYPE = 'BASE TABLE'
+                    """)
+                    table_count = cursor.fetchone()[0]
+                    
+                    cursor.close()
+                    conn.close()
+                    
+                    return jsonify({
+                        'success': True,
+                        'message': f"Successfully connected to {database} database",
+                        'details': {
+                            'database': db_name,
+                            'table_count': table_count,
+                            'timestamp': datetime.datetime.utcnow().isoformat()
+                        }
+                    })
+                except Exception as e:
+                    return jsonify({
+                        'success': False,
+                        'message': f"Connected to {db_name} but couldn't query schema: {str(e)}",
+                        'details': {
+                            'database': db_name,
+                            'error': str(e)
+                        }
+                    })
+            else:
+                cursor.close()
+                conn.close()
+                return jsonify({
+                    'success': False,
+                    'message': f"Connected to wrong database: expected {database}, got {db_name}",
+                    'details': {
+                        'expected': database,
+                        'actual': db_name
+                    }
+                })
+                
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': f"Failed to connect to {database} database: {str(e)}",
+                'details': {
+                    'error': str(e),
+                    'database': database
+                }
+            })
+    else:
+        return jsonify({
+            'success': False,
+            'message': "SQL Server connection string not configured",
+            'details': {}
+        })
+
+@verification_bp.route('/api/test-property-access')
+@login_required
+@role_required('administrator')
+def api_test_property_access():
+    """API endpoint for testing PropertyAccess export."""
+    success, message, details = PropertyExportVerification.test_stored_procedure(
+        database_name='web_internet_benton',
+        num_years=1,
+        min_bill_years=2,
+        log_to_db=True,
+        user_id=session.get('user', {}).get('id')
+    )
+    return jsonify({
+        'success': success,
+        'message': message,
+        'details': details
+    })
+
+@verification_bp.route('/api/test-performance')
+@login_required
+@role_required('administrator')
+def api_test_performance():
+    """API endpoint for testing export performance with more data."""
+    start_time = datetime.datetime.utcnow()
+    
+    success, message, details = PropertyExportVerification.test_stored_procedure(
+        database_name='web_internet_benton',
+        num_years=3,  # More years = more data
+        min_bill_years=1,  # Lower threshold = more properties
+        log_to_db=True,
+        user_id=session.get('user', {}).get('id')
+    )
+    
+    end_time = datetime.datetime.utcnow()
+    total_duration_ms = int((end_time - start_time).total_seconds() * 1000)
+    
+    return jsonify({
+        'success': success,
+        'message': f"Performance test completed in {total_duration_ms}ms",
+        'details': {
+            'test_details': details,
+            'total_duration_ms': total_duration_ms,
+            'stored_procedure_duration_ms': details.get('execution_time_ms', 0) if success else 0,
+            'overhead_ms': total_duration_ms - (details.get('execution_time_ms', 0) if success else 0)
+        }
+    })
+
+@verification_bp.route('/api/compare-schemas')
+@login_required
+@role_required('administrator')
+def api_compare_schemas():
+    """API endpoint for comparing database schemas between environments."""
+    source_db = request.args.get('source_db', 'pacs_oltp')
+    target_db = request.args.get('target_db', 'pacs_training')
+    
+    # This is a complex operation that would require significant code to implement fully
+    # For now, we'll provide a simplified version that checks for key tables
+    
+    if not SQL_SERVER_CONNECTION_STRING:
+        return jsonify({
+            'success': False,
+            'message': "SQL Server connection string not configured",
+            'details': {}
+        })
+    
+    try:
+        # Create connection strings for both databases
+        conn_parts = SQL_SERVER_CONNECTION_STRING.split(';')
+        source_parts = []
+        target_parts = []
+        
+        for part in conn_parts:
+            if part.upper().startswith('DATABASE='):
+                source_parts.append(f"DATABASE={source_db}")
+                target_parts.append(f"DATABASE={target_db}")
+            else:
+                source_parts.append(part)
+                target_parts.append(part)
+        
+        source_conn_string = ';'.join(source_parts)
+        target_conn_string = ';'.join(target_parts)
+        
+        # Connect to source database
+        source_conn = pyodbc.connect(source_conn_string)
+        source_cursor = source_conn.cursor()
+        
+        # Connect to target database
+        target_conn = pyodbc.connect(target_conn_string)
+        target_cursor = target_conn.cursor()
+        
+        # Get tables in source database
+        source_cursor.execute("""
+        SELECT TABLE_NAME, TABLE_SCHEMA
+        FROM INFORMATION_SCHEMA.TABLES
+        WHERE TABLE_TYPE = 'BASE TABLE'
+        ORDER BY TABLE_SCHEMA, TABLE_NAME
+        """)
+        
+        source_tables = {}
+        for row in source_cursor.fetchall():
+            table_name, schema_name = row
+            if schema_name not in source_tables:
+                source_tables[schema_name] = []
+            source_tables[schema_name].append(table_name)
+        
+        # Get tables in target database
+        target_cursor.execute("""
+        SELECT TABLE_NAME, TABLE_SCHEMA
+        FROM INFORMATION_SCHEMA.TABLES
+        WHERE TABLE_TYPE = 'BASE TABLE'
+        ORDER BY TABLE_SCHEMA, TABLE_NAME
+        """)
+        
+        target_tables = {}
+        for row in target_cursor.fetchall():
+            table_name, schema_name = row
+            if schema_name not in target_tables:
+                target_tables[schema_name] = []
+            target_tables[schema_name].append(table_name)
+        
+        # Compare tables
+        schema_comparison = {}
+        all_schemas = set(list(source_tables.keys()) + list(target_tables.keys()))
+        
+        for schema in all_schemas:
+            schema_comparison[schema] = {
+                'source_tables': source_tables.get(schema, []),
+                'target_tables': target_tables.get(schema, []),
+                'only_in_source': list(set(source_tables.get(schema, [])) - set(target_tables.get(schema, []))),
+                'only_in_target': list(set(target_tables.get(schema, [])) - set(source_tables.get(schema, []))),
+                'in_both': list(set(source_tables.get(schema, [])) & set(target_tables.get(schema, [])))
+            }
+        
+        # Overall stats
+        total_source_tables = sum(len(tables) for tables in source_tables.values())
+        total_target_tables = sum(len(tables) for tables in target_tables.values())
+        total_only_in_source = sum(len(schema_comparison[schema]['only_in_source']) for schema in all_schemas)
+        total_only_in_target = sum(len(schema_comparison[schema]['only_in_target']) for schema in all_schemas)
+        total_in_both = sum(len(schema_comparison[schema]['in_both']) for schema in all_schemas)
+        
+        # Close connections
+        source_cursor.close()
+        source_conn.close()
+        target_cursor.close()
+        target_conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': f"Schema comparison completed: {total_in_both} tables match, {total_only_in_source} only in source, {total_only_in_target} only in target",
+            'details': {
+                'source_database': source_db,
+                'target_database': target_db,
+                'total_source_tables': total_source_tables,
+                'total_target_tables': total_target_tables,
+                'total_only_in_source': total_only_in_source,
+                'total_only_in_target': total_only_in_target,
+                'total_in_both': total_in_both,
+                'schema_comparison': schema_comparison
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f"Failed to compare schemas: {str(e)}",
+            'details': {
+                'source_database': source_db,
+                'target_database': target_db,
+                'error': str(e)
+            }
+        })
 
 @verification_bp.route('/automated-test-suite')
 @login_required
