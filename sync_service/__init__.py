@@ -152,6 +152,15 @@ def register_blueprints(app):
             logger.warning(f"Could not load Data Quality module: {e}")
             has_data_quality = False
         
+        # Try to import integration hub routes
+        try:
+            from sync_service.integration_routes import integration_bp, register_integration_blueprint
+            has_integration_hub = True
+            logger.info("Integration Hub module loaded successfully")
+        except ImportError as e:
+            logger.warning(f"Could not load Integration Hub module: {e}")
+            has_integration_hub = False
+        
         # Register the blueprints
         app.register_blueprint(sync_bp)
         app.register_blueprint(verification_bp)
@@ -160,6 +169,10 @@ def register_blueprints(app):
         if has_data_quality:
             register_data_quality_blueprint(app)
             register_quality_report_blueprint(app)
+            
+        # Register integration hub blueprint if available
+        if has_integration_hub:
+            register_integration_blueprint(app)
         
         # Initialize models
         with app.app_context():
