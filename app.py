@@ -98,14 +98,10 @@ with app.app_context():
     # Register Sync Service blueprint
     try:
         # Import the register_blueprints function from sync_service
-        from sync_service.data_quality_routes import data_quality_bp
-        from sync_service.quality_report_routes import quality_report_bp
         from sync_service import register_blueprints
-        # Register blueprints directly
-        app.register_blueprint(data_quality_bp)
-        app.register_blueprint(quality_report_bp)
         
-        # Also use the original register_blueprints function
+        # Let the sync_service handle all its blueprint registrations
+        # This avoids conflicts when registering the same blueprint multiple times
         if register_blueprints(app):
             logger.info("Sync Service and Verification blueprints registered successfully")
     except ImportError as e:
