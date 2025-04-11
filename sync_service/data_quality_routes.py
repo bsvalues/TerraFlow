@@ -18,8 +18,10 @@ from auth import login_required, permission_required
 from mcp import mcp
 from sync_service.models.data_quality import (
     DataQualityRule, DataQualityIssue, DataQualityReport, 
-    AnomalyDetectionConfig, DataAnomaly
+    AnomalyDetectionConfig, DataAnomaly,
+    DataQualityAlert, DataQualityNotification
 )
+from sync_service.data_quality_notifications import notification_manager, check_data_quality_alerts
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -725,6 +727,312 @@ def calculate_consistency_score():
     except Exception as e:
         logger.error(f"Error calculating consistency score: {str(e)}")
         return 92
+
+# Alert management routes
+@data_quality_bp.route('/alerts')
+@login_required
+def list_alerts():
+    """List all data quality alerts"""
+    try:
+        alerts = DataQualityAlert.query.all()
+        
+        # Get database tables for alert configuration
+        inspector = inspect(db.engine)
+        database_tables = inspector.get_table_names()
+        
+        # Get recent notifications
+        notifications = DataQualityNotification.query.order_by(
+            DataQualityNotification.created_at.desc()
+        ).limit(50).all()
+        
+        return render_template(
+            'data_quality/alerts.html',
+            alerts=alerts,
+            database_tables=database_tables,
+            notifications=notifications
+        )
+    except Exception as e:
+        logger.error(f"Error listing data quality alerts: {str(e)}")
+        return render_template('error.html', message=f"Error listing alerts: {str(e)}")
+
+@data_quality_bp.route('/alert', methods=['POST'])
+@login_required
+@permission_required('data_quality.edit')
+def create_alert():
+    """Create a new data quality alert"""
+    try:
+        data = request.json
+        
+        # Create alert
+        alert = DataQualityAlert(
+            name=data['name'],
+            description=data.get('description', ''),
+            alert_type=data['alert_type'],
+            table_name=data.get('table_name'),
+            field_name=data.get('field_name'),
+            severity_threshold=data.get('severity_threshold', 'warning'),
+            conditions=data['conditions'],
+            recipients=data['recipients'],
+            channels=data['channels'],
+            is_active=data.get('is_active', True),
+            created_by=request.user.id if hasattr(request, 'user') else None
+        )
+        
+        db.session.add(alert)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Alert created successfully',
+            'alert_id': alert.id
+        })
+    except Exception as e:
+        logger.error(f"Error creating data quality alert: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f"Error creating alert: {str(e)}"
+        }), 400
+
+@data_quality_bp.route('/alert/<int:alert_id>', methods=['GET'])
+@login_required
+def get_alert(alert_id):
+    """Get a specific data quality alert"""
+    try:
+        alert = DataQualityAlert.query.get(alert_id)
+        
+        if not alert:
+            return jsonify({
+                'success': False,
+                'message': f"Alert with ID {alert_id} not found"
+            }), 404
+        
+        return jsonify({
+            'success': True,
+            'alert': {
+                'id': alert.id,
+                'name': alert.name,
+                'description': alert.description,
+                'alert_type': alert.alert_type,
+                'table_name': alert.table_name,
+                'field_name': alert.field_name,
+                'severity_threshold': alert.severity_threshold,
+                'conditions': alert.conditions,
+                'recipients': alert.recipients,
+                'channels': alert.channels,
+                'is_active': alert.is_active,
+                'created_at': alert.created_at.strftime('%Y-%m-%d %H:%M:%S')
+            }
+        })
+    except Exception as e:
+        logger.error(f"Error getting data quality alert: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f"Error getting alert: {str(e)}"
+        }), 400
+
+@data_quality_bp.route('/alert/<int:alert_id>', methods=['PUT'])
+@login_required
+@permission_required('data_quality.edit')
+def update_alert(alert_id):
+    """Update a data quality alert"""
+    try:
+        alert = DataQualityAlert.query.get(alert_id)
+        
+        if not alert:
+            return jsonify({
+                'success': False,
+                'message': f"Alert with ID {alert_id} not found"
+            }), 404
+        
+        data = request.json
+        
+        # Update alert
+        alert.name = data['name']
+        alert.description = data.get('description', '')
+        alert.alert_type = data['alert_type']
+        alert.table_name = data.get('table_name')
+        alert.field_name = data.get('field_name')
+        alert.severity_threshold = data.get('severity_threshold', 'warning')
+        alert.conditions = data['conditions']
+        alert.recipients = data['recipients']
+        alert.channels = data['channels']
+        alert.is_active = data.get('is_active', True)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Alert updated successfully'
+        })
+    except Exception as e:
+        logger.error(f"Error updating data quality alert: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f"Error updating alert: {str(e)}"
+        }), 400
+
+@data_quality_bp.route('/alert/<int:alert_id>', methods=['DELETE'])
+@login_required
+@permission_required('data_quality.edit')
+def delete_alert(alert_id):
+    """Delete a data quality alert"""
+    try:
+        alert = DataQualityAlert.query.get(alert_id)
+        
+        if not alert:
+            return jsonify({
+                'success': False,
+                'message': f"Alert with ID {alert_id} not found"
+            }), 404
+        
+        db.session.delete(alert)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Alert deleted successfully'
+        })
+    except Exception as e:
+        logger.error(f"Error deleting data quality alert: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f"Error deleting alert: {str(e)}"
+        }), 400
+
+@data_quality_bp.route('/alert/<int:alert_id>/status', methods=['PUT'])
+@login_required
+@permission_required('data_quality.edit')
+def update_alert_status(alert_id):
+    """Update the active status of a data quality alert"""
+    try:
+        alert = DataQualityAlert.query.get(alert_id)
+        
+        if not alert:
+            return jsonify({
+                'success': False,
+                'message': f"Alert with ID {alert_id} not found"
+            }), 404
+        
+        data = request.json
+        alert.is_active = data.get('is_active', True)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Alert status updated successfully'
+        })
+    except Exception as e:
+        logger.error(f"Error updating alert status: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f"Error updating alert status: {str(e)}"
+        }), 400
+
+@data_quality_bp.route('/notifications', methods=['GET'])
+@login_required
+def get_notifications():
+    """Get recent data quality notifications"""
+    try:
+        # Get query parameters
+        limit = request.args.get('limit', 50, type=int)
+        offset = request.args.get('offset', 0, type=int)
+        
+        # Get notifications
+        query = DataQualityNotification.query.order_by(
+            DataQualityNotification.created_at.desc()
+        )
+        
+        total = query.count()
+        notifications = query.offset(offset).limit(limit).all()
+        
+        # Format response
+        notification_list = []
+        for notification in notifications:
+            notification_list.append({
+                'id': notification.id,
+                'title': notification.title,
+                'message': notification.message[:100] + '...' if len(notification.message) > 100 else notification.message,
+                'severity': notification.severity,
+                'recipient': notification.recipient,
+                'channel': notification.channel,
+                'status': notification.status,
+                'created_at': notification.created_at.strftime('%Y-%m-%d %H:%M:%S')
+            })
+        
+        return jsonify({
+            'success': True,
+            'notifications': notification_list,
+            'total': total,
+            'limit': limit,
+            'offset': offset
+        })
+    except Exception as e:
+        logger.error(f"Error getting data quality notifications: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f"Error getting notifications: {str(e)}"
+        }), 400
+
+@data_quality_bp.route('/notifications/<int:notification_id>', methods=['GET'])
+@login_required
+def get_notification(notification_id):
+    """Get a specific data quality notification"""
+    try:
+        notification = DataQualityNotification.query.get(notification_id)
+        
+        if not notification:
+            return jsonify({
+                'success': False,
+                'message': f"Notification with ID {notification_id} not found"
+            }), 404
+        
+        # Mark as read if not already
+        if not notification.read_at:
+            notification.read_at = datetime.utcnow()
+            db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'notification': {
+                'id': notification.id,
+                'title': notification.title,
+                'message': notification.message,
+                'severity': notification.severity,
+                'recipient': notification.recipient,
+                'channel': notification.channel,
+                'status': notification.status,
+                'created_at': notification.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                'delivered_at': notification.delivered_at.strftime('%Y-%m-%d %H:%M:%S') if notification.delivered_at else None,
+                'read_at': notification.read_at.strftime('%Y-%m-%d %H:%M:%S') if notification.read_at else None
+            }
+        })
+    except Exception as e:
+        logger.error(f"Error getting data quality notification: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f"Error getting notification: {str(e)}"
+        }), 400
+
+@data_quality_bp.route('/check-alerts', methods=['POST'])
+@login_required
+@permission_required('data_quality.edit')
+def run_alert_check():
+    """Manually trigger alert checks"""
+    try:
+        # Run alert check
+        check_data_quality_alerts()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Alert check triggered successfully'
+        })
+    except Exception as e:
+        logger.error(f"Error triggering alert check: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f"Error triggering alert check: {str(e)}"
+        }), 400
 
 def register_data_quality_blueprint(app):
     """Register the data_quality blueprint with the app"""

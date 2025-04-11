@@ -45,6 +45,7 @@ def create_routes():
             from sync_service.app_context import with_app_context
             from sync_service.scheduler import init_scheduler
             from sync_service.notification_system import configure_notification_manager, notification_manager
+            from sync_service.data_quality_notifications import notification_manager as dq_notification_manager, check_data_quality_alerts
             from app import db
             
             # Make sure we run initialization in an app context
@@ -84,9 +85,46 @@ def create_routes():
                         pass
                     return None
             
+            @with_app_context
+            def schedule_data_quality_alerts():
+                try:
+                    # Schedule alert checks every 15 minutes
+                    from apscheduler.triggers.interval import IntervalTrigger
+                    logger.info("Setting up data quality alert checking schedule...")
+                    scheduler = init_scheduler()
+                    
+                    # Add job to check data quality alerts
+                    @with_app_context
+                    def run_data_quality_check():
+                        try:
+                            logger.info("Running scheduled data quality alert check")
+                            check_data_quality_alerts()
+                        except Exception as e:
+                            logger.error(f"Error in scheduled data quality alert check: {str(e)}")
+                    
+                    # Add job to scheduler if it doesn't exist
+                    if not any(job.id == 'check_data_quality_alerts' for job in scheduler.get_jobs()):
+                        scheduler.add_job(
+                            run_data_quality_check,
+                            IntervalTrigger(minutes=15),
+                            id='check_data_quality_alerts',
+                            name='Check Data Quality Alerts',
+                            replace_existing=True
+                        )
+                        logger.info("Data quality alert check scheduled to run every 15 minutes")
+                    
+                    db.session.commit()
+                except Exception as e:
+                    logger.error(f"Error scheduling data quality alerts: {str(e)}")
+                    try:
+                        db.session.rollback()
+                    except:
+                        pass
+            
             # Run each initialization separately with clean transaction state
             initialize_notification_manager()
             scheduler = initialize_scheduler()
+            schedule_data_quality_alerts()
             
         except Exception as e:
             logger.error(f"Error initializing services: {str(e)}")

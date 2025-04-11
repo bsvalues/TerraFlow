@@ -1,0 +1,965 @@
+{% extends "layout.html" %}
+
+{% block title %}Data Quality Alerts{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">
+                Data Quality Alerts
+                <a href="{{ url_for('data_quality.dashboard') }}" class="btn btn-outline-primary float-end">
+                    <i class="bi bi-speedometer2 me-1"></i> Dashboard
+                </a>
+            </h1>
+            
+            <!-- Tabs -->
+            <ul class="nav nav-tabs mb-4" id="alertsTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="configured-tab" data-bs-toggle="tab" data-bs-target="#configured" type="button" role="tab" aria-controls="configured" aria-selected="true">
+                        <i class="bi bi-bell me-1"></i> Configured Alerts
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="notifications-tab" data-bs-toggle="tab" data-bs-target="#notifications" type="button" role="tab" aria-controls="notifications" aria-selected="false">
+                        <i class="bi bi-envelope me-1"></i> Notifications
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="settings-tab" data-bs-toggle="tab" data-bs-target="#settings" type="button" role="tab" aria-controls="settings" aria-selected="false">
+                        <i class="bi bi-gear me-1"></i> Alert Settings
+                    </button>
+                </li>
+            </ul>
+            
+            <!-- Tab Content -->
+            <div class="tab-content" id="alertsTabsContent">
+                <!-- Configured Alerts Tab -->
+                <div class="tab-pane fade show active" id="configured" role="tabpanel" aria-labelledby="configured-tab">
+                    <div class="d-flex justify-content-between mb-3">
+                        <h3>Alert Configurations</h3>
+                        <div>
+                            <button class="btn btn-primary" id="createAlert">
+                                <i class="bi bi-plus-circle"></i> Create Alert
+                            </button>
+                            <button class="btn btn-outline-secondary" id="checkAlertsNow">
+                                <i class="bi bi-play-circle"></i> Check Alerts Now
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Alert List -->
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Table</th>
+                                    <th>Severity</th>
+                                    <th>Status</th>
+                                    <th>Channels</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if alerts %}
+                                    {% for alert in alerts %}
+                                    <tr>
+                                        <td>{{ alert.name }}</td>
+                                        <td>
+                                            {% if alert.alert_type == 'issue' %}
+                                                <span class="badge bg-danger">Issue</span>
+                                            {% elif alert.alert_type == 'anomaly' %}
+                                                <span class="badge bg-warning text-dark">Anomaly</span>
+                                            {% elif alert.alert_type == 'score' %}
+                                                <span class="badge bg-info">Score</span>
+                                            {% elif alert.alert_type == 'trend' %}
+                                                <span class="badge bg-primary">Trend</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ alert.table_name or 'All Tables' }}</td>
+                                        <td>
+                                            {% if alert.severity_threshold == 'info' %}
+                                                <span class="badge bg-info">Info</span>
+                                            {% elif alert.severity_threshold == 'warning' %}
+                                                <span class="badge bg-warning text-dark">Warning</span>
+                                            {% elif alert.severity_threshold == 'error' %}
+                                                <span class="badge bg-danger">Error</span>
+                                            {% elif alert.severity_threshold == 'critical' %}
+                                                <span class="badge bg-dark">Critical</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if alert.is_active %}
+                                                <span class="badge bg-success">Active</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">Disabled</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% for channel in alert.channels %}
+                                                {% if channel == 'email' %}
+                                                    <span class="badge bg-primary"><i class="bi bi-envelope"></i> Email</span>
+                                                {% elif channel == 'sms' %}
+                                                    <span class="badge bg-info"><i class="bi bi-phone"></i> SMS</span>
+                                                {% elif channel == 'slack' %}
+                                                    <span class="badge bg-success"><i class="bi bi-slack"></i> Slack</span>
+                                                {% elif channel == 'in_app' %}
+                                                    <span class="badge bg-secondary"><i class="bi bi-app"></i> In-App</span>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </td>
+                                        <td>
+                                            <div class="btn-group">
+                                                <button class="btn btn-sm btn-outline-primary editAlert" data-alert-id="{{ alert.id }}">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-danger deleteAlert" data-alert-id="{{ alert.id }}">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                                {% if alert.is_active %}
+                                                    <button class="btn btn-sm btn-outline-warning toggleAlert" data-alert-id="{{ alert.id }}" data-active="true">
+                                                        <i class="bi bi-pause-circle"></i>
+                                                    </button>
+                                                {% else %}
+                                                    <button class="btn btn-sm btn-outline-success toggleAlert" data-alert-id="{{ alert.id }}" data-active="false">
+                                                        <i class="bi bi-play-circle"></i>
+                                                    </button>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="7" class="text-center">No alerts configured yet</td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Notifications Tab -->
+                <div class="tab-pane fade" id="notifications" role="tabpanel" aria-labelledby="notifications-tab">
+                    <div class="d-flex justify-content-between mb-3">
+                        <h3>Recent Notifications</h3>
+                        <div>
+                            <button class="btn btn-outline-secondary" id="refreshNotifications">
+                                <i class="bi bi-arrow-clockwise"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Notifications List -->
+                    <div class="list-group" id="notificationsList">
+                        {% if notifications %}
+                            {% for notification in notifications %}
+                                <a href="#" class="list-group-item list-group-item-action notification-item" data-notification-id="{{ notification.id }}">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h5 class="mb-1">
+                                            {% if notification.severity == 'error' or notification.severity == 'critical' %}
+                                                <i class="bi bi-exclamation-triangle-fill text-danger me-1"></i>
+                                            {% elif notification.severity == 'warning' %}
+                                                <i class="bi bi-exclamation-circle-fill text-warning me-1"></i>
+                                            {% else %}
+                                                <i class="bi bi-info-circle-fill text-info me-1"></i>
+                                            {% endif %}
+                                            {{ notification.title }}
+                                        </h5>
+                                        <small class="text-muted">{{ notification.created_at }}</small>
+                                    </div>
+                                    <p class="mb-1">{{ notification.message | truncate(100) }}</p>
+                                    <div class="d-flex">
+                                        <small class="me-2">
+                                            <i class="bi bi-tag-fill"></i> {{ notification.severity }}
+                                        </small>
+                                        <small class="me-2">
+                                            <i class="bi bi-send-fill"></i> {{ notification.channel }}
+                                        </small>
+                                        <small>
+                                            <i class="bi bi-person-fill"></i> {{ notification.recipient }}
+                                        </small>
+                                    </div>
+                                </a>
+                            {% endfor %}
+                        {% else %}
+                            <div class="list-group-item text-center">
+                                <p class="mb-0">No notifications yet</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Settings Tab -->
+                <div class="tab-pane fade" id="settings" role="tabpanel" aria-labelledby="settings-tab">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h4>Alert Thresholds</h4>
+                        </div>
+                        <div class="card-body">
+                            <form id="alertThresholdsForm">
+                                <div class="row">
+                                    <div class="col-md-4 mb-3">
+                                        <label for="qualityScoreThreshold" class="form-label">Quality Score Threshold</label>
+                                        <div class="input-group">
+                                            <input type="number" class="form-control" id="qualityScoreThreshold" min="0" max="100" value="80">
+                                            <span class="input-group-text">%</span>
+                                        </div>
+                                        <div class="form-text">Alert when quality score falls below this threshold</div>
+                                    </div>
+                                    
+                                    <div class="col-md-4 mb-3">
+                                        <label for="anomalyCountThreshold" class="form-label">Anomaly Count Threshold</label>
+                                        <input type="number" class="form-control" id="anomalyCountThreshold" min="1" value="5">
+                                        <div class="form-text">Alert when anomaly count exceeds this threshold</div>
+                                    </div>
+                                    
+                                    <div class="col-md-4 mb-3">
+                                        <label for="trendChangeThreshold" class="form-label">Trend Change Threshold</label>
+                                        <div class="input-group">
+                                            <input type="number" class="form-control" id="trendChangeThreshold" min="1" value="10">
+                                            <span class="input-group-text">%</span>
+                                        </div>
+                                        <div class="form-text">Alert when quality metrics change exceeds this percentage</div>
+                                    </div>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-save me-1"></i> Save Thresholds
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header">
+                            <h4>Notification Channels</h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <div class="card h-100">
+                                        <div class="card-header d-flex justify-content-between align-items-center">
+                                            <h5 class="mb-0">
+                                                <i class="bi bi-envelope me-1"></i> Email Notifications
+                                            </h5>
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="enableEmail" checked>
+                                                <label class="form-check-label" for="enableEmail">Enabled</label>
+                                            </div>
+                                        </div>
+                                        <div class="card-body">
+                                            <form id="emailSettingsForm">
+                                                <div class="mb-3">
+                                                    <label for="emailRecipients" class="form-label">Recipients</label>
+                                                    <input type="text" class="form-control" id="emailRecipients" placeholder="email1@example.com, email2@example.com">
+                                                </div>
+                                                
+                                                <button type="submit" class="btn btn-primary btn-sm">
+                                                    <i class="bi bi-save me-1"></i> Save Email Settings
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6 mb-3">
+                                    <div class="card h-100">
+                                        <div class="card-header d-flex justify-content-between align-items-center">
+                                            <h5 class="mb-0">
+                                                <i class="bi bi-phone me-1"></i> SMS Notifications
+                                            </h5>
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="enableSMS">
+                                                <label class="form-check-label" for="enableSMS">Disabled</label>
+                                            </div>
+                                        </div>
+                                        <div class="card-body">
+                                            <form id="smsSettingsForm">
+                                                <div class="mb-3">
+                                                    <label for="smsRecipients" class="form-label">Phone Numbers</label>
+                                                    <input type="text" class="form-control" id="smsRecipients" placeholder="+1234567890, +0987654321" disabled>
+                                                </div>
+                                                
+                                                <button type="submit" class="btn btn-primary btn-sm" disabled>
+                                                    <i class="bi bi-save me-1"></i> Save SMS Settings
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create/Edit Alert Modal -->
+<div class="modal fade" id="alertModal" tabindex="-1" aria-labelledby="alertModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="alertModalLabel">Create Alert</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="alertForm">
+                    <input type="hidden" id="alertId" name="id" value="">
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="alertName" class="form-label">Alert Name</label>
+                            <input type="text" class="form-control" id="alertName" name="name" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="alertType" class="form-label">Alert Type</label>
+                            <select class="form-select" id="alertType" name="alert_type" required>
+                                <option value="">Select Type</option>
+                                <option value="issue">Data Quality Issue</option>
+                                <option value="anomaly">Data Anomaly</option>
+                                <option value="score">Quality Score</option>
+                                <option value="trend">Quality Trend</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="tableName" class="form-label">Table (Optional)</label>
+                            <select class="form-select" id="tableName" name="table_name">
+                                <option value="">All Tables</option>
+                                {% for table in database_tables %}
+                                <option value="{{ table }}">{{ table }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="fieldName" class="form-label">Field (Optional)</label>
+                            <input type="text" class="form-control" id="fieldName" name="field_name">
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="severityThreshold" class="form-label">Severity Threshold</label>
+                            <select class="form-select" id="severityThreshold" name="severity_threshold" required>
+                                <option value="info">Info</option>
+                                <option value="warning" selected>Warning</option>
+                                <option value="error">Error</option>
+                                <option value="critical">Critical</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="isActive" class="form-label">Status</label>
+                            <div class="form-check form-switch mt-2">
+                                <input class="form-check-input" type="checkbox" id="isActive" name="is_active" checked>
+                                <label class="form-check-label" for="isActive">Active</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Alert Type Specific Conditions -->
+                    <div class="alert-type-fields card mb-3 d-none" id="issueFields">
+                        <div class="card-header">Issue Alert Conditions</div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="issueTimeWindow" class="form-label">Time Window (minutes)</label>
+                                    <input type="number" class="form-control" id="issueTimeWindow" min="5" value="60">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="issueMinCount" class="form-label">Minimum Issue Count</label>
+                                    <input type="number" class="form-control" id="issueMinCount" min="1" value="1">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert-type-fields card mb-3 d-none" id="anomalyFields">
+                        <div class="card-header">Anomaly Alert Conditions</div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="anomalyTimeWindow" class="form-label">Time Window (minutes)</label>
+                                    <input type="number" class="form-control" id="anomalyTimeWindow" min="5" value="60">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="anomalyMinCount" class="form-label">Minimum Anomaly Count</label>
+                                    <input type="number" class="form-control" id="anomalyMinCount" min="1" value="1">
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="anomalyTypes" class="form-label">Anomaly Types</label>
+                                    <select class="form-select" id="anomalyTypes" multiple>
+                                        <option value="value_change" selected>Value Change</option>
+                                        <option value="outlier" selected>Outlier</option>
+                                        <option value="z_score">Z-Score</option>
+                                        <option value="pattern">Pattern</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="minAnomalyScore" class="form-label">Minimum Anomaly Score</label>
+                                    <input type="number" class="form-control" id="minAnomalyScore" min="0" max="1" step="0.1" value="0.5">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert-type-fields card mb-3 d-none" id="scoreFields">
+                        <div class="card-header">Score Alert Conditions</div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="minScore" class="form-label">Minimum Acceptable Score</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" id="minScore" min="0" max="100" value="80">
+                                        <span class="input-group-text">%</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="maxScore" class="form-label">Maximum Score (optional)</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" id="maxScore" min="0" max="100" value="100">
+                                        <span class="input-group-text">%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert-type-fields card mb-3 d-none" id="trendFields">
+                        <div class="card-header">Trend Alert Conditions</div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="thresholdChange" class="form-label">Threshold Change</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" id="thresholdChange" min="1" value="10">
+                                        <span class="input-group-text">%</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="trendTimeWindow" class="form-label">Time Window (minutes)</label>
+                                    <input type="number" class="form-control" id="trendTimeWindow" min="60" value="1440">
+                                    <div class="form-text">Default is 24 hours (1440 minutes)</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card mb-3">
+                        <div class="card-header">Notification Settings</div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="alertRecipients" class="form-label">Recipients</label>
+                                    <input type="text" class="form-control" id="alertRecipients" name="recipients" placeholder="user1, user2, user3" required>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Notification Channels</label>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="channelEmail" checked>
+                                        <label class="form-check-label" for="channelEmail">
+                                            Email
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="channelSMS">
+                                        <label class="form-check-label" for="channelSMS">
+                                            SMS
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="channelSlack">
+                                        <label class="form-check-label" for="channelSlack">
+                                            Slack
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="channelInApp" checked>
+                                        <label class="form-check-label" for="channelInApp">
+                                            In-App
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="alertDescription" class="form-label">Description</label>
+                                <textarea class="form-control" id="alertDescription" name="description" rows="3"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveAlertButton">
+                    <i class="bi bi-save me-1"></i> Save Alert
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Notification Detail Modal -->
+<div class="modal fade" id="notificationModal" tabindex="-1" aria-labelledby="notificationModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="notificationModalLabel">Notification Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <h5 class="notification-title"></h5>
+                <div class="notification-meta mb-3">
+                    <span class="badge severity-badge me-2"></span>
+                    <small class="text-muted notification-time"></small>
+                </div>
+                <p class="notification-message"></p>
+                <hr>
+                <div class="notification-details">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <strong>Recipient:</strong> <span class="notification-recipient"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Channel:</strong> <span class="notification-channel"></span>
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-md-6">
+                            <strong>Status:</strong> <span class="notification-status"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Created:</strong> <span class="notification-created"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $(document).ready(function() {
+        // Alert type change handler
+        $('#alertType').change(function() {
+            // Hide all condition fields
+            $('.alert-type-fields').addClass('d-none');
+            
+            // Show fields for selected alert type
+            const alertType = $(this).val();
+            if (alertType === 'issue') {
+                $('#issueFields').removeClass('d-none');
+            } else if (alertType === 'anomaly') {
+                $('#anomalyFields').removeClass('d-none');
+            } else if (alertType === 'score') {
+                $('#scoreFields').removeClass('d-none');
+            } else if (alertType === 'trend') {
+                $('#trendFields').removeClass('d-none');
+            }
+        });
+        
+        // Create alert button
+        $('#createAlert').click(function() {
+            // Reset form
+            $('#alertForm')[0].reset();
+            $('#alertId').val('');
+            $('#alertModalLabel').text('Create Alert');
+            $('.alert-type-fields').addClass('d-none');
+            $('#alertModal').modal('show');
+        });
+        
+        // Check alerts now button
+        $('#checkAlertsNow').click(function() {
+            $(this).html('<i class="bi bi-hourglass-split"></i> Checking...').prop('disabled', true);
+            
+            $.ajax({
+                url: '/data-quality/check-alerts',
+                type: 'POST',
+                success: function(response) {
+                    if (response.success) {
+                        toastr.success('Alert check triggered successfully');
+                        setTimeout(function() {
+                            location.reload();
+                        }, 2000);
+                    } else {
+                        toastr.error(response.message);
+                        $('#checkAlertsNow').html('<i class="bi bi-play-circle"></i> Check Alerts Now').prop('disabled', false);
+                    }
+                },
+                error: function(xhr) {
+                    toastr.error('Error triggering alert check');
+                    $('#checkAlertsNow').html('<i class="bi bi-play-circle"></i> Check Alerts Now').prop('disabled', false);
+                }
+            });
+        });
+        
+        // Save alert button
+        $('#saveAlertButton').click(function() {
+            // Get form values
+            const alertId = $('#alertId').val();
+            const alertType = $('#alertType').val();
+            const channels = [];
+            if ($('#channelEmail').is(':checked')) channels.push('email');
+            if ($('#channelSMS').is(':checked')) channels.push('sms');
+            if ($('#channelSlack').is(':checked')) channels.push('slack');
+            if ($('#channelInApp').is(':checked')) channels.push('in_app');
+            
+            // Get recipients as array
+            const recipients = $('#alertRecipients').val().split(',').map(item => item.trim()).filter(item => item);
+            
+            // Get alert-type specific conditions
+            let conditions = {};
+            
+            if (alertType === 'issue') {
+                conditions = {
+                    time_window: parseInt($('#issueTimeWindow').val()),
+                    min_count: parseInt($('#issueMinCount').val())
+                };
+            } else if (alertType === 'anomaly') {
+                const anomalyTypes = $('#anomalyTypes').val();
+                conditions = {
+                    time_window: parseInt($('#anomalyTimeWindow').val()),
+                    min_count: parseInt($('#anomalyMinCount').val()),
+                    anomaly_types: anomalyTypes,
+                    min_score: parseFloat($('#minAnomalyScore').val())
+                };
+            } else if (alertType === 'score') {
+                conditions = {
+                    min_score: parseInt($('#minScore').val()),
+                    max_score: parseInt($('#maxScore').val())
+                };
+            } else if (alertType === 'trend') {
+                conditions = {
+                    threshold_change: parseInt($('#thresholdChange').val()),
+                    time_window: parseInt($('#trendTimeWindow').val())
+                };
+            }
+            
+            // Prepare data
+            const data = {
+                name: $('#alertName').val(),
+                description: $('#alertDescription').val(),
+                alert_type: alertType,
+                table_name: $('#tableName').val(),
+                field_name: $('#fieldName').val(),
+                severity_threshold: $('#severityThreshold').val(),
+                conditions: conditions,
+                recipients: recipients,
+                channels: channels,
+                is_active: $('#isActive').is(':checked')
+            };
+            
+            // API endpoint and method
+            let url = '/data-quality/alert';
+            let method = 'POST';
+            
+            if (alertId) {
+                url = `/data-quality/alert/${alertId}`;
+                method = 'PUT';
+            }
+            
+            // Submit form
+            $.ajax({
+                url: url,
+                type: method,
+                contentType: 'application/json',
+                data: JSON.stringify(data),
+                success: function(response) {
+                    if (response.success) {
+                        toastr.success(response.message);
+                        $('#alertModal').modal('hide');
+                        setTimeout(function() {
+                            location.reload();
+                        }, 1000);
+                    } else {
+                        toastr.error(response.message);
+                    }
+                },
+                error: function(xhr) {
+                    let errorMessage = 'Error saving alert';
+                    try {
+                        const response = JSON.parse(xhr.responseText);
+                        if (response.message) {
+                            errorMessage = response.message;
+                        }
+                    } catch (e) {}
+                    
+                    toastr.error(errorMessage);
+                }
+            });
+        });
+        
+        // Edit alert button
+        $('.editAlert').click(function() {
+            const alertId = $(this).data('alert-id');
+            
+            // Fetch alert data
+            $.ajax({
+                url: `/data-quality/alert/${alertId}`,
+                type: 'GET',
+                success: function(response) {
+                    if (response.success) {
+                        const alert = response.alert;
+                        
+                        // Reset form
+                        $('#alertForm')[0].reset();
+                        $('.alert-type-fields').addClass('d-none');
+                        
+                        // Set form values
+                        $('#alertId').val(alert.id);
+                        $('#alertName').val(alert.name);
+                        $('#alertDescription').val(alert.description);
+                        $('#alertType').val(alert.alert_type);
+                        $('#tableName').val(alert.table_name);
+                        $('#fieldName').val(alert.field_name);
+                        $('#severityThreshold').val(alert.severity_threshold);
+                        $('#isActive').prop('checked', alert.is_active);
+                        
+                        // Set recipients
+                        $('#alertRecipients').val(alert.recipients.join(', '));
+                        
+                        // Set channels
+                        $('#channelEmail').prop('checked', alert.channels.includes('email'));
+                        $('#channelSMS').prop('checked', alert.channels.includes('sms'));
+                        $('#channelSlack').prop('checked', alert.channels.includes('slack'));
+                        $('#channelInApp').prop('checked', alert.channels.includes('in_app'));
+                        
+                        // Show alert type specific fields
+                        const alertType = alert.alert_type;
+                        if (alertType === 'issue') {
+                            $('#issueFields').removeClass('d-none');
+                            
+                            // Set issue fields
+                            $('#issueTimeWindow').val(alert.conditions.time_window || 60);
+                            $('#issueMinCount').val(alert.conditions.min_count || 1);
+                            
+                        } else if (alertType === 'anomaly') {
+                            $('#anomalyFields').removeClass('d-none');
+                            
+                            // Set anomaly fields
+                            $('#anomalyTimeWindow').val(alert.conditions.time_window || 60);
+                            $('#anomalyMinCount').val(alert.conditions.min_count || 1);
+                            $('#anomalyTypes').val(alert.conditions.anomaly_types || []);
+                            $('#minAnomalyScore').val(alert.conditions.min_score || 0.5);
+                            
+                        } else if (alertType === 'score') {
+                            $('#scoreFields').removeClass('d-none');
+                            
+                            // Set score fields
+                            $('#minScore').val(alert.conditions.min_score || 80);
+                            $('#maxScore').val(alert.conditions.max_score || 100);
+                            
+                        } else if (alertType === 'trend') {
+                            $('#trendFields').removeClass('d-none');
+                            
+                            // Set trend fields
+                            $('#thresholdChange').val(alert.conditions.threshold_change || 10);
+                            $('#trendTimeWindow').val(alert.conditions.time_window || 1440);
+                        }
+                        
+                        // Update modal title
+                        $('#alertModalLabel').text('Edit Alert');
+                        
+                        // Show modal
+                        $('#alertModal').modal('show');
+                    } else {
+                        toastr.error(response.message);
+                    }
+                },
+                error: function() {
+                    toastr.error('Error fetching alert data');
+                }
+            });
+        });
+        
+        // Delete alert button
+        $('.deleteAlert').click(function() {
+            const alertId = $(this).data('alert-id');
+            
+            if (confirm('Are you sure you want to delete this alert?')) {
+                $.ajax({
+                    url: `/data-quality/alert/${alertId}`,
+                    type: 'DELETE',
+                    success: function(response) {
+                        if (response.success) {
+                            toastr.success(response.message);
+                            setTimeout(function() {
+                                location.reload();
+                            }, 1000);
+                        } else {
+                            toastr.error(response.message);
+                        }
+                    },
+                    error: function() {
+                        toastr.error('Error deleting alert');
+                    }
+                });
+            }
+        });
+        
+        // Toggle alert status
+        $('.toggleAlert').click(function() {
+            const alertId = $(this).data('alert-id');
+            const isActive = $(this).data('active') === true;
+            
+            $.ajax({
+                url: `/data-quality/alert/${alertId}/status`,
+                type: 'PUT',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    is_active: !isActive
+                }),
+                success: function(response) {
+                    if (response.success) {
+                        toastr.success(response.message);
+                        setTimeout(function() {
+                            location.reload();
+                        }, 1000);
+                    } else {
+                        toastr.error(response.message);
+                    }
+                },
+                error: function() {
+                    toastr.error('Error updating alert status');
+                }
+            });
+        });
+        
+        // Fetch notification details
+        $('.notification-item').click(function(e) {
+            e.preventDefault();
+            
+            const notificationId = $(this).data('notification-id');
+            
+            $.ajax({
+                url: `/data-quality/notifications/${notificationId}`,
+                type: 'GET',
+                success: function(response) {
+                    if (response.success) {
+                        const notification = response.notification;
+                        
+                        // Set modal content
+                        $('.notification-title').text(notification.title);
+                        $('.notification-message').text(notification.message);
+                        $('.notification-recipient').text(notification.recipient);
+                        $('.notification-channel').text(notification.channel);
+                        $('.notification-status').text(notification.status);
+                        $('.notification-created').text(notification.created_at);
+                        $('.notification-time').text(notification.created_at);
+                        
+                        // Set severity badge
+                        let badgeClass = 'bg-info';
+                        if (notification.severity === 'warning') {
+                            badgeClass = 'bg-warning text-dark';
+                        } else if (notification.severity === 'error') {
+                            badgeClass = 'bg-danger';
+                        } else if (notification.severity === 'critical') {
+                            badgeClass = 'bg-dark';
+                        }
+                        
+                        $('.severity-badge').attr('class', `badge severity-badge me-2 ${badgeClass}`).text(notification.severity);
+                        
+                        // Show modal
+                        $('#notificationModal').modal('show');
+                    } else {
+                        toastr.error(response.message);
+                    }
+                },
+                error: function() {
+                    toastr.error('Error fetching notification data');
+                }
+            });
+        });
+        
+        // Refresh notifications
+        $('#refreshNotifications').click(function() {
+            $(this).html('<i class="bi bi-hourglass-split"></i> Refreshing...').prop('disabled', true);
+            
+            $.ajax({
+                url: '/data-quality/notifications',
+                type: 'GET',
+                success: function(response) {
+                    if (response.success) {
+                        // Clear current list
+                        $('#notificationsList').empty();
+                        
+                        if (response.notifications.length > 0) {
+                            // Populate new items
+                            response.notifications.forEach(function(notification) {
+                                let iconClass = 'bi-info-circle-fill text-info';
+                                if (notification.severity === 'warning') {
+                                    iconClass = 'bi-exclamation-circle-fill text-warning';
+                                } else if (notification.severity === 'error' || notification.severity === 'critical') {
+                                    iconClass = 'bi-exclamation-triangle-fill text-danger';
+                                }
+                                
+                                const item = `
+                                <a href="#" class="list-group-item list-group-item-action notification-item" data-notification-id="${notification.id}">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h5 class="mb-1">
+                                            <i class="bi ${iconClass} me-1"></i>
+                                            ${notification.title}
+                                        </h5>
+                                        <small class="text-muted">${notification.created_at}</small>
+                                    </div>
+                                    <p class="mb-1">${notification.message}</p>
+                                    <div class="d-flex">
+                                        <small class="me-2">
+                                            <i class="bi bi-tag-fill"></i> ${notification.severity}
+                                        </small>
+                                        <small class="me-2">
+                                            <i class="bi bi-send-fill"></i> ${notification.channel}
+                                        </small>
+                                        <small>
+                                            <i class="bi bi-person-fill"></i> ${notification.recipient}
+                                        </small>
+                                    </div>
+                                </a>
+                                `;
+                                
+                                $('#notificationsList').append(item);
+                            });
+                            
+                            // Reattach click handlers
+                            $('.notification-item').click(function(e) {
+                                // Notification details click handler
+                                // (Same as above)
+                            });
+                        } else {
+                            $('#notificationsList').html(`
+                                <div class="list-group-item text-center">
+                                    <p class="mb-0">No notifications yet</p>
+                                </div>
+                            `);
+                        }
+                        
+                        $('#refreshNotifications').html('<i class="bi bi-arrow-clockwise"></i> Refresh').prop('disabled', false);
+                        toastr.success('Notifications refreshed');
+                    } else {
+                        $('#refreshNotifications').html('<i class="bi bi-arrow-clockwise"></i> Refresh').prop('disabled', false);
+                        toastr.error(response.message);
+                    }
+                },
+                error: function() {
+                    $('#refreshNotifications').html('<i class="bi bi-arrow-clockwise"></i> Refresh').prop('disabled', false);
+                    toastr.error('Error refreshing notifications');
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}
