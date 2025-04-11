@@ -5,282 +5,137 @@ body {
     color: #f0f0f0 !important;
 }
 
-.navbar-dark {
-    background-color: #1e1e1e !important; 
-}
-
-.navbar-brand, .nav-link {
-    color: #ffffff !important;
-}
-
-.nav-link:hover {
+.lead {
     color: #f0f0f0 !important;
-    background-color: rgba(255, 255, 255, 0.1);
 }
 
-.container-fluid {
-    padding: 20px;
+h1, h2, h3, h4, h5, h6 {
+    color: #f0f0f0 !important;
 }
 
-h1, h2, h3, h4, h5, h6, .lead {
-    color: #f0f0f0;
-}
-
+/* Card Styles */
 .card {
-    background-color: #2d2d2d;
-    border: 1px solid #444;
-    margin-bottom: 20px;
-    border-radius: 8px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    background-color: #2d2d2d !important;
+    border: 1px solid #444 !important;
+    margin-bottom: 20px !important;
+    border-radius: 5px !important;
 }
 
 .card-header {
-    background-color: #333;
-    color: #f0f0f0;
-    border-bottom: 1px solid #444;
-    font-weight: 600;
-    padding: 15px;
+    color: white !important;
+    border-bottom: 1px solid #444 !important;
+    font-weight: 600 !important;
+    padding: 10px 15px !important;
 }
 
 .card-body {
-    padding: 20px;
-    color: #f0f0f0;
-}
-
-.card-title {
-    margin-bottom: 15px;
-    font-weight: 600;
-}
-
-/* Status Cards */
-.status-card {
-    height: 100%;
-    transition: all 0.3s ease;
-}
-
-.status-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
-}
-
-/* Status Types */
-.sql-server-card {
-    background-color: #2d2d2d;
-}
-
-.sql-server-card .card-header {
-    background-color: #c33;
-}
-
-.stored-procedure-card {
-    background-color: #2d2d2d;
-}
-
-.stored-procedure-card .card-header {
-    background-color: #aa6500;
-}
-
-.api-endpoints-card {
-    background-color: #2d2d2d;
-}
-
-.api-endpoints-card .card-header {
-    background-color: #446e9b;
-}
-
-.overall-status-card {
-    background-color: #2d2d2d;
-}
-
-.overall-status-card .card-header {
-    background-color: #c33;
-}
-
-.verification-actions {
-    margin-bottom: 20px;
-}
-
-.btn-primary {
-    background-color: #446e9b;
-    border-color: #446e9b;
-}
-
-.btn-primary:hover {
-    background-color: #385a81;
-    border-color: #385a81;
-}
-
-.btn-outline-primary {
-    color: #446e9b;
-    border-color: #446e9b;
-}
-
-.btn-outline-primary:hover {
-    background-color: #446e9b;
-    border-color: #446e9b;
-}
-
-.test-btn {
-    margin: 5px;
-}
-
-.test-results {
-    max-height: 400px;
-    overflow-y: auto;
-}
-
-.result-item {
-    padding: 15px;
-    border-left: 4px solid #555;
-    margin-bottom: 15px;
-    background-color: #333;
-    border-radius: 4px;
-}
-
-.result-success {
-    border-left-color: #28a745;
-}
-
-.result-error {
-    border-left-color: #dc3545;
-}
-
-.log-entry {
-    font-family: monospace;
-    padding: 8px;
-    margin-bottom: 8px;
-    border-radius: 4px;
-    background-color: #333;
-}
-
-.log-INFO {
-    border-left: 4px solid #17a2b8;
-}
-
-.log-ERROR {
-    border-left: 4px solid #dc3545;
-}
-
-.log-WARNING {
-    border-left: 4px solid #ffc107;
-}
-
-pre {
-    background-color: #333;
-    color: #f0f0f0;
-    padding: 15px;
-    border-radius: 4px;
-    overflow-x: auto;
-}
-
-pre code {
-    color: #f0f0f0;
-}
-
-.table {
-    color: #f0f0f0;
-}
-
-.table thead th {
-    background-color: #333;
-    border-bottom: 2px solid #444;
-}
-
-.table td, .table th {
-    border-top: 1px solid #444;
-}
-
-.table-striped tbody tr:nth-of-type(odd) {
-    background-color: #2d2d2d;
-}
-
-.badge-success {
-    background-color: #28a745;
-}
-
-.badge-danger {
-    background-color: #dc3545;
-}
-
-.badge-primary {
-    background-color: #446e9b;
-}
-
-.badge-info {
-    background-color: #17a2b8;
-}
-
-.badge-secondary {
-    background-color: #6c757d;
-}
-
-.alert-info {
-    background-color: #333;
-    color: #f0f0f0;
-    border-color: #446e9b;
-}
-
-.modal-content {
-    background-color: #2d2d2d;
-    border: 1px solid #444;
-}
-
-.modal-header {
-    background-color: #333;
-    border-bottom: 1px solid #444;
-    color: #f0f0f0;
-}
-
-.modal-footer {
-    border-top: 1px solid #444;
-}
-
-.close {
-    color: #f0f0f0;
-}
-
-.close:hover {
-    color: #ffffff;
-}
-
-.float-right {
-    float: right;
-}
-
-/* Footer */
-.footer {
-    background-color: #1e1e1e;
-    border-top: 1px solid #333;
-    padding: 15px 0;
-    color: #f0f0f0;
-}
-
-/* Override any bootstrap light theme classes */
-.bg-light {
+    color: #f0f0f0 !important;
     background-color: #2d2d2d !important;
 }
 
-.text-muted {
-    color: #aaa !important;
+/* Status Card Specific Styles */
+.sql-server-card .card-header {
+    background-color: #c33 !important;
 }
 
-/* Status Colors */
-.not-verified {
-    background-color: #fff3cd;
-    color: #856404;
+.stored-procedure-card .card-header {
+    background-color: #aa6500 !important;
 }
 
-.not-configured {
-    background-color: #f8d7da;
-    color: #721c24;
+.api-endpoints-card .card-header {
+    background-color: #446e9b !important;
 }
 
-.verified {
-    background-color: #d4edda;
-    color: #155724;
+.overall-status-card .card-header {
+    background-color: #c33 !important;
 }
 
-.not-ready {
-    background-color: #f8d7da;
-    color: #721c24;
+/* Override the standard status card styles */
+.card.status-card {
+    margin-bottom: 20px !important;
+}
+
+/* Buttons */
+.btn-primary {
+    background-color: #446e9b !important;
+    border-color: #446e9b !important;
+}
+
+.btn-outline-primary {
+    color: #446e9b !important;
+    border-color: #446e9b !important;
+}
+
+.btn-outline-primary:hover {
+    background-color: #446e9b !important;
+    color: white !important;
+}
+
+/* Tables */
+.table {
+    color: #f0f0f0 !important;
+}
+
+.table thead th {
+    background-color: #333 !important;
+    color: white !important;
+    border-bottom: 2px solid #444 !important;
+}
+
+.table-striped tbody tr:nth-of-type(odd) {
+    background-color: #383838 !important;
+}
+
+.table-striped tbody tr:nth-of-type(even) {
+    background-color: #2d2d2d !important;
+}
+
+/* Alerts and Messages */
+.alert-info {
+    background-color: #333 !important;
+    color: #f0f0f0 !important;
+    border-color: #446e9b !important;
+}
+
+/* Add specific styling for the verification dashboard cards */
+#sql-server-card {
+    background-color: #2d2d2d !important;
+}
+
+#sql-server-card .card-header {
+    background-color: #c33 !important;
+}
+
+#stored-procedure-card {
+    background-color: #2d2d2d !important;
+}
+
+#stored-procedure-card .card-header {
+    background-color: #aa6500 !important;
+}
+
+#api-endpoints-card {
+    background-color: #2d2d2d !important;
+}
+
+#api-endpoints-card .card-header {
+    background-color: #446e9b !important;
+}
+
+#overall-status-card {
+    background-color: #2d2d2d !important;
+}
+
+#overall-status-card .card-header {
+    background-color: #c33 !important;
+}
+
+/* Force the dark theme on all elements */
+.container-fluid {
+    background-color: #1e1e1e !important;
+}
+
+/* Override any light styles */
+.bg-light {
+    background-color: #1e1e1e !important;
 }
