@@ -296,48 +296,34 @@ h3 {
     border-color: #6c757d !important;
 }
 
-/* Table improvements - Using Benton County styling with dark theme */
+/* Table improvements - Using Benton County styling */
 .table {
-    color: #ffffff !important;
-    border-color: #444444 !important;
+    border-color: #dee2e6;
 }
 
 .table-striped tbody tr:nth-of-type(odd) {
-    background-color: #2d2d2d !important;
-}
-
-.table-striped tbody tr:nth-of-type(even) {
-    background-color: #333333 !important;
+    background-color: rgba(0, 0, 0, 0.05);
 }
 
 .table thead th {
-    background-color: #005288 !important; /* Benton County blue */
-    color: #ffffff !important;
+    background-color: #005288; /* Benton County blue */
+    color: #ffffff;
     font-weight: 500;
-    border-bottom: 2px solid #003d66 !important;
+    border-bottom: 2px solid #003d66;
 }
 
-.table-dark, .table-dark > th, .table-dark > td {
-    background-color: #2d2d2d !important;
-    color: #ffffff !important;
-}
-
-/* Modal improvements - Using Benton County styling with dark theme */
+/* Modal improvements - Using Benton County styling */
 .modal-content {
-    background-color: #333333 !important;
-    border: 1px solid #444444 !important;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3) !important;
-    color: #ffffff !important;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.15);
 }
 
 .modal-header {
-    background-color: #005288 !important; /* Benton County blue */
-    color: #ffffff !important;
-    border-bottom: 1px solid #444444 !important;
+    background-color: #005288; /* Benton County blue */
+    color: #ffffff;
+    border-bottom: 1px solid #dee2e6;
 }
 
 .modal-footer {
-    background-color: #2d2d2d !important;
-    border-top: 1px solid #444444 !important;
-    color: #ffffff !important;
+    border-top: 1px solid #dee2e6;
 }
