@@ -1,6 +1,10 @@
-{% extends 'verification/base.html' %}
+{% extends 'layout.html' %}
 
 {% block title %}Property Export Verification Dashboard{% endblock %}
+
+{% block additionalcss %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/verification.css') }}">
+{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
@@ -14,41 +18,41 @@
   <!-- System Status Cards -->
   <div class="row">
     <div class="col-md-3">
-      <div class="card status-card {% if sql_server_status == 'Verified' %}status-success{% elif sql_server_status == 'Not Configured' %}status-danger{% else %}status-warning{% endif %}">
+      <div class="card status-card sql-server-card">
         <div class="card-header">SQL Server Connection</div>
         <div class="card-body">
-          <h5 class="card-title">{{ sql_server_status }}</h5>
-          <p class="card-text">{{ connection_details.message if connection_details else 'Connection status not verified' }}</p>
+          <h5 class="card-title">Not Configured</h5>
+          <p class="card-text">Connection status not verified</p>
           <button class="btn btn-sm btn-primary" id="test-connection-btn">Test Connection</button>
         </div>
       </div>
     </div>
     <div class="col-md-3">
-      <div class="card status-card {% if stored_procedure_status == 'Verified' %}status-success{% elif stored_procedure_status == 'Not Found' %}status-danger{% else %}status-warning{% endif %}">
+      <div class="card status-card stored-procedure-card">
         <div class="card-header">Stored Procedure</div>
         <div class="card-body">
-          <h5 class="card-title">{{ stored_procedure_status }}</h5>
-          <p class="card-text">{{ stored_procedure_details.message if stored_procedure_details else 'Stored procedure not verified' }}</p>
+          <h5 class="card-title">Not Verified</h5>
+          <p class="card-text">Stored procedure not verified</p>
           <button class="btn btn-sm btn-primary" id="test-sp-btn">Test Procedure</button>
         </div>
       </div>
     </div>
     <div class="col-md-3">
-      <div class="card status-card {% if api_status == 'All Available' %}status-success{% elif api_status == 'Not Configured' %}status-danger{% else %}status-warning{% endif %}">
+      <div class="card status-card api-endpoints-card">
         <div class="card-header">API Endpoints</div>
         <div class="card-body">
-          <h5 class="card-title">{{ api_status }}</h5>
-          <p class="card-text">{{ api_details.message if api_details else 'API endpoints not verified' }}</p>
+          <h5 class="card-title">Not Verified</h5>
+          <p class="card-text">API endpoints not verified</p>
           <button class="btn btn-sm btn-primary" id="test-api-btn">Test Endpoints</button>
         </div>
       </div>
     </div>
     <div class="col-md-3">
-      <div class="card status-card {% if overall_status == 'Ready' %}status-success{% elif overall_status == 'Not Ready' %}status-danger{% else %}status-warning{% endif %}">
+      <div class="card status-card overall-status-card">
         <div class="card-header">Overall Status</div>
         <div class="card-body">
-          <h5 class="card-title">{{ overall_status }}</h5>
-          <p class="card-text">{{ overall_message }}</p>
+          <h5 class="card-title">Not Ready</h5>
+          <p class="card-text">SQL Server connection string not configured</p>
           <button class="btn btn-sm btn-primary" id="run-all-tests-btn">Run All Tests</button>
         </div>
       </div>
