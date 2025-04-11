@@ -2,18 +2,18 @@
 
 /* Base theme */
 body {
-    background-color: #1e1e1e !important;
-    color: #ffffff !important;
+    background-color: #f8f9fa !important;
+    color: #333333 !important;
 }
 
 /* Main container and headers */
 .container-fluid {
-    background-color: #1e1e1e !important;
+    background-color: #f8f9fa !important;
     padding: 20px !important;
 }
 
 h1, h2, h3, .lead {
-    color: #ffffff !important;
+    color: #333333 !important;
 }
 
 /* Navbar - Benton County blue */
@@ -21,13 +21,13 @@ h1, h2, h3, .lead {
     background-color: #005288 !important;
 }
 
-/* Status Cards - Dark backgrounds with colored headers */
+/* Status Cards - Light backgrounds with colored headers */
 .card {
-    background-color: #333333 !important;
-    color: #ffffff !important;
-    border: none !important;
+    background-color: #ffffff !important;
+    color: #333333 !important;
+    border: 1px solid #dee2e6 !important;
     margin-bottom: 20px !important;
-    border-radius: 0 !important;
+    border-radius: 4px !important;
 }
 
 .card-header {
@@ -35,24 +35,24 @@ h1, h2, h3, .lead {
     font-weight: bold !important;
     color: white !important;
     border-radius: 0 !important;
-    border: none !important;
+    border-bottom: 1px solid #dee2e6 !important;
 }
 
 .card-body {
-    background-color: #2d2d2d !important;
-    color: white !important;
+    background-color: #ffffff !important;
+    color: #333333 !important;
     padding: 15px !important;
     border: none !important;
 }
 
 /* Card titles and text */
 .card-title {
-    color: white !important;
+    color: #333333 !important;
     font-weight: bold !important;
 }
 
 .card-text {
-    color: white !important;
+    color: #333333 !important;
 }
 
 /* Status Card Headers - Colors matching the image */
