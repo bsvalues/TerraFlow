@@ -1,141 +1,202 @@
 /* Verification Dashboard Styles */
 
+/* Main layout styles */
 body {
-    background-color: #1e1e1e !important;
-    color: #f0f0f0 !important;
+    background-color: #222222 !important;
+    color: #ffffff !important;
 }
 
-.lead {
-    color: #f0f0f0 !important;
+.container, .container-fluid {
+    background-color: #222222 !important;
 }
 
-h1, h2, h3, h4, h5, h6 {
-    color: #f0f0f0 !important;
+/* Navigation bar */
+.navbar {
+    background-color: #005288 !important; /* Benton County blue */
 }
 
-/* Card Styles */
-.card {
-    background-color: #2d2d2d !important;
-    border: 1px solid #444 !important;
+/* Dashboard title and description */
+h1, .lead {
+    color: #ffffff !important;
+}
+
+/* Status Cards Layout - 4 columns in a row */
+.status-card {
+    height: 100% !important;
     margin-bottom: 20px !important;
-    border-radius: 5px !important;
+    border: none !important;
+    border-radius: 0 !important;
 }
 
-.card-header {
+/* Status Card Headers */
+#sql-server-card .card-header {
+    background-color: #d9534f !important; /* Red */
     color: white !important;
-    border-bottom: 1px solid #444 !important;
-    font-weight: 600 !important;
+    border-radius: 0 !important;
     padding: 10px 15px !important;
+    font-weight: bold !important;
+    border: none !important;
 }
 
+#stored-procedure-card .card-header {
+    background-color: #f0ad4e !important; /* Orange/Yellow */
+    color: white !important;
+    border-radius: 0 !important;
+    padding: 10px 15px !important;
+    font-weight: bold !important;
+    border: none !important;
+}
+
+#api-endpoints-card .card-header {
+    background-color: #5bc0de !important; /* Blue */
+    color: white !important;
+    border-radius: 0 !important;
+    padding: 10px 15px !important;
+    font-weight: bold !important;
+    border: none !important;
+}
+
+#overall-status-card .card-header {
+    background-color: #d9534f !important; /* Red */
+    color: white !important;
+    border-radius: 0 !important;
+    padding: 10px 15px !important;
+    font-weight: bold !important;
+    border: none !important;
+}
+
+/* Card Bodies */
 .card-body {
-    color: #f0f0f0 !important;
-    background-color: #2d2d2d !important;
+    background-color: #333333 !important;
+    color: white !important;
+    padding: 15px !important;
 }
 
-/* Status Card Specific Styles */
-.sql-server-card .card-header {
-    background-color: #c33 !important;
+.card-title {
+    color: white !important;
+    font-weight: bold !important;
+    margin-bottom: 10px !important;
 }
 
-.stored-procedure-card .card-header {
-    background-color: #aa6500 !important;
+.card-text {
+    color: white !important;
+    margin-bottom: 15px !important;
 }
 
-.api-endpoints-card .card-header {
-    background-color: #446e9b !important;
+/* Section Headers - Blue background */
+.card-header {
+    background-color: #333333 !important;
 }
 
-.overall-status-card .card-header {
-    background-color: #c33 !important;
+.card .card-header:contains("Advanced Verification Tests"),
+.card .card-header:contains("Verification Results"),
+.card .card-header:contains("Recent Logs"),
+.card .card-header:contains("Recent Verification Jobs") {
+    background-color: #005288 !important; /* Benton County blue */
+    color: white !important;
+    font-weight: bold !important;
 }
 
-/* Override the standard status card styles */
-.card.status-card {
-    margin-bottom: 20px !important;
+/* Override all card backgrounds to dark */
+.card {
+    background-color: #333333 !important;
+    border: none !important;
+    margin-bottom: 15px !important;
 }
 
-/* Buttons */
+/* Section specific styles */
+#advanced-verification-section .card-header,
+#verification-results-section .card-header,
+#logs-section .card-header,
+#jobs-section .card-header {
+    background-color: #005288 !important; /* Benton County blue */
+}
+
+/* Button styles */
 .btn-primary {
-    background-color: #446e9b !important;
-    border-color: #446e9b !important;
+    background-color: #5bc0de !important; /* Blue */
+    border-color: #46b8da !important;
+    color: white !important;
 }
 
 .btn-outline-primary {
-    color: #446e9b !important;
-    border-color: #446e9b !important;
+    color: white !important;
+    border-color: #5bc0de !important;
+    background-color: transparent !important;
 }
 
 .btn-outline-primary:hover {
-    background-color: #446e9b !important;
+    background-color: #5bc0de !important;
     color: white !important;
 }
 
 /* Tables */
 .table {
-    color: #f0f0f0 !important;
+    color: white !important;
 }
 
 .table thead th {
-    background-color: #333 !important;
+    background-color: #333333 !important;
     color: white !important;
-    border-bottom: 2px solid #444 !important;
+    border-color: #444444 !important;
+}
+
+.table tbody td {
+    color: white !important;
 }
 
 .table-striped tbody tr:nth-of-type(odd) {
-    background-color: #383838 !important;
-}
-
-.table-striped tbody tr:nth-of-type(even) {
     background-color: #2d2d2d !important;
 }
 
-/* Alerts and Messages */
 .alert-info {
-    background-color: #333 !important;
-    color: #f0f0f0 !important;
-    border-color: #446e9b !important;
+    background-color: #333333 !important;
+    color: white !important;
+    border-color: #444444 !important;
 }
 
-/* Add specific styling for the verification dashboard cards */
-#sql-server-card {
-    background-color: #2d2d2d !important;
+/* Override for any other elements */
+.text-dark, .text-body {
+    color: white !important;
 }
 
-#sql-server-card .card-header {
-    background-color: #c33 !important;
-}
-
-#stored-procedure-card {
-    background-color: #2d2d2d !important;
-}
-
-#stored-procedure-card .card-header {
-    background-color: #aa6500 !important;
-}
-
-#api-endpoints-card {
-    background-color: #2d2d2d !important;
-}
-
-#api-endpoints-card .card-header {
-    background-color: #446e9b !important;
-}
-
-#overall-status-card {
-    background-color: #2d2d2d !important;
-}
-
-#overall-status-card .card-header {
-    background-color: #c33 !important;
-}
-
-/* Force the dark theme on all elements */
-.container-fluid {
-    background-color: #1e1e1e !important;
-}
-
-/* Override any light styles */
 .bg-light {
-    background-color: #1e1e1e !important;
+    background-color: #333333 !important;
+}
+
+/* Fix for any special components */
+.modal-content {
+    background-color: #333333 !important;
+    color: white !important;
+}
+
+.modal-header, .modal-footer {
+    background-color: #444444 !important;
+    border-color: #555555 !important;
+}
+
+/* Direct targeting specific elements */
+.card-header:nth-of-type(1) {
+    background-color: #005288 !important;
+}
+
+.card .card-header {
+    border-bottom: none !important;
+}
+
+/* Added specific section header classes */
+.verification-section-header {
+    background-color: #005288 !important;
+    color: white !important;
+    padding: 10px 15px !important;
+    margin-bottom: 0 !important;
+    font-weight: bold !important;
+}
+
+/* Directly target verification headers */
+div.card:nth-of-type(3) .card-header,
+div.card:nth-of-type(4) .card-header,
+div.card:nth-of-type(5) .card-header,
+div.card:nth-of-type(6) .card-header {
+    background-color: #005288 !important;
 }
