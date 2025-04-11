@@ -116,7 +116,7 @@ def clear_test_data():
         
         # Delete anomalies
         anomaly_count = DataAnomaly.query.filter(
-            DataAnomaly.created_at >= one_hour_ago
+            DataAnomaly.detected_at >= one_hour_ago
         ).delete()
         
         db.session.commit()
