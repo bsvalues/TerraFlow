@@ -503,3 +503,13 @@ def dashboard_data():
 def template_format_date(timestamp):
     """Template filter to format dates"""
     return format_date(timestamp)
+
+@knowledge_bp.app_template_filter('timestamp_to_date')
+def timestamp_to_date(timestamp):
+    """Template filter to convert timestamp to date"""
+    if not timestamp:
+        return "Unknown"
+    try:
+        return datetime.datetime.fromtimestamp(float(timestamp)).strftime('%b %d, %Y %H:%M')
+    except (ValueError, TypeError):
+        return "Invalid date"
