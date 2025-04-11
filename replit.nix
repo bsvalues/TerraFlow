@@ -1,5 +1,6 @@
 {pkgs}: {
   deps = [
+    pkgs.geckodriver
     pkgs.pango
     pkgs.harfbuzz
     pkgs.glib
