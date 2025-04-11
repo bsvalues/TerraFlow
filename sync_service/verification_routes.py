@@ -124,6 +124,10 @@ def verification_dashboard():
         # If we can't get version info from database, use defaults
         pass
     
+    # Get current year for footer
+    import datetime
+    current_year = datetime.datetime.now().year
+    
     return render_template('verification/dashboard.html', 
                           sql_server_status=sql_server_status,
                           stored_procedure_status=stored_procedure_status,
@@ -138,9 +142,9 @@ def verification_dashboard():
                           sync_logs=sync_logs,
                           version=version,
                           build_id=build_id,
+                          now=current_year,
                           environment=environment,
-                          last_deployment=last_deployment,
-                          now=datetime.datetime.utcnow().strftime('%Y-%m-%d'))
+                          last_deployment=last_deployment)
 
 @verification_bp.route('/verify-sql-connection')
 @login_required
