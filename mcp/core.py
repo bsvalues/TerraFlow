@@ -74,7 +74,7 @@ class MCP:
         # Initialize the default system master prompt
         self.default_master_prompt = self.master_prompt_manager.get_default_system_prompt()
         
-        logger.info("MCP initialized with Agent-to-Agent protocol and experience buffer support")
+        logger.info("MCP initialized with Agent-to-Agent protocol, experience buffer, and master prompt system support")
     
     def register_agent(self, agent_id: str, agent_instance) -> bool:
         """Register an agent with the MCP"""
@@ -328,15 +328,15 @@ class MCP:
 
     def inject_protocol_handler(self) -> None:
         """
-        Inject the protocol handler into all registered agents
+        Inject the protocol into all registered agents
         
-        This method provides each agent with a reference to the protocol handler,
+        This method provides each agent with a reference to the protocol,
         enabling them to use the Agent-to-Agent communication functionality.
         """
         for agent_id, agent in self.agents.items():
-            # Add protocol handler to agent if it has the proper interface
+            # Add protocol to agent if it has the proper interface
             if hasattr(agent, 'send_query') and hasattr(agent, 'send_inform') and hasattr(agent, 'send_request'):
-                # Inject the protocol handler into the agent's methods
+                # Inject the protocol into the agent's methods
                 agent.send_query.__defaults__ = agent.send_query.__defaults__[:-1] + (self.protocol,)
                 agent.send_inform.__defaults__ = agent.send_inform.__defaults__[:-1] + (self.protocol,)
                 agent.send_request.__defaults__ = agent.send_request.__defaults__[:-1] + (self.protocol,)
@@ -476,7 +476,7 @@ class MCP:
             return None
         
         try:
-            conversation_id = self.protocol_handler.create_conversation(
+            conversation_id = self.protocol.create_conversation(
                 initiator_id=initiator_id,
                 responder_id=responder_id,
                 topic=topic
@@ -499,13 +499,44 @@ class MCP:
             Conversation data if found, None otherwise
         """
         try:
-            conversation = self.protocol_handler.get_conversation(conversation_id)
+            conversation = self.protocol.get_conversation(conversation_id)
             if conversation:
                 return conversation.to_dict()
             return None
         except Exception as e:
             logger.error(f"Error getting conversation {conversation_id}: {str(e)}")
             return None
+    
+    def distribute_master_prompt(self, prompt_id: Optional[str] = None) -> bool:
+        """
+        Distribute a master prompt to all registered agents
+        
+        This is a centralized function to broadcast a specific master prompt 
+        to all agents, ensuring system-wide consistency in agent behavior
+        and coordination.
+        
+        Args:
+            prompt_id: ID of the prompt to distribute (default: the system default prompt)
+            
+        Returns:
+            True if distribution was successful, False otherwise
+        """
+        try:
+            # Use default prompt if none specified
+            if prompt_id is None:
+                prompt = self.default_master_prompt
+            else:
+                prompt = self.master_prompt_manager.get_prompt(prompt_id)
+            
+            # Register all agents for this prompt
+            for agent_id in self.agents.keys():
+                self.master_prompt_manager.register_agent(agent_id, prompt.prompt_id)
+            
+            logger.info(f"Distributed master prompt {prompt.prompt_id} to {len(self.agents)} agents")
+            return True
+        except Exception as e:
+            logger.error(f"Error distributing master prompt: {str(e)}")
+            return False
     
     def register_workflow_agent(self, agent_type: str) -> str:
         """
