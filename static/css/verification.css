@@ -39,7 +39,7 @@ h1, h2, h3, .lead {
 }
 
 .card-body {
-    background-color: #333333 !important;
+    background-color: #2d2d2d !important;
     color: white !important;
     padding: 15px !important;
 }
@@ -55,19 +55,19 @@ h1, h2, h3, .lead {
 }
 
 /* Status Card Headers - Colors matching the image */
-#sql-server-card .card-header {
+.sql-server-card .card-header, #sql-server-card .card-header {
     background-color: #d9534f !important; /* Red */
 }
 
-#stored-procedure-card .card-header {
+.stored-procedure-card .card-header, #stored-procedure-card .card-header {
     background-color: #f0ad4e !important; /* Orange/Yellow */
 }
 
-#api-endpoints-card .card-header {
+.api-endpoints-card .card-header, #api-endpoints-card .card-header {
     background-color: #4e73df !important; /* Blue */
 }
 
-#overall-status-card .card-header {
+.overall-status-card .card-header, #overall-status-card .card-header {
     background-color: #d9534f !important; /* Red */
 }
 

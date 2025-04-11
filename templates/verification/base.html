@@ -22,9 +22,9 @@
     
     {% block styles %}{% endblock %}
 </head>
-<body>
+<body style="background-color: #1e1e1e !important; color: white !important;">
     <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <nav class="navbar navbar-expand-lg navbar-dark" style="background-color: #005288 !important;">
         <div class="container">
             <a class="navbar-brand" href="/">Benton County GIS</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -85,7 +85,7 @@
     </nav>
 
     <!-- Main Content -->
-    <div class="container mt-4">
+    <div class="container mt-4" style="background-color: #1e1e1e !important;">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
@@ -98,7 +98,7 @@
     </div>
 
     <!-- Footer -->
-    <footer class="footer mt-auto py-3">
+    <footer class="footer mt-auto py-3" style="background-color: #005288 !important; color: white !important;">
         <div class="container">
             <div class="row">
                 <div class="col-md-6">
