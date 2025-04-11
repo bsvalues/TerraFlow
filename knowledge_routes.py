@@ -301,7 +301,7 @@ def dashboard_data():
         # Timestamp for filtering (if needed)
         filter_timestamp = None
         if days > 0:
-            filter_timestamp = datetime.now().timestamp() - (days * 86400)  # 86400 seconds in a day
+            filter_timestamp = datetime.datetime.now().timestamp() - (days * 86400)  # 86400 seconds in a day
         
         # Get all knowledge entries
         entries = []
@@ -354,15 +354,15 @@ def dashboard_data():
         # Knowledge growth data
         entries_by_date = {}
         for entry in sorted(entries, key=lambda x: x.get('created_at', 0)):
-            date_str = datetime.fromtimestamp(entry.get('created_at', 0)).strftime('%Y-%m-%d')
+            date_str = datetime.datetime.fromtimestamp(entry.get('created_at', 0)).strftime('%Y-%m-%d')
             entries_by_date[date_str] = entries_by_date.get(date_str, 0) + 1
         
         # Ensure we have all dates in the range
         date_labels = []
         if days > 0 and len(entries_by_date) > 0:
-            start_date = datetime.now() - datetime.timedelta(days=days)
+            start_date = datetime.datetime.now() - datetime.timedelta(days=days)
             current_date = start_date
-            end_date = datetime.now()
+            end_date = datetime.datetime.now()
             
             while current_date <= end_date:
                 date_str = current_date.strftime('%Y-%m-%d')
