@@ -360,7 +360,7 @@ class DataQualityNotificationManager:
         message += "\nView full report on the Data Quality Dashboard."
         
         # Create notification record
-        self._create_notifications(alert, title, message, 'score', None, report.id)
+        self._create_notifications(alert, title, message, 'score', None, report.id, None)
         
     def _send_trend_alert(self, alert: DataQualityAlert, current_avg: float, previous_avg: float, pct_change: float):
         """
@@ -391,11 +391,11 @@ class DataQualityNotificationManager:
         message += "View trends on the Data Quality Dashboard."
         
         # Create notification record
-        self._create_notifications(alert, title, message, 'trend')
+        self._create_notifications(alert, title, message, 'trend', None, None, None)
         
     def _create_notifications(self, alert: DataQualityAlert, title: str, message: str, 
-                             alert_trigger_type: str, issue_id: int = None, 
-                             report_id: int = None, anomaly_id: int = None):
+                             alert_trigger_type: str, issue_id: Optional[int] = None, 
+                             report_id: Optional[int] = None, anomaly_id: Optional[int] = None):
         """
         Create notification records and send notifications through configured channels.
         
@@ -536,7 +536,7 @@ def send_data_quality_alert(alert_id: int, title: str, message: str, severity: s
             logger.error(f"Alert with ID {alert_id} not found")
             return False
             
-        notification_manager._create_notifications(alert, title, message, 'manual')
+        notification_manager._create_notifications(alert, title, message, 'manual', None, None, None)
         return True
         
     except Exception as e:
