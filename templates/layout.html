@@ -78,6 +78,11 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link {% if '/data-quality' in request.path %}active{% endif %}" href="{{ url_for('data_quality.dashboard') }}">
+                            <i class="fas fa-shield-alt me-1"></i> Data Quality
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link {% if request.path == url_for('api_tester') %}active{% endif %}" href="{{ url_for('api_tester') }}">
                             <i class="fas fa-code me-1"></i> API Tester
                         </a>
