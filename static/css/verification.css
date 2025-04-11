@@ -1,110 +1,77 @@
 /* Verification Dashboard Styles */
 
-/* Main layout styles */
+/* Base theme */
 body {
-    background-color: #222222 !important;
+    background-color: #1e1e1e !important;
     color: #ffffff !important;
 }
 
-.container, .container-fluid {
-    background-color: #222222 !important;
+/* Main container and headers */
+.container-fluid {
+    background-color: #1e1e1e !important;
+    padding: 20px !important;
 }
 
-/* Navigation bar */
+h1, h2, h3, .lead {
+    color: #ffffff !important;
+}
+
+/* Navbar - Benton County blue */
 .navbar {
-    background-color: #005288 !important; /* Benton County blue */
+    background-color: #005288 !important;
 }
 
-/* Dashboard title and description */
-h1, .lead {
+/* Status Cards - Dark backgrounds with colored headers */
+.card {
+    background-color: #333333 !important;
     color: #ffffff !important;
-}
-
-/* Status Cards Layout - 4 columns in a row */
-.status-card {
-    height: 100% !important;
+    border: none !important;
     margin-bottom: 20px !important;
-    border: none !important;
     border-radius: 0 !important;
 }
 
-/* Status Card Headers */
-#sql-server-card .card-header {
-    background-color: #d9534f !important; /* Red */
-    color: white !important;
-    border-radius: 0 !important;
+.card-header {
     padding: 10px 15px !important;
     font-weight: bold !important;
-    border: none !important;
-}
-
-#stored-procedure-card .card-header {
-    background-color: #f0ad4e !important; /* Orange/Yellow */
     color: white !important;
     border-radius: 0 !important;
-    padding: 10px 15px !important;
-    font-weight: bold !important;
     border: none !important;
 }
 
-#api-endpoints-card .card-header {
-    background-color: #5bc0de !important; /* Blue */
-    color: white !important;
-    border-radius: 0 !important;
-    padding: 10px 15px !important;
-    font-weight: bold !important;
-    border: none !important;
-}
-
-#overall-status-card .card-header {
-    background-color: #d9534f !important; /* Red */
-    color: white !important;
-    border-radius: 0 !important;
-    padding: 10px 15px !important;
-    font-weight: bold !important;
-    border: none !important;
-}
-
-/* Card Bodies */
 .card-body {
     background-color: #333333 !important;
     color: white !important;
     padding: 15px !important;
 }
 
+/* Card titles and text */
 .card-title {
     color: white !important;
     font-weight: bold !important;
-    margin-bottom: 10px !important;
 }
 
 .card-text {
     color: white !important;
-    margin-bottom: 15px !important;
 }
 
-/* Section Headers - Blue background */
-.card-header {
-    background-color: #333333 !important;
+/* Status Card Headers - Colors matching the image */
+#sql-server-card .card-header {
+    background-color: #d9534f !important; /* Red */
 }
 
-.card .card-header:contains("Advanced Verification Tests"),
-.card .card-header:contains("Verification Results"),
-.card .card-header:contains("Recent Logs"),
-.card .card-header:contains("Recent Verification Jobs") {
-    background-color: #005288 !important; /* Benton County blue */
-    color: white !important;
-    font-weight: bold !important;
+#stored-procedure-card .card-header {
+    background-color: #f0ad4e !important; /* Orange/Yellow */
 }
 
-/* Override all card backgrounds to dark */
-.card {
-    background-color: #333333 !important;
-    border: none !important;
-    margin-bottom: 15px !important;
+#api-endpoints-card .card-header {
+    background-color: #4e73df !important; /* Blue */
 }
 
-/* Section specific styles */
+#overall-status-card .card-header {
+    background-color: #d9534f !important; /* Red */
+}
+
+/* Section Headers - All blue background */
 #advanced-verification-section .card-header,
 #verification-results-section .card-header,
 #logs-section .card-header,
@@ -114,20 +81,28 @@ h1, .lead {
 
 /* Button styles */
 .btn-primary {
-    background-color: #5bc0de !important; /* Blue */
-    border-color: #46b8da !important;
-    color: white !important;
+    background-color: #4e73df !important;
+    border-color: #4e73df !important;
+}
+
+.btn-primary:hover {
+    background-color: #2653d4 !important;
+    border-color: #2653d4 !important;
 }
 
 .btn-outline-primary {
     color: white !important;
-    border-color: #5bc0de !important;
+    border-color: #4e73df !important;
     background-color: transparent !important;
 }
 
 .btn-outline-primary:hover {
-    background-color: #5bc0de !important;
+    background-color: #4e73df !important;
     color: white !important;
+}
+
+.test-btn {
+    margin: 5px !important;
 }
 
 /* Tables */
@@ -136,13 +111,9 @@ h1, .lead {
 }
 
 .table thead th {
-    background-color: #333333 !important;
+    background-color: #2d2d2d !important;
     color: white !important;
     border-color: #444444 !important;
-}
-
-.table tbody td {
-    color: white !important;
 }
 
 .table-striped tbody tr:nth-of-type(odd) {
@@ -150,53 +121,89 @@ h1, .lead {
 }
 
 .alert-info {
-    background-color: #333333 !important;
+    background-color: #2d2d2d !important;
     color: white !important;
     border-color: #444444 !important;
 }
 
-/* Override for any other elements */
-.text-dark, .text-body {
+/* Footer */
+.footer {
+    background-color: #005288 !important;
     color: white !important;
+    padding: 15px 0 !important;
 }
 
-.bg-light {
-    background-color: #333333 !important;
-}
-
-/* Fix for any special components */
+/* Ensure dark theme for modals */
 .modal-content {
     background-color: #333333 !important;
     color: white !important;
 }
 
 .modal-header, .modal-footer {
-    background-color: #444444 !important;
-    border-color: #555555 !important;
+    background-color: #2d2d2d !important;
+    border-color: #444444 !important;
 }
 
-/* Direct targeting specific elements */
-.card-header:nth-of-type(1) {
-    background-color: #005288 !important;
-}
-
-.card .card-header {
-    border-bottom: none !important;
-}
-
-/* Added specific section header classes */
+/* Add section header class for direct targeting */
 .verification-section-header {
     background-color: #005288 !important;
     color: white !important;
     padding: 10px 15px !important;
-    margin-bottom: 0 !important;
     font-weight: bold !important;
 }
 
-/* Directly target verification headers */
-div.card:nth-of-type(3) .card-header,
-div.card:nth-of-type(4) .card-header,
-div.card:nth-of-type(5) .card-header,
-div.card:nth-of-type(6) .card-header {
-    background-color: #005288 !important;
+/* Override any light theme elements */
+.bg-light, .bg-white {
+    background-color: #333333 !important;
+}
+
+.text-dark {
+    color: white !important;
+}
+
+/* Clear button styling */
+#clear-results-btn {
+    background-color: transparent !important;
+    border-color: #6c757d !important;
+    color: white !important;
+}
+
+#clear-results-btn:hover {
+    background-color: #6c757d !important;
+}
+
+/* Results containers */
+.result-item {
+    background-color: #2d2d2d !important;
+    color: white !important;
+    padding: 15px !important;
+    margin-bottom: 10px !important;
+    border-radius: 4px !important;
+}
+
+pre, code {
+    background-color: #2d2d2d !important;
+    color: #d1d1d1 !important;
+    border: 1px solid #444444 !important;
+}
+
+/* Badge colors */
+.badge-success {
+    background-color: #28a745 !important;
+}
+
+.badge-danger {
+    background-color: #dc3545 !important;
+}
+
+.badge-primary {
+    background-color: #4e73df !important;
+}
+
+.badge-info {
+    background-color: #17a2b8 !important;
+}
+
+.badge-secondary {
+    background-color: #6c757d !important;
 }
