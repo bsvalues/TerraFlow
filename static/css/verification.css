@@ -42,6 +42,7 @@ h1, h2, h3, .lead {
     background-color: #2d2d2d !important;
     color: white !important;
     padding: 15px !important;
+    border: none !important;
 }
 
 /* Card titles and text */

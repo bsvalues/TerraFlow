@@ -23,9 +23,9 @@
     <!-- Additional CSS -->
     {% block additionalcss %}{% endblock %}
 </head>
-<body>
+<body style="background-color: #1e1e1e !important; color: white !important;">
     <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <nav class="navbar navbar-expand-lg navbar-dark" style="background-color: #005288 !important;">
         <div class="container">
             <a class="navbar-brand" href="{{ url_for('index') }}">
                 <i class="fas fa-map-marked-alt me-2"></i>
@@ -125,12 +125,12 @@
     {% endwith %}
 
     <!-- Main content -->
-    <main class="main-content py-4">
+    <main class="main-content py-4" style="background-color: #1e1e1e !important; color: white !important;">
         {% block content %}{% endblock %}
     </main>
 
     <!-- Footer -->
-    <footer class="footer">
+    <footer class="footer" style="background-color: #005288 !important; color: white !important; padding: 15px 0;">
         <div class="container">
             <div class="row">
                 <div class="col-md-6">
