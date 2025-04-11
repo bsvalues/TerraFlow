@@ -142,6 +142,15 @@ def register_blueprints(app):
         # Import verification and data quality blueprints
         from sync_service.verification_routes import verification_bp
         
+        # Try to import sales verification routes
+        try:
+            from sync_service.sales_verification_routes import sales_verification_bp
+            has_sales_verification = True
+            logger.info("Sales Verification module loaded successfully")
+        except ImportError as e:
+            logger.warning(f"Could not load Sales Verification module: {e}")
+            has_sales_verification = False
+        
         # Try to import data quality routes
         try:
             from sync_service.data_quality_routes import data_quality_bp, register_data_quality_blueprint
@@ -164,6 +173,11 @@ def register_blueprints(app):
         # Register the blueprints
         app.register_blueprint(sync_bp)
         app.register_blueprint(verification_bp)
+        
+        # Register sales verification blueprint if available
+        if has_sales_verification:
+            app.register_blueprint(sales_verification_bp)
+            logger.info("Sales Verification blueprint registered")
         
         # Register data quality blueprint if available
         if has_data_quality:

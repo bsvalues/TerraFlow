@@ -148,6 +148,14 @@ with app.app_context():
     except ImportError as e:
         logger.warning(f"Could not load Spatial Analysis Agent: {e}")
         
+    # Try to load the Sales Verification agent
+    try:
+        from mcp.agents.sales_verification_agent import SalesVerificationAgent
+        mcp_instance.register_agent("sales_verification", SalesVerificationAgent())
+        logger.info("Successfully loaded Sales Verification Agent")
+    except ImportError as e:
+        logger.warning(f"Could not load Sales Verification Agent: {e}")
+        
     # Register a basic dummy agent to ensure the MCP dashboard works
     from mcp.agents.base_agent import BaseAgent
         
@@ -166,6 +174,19 @@ with app.app_context():
             logger.warning("API Gateway registration failed")
     except Exception as e:
         logger.warning(f"Could not load API Gateway modules: {str(e)}")
+        
+    # Initialize agent integrators
+    try:
+        from mcp.integrators import initialize_integrators
+        integrators_count = initialize_integrators()
+        if integrators_count > 0:
+            logger.info(f"Successfully initialized {integrators_count} agent integrators")
+        else:
+            logger.warning("No agent integrators were initialized")
+    except ImportError as e:
+        logger.warning(f"Could not load agent integrators module: {e}")
+    except Exception as e:
+        logger.error(f"Error initializing agent integrators: {str(e)}")
         
     def process_task(self, task_data):
         """Process a system task"""
