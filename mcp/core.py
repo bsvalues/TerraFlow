@@ -26,6 +26,7 @@ from mcp.message_broker import MessageBroker, MessageFilter
 from mcp.experience_buffer import ExperienceBuffer, Experience
 from mcp.master_prompt import MasterPromptManager, MasterPrompt
 from mcp.status_reporter import StatusReporter
+from mcp.knowledge_sharing import KnowledgeSharingSystem
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, 
@@ -67,6 +68,9 @@ class MCP:
         # Master Prompt Manager
         self.master_prompt_manager = MasterPromptManager(self)
         
+        # Knowledge Sharing System
+        self.knowledge_sharing = KnowledgeSharingSystem(self.message_broker)
+        
         # Assessment domain customization
         self.assessment_context = {
             "state": "Washington",
@@ -78,7 +82,7 @@ class MCP:
         # Initialize the default system master prompt
         self.default_master_prompt = self.master_prompt_manager.get_default_system_prompt()
         
-        logger.info("MCP initialized with Agent-to-Agent protocol, experience buffer, status reporting, and master prompt system support")
+        logger.info("MCP initialized with Agent-to-Agent protocol, experience buffer, status reporting, knowledge sharing, and master prompt system support")
     
     def register_agent(self, agent_id: str, agent_instance) -> bool:
         """Register an agent with the MCP"""
@@ -204,6 +208,10 @@ class MCP:
         # Start status reporter
         self.status_reporter.start()
         logger.info("Status reporter started")
+        
+        # Start knowledge sharing system
+        self.knowledge_sharing.start()
+        logger.info("Knowledge sharing system started")
         
         # Start MCP worker thread
         self.running = True
