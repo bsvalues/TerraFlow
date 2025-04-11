@@ -8,9 +8,14 @@
         <div class="col-12">
             <h1 class="mb-4">
                 Data Quality Dashboard
-                <a href="{{ url_for('data_quality.list_alerts') }}" class="btn btn-outline-primary float-end">
-                    <i class="bi bi-bell me-1"></i> Manage Alerts
-                </a>
+                <div class="float-end">
+                    <a href="{{ url_for('quality_report.report_dashboard') }}" class="btn btn-outline-success me-2">
+                        <i class="bi bi-file-earmark-pdf me-1"></i> Reports
+                    </a>
+                    <a href="{{ url_for('data_quality.list_alerts') }}" class="btn btn-outline-primary">
+                        <i class="bi bi-bell me-1"></i> Manage Alerts
+                    </a>
+                </div>
             </h1>
             
             <!-- Overview Cards -->
