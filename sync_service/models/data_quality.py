@@ -147,3 +147,79 @@ class DataAnomaly(db.Model):
 
     def __repr__(self):
         return f"<DataAnomaly {self.id}: {self.table_name}.{self.field_name or '*'} ({self.anomaly_type})>"
+
+
+class DataQualityAlert(db.Model):
+    """
+    Alert configurations and notifications for data quality issues and anomalies.
+    """
+    __tablename__ = 'data_quality_alert'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(128), nullable=False)
+    description = db.Column(db.Text)
+    
+    # Alert type and conditions
+    alert_type = db.Column(db.String(64), nullable=False)  # issue, anomaly, score, trend
+    table_name = db.Column(db.String(128), nullable=True)  # Optional filter by table
+    field_name = db.Column(db.String(128), nullable=True)  # Optional filter by field
+    severity_threshold = db.Column(db.String(32), default='warning')  # Minimum severity level to trigger
+    
+    # Alert conditions specific to the alert_type
+    conditions = db.Column(JsonType, nullable=False)  # JSON with alert conditions
+    
+    # Recipients and delivery channels
+    recipients = db.Column(JsonType, nullable=False)  # List of user IDs or email addresses
+    channels = db.Column(JsonType, nullable=False)  # List of channels: email, sms, slack, in_app, etc.
+    
+    # Alert status and configuration
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    
+    # Relationships
+    creator = db.relationship('User', backref=db.backref('quality_alerts', lazy='dynamic'))
+    
+    def __repr__(self):
+        return f"<DataQualityAlert {self.id}: {self.name} ({self.alert_type})>"
+
+
+class DataQualityNotification(db.Model):
+    """
+    Record of notifications sent for data quality alerts.
+    """
+    __tablename__ = 'data_quality_notification'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    alert_id = db.Column(db.Integer, db.ForeignKey('data_quality_alert.id'), nullable=True)
+    
+    # Reference to the triggering entity
+    issue_id = db.Column(db.Integer, db.ForeignKey('data_quality_issue.id'), nullable=True)
+    anomaly_id = db.Column(db.Integer, db.ForeignKey('data_anomaly.id'), nullable=True)
+    report_id = db.Column(db.Integer, db.ForeignKey('data_quality_report.id'), nullable=True)
+    
+    # Notification details
+    title = db.Column(db.String(255), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    severity = db.Column(db.String(32), default='warning')  # info, warning, error, critical
+    
+    # Recipient and delivery information
+    recipient = db.Column(db.String(255), nullable=False)  # User ID, email, or other identifier
+    channel = db.Column(db.String(64), nullable=False)  # email, sms, slack, in_app
+    status = db.Column(db.String(32), default='sent')  # sent, delivered, read, failed
+    
+    # Additional data
+    notification_data = db.Column(JsonType, nullable=True)  # JSON with additional data
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    delivered_at = db.Column(db.DateTime, nullable=True)
+    read_at = db.Column(db.DateTime, nullable=True)
+    
+    # Relationships
+    alert = db.relationship('DataQualityAlert', backref=db.backref('notifications', lazy='dynamic'))
+    issue = db.relationship('DataQualityIssue', backref=db.backref('notifications', lazy='dynamic'))
+    anomaly = db.relationship('DataAnomaly', backref=db.backref('notifications', lazy='dynamic'))
+    report = db.relationship('DataQualityReport', backref=db.backref('notifications', lazy='dynamic'))
+    
+    def __repr__(self):
+        return f"<DataQualityNotification {self.id}: {self.title} to {self.recipient} via {self.channel}>"
