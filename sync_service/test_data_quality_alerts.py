@@ -28,7 +28,9 @@ def trigger_quality_score_alert():
     with app.app_context():
         # Create a low quality score report
         report = DataQualityReport(
-            report_type='weekly',
+            report_name='Weekly Quality Report',
+            tables_checked=['parcels', 'property_values', 'improvements'],
+            overall_score=75.0,  # This is below our 85% threshold
             report_data={
                 'overall_score': 75,  # This is below our 85% threshold
                 'completeness_score': 70,
@@ -37,7 +39,11 @@ def trigger_quality_score_alert():
                 'tables_checked': 25,
                 'fields_checked': 342,
                 'records_checked': 15240
-            }
+            },
+            critical_issues=0,
+            high_issues=2,
+            medium_issues=5,
+            low_issues=12
         )
         
         db.session.add(report)
@@ -71,8 +77,8 @@ def create_data_anomalies(count=5):
                 status='open',
                 current_value=str(random.randint(1000, 5000)),
                 previous_value=str(random.randint(1000, 5000)),
-                score=random.uniform(0.5, 0.95),
-                details={
+                anomaly_score=random.uniform(0.5, 0.95),
+                anomaly_details={
                     'detection_method': 'z_score' if i % 3 == 0 else 'histogram',
                     'threshold': random.uniform(2.0, 4.0),
                     'expected_range': [1000, 3000]
