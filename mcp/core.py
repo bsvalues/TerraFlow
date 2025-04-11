@@ -95,6 +95,9 @@ class MCP:
         # Register agent with status reporter
         self.status_reporter.register_agent(agent_id)
         
+        # Register agent with knowledge sharing system
+        self.knowledge_sharing.register_agent(agent_id)
+        
         # Set initial agent status - using 'normal' as the default valid status level
         # Status options are typically: 'normal', 'warning', 'error', 'critical', 'blocked'
         agent_status = getattr(agent_instance, 'status', 'normal')
@@ -137,6 +140,12 @@ class MCP:
             )
         except Exception as e:
             logger.warning(f"Error updating status for deregistered agent {agent_id}: {str(e)}")
+        
+        # Unregister from knowledge sharing system
+        try:
+            self.knowledge_sharing.unregister_agent(agent_id)
+        except Exception as e:
+            logger.warning(f"Error unregistering agent {agent_id} from knowledge sharing: {str(e)}")
         
         logger.info(f"Agent {agent_id} deregistered")
         return True
@@ -240,6 +249,10 @@ class MCP:
         # Stop status reporter
         self.status_reporter.stop()
         logger.info("Status reporter stopped")
+        
+        # Stop knowledge sharing system
+        self.knowledge_sharing.stop()
+        logger.info("Knowledge sharing system stopped")
         
         # Stop message broker
         self.message_broker.stop()
@@ -420,6 +433,190 @@ class MCP:
             result[aid] = combined_info
             
         return result
+        
+    def add_knowledge(
+        self,
+        agent_id: str,
+        title: str,
+        content: str,
+        entry_type: str,
+        tags: List[str] = None,
+        context: Dict[str, Any] = None,
+        references: List[str] = None
+    ) -> Optional[str]:
+        """
+        Add a knowledge entry to the knowledge sharing system
+        
+        Args:
+            agent_id: ID of the agent adding the knowledge
+            title: Title or summary of the entry
+            content: Main content of the entry
+            entry_type: Type of knowledge (insight, error, warning, etc.)
+            tags: List of tags for categorization
+            context: Additional context information
+            references: List of related knowledge entry IDs
+            
+        Returns:
+            ID of the added entry, or None if there was an error
+        """
+        if agent_id not in self.agents:
+            logger.error(f"Cannot add knowledge from unknown agent {agent_id}")
+            return None
+            
+        try:
+            entry_id = self.knowledge_sharing.add_knowledge(
+                agent_id=agent_id,
+                title=title,
+                content=content,
+                entry_type=entry_type,
+                tags=tags,
+                context=context,
+                references=references
+            )
+            
+            logger.info(f"Added knowledge entry {entry_id} from agent {agent_id}")
+            return entry_id
+        except Exception as e:
+            logger.error(f"Error adding knowledge from agent {agent_id}: {str(e)}")
+            return None
+            
+    def query_knowledge(
+        self,
+        agent_id: str,
+        query_text: str,
+        entry_type: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        limit: int = 10
+    ) -> List[Dict[str, Any]]:
+        """
+        Query the knowledge base
+        
+        Args:
+            agent_id: ID of the agent making the query
+            query_text: Text to search for
+            entry_type: Optional type of entries to search for
+            tags: Optional tags to filter by
+            limit: Maximum number of entries to return
+            
+        Returns:
+            List of matching knowledge entries as dictionaries
+        """
+        if agent_id not in self.agents:
+            logger.error(f"Cannot query knowledge from unknown agent {agent_id}")
+            return []
+            
+        try:
+            results = self.knowledge_sharing.query_knowledge(
+                agent_id=agent_id,
+                query_text=query_text,
+                entry_type=entry_type,
+                tags=tags,
+                limit=limit
+            )
+            
+            logger.info(f"Agent {agent_id} queried knowledge base with '{query_text}'")
+            return results
+        except Exception as e:
+            logger.error(f"Error querying knowledge for agent {agent_id}: {str(e)}")
+            return []
+            
+    def get_knowledge_entry(self, entry_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get a specific knowledge entry
+        
+        Args:
+            entry_id: ID of the entry to retrieve
+            
+        Returns:
+            The entry as a dictionary, or None if not found
+        """
+        try:
+            entry = self.knowledge_sharing.get_entry(entry_id)
+            return entry
+        except Exception as e:
+            logger.error(f"Error retrieving knowledge entry {entry_id}: {str(e)}")
+            return None
+    
+    def get_related_knowledge(self, entry_id: str, limit: int = 5) -> List[Dict[str, Any]]:
+        """
+        Get entries related to a specific entry
+        
+        Args:
+            entry_id: ID of the entry to find related entries for
+            limit: Maximum number of entries to return
+            
+        Returns:
+            List of related entries as dictionaries
+        """
+        try:
+            related = self.knowledge_sharing.get_related_entries(entry_id, limit)
+            return related
+        except Exception as e:
+            logger.error(f"Error retrieving related knowledge for entry {entry_id}: {str(e)}")
+            return []
+    
+    def get_agent_knowledge(self, agent_id: str, limit: int = 100) -> List[Dict[str, Any]]:
+        """
+        Get knowledge entries from a specific agent
+        
+        Args:
+            agent_id: ID of the agent to get entries for
+            limit: Maximum number of entries to return
+            
+        Returns:
+            List of knowledge entries as dictionaries
+        """
+        if agent_id not in self.agents:
+            logger.error(f"Cannot get knowledge from unknown agent {agent_id}")
+            return []
+            
+        try:
+            entries = self.knowledge_sharing.get_agent_knowledge(agent_id, limit)
+            return entries
+        except Exception as e:
+            logger.error(f"Error retrieving knowledge for agent {agent_id}: {str(e)}")
+            return []
+    
+    def provide_knowledge_feedback(
+        self,
+        agent_id: str,
+        entry_id: str,
+        rating: float,
+        feedback_text: Optional[str] = None
+    ) -> bool:
+        """
+        Provide feedback on a knowledge entry
+        
+        Args:
+            agent_id: ID of the agent providing feedback
+            entry_id: ID of the entry to rate
+            rating: Rating (0.0 to 5.0)
+            feedback_text: Optional feedback text
+            
+        Returns:
+            True if feedback was recorded, False otherwise
+        """
+        if agent_id not in self.agents:
+            logger.error(f"Cannot provide feedback from unknown agent {agent_id}")
+            return False
+            
+        try:
+            success = self.knowledge_sharing.provide_feedback(
+                agent_id=agent_id,
+                entry_id=entry_id,
+                rating=rating,
+                feedback_text=feedback_text
+            )
+            
+            if success:
+                logger.info(f"Agent {agent_id} provided feedback for knowledge entry {entry_id}")
+            else:
+                logger.warning(f"Failed to record feedback from agent {agent_id} for entry {entry_id}")
+                
+            return success
+        except Exception as e:
+            logger.error(f"Error providing knowledge feedback from agent {agent_id}: {str(e)}")
+            return False
     
     def discover_agents(self, agent_dir: str = 'agents') -> List[str]:
         """Automatically discover and register available agents"""
