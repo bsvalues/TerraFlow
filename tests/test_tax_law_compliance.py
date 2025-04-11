@@ -7,8 +7,13 @@ functionality implemented in the TaxLawComplianceAgent.
 
 import unittest
 import datetime
+import sys
+import os
 from typing import Dict, Any
 from unittest.mock import patch, MagicMock
+
+# Add the project root to the path so we can import the modules
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Import the agent
 from mcp.agents.tax_law_compliance_agent import TaxLawComplianceAgent
