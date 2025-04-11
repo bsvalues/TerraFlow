@@ -8,10 +8,10 @@ import os
 import logging
 import datetime
 import pandas as pd
-from typing import Dict, Any, Optional, List, Tuple, Union
+from typing import Dict, Any, Optional, List, Tuple, Union, cast
 
 from sync_service.sqlite_export import SQLiteExporter
-from sync_service.multi_format_exporter import MultiFormatExporter
+from sync_service.multi_format_exporter import MultiFormatExporter, ExportFormat
 from sync_service.incremental_sync import IncrementalSyncManager
 
 # Set up logging
@@ -176,10 +176,10 @@ class CountyDataSyncETL:
             for fmt in formats:
                 if incremental and key_columns:
                     # Use merge for incremental update with key columns
-                    results[fmt] = self.multi_exporter.merge_data(df, 'stats', fmt, key_columns)
+                    results[fmt] = self.multi_exporter.merge_data(df, 'stats', cast(ExportFormat, fmt), key_columns)
                 else:
                     # Export to the specified format
-                    results[fmt] = self.multi_exporter.export_data(df, 'stats', fmt)
+                    results[fmt] = self.multi_exporter.export_data(df, 'stats', cast(ExportFormat, fmt))
         
         return results
     
@@ -230,10 +230,10 @@ class CountyDataSyncETL:
             for fmt in formats:
                 if incremental and key_columns:
                     # Use merge for incremental update with key columns
-                    results[fmt] = self.multi_exporter.merge_data(df, 'working', fmt, key_columns)
+                    results[fmt] = self.multi_exporter.merge_data(df, 'working', cast(ExportFormat, fmt), key_columns)
                 else:
                     # Export to the specified format
-                    results[fmt] = self.multi_exporter.export_data(df, 'working', fmt)
+                    results[fmt] = self.multi_exporter.export_data(df, 'working', cast(ExportFormat, fmt))
         
         return results
     
@@ -333,14 +333,21 @@ class CountyDataSyncETL:
             
             working_transformed_df = self.transform_data(working_df, working_transformations)
             
-            working_db_path = self.load_working_data(
+            working_export_results = self.load_working_data(
                 working_transformed_df, 
                 incremental=incremental,
-                key_columns=working_key_columns
+                key_columns=working_key_columns,
+                formats=export_formats
             )
             
             results['stats']['working_records'] = len(working_df)
-            results['working_db_path'] = working_db_path
+            results['working_db_path'] = working_export_results.get('sqlite')
+            results['working_export_paths'] = working_export_results
+            
+            # Log exports
+            for fmt, path in working_export_results.items():
+                if path:
+                    logger.info(f"Working data exported to {fmt} format: {path}")
             
             # Update sync times
             if incremental:

@@ -2,97 +2,106 @@
 
 ## Overview
 
-The CountyDataSync ETL process has been enhanced with two major improvements:
+CountyDataSync is a comprehensive data synchronization and ETL (Extract, Transform, Load) solution designed for the Benton County GIS and Assessment systems. It provides robust capabilities for extracting data from various sources, transforming it as needed, and loading it into multiple output formats.
 
-1. **SQLite Database Export**: Instead of exporting data to CSV files, the system now exports data to SQLite databases for better performance and query capabilities.
-2. **Incremental Updates**: The ETL process now supports incremental updates by only processing records that have changed since the last successful sync.
+## Recent Enhancements
 
-## Components
+### Multi-Format Export System
 
-### SQLite Exporter
+The ETL process has been enhanced with a new multi-format export system that allows exporting data to multiple formats simultaneously:
 
-The `SQLiteExporter` class in `sqlite_export.py` provides functions for exporting data to SQLite databases:
+- **SQLite databases**: Relational database files for complex data with query capabilities
+- **CSV files**: Simple, universal tabular format compatible with Excel and other tools
+- **JSON files**: Web-friendly format for structured data
+- **GeoJSON files**: Specialized format for geospatial data
 
-- `create_and_load_stats_db(df_stats)`: Creates a SQLite database for statistics data
-- `create_and_load_working_db(df_working)`: Creates a SQLite database for working data
-- `append_to_working_db(df_working)`: Appends new records to an existing working database
-- `append_to_stats_db(df_stats)`: Appends new records to an existing stats database
-- `merge_with_working_db(df_working, key_columns)`: Merges records with an existing working database
-- `merge_with_stats_db(df_stats, key_columns)`: Merges records with an existing stats database
+This enhancement provides greater flexibility and interoperability with various systems and applications.
 
-### Incremental Sync Manager
+### Key Features
 
-The `IncrementalSyncManager` class in `incremental_sync.py` tracks the last sync timestamp and provides functions for incremental updates:
+1. **Simultaneous Export to Multiple Formats**:
+   - Export datasets to any combination of supported formats in a single ETL run
+   - Each format is optimized for its intended use case
 
-- `get_last_sync_time(table_name)`: Gets the timestamp of the last successful sync
-- `update_sync_time(table_name, job_id)`: Updates the last sync timestamp
-- `filter_changed_records(df, timestamp_column, table_name)`: Filters a DataFrame to include only records that changed since the last sync
-- `get_changed_record_ids(df, timestamp_column, id_column, table_name)`: Gets a list of IDs for records that changed since the last sync
-- `update_record_counts(inserted, updated, table_name)`: Updates record counts in the metadata
-- `get_sync_statistics()`: Gets statistics about sync operations
+2. **Incremental Updates**:
+   - All formats support incremental updates for efficient processing
+   - Reduces processing time and resource usage for large datasets
 
-### ETL Workflow
+3. **Proper Timestamp Handling**:
+   - Export files include timestamps in filenames
+   - Symlinks to latest versions for easy access
 
-The `CountyDataSyncETL` class in `sync.py` implements the complete ETL workflow:
+4. **Enhanced Logging**:
+   - Detailed logging of export operations
+   - Better error reporting and troubleshooting
 
-- `extract_data(source_connection, query, timestamp_column, table_name)`: Extracts data from the source database
-- `transform_data(df, transformations)`: Applies transformations to the extracted data
-- `load_stats_data(df, incremental, key_columns)`: Loads statistics data into a SQLite database
-- `load_working_data(df, incremental, key_columns)`: Loads working data into a SQLite database
-- `run_etl_workflow(...)`: Runs the complete ETL workflow
+5. **Structured Results**:
+   - Comprehensive results dictionary with paths to all exported files
+   - Detailed statistics on processed records
 
-## Usage Example
+### Architectural Components
+
+1. **MultiFormatExporter**: Core class for handling exports to various formats
+2. **SQLiteExporter**: Specialized class for SQLite databases (maintained for backward compatibility)
+3. **IncrementalSyncManager**: Manages sync state and incremental updates
+4. **CountyDataSyncETL**: Main ETL engine, enhanced with multi-format support
+
+## Usage
+
+### Basic Export
 
 ```python
 from sync_service.sync import CountyDataSyncETL
 
-# Initialize the ETL workflow
-etl = CountyDataSyncETL(export_dir='exports', sync_metadata_path='sync_metadata.json')
-etl.set_job_id('my_job_id')
-
-# Define queries
-stats_query = "SELECT id, use_code, acres, assessed_value, updated_at FROM property_stats"
-working_query = "SELECT id, owner, use_code, parcel_id, updated_at FROM property_working"
-
-# Run the ETL workflow (incremental mode)
+etl = CountyDataSyncETL(export_dir='exports')
 results = etl.run_etl_workflow(
-    source_connection="postgresql://user:password@host/database",
-    stats_query=stats_query,
-    working_query=working_query,
-    stats_timestamp_column='updated_at',
-    working_timestamp_column='updated_at',
-    stats_table_name='property_stats',
-    working_table_name='property_working',
-    stats_key_columns=['id'],
-    working_key_columns=['id'],
-    incremental=True
+    source_connection=db_connection,
+    stats_query="SELECT * FROM statistics",
+    working_query="SELECT * FROM operational_data",
+    export_formats=['sqlite', 'csv', 'json']
 )
-
-# Check results
-if results['success']:
-    print(f"ETL completed successfully. Processed {results['stats']['records_processed']} records.")
-    print(f"Stats database: {results['stats_db_path']}")
-    print(f"Working database: {results['working_db_path']}")
-else:
-    print(f"ETL failed with errors: {results['errors']}")
 ```
 
-## Testing
+### Using Exported Data
 
-The ETL process includes comprehensive unit and integration tests:
+The ETL process returns a detailed results dictionary containing paths to all exported files:
 
-- `test_sqlite_export.py`: Tests the SQLite export functionality
-- `test_incremental_sync.py`: Tests the incremental sync functionality
-- `test_etl_workflow.py`: Tests the complete ETL workflow
+```python
+# Access SQLite database for complex queries
+sqlite_path = results['stats_export_paths']['sqlite']
+conn = sqlite3.connect(sqlite_path)
+cursor = conn.cursor()
+cursor.execute("SELECT * FROM stats_data WHERE stat_value > 100")
 
-To run all tests:
+# Process CSV data with pandas
+csv_path = results['stats_export_paths']['csv']
+df = pd.read_csv(csv_path)
+avg_value = df['stat_value'].mean()
 
+# Use JSON data in web applications
+json_path = results['stats_export_paths']['json']
+with open(json_path, 'r') as f:
+    data = json.load(f)
 ```
-python -m unittest discover -s sync_service/tests
-```
 
-To run a specific test:
+## Documentation
 
-```
-python -m unittest sync_service.tests.test_etl_workflow
-```
+For detailed information, see the following resources:
+
+- [Multi-Format Export Guide](./docs/multi_format_export_guide.md): Comprehensive guide to the export system
+- [Examples](./examples/): Sample code demonstrating various use cases
+- [Unit Tests](./tests/): Test cases showing expected behavior
+
+## Getting Started
+
+1. **Installation**: Ensure all required dependencies are installed
+2. **Configuration**: Set up export directories and metadata paths
+3. **Usage**: Import and use the CountyDataSyncETL class as shown in examples
+4. **Testing**: Run unit tests to verify functionality
+
+## Dependencies
+
+- pandas: Data manipulation and analysis
+- SQLite: Embedded database for data storage
+- geopandas (optional): For working with geospatial data
+- shapely (optional): For geometry operations

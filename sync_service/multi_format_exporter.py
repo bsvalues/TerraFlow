@@ -13,7 +13,7 @@ import logging
 import pandas as pd
 import sqlite3
 import datetime
-from typing import Dict, Any, Optional, Union, List, Literal
+from typing import Dict, Any, Optional, Union, List, Literal, cast
 
 from sync_service.sqlite_export import SQLiteExporter
 
@@ -47,7 +47,7 @@ class MultiFormatExporter:
                    df: pd.DataFrame, 
                    name: str, 
                    format: ExportFormat,
-                   timestamp: Optional[datetime.datetime] = None) -> str:
+                   timestamp: Optional[datetime.datetime] = None) -> Optional[str]:
         """Export data to the specified format.
         
         Args:
