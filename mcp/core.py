@@ -22,9 +22,10 @@ import uuid
 
 # Agent-to-Agent protocol support
 from mcp.agent_protocol import AgentCommunicationProtocol, MessageType, Message
-from mcp.message_broker import MessageBroker
+from mcp.message_broker import MessageBroker, MessageFilter
 from mcp.experience_buffer import ExperienceBuffer, Experience
 from mcp.master_prompt import MasterPromptManager, MasterPrompt
+from mcp.status_reporter import StatusReporter
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, 
@@ -56,6 +57,9 @@ class MCP:
         
         # Initialize experience buffer
         self.experience_buffer = ExperienceBuffer(max_size=10000, cleanup_interval=3600)
+        
+        # Initialize status reporter
+        self.status_reporter = StatusReporter(self.message_broker)
         
         # Agent-to-Agent communication protocol
         self.protocol = AgentCommunicationProtocol(self)
@@ -160,6 +164,10 @@ class MCP:
         self.experience_buffer.start()
         logger.info("Experience buffer started")
         
+        # Start status reporter
+        self.status_reporter.start()
+        logger.info("Status reporter started")
+        
         # Start MCP worker thread
         self.running = True
         self.worker_thread = threading.Thread(target=self._worker_loop)
@@ -183,6 +191,10 @@ class MCP:
         # Stop experience buffer
         self.experience_buffer.stop()
         logger.info("Experience buffer stopped")
+        
+        # Stop status reporter
+        self.status_reporter.stop()
+        logger.info("Status reporter stopped")
         
         # Stop message broker
         self.message_broker.stop()
