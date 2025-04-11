@@ -853,7 +853,11 @@ class PropertyValuationAgent(BaseAgent):
     
     def _cost_approach(self, property_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Implement the cost approach for property valuation
+        Implement the cost approach for property valuation following Washington standards
+        
+        Washington assessors rely heavily on the cost approach for new construction
+        and special purpose properties, per WAC 458-53-130. This implementation
+        follows Washington's standards for cost estimation and depreciation.
         
         Args:
             property_data: Subject property data
@@ -861,28 +865,723 @@ class PropertyValuationAgent(BaseAgent):
         Returns:
             Valuation result with cost components
         """
-        # For now, use placeholder logic as skeleton
-        # In a real implementation, we would:
-        # 1. Estimate land value
-        # 2. Estimate replacement cost of improvements
-        # 3. Deduct depreciation (physical, functional, external)
-        # 4. Calculate total value
+        # Check if we have sufficient data for cost approach
+        property_type = property_data.get("property_type", "").lower()
+        building_area = property_data.get("building_area", 0)
         
-        # Placeholder implementation
-        land_value = property_data.get("land_value", 0)
-        improvement_cost = property_data.get("improvement_value", 0)
+        if building_area <= 0:
+            return {
+                "approach": "cost_approach",
+                "value": 0,
+                "message": "Insufficient building area data for cost approach",
+                "confidence_score": 0.0
+            }
+            
+        # Extract key property characteristics
+        land_area = property_data.get("land_area", 0)
+        year_built = property_data.get("year_built", datetime.datetime.now().year)
+        quality_grade = property_data.get("quality_grade", "average").lower()
+        condition = property_data.get("condition", "average").lower()
+        location = property_data.get("location", "").lower()
         
-        # Simple cost calculation
-        depreciation = property_data.get("depreciation", 0)
-        value = land_value + (improvement_cost - depreciation)
+        # 1. Land Valuation - using Washington-specific land valuation methods
+        # Washington assessors typically use market extraction to determine land values
+        land_value = self._calculate_land_value(
+            property_type, land_area, location
+        )
         
+        # 2. Building Cost Calculation - using Washington cost manuals
+        # Washington counties typically use Marshall & Swift with local modifiers
+        base_cost_per_sf = self._get_base_construction_cost(
+            property_type, 
+            property_data.get("subtype", ""),
+            quality_grade
+        )
+        
+        # Apply Washington regional cost modifiers
+        regional_modifier = self._get_wa_regional_modifier(location)
+        
+        # Calculate total replacement cost new (RCN)
+        rcn = building_area * base_cost_per_sf * regional_modifier
+        
+        # Add improvements and site development costs
+        # Washington typically itemizes these separately
+        site_improvements = self._calculate_site_improvements(property_data)
+        
+        # 3. Depreciation Analysis (Washington's 3-factor method)
+        # Washington uses a detailed depreciation methodology
+        
+        # Physical depreciation (age/condition based)
+        effective_age = self._calculate_effective_age(year_built, condition)
+        physical_depreciation_pct = self._calculate_physical_depreciation(
+            effective_age, 
+            property_type
+        )
+        
+        # Functional obsolescence (design/utility issues)
+        functional_depreciation_pct = self._calculate_functional_depreciation(
+            year_built, 
+            property_data.get("features", {}),
+            property_type
+        )
+        
+        # External/economic obsolescence (location/market factors)
+        external_depreciation_pct = self._calculate_external_depreciation(
+            location, 
+            property_type,
+            property_data.get("external_factors", {})
+        )
+        
+        # Calculate total depreciation percentage (Washington method)
+        # WA uses a compounded method rather than straight addition
+        total_depreciation_pct = self._calculate_total_depreciation(
+            physical_depreciation_pct,
+            functional_depreciation_pct,
+            external_depreciation_pct
+        )
+        
+        # Calculate depreciated improvement value
+        depreciation_amount = rcn * total_depreciation_pct
+        depreciated_improvement_value = rcn - depreciation_amount
+        
+        # Add site improvements (less depreciation)
+        site_improvement_depreciation = site_improvements * physical_depreciation_pct
+        depreciated_site_value = site_improvements - site_improvement_depreciation
+        
+        # 4. Calculate total property value (WA method)
+        total_improvement_value = depreciated_improvement_value + depreciated_site_value
+        total_value = land_value + total_improvement_value
+        
+        # Round to nearest hundred per WA assessment practice
+        total_value = round(total_value / 100) * 100
+        
+        # 5. Calculate confidence score for cost approach
+        confidence_score = self._calculate_cost_confidence_score(
+            property_data,
+            base_cost_per_sf,
+            land_value,
+            physical_depreciation_pct,
+            year_built
+        )
+        
+        # Return comprehensive result with all cost components
         return {
             "approach": "cost_approach",
-            "value": value,
+            "value": total_value,
             "land_value": land_value,
-            "improvement_cost": improvement_cost,
-            "depreciation": depreciation
+            "improvement_components": {
+                "base_cost_per_sqft": base_cost_per_sf,
+                "regional_modifier": regional_modifier,
+                "replacement_cost_new": rcn,
+                "site_improvements": site_improvements,
+                "total_replacement_cost": rcn + site_improvements
+            },
+            "depreciation_components": {
+                "effective_age": effective_age,
+                "physical_depreciation_pct": physical_depreciation_pct * 100,
+                "functional_depreciation_pct": functional_depreciation_pct * 100,
+                "external_depreciation_pct": external_depreciation_pct * 100,
+                "total_depreciation_pct": total_depreciation_pct * 100,
+                "total_depreciation_amount": depreciation_amount
+            },
+            "improvement_value": total_improvement_value,
+            "confidence_score": confidence_score
         }
+        
+    def _calculate_land_value(
+        self,
+        property_type: str,
+        land_area: float,
+        location: str
+    ) -> float:
+        """
+        Calculate land value based on Washington assessment methods
+        
+        Washington assessors typically use market extraction method
+        with benchmarks for different land types and locations
+        
+        Args:
+            property_type: Type of property
+            land_area: Land area in square feet or acres
+            location: Property location
+            
+        Returns:
+            Land value
+        """
+        # In production, would query land valuation tables specific to Benton County
+        # Here we use WA-specific land value rates from the knowledge base
+        
+        # Default to square feet if not specified
+        area_unit = "sf"
+        area = land_area
+        
+        # Check if area might be in acres (common for WA rural properties)
+        if land_area < 100 and property_type not in ["apartment", "commercial", "industrial"]:
+            area_unit = "acre"
+            area = land_area
+        
+        # Get base land value rates from knowledge base
+        if area_unit == "sf":
+            base_land_values = self.get_knowledge("wa_land_values", "per_sf", {})
+            land_value_per_unit = base_land_values.get(property_type, 15.0)  # Default $15/sf
+        else:
+            base_land_values = self.get_knowledge("wa_land_values", "per_acre", {})
+            land_value_per_unit = base_land_values.get(property_type, 50000.0)  # Default $50k/acre
+            
+        # Apply location adjustments (specific to Benton County areas)
+        location_factor = 1.0
+        if "kennewick" in location:
+            location_factor = 1.15
+        elif "richland" in location:
+            location_factor = 1.2
+        elif "west richland" in location:
+            location_factor = 1.1
+        elif "pasco" in location:
+            location_factor = 0.95
+        elif "benton city" in location:
+            location_factor = 0.85
+        elif "prosser" in location:
+            location_factor = 0.8
+            
+        # Apply neighborhood quality adjustment if available
+        neighborhood = location.split(',')[0] if ',' in location else location
+        neighborhood_factor = self.get_knowledge("wa_neighborhoods", neighborhood, 1.0)
+        
+        # In a real implementation, zoning would come from property_data parameter
+        # For this example, we'll use a default zoning factor
+        zoning_factor = 1.0
+            
+        # Calculate final land value
+        land_value = area * land_value_per_unit * location_factor * neighborhood_factor * zoning_factor
+        
+        return land_value
+        
+    def _get_base_construction_cost(
+        self,
+        property_type: str,
+        subtype: str,
+        quality_grade: str
+    ) -> float:
+        """
+        Get base construction cost per square foot
+        
+        Uses Washington-specific cost tables (based on Marshall & Swift)
+        adjusted for local conditions and building quality
+        
+        Args:
+            property_type: Type of property
+            subtype: Specific subtype
+            quality_grade: Quality grade of construction
+            
+        Returns:
+            Base construction cost per square foot
+        """
+        # In production would use a full Marshall & Swift integration
+        # Here we use Washington-specific base costs from the knowledge base
+        
+        # Base construction costs from knowledge base
+        base_costs = self.get_knowledge("wa_construction_costs", "base_costs", {})
+        
+        # Get base cost for property type, defaulting to general residential
+        type_costs = base_costs.get(property_type, base_costs.get("residential", {}))
+        
+        # Get cost for subtype, defaulting to standard type cost
+        base_cost = type_costs.get(subtype, type_costs.get("standard", 150.0))
+        
+        # Apply quality adjustments per Washington assessment standards
+        quality_factors = {
+            "low": 0.85,
+            "fair": 0.9,
+            "average": 1.0,
+            "good": 1.15,
+            "very good": 1.3,
+            "excellent": 1.5,
+            "luxury": 2.0,
+            "mansion": 2.5
+        }
+        
+        quality_factor = quality_factors.get(quality_grade, 1.0)
+        
+        # Apply the quality factor
+        adjusted_cost = base_cost * quality_factor
+        
+        return adjusted_cost
+        
+    def _get_wa_regional_modifier(self, location: str) -> float:
+        """
+        Get Washington-specific regional cost modifier
+        
+        Different regions in Washington have different construction cost bases,
+        this provides the appropriate modifier for the location
+        
+        Args:
+            location: Property location
+            
+        Returns:
+            Regional cost modifier
+        """
+        # Get regional modifiers from knowledge base or use defaults
+        wa_regional_modifiers = self.get_knowledge("methodologies", "cost_approach", {}).get("wa_cost_modifiers", {})
+        
+        # Default to Eastern Washington / Benton County
+        modifier = wa_regional_modifiers.get("benton_county", 0.98)
+        
+        # Check for more specific locations
+        if "seattle" in location or "king county" in location:
+            modifier = wa_regional_modifiers.get("puget_sound", 1.12)
+        elif "tacoma" in location or "pierce county" in location:
+            modifier = wa_regional_modifiers.get("puget_sound", 1.12)
+        elif "spokane" in location:
+            modifier = wa_regional_modifiers.get("eastern_wa", 0.97)
+        elif "vancouver" in location or "clark county" in location:
+            modifier = wa_regional_modifiers.get("western_wa", 1.05)
+        elif "olympia" in location or "thurston county" in location:
+            modifier = wa_regional_modifiers.get("western_wa", 1.05)
+            
+        return modifier
+        
+    def _calculate_site_improvements(self, property_data: Dict[str, Any]) -> float:
+        """
+        Calculate site improvement value
+        
+        In Washington, site improvements are typically assessed separately
+        from the main building and include landscaping, driveways, etc.
+        
+        Args:
+            property_data: Property data
+            
+        Returns:
+            Site improvement value
+        """
+        # If site improvements are explicitly provided, use them
+        if "site_improvements" in property_data:
+            return property_data.get("site_improvements", 0)
+            
+        # Otherwise, estimate based on property type and land area
+        property_type = property_data.get("property_type", "").lower()
+        land_area = property_data.get("land_area", 0)
+        building_area = property_data.get("building_area", 0)
+        
+        # Calculate site improvement percentage based on property type
+        # These are typical percentages used in Washington assessments
+        if property_type == "residential":
+            # For residential, typically 5-15% of building value
+            base_cost = self._get_base_construction_cost(
+                property_type, 
+                property_data.get("subtype", ""),
+                property_data.get("quality_grade", "average")
+            )
+            return building_area * base_cost * 0.1  # 10% of building value
+            
+        elif property_type in ["commercial", "retail", "office"]:
+            # For commercial, typically higher percentage for site work
+            base_cost = self._get_base_construction_cost(
+                property_type, 
+                property_data.get("subtype", ""),
+                property_data.get("quality_grade", "average")
+            )
+            return building_area * base_cost * 0.15  # 15% of building value
+            
+        elif property_type == "industrial":
+            # Industrial often has extensive site work
+            base_cost = self._get_base_construction_cost(
+                property_type, 
+                property_data.get("subtype", ""),
+                property_data.get("quality_grade", "average")
+            )
+            return building_area * base_cost * 0.2  # 20% of building value
+            
+        # Default fallback based on land area
+        if land_area > 0:
+            return land_area * 2.0  # $2 per square foot of land
+            
+        return 0
+        
+    def _calculate_effective_age(self, year_built: int, condition: str) -> int:
+        """
+        Calculate effective age based on actual age and condition
+        
+        Washington assessors use effective age rather than actual age
+        to account for remodeling, maintenance, and condition
+        
+        Args:
+            year_built: Year property was built
+            condition: Condition of property
+            
+        Returns:
+            Effective age in years
+        """
+        current_year = datetime.datetime.now().year
+        actual_age = max(0, current_year - year_built)
+        
+        # Apply condition adjustment to actual age
+        # Washington typically uses condition to adjust effective age
+        condition_factors = {
+            "excellent": 0.5,  # Half the actual age
+            "very good": 0.6,
+            "good": 0.7,
+            "average": 1.0,  # Same as actual age
+            "fair": 1.2,
+            "poor": 1.5,
+            "very poor": 1.7,
+            "unsound": 2.0  # Twice the actual age
+        }
+        
+        condition_factor = condition_factors.get(condition, 1.0)
+        effective_age = int(actual_age * condition_factor)
+        
+        return effective_age
+        
+    def _calculate_physical_depreciation(self, effective_age: int, property_type: str) -> float:
+        """
+        Calculate physical depreciation percentage
+        
+        Washington assessors typically use a modified age-life method
+        with different expected lifespans based on property type
+        
+        Args:
+            effective_age: Effective age of property
+            property_type: Type of property
+            
+        Returns:
+            Physical depreciation percentage (as a decimal)
+        """
+        # Get typical lifespan for property type from Washington standards
+        typical_lifespans = {
+            "residential": 60,
+            "apartment": 50,
+            "commercial": 45,
+            "retail": 40,
+            "office": 45,
+            "industrial": 50,
+            "warehouse": 50,
+            "agricultural": 40
+        }
+        
+        # Get typical lifespan for this property type
+        typical_lifespan = typical_lifespans.get(property_type, 50)
+        
+        # Calculate straight-line depreciation percentage
+        # Washington typically uses a straight-line method with a residual value
+        max_depreciation = 0.8  # Maximum 80% depreciation (20% residual)
+        
+        # Calculate percentage
+        if effective_age >= typical_lifespan:
+            return max_depreciation
+            
+        depreciation_pct = min(max_depreciation, effective_age / typical_lifespan)
+        
+        # Washington uses a calibrated curve rather than straight-line for early years
+        # Apply a slight curve to early years depreciation (first third of life)
+        if effective_age < (typical_lifespan / 3):
+            # Slightly accelerated early-year depreciation
+            depreciation_pct = depreciation_pct * 1.1
+            
+        return min(max_depreciation, depreciation_pct)
+        
+    def _calculate_functional_depreciation(
+        self,
+        year_built: int,
+        features: Dict[str, Any],
+        property_type: str
+    ) -> float:
+        """
+        Calculate functional depreciation percentage
+        
+        Washington assessors consider functional obsolescence separately
+        based on design, layout, and features compared to modern standards
+        
+        Args:
+            year_built: Year property was built
+            features: Property features/amenities
+            property_type: Type of property
+            
+        Returns:
+            Functional depreciation percentage (as a decimal)
+        """
+        # Start with base functional obsolescence based on age
+        current_year = datetime.datetime.now().year
+        actual_age = max(0, current_year - year_built)
+        
+        # Base functional obsolescence based on age brackets
+        # Washington typically considers properties built before certain
+        # key dates to have specific functional issues
+        base_functional_pct = 0.0
+        
+        if property_type in ["residential", "apartment"]:
+            if year_built < 1950:
+                base_functional_pct = 0.15  # Pre-1950 homes (older layouts, electrical, etc.)
+            elif year_built < 1970:
+                base_functional_pct = 0.1   # Pre-1970 homes (older systems, less energy efficient)
+            elif year_built < 1990:
+                base_functional_pct = 0.05  # Pre-1990 homes (older finishes, less open concepts)
+            elif year_built < 2000:
+                base_functional_pct = 0.02  # Pre-2000 homes (minor layout differences)
+                
+        elif property_type in ["commercial", "retail", "office"]:
+            if year_built < 1970:
+                base_functional_pct = 0.2   # Pre-1970 commercial (significant layout/systems issues)
+            elif year_built < 1990:
+                base_functional_pct = 0.15  # Pre-1990 commercial (older systems/tech infrastructure)
+            elif year_built < 2000:
+                base_functional_pct = 0.1   # Pre-2000 commercial (less efficient design)
+            elif year_built < 2010:
+                base_functional_pct = 0.05  # Pre-2010 commercial (minor tech/efficiency issues)
+                
+        elif property_type in ["industrial", "warehouse"]:
+            if year_built < 1970:
+                base_functional_pct = 0.25  # Pre-1970 industrial (major layout/height/loading issues)
+            elif year_built < 1990:
+                base_functional_pct = 0.15  # Pre-1990 industrial (older systems, lower clearance)
+            elif year_built < 2000:
+                base_functional_pct = 0.1   # Pre-2000 industrial (less efficient layout)
+            elif year_built < 2010:
+                base_functional_pct = 0.05  # Pre-2010 industrial (minor functionality issues)
+                
+        # Adjust based on feature data
+        # In Washington, renovations can reduce functional obsolescence
+        has_renovation = features.get("renovated", False)
+        renovation_year = features.get("renovation_year", 0)
+        
+        # Apply renovation adjustment if applicable
+        if has_renovation and renovation_year > 0:
+            # Calculate how recent the renovation was
+            years_since_renovation = max(0, current_year - renovation_year)
+            
+            # Recent renovations significantly reduce functional obsolescence
+            if years_since_renovation < 5:
+                base_functional_pct *= 0.3  # Reduce by 70%
+            elif years_since_renovation < 10:
+                base_functional_pct *= 0.5  # Reduce by 50%
+            elif years_since_renovation < 20:
+                base_functional_pct *= 0.7  # Reduce by 30%
+                
+        # Consider specific functional issues
+        if property_type in ["residential", "apartment"]:
+            # Check for layout issues common in Washington assessments
+            if features.get("layout", "") == "poor":
+                base_functional_pct += 0.05
+            
+            # Check for bathroom/bedroom ratio issues
+            bedrooms = features.get("bedrooms", 0)
+            bathrooms = features.get("bathrooms", 0)
+            if bedrooms > 0 and bathrooms > 0:
+                if bathrooms < (bedrooms / 2):
+                    # Insufficient bathrooms - common functional issue
+                    base_functional_pct += 0.03
+                    
+        elif property_type in ["commercial", "retail", "office"]:
+            # Check for retail-specific functional issues
+            if property_type == "retail" and features.get("storefront", "") == "poor":
+                base_functional_pct += 0.05
+                
+            # Check for parking issues
+            if features.get("parking_ratio", 0) < 3:  # Less than 3 spaces per 1000 SF
+                base_functional_pct += 0.03
+                
+        elif property_type in ["industrial", "warehouse"]:
+            # Check for ceiling height issues (critical for industrial)
+            ceiling_height = features.get("ceiling_height", 0)
+            if ceiling_height > 0:
+                if ceiling_height < 16:  # Less than 16 feet
+                    base_functional_pct += 0.1
+                elif ceiling_height < 24:  # Less than 24 feet
+                    base_functional_pct += 0.05
+                    
+            # Check for truck access issues
+            if features.get("truck_access", "") == "poor":
+                base_functional_pct += 0.07
+                
+        # Cap functional obsolescence at reasonable maximum
+        return min(0.5, base_functional_pct)
+        
+    def _calculate_external_depreciation(
+        self,
+        location: str,
+        property_type: str,
+        external_factors: Dict[str, Any]
+    ) -> float:
+        """
+        Calculate external/economic depreciation percentage
+        
+        Washington assessors consider economic obsolescence based on
+        location issues, market conditions, and external influences
+        
+        Args:
+            location: Property location
+            property_type: Type of property
+            external_factors: External influence factors
+            
+        Returns:
+            External depreciation percentage (as a decimal)
+        """
+        # Start with no external obsolescence
+        external_pct = 0.0
+        
+        # Check location factors common in Washington
+        location_lower = location.lower()
+        
+        # Washington assessors consider flood zones a significant factor
+        if external_factors.get("flood_zone", False):
+            flood_zone = external_factors.get("flood_zone_type", "")
+            if flood_zone == "A" or flood_zone == "AE":
+                external_pct += 0.1  # 100-year flood zone
+            elif flood_zone == "X":
+                external_pct += 0.03  # 500-year flood zone
+                
+        # Traffic impacts (both positive and negative)
+        traffic_level = external_factors.get("traffic_level", "")
+        if property_type in ["residential", "apartment"]:
+            # High traffic is negative for residential
+            if traffic_level == "high":
+                external_pct += 0.07
+            elif traffic_level == "medium":
+                external_pct += 0.03
+        elif property_type in ["retail", "commercial"]:
+            # Low traffic is negative for retail
+            if traffic_level == "low":
+                external_pct += 0.05
+                
+        # Environmental issues
+        if external_factors.get("environmental_issue", False):
+            external_pct += 0.1
+            
+        # Proximity to nuisances
+        if external_factors.get("proximity_to_nuisance", False):
+            external_pct += 0.05
+            
+        # Economic conditions of the area
+        economic_condition = external_factors.get("economic_condition", "stable")
+        if economic_condition == "declining":
+            external_pct += 0.1
+        elif economic_condition == "distressed":
+            external_pct += 0.2
+            
+        # For commercial/industrial, consider special cases
+        if property_type in ["commercial", "industrial", "retail"]:
+            # Access issues
+            if external_factors.get("limited_access", False):
+                external_pct += 0.07
+                
+            # Zoning restrictions
+            if external_factors.get("zoning_restriction", False):
+                external_pct += 0.05
+                
+        # Cap external obsolescence at reasonable maximum
+        return min(0.7, external_pct)
+        
+    def _calculate_total_depreciation(
+        self,
+        physical_pct: float,
+        functional_pct: float,
+        external_pct: float
+    ) -> float:
+        """
+        Calculate total depreciation percentage using Washington method
+        
+        Washington assessors use a compound calculation rather than
+        simple addition to avoid excessive total depreciation
+        
+        Args:
+            physical_pct: Physical depreciation percentage
+            functional_pct: Functional depreciation percentage
+            external_pct: External depreciation percentage
+            
+        Returns:
+            Total depreciation percentage (as a decimal)
+        """
+        # Washington method (compound depreciation rather than additive)
+        # Avoid double-counting across categories
+        
+        # Start with physical depreciation
+        remaining_value = 1.0 - physical_pct
+        
+        # Apply functional to remaining value
+        remaining_value = remaining_value * (1.0 - functional_pct)
+        
+        # Apply external to remaining value
+        remaining_value = remaining_value * (1.0 - external_pct)
+        
+        # Calculate total depreciation
+        total_depreciation = 1.0 - remaining_value
+        
+        # Cap at 90% total depreciation per Washington guidelines
+        return min(0.9, total_depreciation)
+        
+    def _calculate_cost_confidence_score(
+        self,
+        property_data: Dict[str, Any],
+        base_cost: float,
+        land_value: float,
+        physical_depreciation: float,
+        year_built: int
+    ) -> float:
+        """
+        Calculate confidence score for cost approach
+        
+        Args:
+            property_data: Property data
+            base_cost: Base construction cost per square foot
+            land_value: Calculated land value
+            physical_depreciation: Physical depreciation percentage
+            year_built: Year property was built
+            
+        Returns:
+            Confidence score between 0 and 1
+        """
+        # Start with base confidence
+        score = 0.5
+        
+        # 1. Appropriateness of method for property type
+        property_type = property_data.get("property_type", "").lower()
+        property_age = datetime.datetime.now().year - year_built
+        
+        # Cost approach works best for newer properties and special purpose properties
+        if property_age < 10:
+            score += 0.2  # Newer properties have higher confidence
+        elif property_age < 20:
+            score += 0.1
+        elif property_age > 40:
+            score -= 0.1  # Older properties have lower confidence
+        
+        # Property type appropriateness
+        if property_type in ["special_purpose", "industrial", "institutional"]:
+            score += 0.15  # Best for special purpose properties
+        elif property_type in ["commercial", "mixed_use"]:
+            score += 0.1   # Good for commercial
+        elif property_type == "new_construction":
+            score += 0.25  # Excellent for new construction
+            
+        # 2. Data quality factors
+        if base_cost > 0:
+            score += 0.1  # Have reliable cost data
+        else:
+            score -= 0.2  # Missing critical data
+            
+        if land_value > 0:
+            score += 0.1  # Have reliable land value
+        else:
+            score -= 0.1  # Missing critical data
+            
+        # Depreciation appropriateness
+        if property_age < 5 and physical_depreciation < 0.1:
+            score += 0.1  # Minimal depreciation for new properties is appropriate
+        elif property_age > 30 and physical_depreciation < 0.3:
+            score -= 0.1  # Suspiciously low depreciation for older property
+        elif property_age > 50 and physical_depreciation > 0.7:
+            score -= 0.05  # Very high depreciation may be subjective
+            
+        # 3. Special factors
+        if property_data.get("recent_cost_data", False):
+            score += 0.15  # Recent actual construction cost available
+            
+        if property_data.get("special_construction", False):
+            score += 0.1  # Special construction type favors cost approach
+            
+        # Normalize score to 0-1 range
+        final_score = min(max(score, 0.0), 1.0)
+        
+        return final_score
     
     def _hybrid_approach(self, property_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -1732,6 +2431,52 @@ class PropertyValuationAgent(BaseAgent):
         # Washington market trends (would be regularly updated in a real system)
         self.add_knowledge("wa_market_trends", "monthly_change", 0.006)  # 0.6% monthly appreciation
         self.add_knowledge("wa_market_trends", "annual_change", 0.072)   # 7.2% annual appreciation
+        
+        # Washington construction costs (based on Marshall & Swift with regional adjustments)
+        self.add_knowledge("wa_construction_costs", "base_costs", {
+            "residential": {
+                "standard": 175.0,
+                "custom": 225.0,
+                "luxury": 300.0,
+                "economy": 140.0
+            },
+            "apartment": {
+                "standard": 165.0,
+                "garden": 155.0,
+                "mid_rise": 185.0,
+                "high_rise": 210.0
+            },
+            "commercial": {
+                "standard": 195.0,
+                "office": 205.0,
+                "retail": 180.0,
+                "restaurant": 220.0
+            },
+            "industrial": {
+                "standard": 125.0,
+                "warehouse": 110.0,
+                "manufacturing": 145.0,
+                "flex": 155.0
+            }
+        })
+        
+        # Washington land values (per square foot and per acre)
+        self.add_knowledge("wa_land_values", "per_sf", {
+            "residential": 10.0,
+            "apartment": 15.0,
+            "commercial": 18.0,
+            "retail": 22.0,
+            "office": 20.0,
+            "industrial": 8.0
+        })
+        
+        self.add_knowledge("wa_land_values", "per_acre", {
+            "residential": 250000.0,
+            "agricultural": 25000.0,
+            "timber": 10000.0,
+            "commercial": 500000.0,
+            "industrial": 300000.0
+        })
         
         # Washington view type adjustments (critical in WA markets)
         self.add_knowledge("wa_view_adjustments", "factors", {
