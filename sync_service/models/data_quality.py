@@ -82,6 +82,7 @@ class DataQualityReport(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     report_name = db.Column(db.String(128), nullable=False)
+    report_type = db.Column(db.String(32), default='default')  # Type of report (default, monthly, custom, etc.)
     tables_checked = db.Column(JsonType, nullable=False)  # List of tables included in the report
     overall_score = db.Column(db.Float, nullable=True)  # Overall quality score (0-100)
     report_data = db.Column(JsonType, nullable=False)  # Full report data
@@ -89,6 +90,10 @@ class DataQualityReport(db.Model):
     high_issues = db.Column(db.Integer, default=0)  # Number of high severity issues
     medium_issues = db.Column(db.Integer, default=0)  # Number of medium severity issues
     low_issues = db.Column(db.Integer, default=0)  # Number of low severity issues
+    report_file_path = db.Column(db.String(255), nullable=True)  # Path to saved PDF report
+    report_format = db.Column(db.String(32), default='pdf')  # Format of the report (pdf, excel, etc.)
+    start_date = db.Column(db.DateTime, nullable=True)  # Start date for report period
+    end_date = db.Column(db.DateTime, nullable=True)  # End date for report period
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
 

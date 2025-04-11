@@ -33,7 +33,8 @@ class QualityReportGenerator:
     
     def generate_pdf_report(self, report_id: Optional[int] = None, 
                           start_date: Optional[datetime.datetime] = None,
-                          end_date: Optional[datetime.datetime] = None) -> Tuple[bytes, str]:
+                          end_date: Optional[datetime.datetime] = None,
+                          save_to_db: bool = True) -> Tuple[bytes, str, Optional[int]]:
         """
         Generate a PDF report for the specified time period or report ID.
         
@@ -41,9 +42,10 @@ class QualityReportGenerator:
             report_id: Optional ID of a specific report to use as the base
             start_date: Optional start date for the report period
             end_date: Optional end date for the report period
+            save_to_db: Whether to save the report metadata to the database
             
         Returns:
-            Tuple of (PDF bytes, filename)
+            Tuple of (PDF bytes, filename, report_id)
         """
         # Get report data
         summary, anomaly_summary, recent_anomalies, table_metrics, recommendations = self._get_report_data(
@@ -72,7 +74,53 @@ class QualityReportGenerator:
         # Generate filename with date and ID
         filename = f"quality_report_{datetime.datetime.now().strftime('%Y%m%d')}_{report_uuid}.pdf"
         
-        return pdf_bytes, filename
+        # Save report to filesystem
+        reports_dir = os.path.join('uploads', 'reports')
+        if not os.path.exists(reports_dir):
+            os.makedirs(reports_dir, exist_ok=True)
+            
+        file_path = os.path.join(reports_dir, filename)
+        with open(file_path, 'wb') as f:
+            f.write(pdf_bytes)
+            
+        # Save report metadata to database
+        db_report_id = None
+        if save_to_db:
+            try:
+                # Create report record
+                report = DataQualityReport(
+                    report_name=f"Quality Report {datetime.datetime.now().strftime('%Y-%m-%d')}",
+                    report_type='pdf',
+                    tables_checked=summary.get('tables_checked', []),
+                    overall_score=summary.get('overall_score', 0),
+                    report_data={
+                        'summary': summary,
+                        'anomaly_summary': anomaly_summary,
+                        'recent_anomalies': recent_anomalies,
+                        'table_metrics': table_metrics,
+                        'recommendations': recommendations
+                    },
+                    critical_issues=summary.get('critical_issues', 0),
+                    high_issues=summary.get('high_issues', 0),
+                    medium_issues=summary.get('medium_issues', 0),
+                    low_issues=summary.get('low_issues', 0),
+                    report_file_path=file_path,
+                    report_format='pdf',
+                    start_date=start_date,
+                    end_date=end_date,
+                    created_at=datetime.datetime.now()
+                )
+                
+                db.session.add(report)
+                db.session.commit()
+                db_report_id = report.id
+                
+                logger.info(f"Report saved to database with ID: {db_report_id}")
+            except Exception as e:
+                logger.error(f"Error saving report to database: {str(e)}")
+                db.session.rollback()
+        
+        return pdf_bytes, filename, db_report_id
     
     def _get_report_data(self, report_id: Optional[int] = None,
                         start_date: Optional[datetime.datetime] = None,
