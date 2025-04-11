@@ -11,6 +11,7 @@ import pandas as pd
 from typing import Dict, Any, Optional, List, Tuple, Union
 
 from sync_service.sqlite_export import SQLiteExporter
+from sync_service.multi_format_exporter import MultiFormatExporter
 from sync_service.incremental_sync import IncrementalSyncManager
 
 # Set up logging
@@ -26,10 +27,11 @@ class CountyDataSyncETL:
         """Initialize the ETL process.
         
         Args:
-            export_dir: Directory where SQLite database files will be stored.
+            export_dir: Directory where export files will be stored.
             sync_metadata_path: Path to the metadata file that stores the last sync time.
         """
-        self.exporter = SQLiteExporter(export_dir)
+        self.sqlite_exporter = SQLiteExporter(export_dir)
+        self.multi_exporter = MultiFormatExporter(export_dir)
         self.sync_manager = IncrementalSyncManager(sync_metadata_path)
         self.job_id = None
         
@@ -129,61 +131,111 @@ class CountyDataSyncETL:
     
     def load_stats_data(self, df: pd.DataFrame, 
                        incremental: bool = True,
-                       key_columns: Optional[List[str]] = None) -> Optional[str]:
-        """Load statistics data into a SQLite database.
+                       key_columns: Optional[List[str]] = None,
+                       formats: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Load statistics data into multiple formats.
         
         Args:
             df: DataFrame containing statistics data.
             incremental: Whether to perform an incremental update.
             key_columns: List of column names that form the unique key (for merging).
+            formats: List of export formats to use. Defaults to ['sqlite'].
             
         Returns:
-            Path to the SQLite database file.
+            Dictionary with export paths by format.
         """
         if df.empty:
             logger.info("No stats data to load")
-            return None
+            return {'sqlite': None}
             
         logger.info(f"Loading {len(df)} records to stats database")
         
-        if incremental and key_columns:
-            # Use merge for incremental update with key columns
-            return self.exporter.merge_with_stats_db(df, key_columns)
-        elif incremental:
-            # Use append for incremental update without key columns
-            return self.exporter.append_to_stats_db(df)
-        else:
-            # Create a new database for full refresh
-            return self.exporter.create_and_load_stats_db(df)
+        # Default to SQLite if no formats specified
+        if formats is None:
+            formats = ['sqlite']
+        
+        results = {}
+        
+        # For backward compatibility, still use SQLite exporter for SQLite format
+        if 'sqlite' in formats:
+            if incremental and key_columns:
+                # Use merge for incremental update with key columns
+                results['sqlite'] = self.sqlite_exporter.merge_with_stats_db(df, key_columns)
+            elif incremental:
+                # Use append for incremental update without key columns
+                results['sqlite'] = self.sqlite_exporter.append_to_stats_db(df)
+            else:
+                # Create a new database for full refresh
+                results['sqlite'] = self.sqlite_exporter.create_and_load_stats_db(df)
+            
+            # Remove 'sqlite' from formats to avoid processing it twice
+            formats = [fmt for fmt in formats if fmt != 'sqlite']
+        
+        # Process other formats using the multi-format exporter
+        if formats:
+            for fmt in formats:
+                if incremental and key_columns:
+                    # Use merge for incremental update with key columns
+                    results[fmt] = self.multi_exporter.merge_data(df, 'stats', fmt, key_columns)
+                else:
+                    # Export to the specified format
+                    results[fmt] = self.multi_exporter.export_data(df, 'stats', fmt)
+        
+        return results
     
     def load_working_data(self, df: pd.DataFrame, 
                          incremental: bool = True,
-                         key_columns: Optional[List[str]] = None) -> Optional[str]:
-        """Load working data into a SQLite database.
+                         key_columns: Optional[List[str]] = None,
+                         formats: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Load working data into multiple formats.
         
         Args:
             df: DataFrame containing working data.
             incremental: Whether to perform an incremental update.
             key_columns: List of column names that form the unique key (for merging).
+            formats: List of export formats to use. Defaults to ['sqlite'].
             
         Returns:
-            Path to the SQLite database file.
+            Dictionary with export paths by format.
         """
         if df.empty:
             logger.info("No working data to load")
-            return None
+            return {'sqlite': None}
             
         logger.info(f"Loading {len(df)} records to working database")
         
-        if incremental and key_columns:
-            # Use merge for incremental update with key columns
-            return self.exporter.merge_with_working_db(df, key_columns)
-        elif incremental:
-            # Use append for incremental update without key columns
-            return self.exporter.append_to_working_db(df)
-        else:
-            # Create a new database for full refresh
-            return self.exporter.create_and_load_working_db(df)
+        # Default to SQLite if no formats specified
+        if formats is None:
+            formats = ['sqlite']
+        
+        results = {}
+        
+        # For backward compatibility, still use SQLite exporter for SQLite format
+        if 'sqlite' in formats:
+            if incremental and key_columns:
+                # Use merge for incremental update with key columns
+                results['sqlite'] = self.sqlite_exporter.merge_with_working_db(df, key_columns)
+            elif incremental:
+                # Use append for incremental update without key columns
+                results['sqlite'] = self.sqlite_exporter.append_to_working_db(df)
+            else:
+                # Create a new database for full refresh
+                results['sqlite'] = self.sqlite_exporter.create_and_load_working_db(df)
+            
+            # Remove 'sqlite' from formats to avoid processing it twice
+            formats = [fmt for fmt in formats if fmt != 'sqlite']
+        
+        # Process other formats using the multi-format exporter
+        if formats:
+            for fmt in formats:
+                if incremental and key_columns:
+                    # Use merge for incremental update with key columns
+                    results[fmt] = self.multi_exporter.merge_data(df, 'working', fmt, key_columns)
+                else:
+                    # Export to the specified format
+                    results[fmt] = self.multi_exporter.export_data(df, 'working', fmt)
+        
+        return results
     
     def run_etl_workflow(self, 
                         source_connection,
@@ -197,7 +249,8 @@ class CountyDataSyncETL:
                         working_key_columns: Optional[List[str]] = None,
                         stats_transformations: Optional[Dict[str, Any]] = None,
                         working_transformations: Optional[Dict[str, Any]] = None,
-                        incremental: bool = True) -> Dict[str, Any]:
+                        incremental: bool = True,
+                        export_formats: Optional[List[str]] = None) -> Dict[str, Any]:
         """Run the complete ETL workflow.
         
         Args:
@@ -213,6 +266,8 @@ class CountyDataSyncETL:
             stats_transformations: Dictionary of transformation functions for stats data.
             working_transformations: Dictionary of transformation functions for working data.
             incremental: Whether to perform an incremental update.
+            export_formats: List of export formats to use. Defaults to ['sqlite'].
+                           Supported formats are 'sqlite', 'csv', 'json', and 'geojson'.
             
         Returns:
             Dictionary containing results of the ETL process.
@@ -251,14 +306,21 @@ class CountyDataSyncETL:
             
             stats_transformed_df = self.transform_data(stats_df, stats_transformations)
             
-            stats_db_path = self.load_stats_data(
+            stats_export_results = self.load_stats_data(
                 stats_transformed_df, 
                 incremental=incremental,
-                key_columns=stats_key_columns
+                key_columns=stats_key_columns,
+                formats=export_formats
             )
             
             results['stats']['stats_records'] = len(stats_df)
-            results['stats_db_path'] = stats_db_path
+            results['stats_db_path'] = stats_export_results.get('sqlite')
+            results['stats_export_paths'] = stats_export_results
+            
+            # Log exports
+            for fmt, path in stats_export_results.items():
+                if path:
+                    logger.info(f"Stats data exported to {fmt} format: {path}")
             
             # Extract and process working data
             logger.info("Processing working data")
