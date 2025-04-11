@@ -11,7 +11,7 @@ import time
 
 logger = logging.getLogger(__name__)
 
-def initialize_integrators():
+def initialize_integrators(*args, **kwargs):
     """Initialize and register all supported agent integrators"""
     start_time = time.time()
     integrators_count = 0
