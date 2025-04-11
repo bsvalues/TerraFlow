@@ -50,59 +50,78 @@ def generate_report():
     try:
         # Get form parameters
         report_format = request.form.get('format', 'pdf')
-        report_id = request.form.get('report_id')
-        if report_id:
-            try:
-                report_id = int(report_id)
-            except ValueError:
-                report_id = None
-                
-        # Parse date parameters if provided
+        scope = request.form.get('scope', 'latest')
+        
+        # Get content inclusion preferences
+        include_anomalies = request.form.get('include_anomalies') == 'true'
+        include_issues = request.form.get('include_issues') == 'true'
+        include_recommendations = request.form.get('include_recommendations') == 'true'
+        
+        # For the latest scope, we don't need a report_id or dates
+        report_id = None
         start_date = None
         end_date = None
         
-        start_date_str = request.form.get('start_date')
-        end_date_str = request.form.get('end_date')
+        # If custom date range is selected, parse date parameters
+        if scope == 'custom':
+            start_date_str = request.form.get('start_date')
+            end_date_str = request.form.get('end_date')
+            
+            if start_date_str:
+                try:
+                    start_date = datetime.datetime.strptime(start_date_str, '%Y-%m-%d')
+                except ValueError:
+                    pass
+                    
+            if end_date_str:
+                try:
+                    end_date = datetime.datetime.strptime(end_date_str, '%Y-%m-%d')
+                    # Set to end of day
+                    end_date = end_date.replace(hour=23, minute=59, second=59)
+                except ValueError:
+                    pass
         
-        if start_date_str:
-            try:
-                start_date = datetime.datetime.strptime(start_date_str, '%Y-%m-%d')
-            except ValueError:
-                pass
-                
-        if end_date_str:
-            try:
-                end_date = datetime.datetime.strptime(end_date_str, '%Y-%m-%d')
-                # Set to end of day
-                end_date = end_date.replace(hour=23, minute=59, second=59)
-            except ValueError:
-                pass
-                
+        # Create report options
+        report_options = {
+            'include_anomalies': include_anomalies,
+            'include_issues': include_issues,
+            'include_recommendations': include_recommendations
+        }
+        
         # Generate report based on format
         if report_format == 'pdf':
-            pdf_bytes, filename, new_report_id = report_generator.generate_pdf_report(
-                report_id=report_id,
-                start_date=start_date,
-                end_date=end_date
-            )
-            
-            # Return PDF as downloadable attachment
-            response = make_response(pdf_bytes)
-            response.headers['Content-Type'] = 'application/pdf'
-            response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
-            return response
+            try:
+                pdf_bytes, filename, new_report_id = report_generator.generate_pdf_report(
+                    report_id=report_id,
+                    start_date=start_date,
+                    end_date=end_date,
+                    options=report_options
+                )
+                
+                # Return PDF as downloadable attachment
+                response = make_response(pdf_bytes)
+                response.headers['Content-Type'] = 'application/pdf'
+                response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+                return response
+            except Exception as e:
+                logger.exception(f"Error generating PDF report: {str(e)}")
+                return render_template('data_quality/generate_report.html', 
+                                      error=f"Error generating report: {str(e)}")
         
         # Future: support for Excel reports
         elif report_format == 'excel':
             # Not implemented yet
-            return jsonify({'error': 'Excel format not implemented yet'}), 501
+            return render_template('data_quality/generate_report.html', 
+                                  error="Excel format is not implemented yet.")
             
         else:
-            return jsonify({'error': 'Unsupported format'}), 400
+            return render_template('data_quality/generate_report.html', 
+                                  error="Unsupported report format.")
             
     except Exception as e:
         logger.exception(f"Error generating report: {str(e)}")
-        return jsonify({'error': f'Error generating report: {str(e)}'}), 500
+        return render_template('data_quality/generate_report.html', 
+                              error=f"Error processing report request: {str(e)}")
 
 @quality_report_bp.route('/api/generate', methods=['POST'])
 @login_required
@@ -168,6 +187,60 @@ def api_generate_report():
     except Exception as e:
         logger.exception(f"Error generating report via API: {str(e)}")
         return jsonify({'error': f'Error generating report: {str(e)}'}), 500
+
+@quality_report_bp.route('/api/details/<int:report_id>', methods=['GET'])
+@login_required
+def get_report_details(report_id):
+    """Get details for a specific report."""
+    try:
+        # Find the report in the database
+        report = DataQualityReport.query.get(report_id)
+        if not report:
+            return jsonify({'error': 'Report not found'}), 404
+            
+        # Prepare response with report details
+        response = {
+            'id': report.id,
+            'report_name': report.report_name,
+            'created_at': report.created_at.isoformat(),
+            'report_type': report.report_type,
+            'overall_score': report.overall_score,
+            'critical_issues': report.critical_issues,
+            'high_issues': report.high_issues,
+            'medium_issues': report.medium_issues,
+            'low_issues': report.low_issues,
+            'start_date': report.start_date.isoformat() if report.start_date else None,
+            'end_date': report.end_date.isoformat() if report.end_date else None,
+            'summary': {}
+        }
+        
+        # Include summary data if available
+        if report.report_data:
+            try:
+                report_data = report.report_data
+                
+                # Add summary metrics
+                if 'summary' in report_data:
+                    response['summary'] = report_data['summary']
+                
+                # Add table metrics if available
+                if 'table_metrics' in report_data:
+                    response['table_metrics'] = report_data['table_metrics']
+                
+                # Add recent anomalies if available
+                if 'recent_anomalies' in report_data:
+                    response['recent_anomalies'] = report_data['recent_anomalies'][:5]  # Limit to 5 most recent
+                
+                # Add recommendations if available
+                if 'recommendations' in report_data:
+                    response['recommendations'] = report_data['recommendations']
+            except Exception as e:
+                logger.error(f"Error parsing report data: {str(e)}")
+                
+        return jsonify(response)
+    except Exception as e:
+        logger.exception(f"Error getting report details: {str(e)}")
+        return jsonify({'error': f'Error getting report details: {str(e)}'}), 500
 
 @quality_report_bp.route('/download/<int:report_id>', methods=['GET'])
 @login_required
