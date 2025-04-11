@@ -320,8 +320,8 @@ class DataQualityNotificationManager:
         # Add link to dashboard
         message += "\nView all anomalies on the Data Quality Dashboard."
         
-        # Create notification record
-        self._create_notifications(alert, title, message, 'anomaly', anomalies[0].id)
+        # Create notification record - using anomaly_id parameter, not issue_id
+        self._create_notifications(alert, title, message, 'anomaly', None, None, anomalies[0].id)
         
     def _send_score_alert(self, alert: DataQualityAlert, report: DataQualityReport):
         """

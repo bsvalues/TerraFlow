@@ -156,12 +156,25 @@ def api_generate_report():
             except ValueError:
                 pass
                 
+        # Get content inclusion preferences
+        include_anomalies = data.get('include_anomalies', True)
+        include_issues = data.get('include_issues', True)
+        include_recommendations = data.get('include_recommendations', True)
+        
+        # Create report options
+        report_options = {
+            'include_anomalies': include_anomalies,
+            'include_issues': include_issues,
+            'include_recommendations': include_recommendations
+        }
+        
         # Generate PDF report
         if report_format == 'pdf':
             pdf_bytes, filename, new_report_id = report_generator.generate_pdf_report(
                 report_id=report_id,
                 start_date=start_date,
-                end_date=end_date
+                end_date=end_date,
+                options=report_options
             )
             
             # Return base64 encoded PDF
@@ -267,11 +280,19 @@ def download_report(report_id):
                 start_date = report.start_date
                 end_date = report.end_date
                 
+                # Default options to include everything
+                report_options = {
+                    'include_anomalies': True,
+                    'include_issues': True,
+                    'include_recommendations': True
+                }
+                
                 # Generate new PDF
                 pdf_bytes, filename, _ = report_generator.generate_pdf_report(
                     report_id=report_id,
                     start_date=start_date,
                     end_date=end_date,
+                    options=report_options,
                     save_to_db=False  # Don't save duplicate entry
                 )
                 
