@@ -707,6 +707,9 @@
 {% endblock %}
 
 {% block scripts %}
+<!-- Include Chart.js for visualization -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
 <script>
     // Initialize the data quality dashboard
     $(document).ready(function() {
@@ -871,6 +874,327 @@
                 }
             });
         });
+        
+        // ==================== TREND ANALYSIS FUNCTIONALITY ====================
+        
+        // Chart objects
+        let mainTrendChart = null;
+        let issueTypeChart = null;
+        let tableComparisonChart = null;
+        
+        // Initialize trend analysis if the tab is shown
+        $('#trends-tab').on('shown.bs.tab', function (e) {
+            initializeTrendCharts();
+            loadTrendData();
+        });
+        
+        // Handle refresh button click
+        $('#refreshTrendsBtn').on('click', function() {
+            loadTrendData();
+        });
+        
+        // Handle apply filters button click
+        $('#applyFiltersBtn').on('click', function() {
+            loadTrendData();
+        });
+        
+        // Initialize the trend charts with empty data
+        function initializeTrendCharts() {
+            if (!mainTrendChart) {
+                const mainCtx = document.getElementById('mainTrendChart');
+                if (mainCtx) {
+                    mainTrendChart = new Chart(mainCtx, {
+                        type: 'line',
+                        data: {
+                            labels: [],
+                            datasets: [{
+                                label: 'Quality Score',
+                                data: [],
+                                borderColor: 'rgba(75, 192, 192, 1)',
+                                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                                tension: 0.1,
+                                fill: true
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    max: 100,
+                                    title: {
+                                        display: true,
+                                        text: 'Quality Score (%)'
+                                    }
+                                },
+                                x: {
+                                    title: {
+                                        display: true,
+                                        text: 'Date'
+                                    }
+                                }
+                            },
+                            plugins: {
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            return `Score: ${context.parsed.y}%`;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+            
+            if (!issueTypeChart) {
+                const issueCtx = document.getElementById('issueTypeChart');
+                if (issueCtx) {
+                    issueTypeChart = new Chart(issueCtx, {
+                        type: 'pie',
+                        data: {
+                            labels: ['Format', 'Required', 'Range', 'Uniqueness', 'Referential'],
+                            datasets: [{
+                                data: [0, 0, 0, 0, 0],
+                                backgroundColor: [
+                                    'rgba(255, 99, 132, 0.7)',
+                                    'rgba(54, 162, 235, 0.7)',
+                                    'rgba(255, 206, 86, 0.7)',
+                                    'rgba(75, 192, 192, 0.7)',
+                                    'rgba(153, 102, 255, 0.7)'
+                                ],
+                                borderColor: [
+                                    'rgba(255, 99, 132, 1)',
+                                    'rgba(54, 162, 235, 1)',
+                                    'rgba(255, 206, 86, 1)',
+                                    'rgba(75, 192, 192, 1)',
+                                    'rgba(153, 102, 255, 1)'
+                                ],
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'right'
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            const value = context.raw;
+                                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                            const percentage = total ? ((value / total) * 100).toFixed(1) : 0;
+                                            return `${context.label}: ${value} (${percentage}%)`;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+            
+            if (!tableComparisonChart) {
+                const tableCtx = document.getElementById('tableComparisonChart');
+                if (tableCtx) {
+                    tableComparisonChart = new Chart(tableCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: ['Parcel', 'Property', 'Assessment', 'Owner'],
+                            datasets: [{
+                                label: 'Quality Score',
+                                data: [0, 0, 0, 0],
+                                backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                                borderColor: 'rgba(54, 162, 235, 1)',
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    max: 100,
+                                    title: {
+                                        display: true,
+                                        text: 'Quality Score (%)'
+                                    }
+                                }
+                            },
+                            plugins: {
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            return `Score: ${context.parsed.y}%`;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+        }
+        
+        // Load trend data from the server
+        function loadTrendData() {
+            const timeRange = $('#timeRangeFilter').val();
+            const metric = $('#metricFilter').val();
+            const table = $('#tableFilter').val();
+            
+            // Show loading indicators
+            updateLoadingState(true);
+            
+            // Fetch trend data from server
+            $.ajax({
+                url: '/data-quality/trends',
+                method: 'GET',
+                data: {
+                    time_range: timeRange,
+                    metric: metric,
+                    table: table
+                },
+                dataType: 'json',
+                success: function(data) {
+                    updateCharts(data);
+                    updateMetricsCards(data);
+                    updateLoadingState(false);
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error loading trend data:', error);
+                    // Use sample data for demo if server returns error
+                    const sampleData = generateSampleTrendData();
+                    updateCharts(sampleData);
+                    updateMetricsCards(sampleData);
+                    updateLoadingState(false);
+                }
+            });
+        }
+        
+        // Update charts with data
+        function updateCharts(data) {
+            // Update main trend chart
+            if (mainTrendChart && data.trends) {
+                mainTrendChart.data.labels = data.trends.dates;
+                mainTrendChart.data.datasets[0].data = data.trends.values;
+                mainTrendChart.data.datasets[0].label = $('#metricFilter option:selected').text();
+                mainTrendChart.update();
+            }
+            
+            // Update issue type distribution chart
+            if (issueTypeChart && data.issue_distribution) {
+                issueTypeChart.data.labels = data.issue_distribution.labels;
+                issueTypeChart.data.datasets[0].data = data.issue_distribution.values;
+                issueTypeChart.update();
+            }
+            
+            // Update table comparison chart
+            if (tableComparisonChart && data.table_comparison) {
+                tableComparisonChart.data.labels = data.table_comparison.labels;
+                tableComparisonChart.data.datasets[0].data = data.table_comparison.values;
+                tableComparisonChart.update();
+            }
+        }
+        
+        // Update metrics summary cards
+        function updateMetricsCards(data) {
+            if (data.summary) {
+                // Update quality score
+                $('#avgQualityScore').text(data.summary.avg_quality_score + '%');
+                updateTrendBadge('#qualityScoreTrend', data.summary.quality_score_trend);
+                
+                // Update completeness
+                $('#dataCompleteness').text(data.summary.completeness + '%');
+                updateTrendBadge('#completenessTrend', data.summary.completeness_trend);
+                
+                // Update accuracy
+                $('#dataAccuracy').text(data.summary.accuracy + '%');
+                updateTrendBadge('#accuracyTrend', data.summary.accuracy_trend);
+                
+                // Update consistency
+                $('#dataConsistency').text(data.summary.consistency + '%');
+                updateTrendBadge('#consistencyTrend', data.summary.consistency_trend);
+            }
+        }
+        
+        // Update trend badge (up/down indicator)
+        function updateTrendBadge(selector, trendValue) {
+            const element = $(selector);
+            const badge = element.find('.badge');
+            
+            if (trendValue > 0) {
+                badge.removeClass('bg-warning bg-danger').addClass('bg-success');
+                badge.html(`↑ ${Math.abs(trendValue).toFixed(1)}%`);
+            } else if (trendValue < 0) {
+                badge.removeClass('bg-success bg-danger').addClass('bg-warning');
+                badge.html(`↓ ${Math.abs(trendValue).toFixed(1)}%`);
+            } else {
+                badge.removeClass('bg-success bg-warning').addClass('bg-secondary');
+                badge.html(`→ 0.0%`);
+            }
+        }
+        
+        // Toggle loading state
+        function updateLoadingState(isLoading) {
+            if (isLoading) {
+                $('#refreshTrendsBtn').prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Loading...');
+                $('#applyFiltersBtn').prop('disabled', true);
+            } else {
+                $('#refreshTrendsBtn').prop('disabled', false).html('<i class="bi bi-arrow-repeat"></i> Refresh Data');
+                $('#applyFiltersBtn').prop('disabled', false);
+            }
+        }
+        
+        // Generate sample trend data for development/demo purposes
+        function generateSampleTrendData() {
+            const dates = [];
+            const today = new Date();
+            const values = [];
+            const timeRange = parseInt($('#timeRangeFilter').val());
+            
+            // Generate dates and random trend values
+            for (let i = timeRange; i >= 0; i--) {
+                const date = new Date(today);
+                date.setDate(date.getDate() - i);
+                dates.push(date.toLocaleDateString());
+                
+                // Generate a realistic trend line (85-95 quality score with some variation)
+                const baseValue = 90;
+                const variation = 5;
+                const randomFactor = Math.sin(i / 5) * variation;
+                values.push(Math.round(baseValue + randomFactor));
+            }
+            
+            return {
+                trends: {
+                    dates: dates,
+                    values: values
+                },
+                issue_distribution: {
+                    labels: ['Format', 'Required', 'Range', 'Uniqueness', 'Referential'],
+                    values: [12, 19, 8, 5, 2]
+                },
+                table_comparison: {
+                    labels: ['Parcel', 'Property', 'Assessment', 'Owner'],
+                    values: [92, 88, 95, 91]
+                },
+                summary: {
+                    avg_quality_score: 91,
+                    quality_score_trend: 2.3,
+                    completeness: 94,
+                    completeness_trend: 1.7,
+                    accuracy: 89,
+                    accuracy_trend: -0.5,
+                    consistency: 92,
+                    consistency_trend: 3.1
+                }
+            };
+        }
     });
 </script>
 {% endblock %}

@@ -8,9 +8,11 @@ import logging
 import json
 import datetime
 from flask import Blueprint, render_template, request, jsonify, current_app, send_file
-from sqlalchemy import inspect, text
+from sqlalchemy import inspect, text, func, and_, desc
 import pandas as pd
 import io
+import numpy as np
+from datetime import datetime, timedelta
 
 from app import db
 from auth import login_required, permission_required
