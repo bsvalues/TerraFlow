@@ -23,7 +23,15 @@ quality_report_bp = Blueprint('quality_report', __name__, url_prefix='/data-qual
 @login_required
 def report_dashboard():
     """Render the report dashboard page."""
-    return render_template('data_quality/reports.html')
+    # Get recent reports
+    reports = []
+    try:
+        # Get the latest 10 reports
+        reports = DataQualityReport.query.order_by(DataQualityReport.created_at.desc()).limit(10).all()
+    except Exception as e:
+        logger.error(f"Error fetching reports: {str(e)}")
+        
+    return render_template('data_quality/reports.html', reports=reports)
 
 @quality_report_bp.route('/generate', methods=['GET'])
 @login_required
@@ -69,7 +77,7 @@ def generate_report():
                 
         # Generate report based on format
         if report_format == 'pdf':
-            pdf_bytes, filename = report_generator.generate_pdf_report(
+            pdf_bytes, filename, new_report_id = report_generator.generate_pdf_report(
                 report_id=report_id,
                 start_date=start_date,
                 end_date=end_date
@@ -128,7 +136,7 @@ def api_generate_report():
                 
         # Generate PDF report
         if report_format == 'pdf':
-            pdf_bytes, filename = report_generator.generate_pdf_report(
+            pdf_bytes, filename, new_report_id = report_generator.generate_pdf_report(
                 report_id=report_id,
                 start_date=start_date,
                 end_date=end_date
@@ -141,6 +149,7 @@ def api_generate_report():
             return jsonify({
                 'success': True,
                 'filename': filename,
+                'report_id': new_report_id,
                 'data': pdf_base64,
                 'format': 'pdf'
             })
@@ -157,12 +166,47 @@ def api_generate_report():
         logger.exception(f"Error generating report via API: {str(e)}")
         return jsonify({'error': f'Error generating report: {str(e)}'}), 500
 
-@quality_report_bp.route('/download/<report_id>', methods=['GET'])
+@quality_report_bp.route('/download/<int:report_id>', methods=['GET'])
 @login_required
 def download_report(report_id):
     """Download a previously generated report by ID."""
-    # For future implementation - store generated reports in database or filesystem
-    abort(501, "Report download by ID not implemented yet")
+    try:
+        with app.app_context():
+            # Find the report in the database
+            report = DataQualityReport.query.get(report_id)
+            if not report:
+                return jsonify({'error': 'Report not found'}), 404
+                
+            # Check if the report has a stored file
+            if report.report_file_path and os.path.exists(report.report_file_path):
+                # Return the stored file
+                return send_file(
+                    report.report_file_path,
+                    mimetype='application/pdf',
+                    as_attachment=True,
+                    download_name=os.path.basename(report.report_file_path)
+                )
+            else:
+                # If not stored or file missing, regenerate the report
+                start_date = report.start_date
+                end_date = report.end_date
+                
+                # Generate new PDF
+                pdf_bytes, filename, _ = report_generator.generate_pdf_report(
+                    report_id=report_id,
+                    start_date=start_date,
+                    end_date=end_date,
+                    save_to_db=False  # Don't save duplicate entry
+                )
+                
+                # Return PDF as downloadable attachment
+                response = make_response(pdf_bytes)
+                response.headers['Content-Type'] = 'application/pdf'
+                response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+                return response
+    except Exception as e:
+        logger.exception(f"Error downloading report: {str(e)}")
+        return jsonify({'error': f'Error downloading report: {str(e)}'}), 500
 
 def register_blueprint(app):
     """Register the blueprint with the app."""

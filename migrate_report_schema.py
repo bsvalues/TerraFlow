@@ -26,13 +26,16 @@ def migrate_report_table():
             FROM information_schema.columns 
             WHERE table_name = 'data_quality_report'
             """
-            existing_columns = [row[0] for row in conn.execute(columns_query)]
+            result = conn.execute(db.text(columns_query))
+            existing_columns = [row[0] for row in result]
+            
+            logger.info(f"Existing columns: {existing_columns}")
             
             # Add new columns if they don't exist
             new_columns = {
-                'report_type': 'VARCHAR(32)',
+                'report_type': 'VARCHAR(32) DEFAULT \'default\'',
                 'report_file_path': 'VARCHAR(255)',
-                'report_format': 'VARCHAR(32)',
+                'report_format': 'VARCHAR(32) DEFAULT \'pdf\'',
                 'start_date': 'TIMESTAMP',
                 'end_date': 'TIMESTAMP'
             }
@@ -45,7 +48,7 @@ def migrate_report_table():
                     if column_name not in existing_columns:
                         logger.info(f"Adding column {column_name} to data_quality_report")
                         alter_query = f"ALTER TABLE data_quality_report ADD COLUMN {column_name} {column_type}"
-                        conn.execute(alter_query)
+                        conn.execute(db.text(alter_query))
                     else:
                         logger.info(f"Column {column_name} already exists")
                 
