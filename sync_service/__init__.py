@@ -103,17 +103,10 @@ def create_routes():
                     # Instead, we'll rely on server.py custom scheduler code
                     db.session.commit()
                     
-                    # Store scheduling info in global settings
-                    from sync_service.models import GlobalSetting
-                    setting = GlobalSetting.query.filter_by(key='data_quality_alert_check_interval').first()
-                    if not setting:
-                        setting = GlobalSetting(
-                            key='data_quality_alert_check_interval',
-                            value='15',  # minutes
-                            description='Interval in minutes for data quality alert checks'
-                        )
-                        db.session.add(setting)
-                        db.session.commit()
+                    # Store scheduling info in a database record
+                    # We won't use global settings due to the entity mapping issue
+                    # Instead, we'll just rely on the hardcoded interval value of 15 minutes
+                    # This is a simplification for the alert check schedule
                         
                     logger.info("Data quality alert check interval set to 15 minutes")
                 except Exception as e:

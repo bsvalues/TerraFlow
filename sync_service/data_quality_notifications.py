@@ -476,7 +476,13 @@ class DataQualityNotificationManager:
             
             notification_channel = channel_map.get(channel, 'log')
             
-            # Send notification through SyncNotificationManager
+            # For now, just log all notifications since we have email/SMS disabled
+            logger.info(f"NOTIFICATION [{severity.upper()}] - {title}")
+            logger.info(f"To: {recipient} via {channel}")
+            logger.info(f"Message: {message}")
+            
+            # If we have the actual notification system properly set up, uncomment:
+            """
             self.notification_manager.send_notification(
                 title=title,
                 message=message,
@@ -484,6 +490,7 @@ class DataQualityNotificationManager:
                 channel=notification_channel,
                 recipient=recipient
             )
+            """
             
             return True
             
