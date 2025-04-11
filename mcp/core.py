@@ -326,7 +326,7 @@ class MCP:
         
         return report
 
-    def inject_protocol_handler(self) -> None:
+    def inject_protocol(self) -> None:
         """
         Inject the protocol into all registered agents
         
@@ -341,7 +341,7 @@ class MCP:
                 agent.send_inform.__defaults__ = agent.send_inform.__defaults__[:-1] + (self.protocol,)
                 agent.send_request.__defaults__ = agent.send_request.__defaults__[:-1] + (self.protocol,)
                 
-                logger.info(f"Injected protocol handler into agent {agent_id}")
+                logger.info(f"Injected protocol into agent {agent_id}")
                 
                 # Register default message handlers if they exist
                 if hasattr(agent, '_handle_query'):
@@ -438,7 +438,7 @@ class MCP:
                 payload=content
             )
             
-            # Send through the protocol handler
+            # Send through the protocol
             result = self.protocol.send_message(
                 message=message,
                 wait_for_response=wait_for_response,
@@ -562,8 +562,8 @@ class MCP:
             
             self.register_agent(agent_id, agent)
             
-            # Inject protocol handler
-            self.inject_protocol_handler()
+            # Inject protocol
+            self.inject_protocol()
             
             return agent_id
         except Exception as e:
