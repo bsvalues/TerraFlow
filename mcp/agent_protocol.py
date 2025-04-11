@@ -569,4 +569,3 @@ class AgentCommunicationProtocol:
             conv for conv in self.conversations.values()
             if conv.initiator_id == agent_id or conv.responder_id == agent_id
         ]
-"""

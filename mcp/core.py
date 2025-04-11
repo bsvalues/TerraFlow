@@ -4,16 +4,22 @@ Master Control Program (MCP) Core Module
 This module provides the central coordination for the MCP architecture,
 which manages and orchestrates the various specialized agents in the system.
 The MCP is designed as a central intelligence that delegates tasks to appropriate agents.
+
+The enhanced version now supports the Agent-to-Agent communication protocol,
+enabling specialized agents to collaborate effectively on complex assessment workflows.
 """
 
 import logging
 import threading
 import time
-from typing import Dict, List, Callable, Any, Optional
+from typing import Dict, List, Callable, Any, Optional, Union
 import importlib
 import os
 import sys
 import json
+
+# Agent-to-Agent protocol support
+from mcp.agent_protocol import AgentCommunicationProtocol, MessageType
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, 
@@ -21,7 +27,13 @@ logging.basicConfig(level=logging.INFO,
 logger = logging.getLogger('mcp')
 
 class MCP:
-    """Master Control Program coordinator class"""
+    """
+    Master Control Program coordinator class
+    
+    This class serves as the central coordination system for the agent-based architecture,
+    managing agent registration, task delegation, workflow orchestration, and inter-agent
+    communication through the Agent-to-Agent protocol.
+    """
     
     def __init__(self):
         """Initialize the MCP"""
@@ -32,7 +44,19 @@ class MCP:
         self.running = False
         self.worker_thread = None
         self.task_id_counter = 0
-        logger.info("MCP initialized")
+        
+        # Agent-to-Agent communication protocol
+        self.protocol_handler = AgentCommunicationProtocol(self)
+        
+        # Assessment domain customization
+        self.assessment_context = {
+            "state": "Washington",
+            "county": "Benton",
+            "current_assessment_year": time.strftime("%Y"),
+            "property_types": ["residential", "commercial", "agricultural", "industrial"]
+        }
+        
+        logger.info("MCP initialized with Agent-to-Agent protocol support")
     
     def register_agent(self, agent_id: str, agent_instance) -> bool:
         """Register an agent with the MCP"""
@@ -264,6 +288,214 @@ class MCP:
             report += "\n"
         
         return report
+
+    def inject_protocol_handler(self) -> None:
+        """
+        Inject the protocol handler into all registered agents
+        
+        This method provides each agent with a reference to the protocol handler,
+        enabling them to use the Agent-to-Agent communication functionality.
+        """
+        for agent_id, agent in self.agents.items():
+            # Add protocol handler to agent if it has the proper interface
+            if hasattr(agent, 'send_query') and hasattr(agent, 'send_inform') and hasattr(agent, 'send_request'):
+                # Inject the protocol handler into the agent's methods
+                agent.send_query.__defaults__ = agent.send_query.__defaults__[:-1] + (self.protocol_handler,)
+                agent.send_inform.__defaults__ = agent.send_inform.__defaults__[:-1] + (self.protocol_handler,)
+                agent.send_request.__defaults__ = agent.send_request.__defaults__[:-1] + (self.protocol_handler,)
+                
+                logger.info(f"Injected protocol handler into agent {agent_id}")
+                
+                # Register default message handlers if they exist
+                if hasattr(agent, '_handle_query'):
+                    self.protocol_handler.register_message_handler(
+                        agent_id,
+                        MessageType.QUERY,
+                        agent._handle_query
+                    )
+                
+                if hasattr(agent, '_handle_inform'):
+                    self.protocol_handler.register_message_handler(
+                        agent_id,
+                        MessageType.INFORM,
+                        agent._handle_inform
+                    )
+                
+                if hasattr(agent, '_handle_request'):
+                    self.protocol_handler.register_message_handler(
+                        agent_id,
+                        MessageType.REQUEST,
+                        agent._handle_request
+                    )
+    
+    def register_message_handler(
+        self, 
+        agent_id: str, 
+        message_type: Union[str, MessageType], 
+        handler: Callable
+    ) -> bool:
+        """
+        Register a message handler for an agent
+        
+        Args:
+            agent_id: ID of the agent
+            message_type: Type of message to handle
+            handler: Function to call when a message of this type is received
+            
+        Returns:
+            True if handler registered successfully, False otherwise
+        """
+        if agent_id not in self.agents:
+            logger.error(f"Cannot register handler for unknown agent {agent_id}")
+            return False
+        
+        # Convert string message types to enum if needed
+        if isinstance(message_type, str):
+            try:
+                message_type = MessageType(message_type)
+            except ValueError:
+                logger.error(f"Invalid message type: {message_type}")
+                return False
+        
+        self.protocol_handler.register_message_handler(agent_id, message_type, handler)
+        logger.info(f"Registered {message_type.value if isinstance(message_type, MessageType) else message_type} handler for agent {agent_id}")
+        return True
+    
+    def send_agent_message(
+        self,
+        sender_id: str,
+        receiver_id: str,
+        message_type: str,
+        content: Any,
+        wait_for_response: bool = False,
+        timeout: float = 30.0
+    ) -> Optional[Any]:
+        """
+        Send a message from one agent to another
+        
+        Args:
+            sender_id: ID of the sending agent
+            receiver_id: ID of the receiving agent
+            message_type: Type of message to send
+            content: Content of the message
+            wait_for_response: Whether to wait for a response
+            timeout: Timeout in seconds when waiting for response
+            
+        Returns:
+            Response message if wait_for_response is True, otherwise None
+        """
+        if sender_id not in self.agents:
+            logger.error(f"Unknown sending agent {sender_id}")
+            return None
+        
+        if receiver_id not in self.agents:
+            logger.error(f"Unknown receiving agent {receiver_id}")
+            return None
+        
+        try:
+            result = self.protocol_handler.send_message(
+                message_type=message_type,
+                content=content,
+                sender_id=sender_id,
+                receiver_id=receiver_id,
+                wait_for_response=wait_for_response,
+                timeout=timeout
+            )
+            
+            return result
+        except Exception as e:
+            logger.error(f"Error sending message from {sender_id} to {receiver_id}: {str(e)}")
+            return None
+    
+    def create_conversation(
+        self,
+        initiator_id: str,
+        responder_id: str,
+        topic: str
+    ) -> Optional[str]:
+        """
+        Create a conversation between two agents
+        
+        Args:
+            initiator_id: ID of the initiating agent
+            responder_id: ID of the responding agent
+            topic: Topic of the conversation
+            
+        Returns:
+            Conversation ID if successful, None otherwise
+        """
+        if initiator_id not in self.agents:
+            logger.error(f"Unknown initiating agent {initiator_id}")
+            return None
+        
+        if responder_id not in self.agents:
+            logger.error(f"Unknown responding agent {responder_id}")
+            return None
+        
+        try:
+            conversation_id = self.protocol_handler.create_conversation(
+                initiator_id=initiator_id,
+                responder_id=responder_id,
+                topic=topic
+            )
+            
+            logger.info(f"Created conversation {conversation_id} between {initiator_id} and {responder_id}")
+            return conversation_id
+        except Exception as e:
+            logger.error(f"Error creating conversation: {str(e)}")
+            return None
+    
+    def get_conversation(self, conversation_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get a conversation by ID
+        
+        Args:
+            conversation_id: ID of the conversation
+            
+        Returns:
+            Conversation data if found, None otherwise
+        """
+        try:
+            conversation = self.protocol_handler.get_conversation(conversation_id)
+            if conversation:
+                return conversation.to_dict()
+            return None
+        except Exception as e:
+            logger.error(f"Error getting conversation {conversation_id}: {str(e)}")
+            return None
+    
+    def register_workflow_agent(self, agent_type: str) -> str:
+        """
+        Register a specialized assessment agent with the MCP
+        
+        Args:
+            agent_type: Type of agent to register
+            
+        Returns:
+            ID of the registered agent
+        """
+        try:
+            # Import the agent class
+            module_path = f"mcp.agents.{agent_type}_agent"
+            class_name = f"{agent_type.title().replace('_', '')}Agent"
+            
+            module = importlib.import_module(module_path)
+            agent_class = getattr(module, class_name)
+            
+            # Create and register the agent
+            agent = agent_class()
+            agent_id = agent_type
+            
+            self.register_agent(agent_id, agent)
+            
+            # Inject protocol handler
+            self.inject_protocol_handler()
+            
+            return agent_id
+        except Exception as e:
+            logger.error(f"Error registering workflow agent {agent_type}: {str(e)}")
+            return ""
+
 
 # Create a global instance
 mcp_instance = MCP()
