@@ -1,7 +1,8 @@
 // Benton County GIS Map Viewer
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize the map
-    const map = L.map('map').setView([46.2362, -119.2478], 10); // Default to Benton County, WA
+    window.map = L.map('map').setView([46.2362, -119.2478], 10); // Default to Benton County, WA
+    const map = window.map;
 
     // Add OpenStreetMap base layer
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -166,7 +167,7 @@ function initMapControls(map) {
     }).addTo(map);
     
     // Add measurement tools
-    L.control.measure({
+    new L.Control.Measure({
         position: 'bottomleft',
         primaryLengthUnit: 'feet',
         secondaryLengthUnit: 'miles',
