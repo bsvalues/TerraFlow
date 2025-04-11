@@ -46,14 +46,16 @@ body {
     box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
 }
 
-/* Login page */
+/* Login page - dark theme */
 .login-container {
     max-width: 400px;
     margin: 0 auto;
     padding: 2rem;
-    background-color: var(--bs-light);
+    background-color: #2d2d2d !important;
     border-radius: 0.5rem;
-    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.4);
+    color: #ffffff !important;
+    border: 1px solid #444444;
 }
 
 .login-logo {
@@ -102,39 +104,47 @@ body {
     cursor: pointer;
 }
 
-/* Map viewer */
+/* Map viewer - dark theme */
 #map {
     width: 100%;
     height: 600px;
     border-radius: 0.5rem;
     margin-bottom: 1rem;
+    border: 1px solid #444444;
 }
 
 .map-controls {
-    background-color: var(--bs-light);
+    background-color: #2d2d2d !important;
     padding: 1rem;
     border-radius: 0.5rem;
     margin-bottom: 1rem;
+    border: 1px solid #444444;
+    color: #ffffff !important;
 }
 
 .feature-popup table {
     margin-bottom: 0;
+    color: #ffffff !important;
 }
 
 .map-sidebar {
     max-height: 600px;
     overflow-y: auto;
+    background-color: #333333 !important;
+    color: #ffffff !important;
 }
 
 .map-coordinates {
     font-family: monospace;
-    background-color: rgba(255, 255, 255, 0.8);
+    background-color: rgba(60, 60, 60, 0.9) !important;
+    color: #dddddd !important;
     padding: 0.25rem 0.5rem;
     border-radius: 0.25rem;
     font-size: 0.875rem;
+    border: 1px solid #444444;
 }
 
-/* Search page */
+/* Search page - dark theme */
 .search-container {
     max-width: 800px;
     margin: 0 auto;
@@ -146,50 +156,73 @@ body {
 
 .search-result-box {
     margin-bottom: 1.5rem;
+    background-color: #2d2d2d !important;
+    border: 1px solid #444444;
+    border-radius: 0.5rem;
+    padding: 1rem;
 }
 
 .answer-content {
     line-height: 1.6;
     margin-top: 1rem;
+    color: #ffffff !important;
 }
 
-/* Metadata modal */
+/* Metadata modal - dark theme */
 .metadata-modal-body {
     max-height: 70vh;
     overflow-y: auto;
+    background-color: #333333 !important;
+    color: #ffffff !important;
 }
 
 pre code {
-    background-color: var(--bs-gray-100);
-    border: 1px solid var(--bs-gray-300);
+    background-color: #222222 !important;
+    border: 1px solid #444444 !important;
     border-radius: 0.25rem;
     padding: 0.5rem;
     white-space: pre-wrap;
     font-size: 0.875rem;
+    color: #dddddd !important;
 }
 
-/* Dashboard */
+pre {
+    background-color: #222222 !important;
+    color: #dddddd !important;
+    border: 1px solid #444444 !important;
+}
+
+/* Dashboard - dark theme */
 .stats-card {
     text-align: center;
     padding: 1.5rem;
     border-radius: 0.5rem;
     margin-bottom: 1.5rem;
-    box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.05);
+    box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.2);
+    background-color: #2d2d2d !important;
+    color: #ffffff !important;
+    border: 1px solid #444444;
 }
 
 .stats-icon {
     font-size: 2.5rem;
     margin-bottom: 1rem;
+    color: #5599ff !important;
 }
 
 .stats-number {
     font-size: 2rem;
     font-weight: bold;
     margin-bottom: 0.5rem;
+    color: #ffffff !important;
 }
 
 .recent-activity {
     margin-top: 2rem;
+    background-color: #2d2d2d !important;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    border: 1px solid #444444;
 }
 
 /* Improved Headings - Using Benton County styling with dark theme */
@@ -245,20 +278,20 @@ h3 {
     color: #ffffff !important;
 }
 
-/* Form controls with better contrast - Using Benton County styling */
+/* Form controls with better contrast - Using Benton County styling with dark theme */
 .form-control, .form-select {
-    background-color: #ffffff;
-    color: #333333;
-    border: 1px solid #b3b3b3;
+    background-color: #444444 !important;
+    color: #ffffff !important;
+    border: 1px solid #555555 !important;
     font-size: 1rem;
     padding: 10px 12px;
 }
 
 .form-control:focus, .form-select:focus {
-    background-color: #ffffff;
-    color: #333333;
-    border-color: #005288; /* Benton County blue */
-    box-shadow: 0 0 0 0.25rem rgba(0, 82, 136, 0.25);
+    background-color: #3a3a3a !important;
+    color: #ffffff !important;
+    border-color: #005288 !important; /* Benton County blue */
+    box-shadow: 0 0 0 0.25rem rgba(0, 82, 136, 0.25) !important;
 }
 
 /* Buttons with better visibility - Using Benton County styling */
@@ -269,58 +302,81 @@ h3 {
 }
 
 .btn-primary {
-    background-color: #005288; /* Benton County blue */
-    border-color: #005288;
-    color: #ffffff;
+    background-color: #005288 !important; /* Benton County blue */
+    border-color: #005288 !important;
+    color: #ffffff !important;
 }
 
 .btn-primary:hover {
-    background-color: #003d66; /* Darker blue */
-    border-color: #003d66;
+    background-color: #003d66 !important; /* Darker blue */
+    border-color: #003d66 !important;
+}
+
+.btn-outline-primary {
+    border-color: #005288 !important;
+    color: #dddddd !important;
+    background-color: transparent !important;
+}
+
+.btn-outline-primary:hover {
+    background-color: #005288 !important;
+    color: #ffffff !important;
 }
 
 .btn-outline-secondary {
-    border-color: #737373;
-    color: #555555;
+    border-color: #777777 !important;
+    color: #dddddd !important;
+    background-color: transparent !important;
 }
 
 .btn-outline-secondary:hover {
-    background-color: #f0f0f0;
-    color: #333333;
-    border-color: #737373;
+    background-color: #555555 !important;
+    color: #ffffff !important;
+    border-color: #999999 !important;
 }
 
-/* Table improvements - Using Benton County styling */
+/* Table improvements - Using Benton County styling with dark theme */
 .table {
-    color: #333333;
-    border-color: #d9d9d9;
+    color: #ffffff !important;
+    border-color: #444444 !important;
 }
 
 .table-striped tbody tr:nth-of-type(odd) {
-    background-color: #f7f7f7;
+    background-color: #2d2d2d !important;
+}
+
+.table-striped tbody tr:nth-of-type(even) {
+    background-color: #333333 !important;
 }
 
 .table thead th {
-    background-color: #005288; /* Benton County blue */
-    color: #ffffff;
+    background-color: #005288 !important; /* Benton County blue */
+    color: #ffffff !important;
     font-weight: 500;
-    border-bottom: 2px solid #003d66;
+    border-bottom: 2px solid #003d66 !important;
 }
 
-/* Modal improvements - Using Benton County styling */
+.table-dark, .table-dark > th, .table-dark > td {
+    background-color: #2d2d2d !important;
+    color: #ffffff !important;
+}
+
+/* Modal improvements - Using Benton County styling with dark theme */
 .modal-content {
-    background-color: #ffffff;
-    border: 1px solid #d9d9d9;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    background-color: #333333 !important;
+    border: 1px solid #444444 !important;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3) !important;
+    color: #ffffff !important;
 }
 
 .modal-header {
-    background-color: #005288; /* Benton County blue */
-    color: #ffffff;
-    border-bottom: 1px solid #d9d9d9;
+    background-color: #005288 !important; /* Benton County blue */
+    color: #ffffff !important;
+    border-bottom: 1px solid #444444 !important;
 }
 
 .modal-footer {
-    background-color: #f7f7f7;
-    border-top: 1px solid #d9d9d9;
+    background-color: #2d2d2d !important;
+    border-top: 1px solid #444444 !important;
+    color: #ffffff !important;
 }
