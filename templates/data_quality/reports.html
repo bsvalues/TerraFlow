@@ -2,6 +2,20 @@
 
 {% block title %}Data Quality Reports{% endblock %}
 
+{% block styles %}
+<style>
+    .trend-up {
+        color: #28a745;
+    }
+    .trend-down {
+        color: #dc3545;
+    }
+    .trend-neutral {
+        color: #6c757d;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container mt-4">
     <div class="row mb-4">
@@ -60,7 +74,7 @@
                                     {% for report in reports %}
                                         <tr>
                                             <td>{{ report.report_name }}</td>
-                                            <td>{{ report.created_at }}</td>
+                                            <td>{{ report.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
                                             <td>
                                                 <div class="progress">
                                                     <div class="progress-bar 
@@ -80,10 +94,21 @@
                                                 {% if report.high_issues > 0 %}
                                                     <span class="badge bg-warning text-dark">{{ report.high_issues }} high</span>
                                                 {% endif %}
+                                                {% if report.medium_issues > 0 %}
+                                                    <span class="badge bg-info text-dark">{{ report.medium_issues }} medium</span>
+                                                {% endif %}
+                                                {% if report.low_issues > 0 %}
+                                                    <span class="badge bg-secondary">{{ report.low_issues }} low</span>
+                                                {% endif %}
                                             </td>
                                             <td>
                                                 <div class="btn-group btn-group-sm">
-                                                    <a href="{{ url_for('quality_report.generate_report', report_id=report.id) }}" class="btn btn-outline-primary">Download</a>
+                                                    <a href="{{ url_for('quality_report.download_report', report_id=report.id) }}" class="btn btn-outline-primary">
+                                                        <i class="bi bi-download"></i> Download
+                                                    </a>
+                                                    <button class="btn btn-outline-info view-report-details" data-id="{{ report.id }}">
+                                                        <i class="bi bi-eye"></i> View
+                                                    </button>
                                                 </div>
                                             </td>
                                         </tr>

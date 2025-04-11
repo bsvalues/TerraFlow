@@ -4,13 +4,16 @@ Quality Report Routes
 This module provides routes for generating and downloading data quality reports.
 """
 
+import os
 import logging
 import datetime
 from flask import Blueprint, request, jsonify, send_file, render_template, abort, make_response
 from io import BytesIO
 from werkzeug.exceptions import BadRequest
 
+from app import app, db
 from auth import login_required, permission_required
+from sync_service.models.data_quality import DataQualityReport
 from sync_service.quality_report_generator import report_generator
 
 # Configure logging

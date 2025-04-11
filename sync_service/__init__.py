@@ -145,6 +145,7 @@ def register_blueprints(app):
         # Try to import data quality routes
         try:
             from sync_service.data_quality_routes import data_quality_bp, register_data_quality_blueprint
+            from sync_service.quality_report_routes import quality_report_bp, register_blueprint as register_quality_report_blueprint
             has_data_quality = True
             logger.info("Data Quality module loaded successfully")
         except ImportError as e:
@@ -158,6 +159,7 @@ def register_blueprints(app):
         # Register data quality blueprint if available
         if has_data_quality:
             register_data_quality_blueprint(app)
+            register_quality_report_blueprint(app)
         
         # Initialize models
         with app.app_context():
