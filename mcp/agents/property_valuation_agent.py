@@ -915,61 +915,376 @@ class PropertyValuationAgent(BaseAgent):
     
     def _find_comparable_properties(self, subject_property: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
-        Find comparable properties for a subject property
+        Find comparable properties using Washington's assessment standards
+        
+        Washington State assessors typically define comparable properties as:
+        1. In the same or similar neighborhood
+        2. Similar property type (e.g., residential, commercial)
+        3. Similar size (within 20-30% of subject)
+        4. Similar age (within 10-15 years)
+        5. Similar quality/grade
+        6. Recent sales (typically within the last 12-24 months)
+        
+        This method implements these standards for comparable property selection.
         
         Args:
             subject_property: Subject property data
             
         Returns:
-            List of comparable properties
+            List of comparable properties meeting Washington standards
         """
-        # Placeholder implementation - in a real system, this would query the database
-        # Mock data for development purposes
-        # In production, this would be replaced with actual database queries
+        # In a production system, this would query the database
+        # Here we'll demonstrate the filtering logic with a sample property set
         
-        # In a real implementation, we would query the database for comparable properties
-        # based on location, size, features, etc.
-        # For now, returning an empty list as a placeholder
-        return []
+        # Extract key characteristics of subject property
+        subject_type = subject_property.get("property_type", "residential")
+        subject_neighborhood = subject_property.get("neighborhood", "")
+        subject_sqft = subject_property.get("building_area", 0)
+        subject_year_built = subject_property.get("year_built", 0)
+        subject_quality = subject_property.get("quality_grade", "average")
+        subject_bedrooms = subject_property.get("bedrooms", 0)
+        subject_bathrooms = subject_property.get("bathrooms", 0)
+        
+        # Query parameters for database search (in real implementation)
+        params = {
+            "property_type": subject_type,
+            "min_sqft": subject_sqft * 0.7 if subject_sqft else 0,  # 30% smaller
+            "max_sqft": subject_sqft * 1.3 if subject_sqft else 0,  # 30% larger
+            "min_year": subject_year_built - 15 if subject_year_built else 0,
+            "max_year": subject_year_built + 15 if subject_year_built else 0,
+            "bedrooms": subject_bedrooms,
+            "bathrooms": subject_bathrooms,
+            "neighborhoods": [subject_neighborhood] if subject_neighborhood else []
+        }
+        
+        # Add nearby neighborhoods (in real implementation)
+        if subject_neighborhood:
+            nearby = self.get_knowledge("wa_neighborhoods", f"{subject_neighborhood}_nearby", [])
+            if nearby:
+                params["neighborhoods"].extend(nearby)
+                
+        # Get sales within the last 24 months (in real implementation)
+        current_date = datetime.datetime.now().date()
+        min_sale_date = (current_date - datetime.timedelta(days=730)).isoformat()  # 24 months
+        
+        # In a real implementation, we would execute a database query here
+        # For demonstration, we'll use sample property data
+        # This would be replaced with an actual database query in production
+        
+        # Sample comparable properties - these would come from a database in production
+        # Note: Using a small sample here for demonstration purposes
+        sample_properties = [
+            {
+                "property_id": "COMP001",
+                "property_type": "residential",
+                "neighborhood": subject_neighborhood,
+                "building_area": subject_sqft * 0.95,
+                "year_built": subject_year_built - 5 if subject_year_built else 1990,
+                "quality_grade": subject_quality,
+                "bedrooms": subject_bedrooms,
+                "bathrooms": subject_bathrooms,
+                "sale_price": 350000,
+                "sale_date": "2024-09-15",
+                "lot_size": 8000,
+                "view_type": "none",
+                "view_rating": 0
+            },
+            {
+                "property_id": "COMP002",
+                "property_type": "residential",
+                "neighborhood": subject_neighborhood,
+                "building_area": subject_sqft * 1.1,
+                "year_built": subject_year_built + 3 if subject_year_built else 2000,
+                "quality_grade": "good" if subject_quality == "average" else subject_quality,
+                "bedrooms": subject_bedrooms + 1,
+                "bathrooms": subject_bathrooms,
+                "sale_price": 425000,
+                "sale_date": "2024-06-22",
+                "lot_size": 9500,
+                "view_type": "mountain",
+                "view_rating": 2
+            },
+            {
+                "property_id": "COMP003",
+                "property_type": "residential",
+                "neighborhood": "Adjacent Neighborhood",
+                "building_area": subject_sqft * 0.9,
+                "year_built": subject_year_built - 10 if subject_year_built else 1985,
+                "quality_grade": subject_quality,
+                "bedrooms": subject_bedrooms,
+                "bathrooms": subject_bathrooms - 0.5,
+                "sale_price": 310000,
+                "sale_date": "2024-11-05",
+                "lot_size": 7200,
+                "view_type": "none",
+                "view_rating": 0
+            },
+            {
+                "property_id": "COMP004",
+                "property_type": "residential",
+                "neighborhood": subject_neighborhood,
+                "building_area": subject_sqft * 1.05,
+                "year_built": subject_year_built + 8 if subject_year_built else 2005,
+                "quality_grade": subject_quality,
+                "bedrooms": subject_bedrooms,
+                "bathrooms": subject_bathrooms + 1,
+                "sale_price": 390000,
+                "sale_date": "2024-08-11",
+                "lot_size": 8800,
+                "view_type": "none",
+                "view_rating": 0
+            },
+            {
+                "property_id": "COMP005",
+                "property_type": "residential",
+                "neighborhood": "Another Nearby Area",
+                "building_area": subject_sqft * 1.2,
+                "year_built": subject_year_built + 5 if subject_year_built else 2002,
+                "quality_grade": "excellent" if subject_quality != "excellent" else subject_quality,
+                "bedrooms": subject_bedrooms + 1,
+                "bathrooms": subject_bathrooms + 0.5,
+                "sale_price": 450000,
+                "sale_date": "2024-05-30",
+                "lot_size": 10200,
+                "view_type": "water",
+                "view_rating": 3
+            }
+        ]
+        
+        # In a production system, we would fetch real market data
+        # For now, using our sample data but applying Washington-specific filtering logic
+        
+        # Apply Washington-specific filtering:
+        filtered_comps = []
+        
+        for comp in sample_properties:
+            # Property type must match exactly (WA standard)
+            if comp["property_type"] != subject_type:
+                continue
+                
+            # Size must be within 30% (WA typically uses 20-30%)
+            comp_sqft = comp.get("building_area", 0)
+            if subject_sqft and comp_sqft:
+                size_diff_percent = abs(comp_sqft - subject_sqft) / subject_sqft
+                if size_diff_percent > 0.3:  # More than 30% different
+                    continue
+                    
+            # Year built should be within 15 years (WA standard)
+            comp_year = comp.get("year_built", 0)
+            if subject_year_built and comp_year:
+                if abs(comp_year - subject_year_built) > 15:
+                    continue
+                    
+            # Bedrooms/bathrooms should be similar (WA standard)
+            if subject_bedrooms and comp["bedrooms"]:
+                if abs(comp["bedrooms"] - subject_bedrooms) > 1:
+                    continue
+                    
+            # Check sale date - should be within past 24 months (WA standard)
+            # In a real implementation, this would be more robust date parsing
+            if "sale_date" in comp:
+                try:
+                    sale_date = datetime.datetime.strptime(comp["sale_date"], "%Y-%m-%d").date()
+                    months_diff = ((current_date.year - sale_date.year) * 12 + 
+                                  current_date.month - sale_date.month)
+                    if months_diff > 24:  # Older than 24 months
+                        continue
+                except (ValueError, TypeError):
+                    # Skip date check if format is invalid
+                    pass
+                    
+            # If it passed all filters, add to filtered comps
+            filtered_comps.append(comp)
+            
+        # Sort by similarity (most similar first)
+        # In WA assessment, proximity and physical similarity are key factors
+        def similarity_score(comp):
+            score = 0
+            
+            # Same neighborhood is best
+            if comp.get("neighborhood") == subject_neighborhood:
+                score += 30
+                
+            # Size similarity
+            comp_sqft = comp.get("building_area", 0)
+            if subject_sqft and comp_sqft:
+                size_diff_percent = abs(comp_sqft - subject_sqft) / subject_sqft
+                score += max(0, 20 - (size_diff_percent * 100))
+                
+            # Age similarity
+            comp_year = comp.get("year_built", 0)
+            if subject_year_built and comp_year:
+                year_diff = abs(comp_year - subject_year_built)
+                score += max(0, 15 - year_diff)
+                
+            # Sale date recency (more recent is better)
+            if "sale_date" in comp:
+                try:
+                    sale_date = datetime.datetime.strptime(comp["sale_date"], "%Y-%m-%d").date()
+                    months_diff = ((current_date.year - sale_date.year) * 12 + 
+                                 current_date.month - sale_date.month)
+                    score += max(0, 20 - months_diff)
+                except (ValueError, TypeError):
+                    pass
+                    
+            # Quality match
+            if comp.get("quality_grade") == subject_quality:
+                score += 15
+                
+            return score
+            
+        # Sort by similarity score (highest first)
+        filtered_comps.sort(key=similarity_score, reverse=True)
+        
+        # Limit to best 5 comparables per Washington standards
+        return filtered_comps[:5]
     
     # Knowledge base initialization
     
     def _initialize_knowledge_base(self) -> None:
-        """Initialize the knowledge base with valuation standards and references"""
+        """Initialize the knowledge base with Washington State valuation standards and references"""
         
         # Washington State assessment standards
+        # Based on RCW 84.40.030 (all property valued at 100% true and fair value)
         self.add_knowledge("wa_standards", "assessment_ratio", 1.0)
-        self.add_knowledge("wa_standards", "revaluation_cycle", 1)
-        self.add_knowledge("wa_standards", "appeal_deadline_days", 60)
+        self.add_knowledge("wa_standards", "revaluation_cycle", 1)  # Annual per RCW 36.21.080
+        self.add_knowledge("wa_standards", "appeal_deadline_days", 60)  # Per Washington statute
         
-        # Valuation methodologies
+        # Washington State regulatory references
+        self.add_knowledge("wa_rcw", "valuation", {
+            "RCW_84.40.030": "True and fair value standard for all property",
+            "RCW_84.41.041": "Physical inspection of property at least once every 6 years",
+            "RCW_84.33": "Timber and forest lands valuation",
+            "RCW_84.34": "Open space and agricultural land valuation",
+            "RCW_84.36": "Property tax exemptions", 
+            "RCW_84.26": "Historic property valuation"
+        })
+        
+        # Washington State valuation methodologies
         self.add_knowledge("methodologies", "sales_comparison", {
             "description": "Compares subject property to similar recently sold properties",
             "best_use": ["residential", "vacant_land", "small_commercial"],
-            "required_data": ["recent_sales", "property_characteristics"]
+            "required_data": ["recent_sales", "property_characteristics"],
+            "wa_standard": "Primary method for residential per WAC 458-53-130",
+            "wa_reliability_criteria": "COD < 15% for residential, < 20% for commercial",
+            "wa_sale_verification": "Per WAC 458-53-080"
         })
         
         self.add_knowledge("methodologies", "income_approach", {
             "description": "Values property based on income potential",
             "best_use": ["commercial", "multi_family", "industrial"],
-            "required_data": ["rental_rates", "expenses", "cap_rates"]
+            "required_data": ["rental_rates", "expenses", "cap_rates"],
+            "wa_standard": "Primary method for income properties per WAC 458-53-130",
+            "wa_cap_rates": {
+                "apartment": 0.065,
+                "office": 0.075,
+                "retail": 0.07,
+                "industrial": 0.08,
+                "mixed_use": 0.07
+            },
+            "wa_income_multipliers": {
+                "apartment": 8.5,
+                "office": 7.5, 
+                "retail": 8.0,
+                "industrial": 7.0
+            }
         })
         
         self.add_knowledge("methodologies", "cost_approach", {
             "description": "Values property based on cost to replace minus depreciation",
             "best_use": ["new_construction", "unique_properties", "industrial"],
-            "required_data": ["land_values", "construction_costs", "depreciation"]
+            "required_data": ["land_values", "construction_costs", "depreciation"],
+            "wa_standard": "Primary for special purpose properties per WAC 458-53-130",
+            "wa_cost_modifiers": {
+                "benton_county": 0.98,  # Regional cost modifier for Benton County
+                "eastern_wa": 0.97,
+                "western_wa": 1.05,
+                "puget_sound": 1.12
+            },
+            "wa_depreciation_standards": {
+                "physical": "Straight-line based on effective age/condition",
+                "functional": "Modified observed condition method",
+                "economic": "Market extraction method"
+            }
         })
         
-        # Property characteristics for valuation
+        # Washington specific neighborhood factors
+        # These would be derived from actual sales data analysis in a production system
+        # In a real implementation, this would be much more comprehensive
+        self.add_knowledge("wa_neighborhoods", "central_kennewick", 1.05)
+        self.add_knowledge("wa_neighborhoods", "west_richland", 1.10)
+        self.add_knowledge("wa_neighborhoods", "south_richland", 1.15)
+        self.add_knowledge("wa_neighborhoods", "central_pasco", 0.95)
+        self.add_knowledge("wa_neighborhoods", "finley", 0.90)
+        
+        # Nearby neighborhoods for comp searches
+        self.add_knowledge("wa_neighborhoods", "central_kennewick_nearby", 
+                          ["east_kennewick", "south_kennewick", "central_pasco"])
+        self.add_knowledge("wa_neighborhoods", "west_richland_nearby", 
+                          ["south_richland", "central_richland"])
+        
+        # Washington market trends (would be regularly updated in a real system)
+        self.add_knowledge("wa_market_trends", "monthly_change", 0.006)  # 0.6% monthly appreciation
+        self.add_knowledge("wa_market_trends", "annual_change", 0.072)   # 7.2% annual appreciation
+        
+        # Washington view type adjustments (critical in WA markets)
+        self.add_knowledge("wa_view_adjustments", "factors", {
+            "none": 1.00,
+            "territorial": 1.05,
+            "mountain": 1.10,
+            "river": 1.15,
+            "water": 1.20,
+            "puget_sound": 1.25,
+            "lake": 1.20
+        })
+        
+        # Special valuation adjustments per Washington State law
+        self.add_knowledge("wa_special_valuations", "types", {
+            "historic_property": {
+                "rcw": "RCW 84.26",
+                "description": "Special valuation for historic properties",
+                "requirements": ["Historic designation", "Rehabilitation costs >= 25% of value"],
+                "valuation_method": "Subtract rehabilitation costs from value for 10 years"
+            },
+            "current_use_farm": {
+                "rcw": "RCW 84.34",
+                "description": "Current use valuation for farm and agricultural land",
+                "requirements": ["Agricultural use", "Size and income requirements"],
+                "valuation_method": "Value based on farm income potential, not market value"
+            },
+            "open_space": {
+                "rcw": "RCW 84.34",
+                "description": "Current use valuation for open space land",
+                "requirements": ["Public benefit", "Approved application"],
+                "valuation_method": "Value based on current use, not highest and best use"
+            },
+            "designated_forest_land": {
+                "rcw": "RCW 84.33",
+                "description": "Special valuation for forest land",
+                "requirements": ["5+ acres", "Forest land use", "Approved application"],
+                "valuation_method": "Value based on productivity, not market value"
+            },
+            "senior_exemption": {
+                "rcw": "RCW 84.36.381",
+                "description": "Senior citizen and disabled persons exemption",
+                "requirements": ["Age 61+ or disabled", "Income limits", "Primary residence"],
+                "valuation_method": "Valuation not changed, but tax exemption applied"
+            }
+        })
+        
+        # Property characteristics for valuation (expanded for Washington markets)
         self.add_knowledge("characteristics", "residential", [
             "lot_size", "building_size", "year_built", "bedrooms", "bathrooms",
-            "quality", "condition", "location", "view", "amenities"
+            "quality", "condition", "location", "view", "amenities", "waterfront",
+            "heating_type", "garage_type", "stories", "basement", "roof_type",
+            "exterior_finish", "fireplaces", "school_district", "energy_features"
         ])
         
         self.add_knowledge("characteristics", "commercial", [
             "lot_size", "building_size", "year_built", "zoning", "use_type",
-            "income_potential", "expenses", "location", "access", "parking"
+            "income_potential", "expenses", "location", "access", "parking",
+            "construction_class", "ceiling_height", "office_pct", "frontage",
+            "loading_docks", "retail_exposure", "traffic_count", "visibility"
         ])
     
     # Utility methods
@@ -1050,50 +1365,355 @@ class PropertyValuationAgent(BaseAgent):
             "market_activity_index": 100.0
         }
     
+    def _get_neighborhood_adjustment_factor(
+        self,
+        subject_neighborhood: str,
+        comp_neighborhood: str
+    ) -> float:
+        """
+        Calculate neighborhood adjustment factor based on Washington assessment standards
+        
+        Washington State emphasizes neighborhood delineation as a key factor in the
+        assessment process per RCW 84.40.030 - this implements neighborhood equalization
+        
+        Args:
+            subject_neighborhood: Subject property's neighborhood identifier
+            comp_neighborhood: Comparable property's neighborhood identifier
+            
+        Returns:
+            Adjustment factor (1.0 = no adjustment)
+        """
+        # In production, this would query a market-derived neighborhood factor table
+        if subject_neighborhood == comp_neighborhood:
+            return 1.0
+            
+        # Check if we have neighborhood factor data in our knowledge base
+        # Neighborhood factors are derived from statistical analysis of sales
+        # in accordance with Washington assessment standards
+        subject_factor = self.get_knowledge("wa_neighborhoods", subject_neighborhood, 1.0)
+        comp_factor = self.get_knowledge("wa_neighborhoods", comp_neighborhood, 1.0)
+        
+        if subject_factor and comp_factor:
+            # Calculate relative difference in neighborhood values
+            return subject_factor / comp_factor
+            
+        # Default adjustment for different neighborhoods (5% difference)
+        # In a production environment, this would be derived from sales data
+        return 0.95
+        
+    def _get_time_adjustment_factor(
+        self,
+        subject_date: datetime.date,
+        comp_sale_date: datetime.date
+    ) -> float:
+        """
+        Calculate time adjustment factor based on Washington assessment standards
+        
+        Washington's property tax assessment system requires time adjustments for sales
+        older than set timeframes (typically 6-12 months) per RCW 84.40.030 and WAC 458-53
+        
+        Args:
+            subject_date: Assessment date for subject property (typically January 1)
+            comp_sale_date: Sale date of comparable property
+            
+        Returns:
+            Time adjustment factor (1.0 = no adjustment)
+        """
+        if not comp_sale_date or not subject_date:
+            return 1.0
+            
+        # Calculate months between dates
+        months_diff = ((subject_date.year - comp_sale_date.year) * 12 + 
+                      subject_date.month - comp_sale_date.month)
+                      
+        # No adjustment for sales within 3 months (WA standard practice)
+        if abs(months_diff) <= 3:
+            return 1.0
+            
+        # Get monthly market trend from knowledge base or use default
+        # Washington generally expects assessors to develop and apply time adjustments
+        monthly_trend = self.get_knowledge("wa_market_trends", "monthly_change", 0.005)
+        
+        # Calculate cumulative adjustment (compound interest formula)
+        adjustment = (1 + monthly_trend) ** months_diff
+        
+        return adjustment
+        
+    def _get_view_adjustment_factor(
+        self,
+        subject_property: Dict[str, Any],
+        comp_property: Dict[str, Any]
+    ) -> float:
+        """
+        Calculate view adjustment factor based on Washington assessment standards
+        
+        Washington State often requires significant adjustments for view properties,
+        especially for waterfront, mountain, or city views which have significant 
+        impact on market value.
+        
+        Args:
+            subject_property: Subject property data
+            comp_property: Comparable property data
+            
+        Returns:
+            View adjustment factor (1.0 = no adjustment)
+        """
+        subject_view_rating = subject_property.get("view_rating", 0)
+        comp_view_rating = comp_property.get("view_rating", 0)
+        
+        # If both have same view rating, no adjustment needed
+        if subject_view_rating == comp_view_rating:
+            return 1.0
+            
+        # View type matters significantly in Washington (water, mountain, etc.)
+        subject_view_type = subject_property.get("view_type", "none")
+        comp_view_type = comp_property.get("view_type", "none")
+        
+        # If the view types are different, use predefined adjustments from knowledge base
+        if subject_view_type != comp_view_type:
+            view_adjustments = self.get_knowledge("wa_view_adjustments", "factors", {})
+            subject_factor = view_adjustments.get(subject_view_type, 1.0)
+            comp_factor = view_adjustments.get(comp_view_type, 1.0)
+            return subject_factor / comp_factor
+            
+        # Otherwise use rating difference (each point = 2% value difference)
+        # Studies in WA markets suggest 2-5% per view rating point
+        rating_diff = subject_view_rating - comp_view_rating
+        return 1.0 + (rating_diff * 0.02)
+        
     def _adjust_comparables(
         self, 
         subject_property: Dict[str, Any], 
         comps: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
         """
-        Apply adjustments to comparable properties
+        Apply adjustments to comparable properties using Washington-specific standards
+        
+        This implements the Washington State adjustment methodology which emphasizes:
+        1. Location/neighborhood adjustments (WAC 458-53-020)
+        2. Time-based sales adjustments (WAC 458-53-080)
+        3. View adjustments (significant in WA waterfront/view markets)
+        4. Property characteristic adjustments (size, quality, etc.)
         
         Args:
             subject_property: Subject property data
             comps: List of comparable properties
             
         Returns:
-            List of adjusted comparable properties
+            List of adjusted comparable properties with Washington-specific adjustments
         """
-        # Placeholder method - in a real implementation, this would:
-        # 1. Identify differences between subject and comps
-        # 2. Apply adjustments based on market-derived factors
-        # 3. Return adjusted values
+        if not comps:
+            return []
+            
+        adjusted_comps = []
+        assessment_date = datetime.datetime.strptime(
+            subject_property.get("assessment_date", "2025-01-01"), 
+            "%Y-%m-%d"
+        ).date()
         
-        # For now, returning the input comps as a placeholder
-        return comps
+        for comp in comps:
+            # Create a copy to avoid modifying original
+            adjusted_comp = comp.copy()
+            
+            # Get original price
+            original_price = comp.get("sale_price", 0)
+            adjusted_price = original_price
+            
+            # Track adjustments for reporting
+            adjustments = []
+            
+            # 1. Apply time adjustment (sales date to assessment date)
+            if "sale_date" in comp:
+                try:
+                    sale_date = datetime.datetime.strptime(
+                        comp["sale_date"], "%Y-%m-%d"
+                    ).date()
+                    time_factor = self._get_time_adjustment_factor(assessment_date, sale_date)
+                    if time_factor != 1.0:
+                        time_adjustment = (time_factor - 1.0) * original_price
+                        adjusted_price += time_adjustment
+                        adjustments.append({
+                            "type": "time",
+                            "factor": time_factor,
+                            "amount": time_adjustment,
+                            "description": f"Time adjustment ({comp['sale_date']} to assessment date)"
+                        })
+                except (ValueError, TypeError):
+                    # If date parsing fails, skip time adjustment
+                    pass
+                    
+            # 2. Apply neighborhood adjustment
+            subject_neighborhood = subject_property.get("neighborhood", "")
+            comp_neighborhood = comp.get("neighborhood", "")
+            if subject_neighborhood and comp_neighborhood and subject_neighborhood != comp_neighborhood:
+                neighborhood_factor = self._get_neighborhood_adjustment_factor(
+                    subject_neighborhood, comp_neighborhood
+                )
+                if neighborhood_factor != 1.0:
+                    neighborhood_adjustment = (neighborhood_factor - 1.0) * original_price
+                    adjusted_price += neighborhood_adjustment
+                    adjustments.append({
+                        "type": "neighborhood",
+                        "factor": neighborhood_factor,
+                        "amount": neighborhood_adjustment,
+                        "description": f"Neighborhood adjustment ({comp_neighborhood} to {subject_neighborhood})"
+                    })
+                    
+            # 3. Apply view adjustment (very important in Washington State)
+            view_factor = self._get_view_adjustment_factor(subject_property, comp)
+            if view_factor != 1.0:
+                view_adjustment = (view_factor - 1.0) * original_price
+                adjusted_price += view_adjustment
+                adjustments.append({
+                    "type": "view",
+                    "factor": view_factor,
+                    "amount": view_adjustment,
+                    "description": f"View adjustment"
+                })
+                
+            # 4. Apply size adjustment (standard practice)
+            subject_sqft = subject_property.get("building_area", 0)
+            comp_sqft = comp.get("building_area", 0)
+            if subject_sqft and comp_sqft and subject_sqft != comp_sqft:
+                # Size adjustment using diminishing returns formula (standard in WA)
+                size_diff_percent = (subject_sqft - comp_sqft) / comp_sqft
+                # Apply with diminishing returns (0.5 factor typical in WA)
+                size_factor = 1.0 + (size_diff_percent * 0.5)
+                size_adjustment = (size_factor - 1.0) * original_price
+                adjusted_price += size_adjustment
+                adjustments.append({
+                    "type": "size",
+                    "factor": size_factor,
+                    "amount": size_adjustment,
+                    "description": f"Size adjustment ({comp_sqft} to {subject_sqft} sqft)"
+                })
+                
+            # 5. Apply quality/condition adjustment
+            subject_quality = subject_property.get("quality_grade", "average")
+            comp_quality = comp.get("quality_grade", "average")
+            if subject_quality != comp_quality:
+                # Quality grade lookup table (typical in WA assessment)
+                quality_factors = {
+                    "low": 0.85,
+                    "fair": 0.92,
+                    "average": 1.0,
+                    "good": 1.08,
+                    "excellent": 1.15,
+                    "luxury": 1.25
+                }
+                subject_quality_factor = quality_factors.get(subject_quality, 1.0)
+                comp_quality_factor = quality_factors.get(comp_quality, 1.0)
+                quality_factor = subject_quality_factor / comp_quality_factor
+                quality_adjustment = (quality_factor - 1.0) * original_price
+                adjusted_price += quality_adjustment
+                adjustments.append({
+                    "type": "quality",
+                    "factor": quality_factor,
+                    "amount": quality_adjustment,
+                    "description": f"Quality adjustment ({comp_quality} to {subject_quality})"
+                })
+            
+            # Store the adjusted price and all adjustments
+            adjusted_comp["adjusted_price"] = adjusted_price
+            adjusted_comp["adjustments"] = adjustments
+            adjusted_comp["total_adjustment"] = adjusted_price - original_price
+            adjusted_comp["total_adjustment_percent"] = ((adjusted_price - original_price) / original_price) * 100 if original_price else 0
+            
+            # In Washington State, if total adjustment exceeds 25%, the comp is considered less reliable
+            adjusted_comp["reliability"] = "low" if abs(adjusted_comp["total_adjustment_percent"]) > 25 else "high"
+            
+            adjusted_comps.append(adjusted_comp)
+            
+        return adjusted_comps
     
     def _reconcile_comparable_values(self, adjusted_comps: List[Dict[str, Any]]) -> float:
         """
-        Reconcile a final value from adjusted comparables
+        Reconcile a final value from adjusted comparables using Washington-specific standards
+        
+        Washington assessors typically use a weighted reconciliation approach that considers:
+        1. The reliability of each comparable (adjustment percentage)
+        2. The recency of the sale (more recent sales given higher weight)
+        3. The similarity of property characteristics
         
         Args:
             adjusted_comps: List of adjusted comparable properties
             
         Returns:
-            Reconciled value
+            Reconciled value per Washington valuation standards
         """
-        # Placeholder method - in a real implementation, this would:
-        # 1. Analyze the reliability of each comparable
-        # 2. Assign weights based on similarity and adjustment amounts
-        # 3. Calculate a weighted average or other statistical measure
+        if not adjusted_comps:
+            return 0.0
+            
+        # Get adjusted prices from all comparables
+        prices = [comp.get("adjusted_price", 0) for comp in adjusted_comps]
         
-        # For now, returning 0 as a placeholder
-        return 0.0
+        # If we have fewer than 3 comparables, just use simple average
+        # Washington assessors typically require 3-5 comparables minimum
+        if len(adjusted_comps) < 3:
+            return sum(prices) / len(prices) if prices else 0.0
+            
+        # Calculate weights based on reliability and total adjustment percentage
+        # In Washington, comparables with smaller adjustment percentages are given more weight
+        weights = []
+        for comp in adjusted_comps:
+            # Base weight starts at 1.0
+            weight = 1.0
+            
+            # Adjust weight based on reliability
+            reliability = comp.get("reliability", "high")
+            if reliability == "low":
+                weight *= 0.5
+                
+            # Adjust weight based on total adjustment percentage
+            # Washington assessors typically discount comps with large adjustments
+            adj_percent = abs(comp.get("total_adjustment_percent", 0))
+            if adj_percent > 20:
+                weight *= 0.7
+            elif adj_percent > 10:
+                weight *= 0.9
+                
+            # Adjust weight based on sale date recency (if available)
+            if "sale_date" in comp:
+                try:
+                    sale_date = datetime.datetime.strptime(comp["sale_date"], "%Y-%m-%d").date()
+                    today = datetime.date.today()
+                    months_ago = ((today.year - sale_date.year) * 12 + 
+                                  today.month - sale_date.month)
+                    
+                    # More recent sales get higher weight
+                    if months_ago <= 3:
+                        weight *= 1.2  # Very recent sales (0-3 months)
+                    elif months_ago <= 6:
+                        weight *= 1.1  # Recent sales (3-6 months)
+                    elif months_ago > 12:
+                        weight *= 0.8  # Older sales (> 12 months)
+                except (ValueError, TypeError):
+                    # If date parsing fails, don't adjust weight
+                    pass
+                    
+            weights.append(weight)
+            
+        # Normalize weights
+        total_weight = sum(weights)
+        if total_weight > 0:
+            normalized_weights = [w / total_weight for w in weights]
+        else:
+            # If all weights are 0, use equal weights
+            normalized_weights = [1.0 / len(adjusted_comps)] * len(adjusted_comps)
+            
+        # Calculate weighted average
+        weighted_value = sum(p * w for p, w in zip(prices, normalized_weights))
+        
+        # In Washington, assessors often round to nearest hundred for residential
+        return round(weighted_value / 100) * 100
     
     def _calculate_confidence_score(self, adjusted_comps: List[Dict[str, Any]]) -> float:
         """
-        Calculate a confidence score for the valuation
+        Calculate a confidence score for the valuation based on Washington assessment standards
+        
+        Washington State requires high confidence levels for assessment valuations,
+        typically measured through statistical reliability metrics like COD
+        (Coefficient of Dispersion) and comparable quality analysis
         
         Args:
             adjusted_comps: List of adjusted comparable properties
@@ -1101,10 +1721,110 @@ class PropertyValuationAgent(BaseAgent):
         Returns:
             Confidence score between 0 and 1
         """
-        # Placeholder method - in a real implementation, this would:
-        # 1. Evaluate the number and quality of comparables
-        # 2. Consider the size of adjustments
-        # 3. Analyze the variance in adjusted values
+        if not adjusted_comps:
+            return 0.0
+            
+        # Base factors affecting confidence in Washington assessments
+        num_comps = len(adjusted_comps)
         
-        # For now, returning a placeholder score
-        return 0.75
+        # 1. Number of comparables factor (WA assessors typically want 3-5 minimum)
+        if num_comps >= 5:
+            num_factor = 1.0
+        elif num_comps >= 3:
+            num_factor = 0.8
+        elif num_comps >= 1:
+            num_factor = 0.5
+        else:
+            return 0.0
+            
+        # 2. Adjustment size factor (smaller adjustments = higher confidence)
+        # Calculate average absolute adjustment percentage
+        total_adj_percent = sum(abs(comp.get("total_adjustment_percent", 0)) 
+                              for comp in adjusted_comps)
+        avg_adj_percent = total_adj_percent / num_comps if num_comps > 0 else 100
+        
+        # Washington assessors prefer adjustments under 15% for high confidence
+        if avg_adj_percent <= 10:
+            adj_factor = 1.0
+        elif avg_adj_percent <= 15:
+            adj_factor = 0.9
+        elif avg_adj_percent <= 25:
+            adj_factor = 0.7
+        else:
+            adj_factor = 0.5
+            
+        # 3. Sale date recency factor (more recent sales = higher confidence)
+        # Check if we have sale dates
+        sale_dates = []
+        for comp in adjusted_comps:
+            if "sale_date" in comp:
+                try:
+                    sale_date = datetime.datetime.strptime(comp["sale_date"], "%Y-%m-%d").date()
+                    sale_dates.append(sale_date)
+                except (ValueError, TypeError):
+                    pass
+                    
+        # Calculate average months since sale
+        today = datetime.date.today()
+        if sale_dates:
+            months_diffs = [((today.year - date.year) * 12 + today.month - date.month) 
+                            for date in sale_dates]
+            avg_months = sum(months_diffs) / len(months_diffs)
+            
+            # Washington typically prefers sales within 12 months
+            if avg_months <= 6:
+                time_factor = 1.0
+            elif avg_months <= 12:
+                time_factor = 0.9
+            elif avg_months <= 24:
+                time_factor = 0.7
+            else:
+                time_factor = 0.5
+        else:
+            time_factor = 0.7  # Default if no dates available
+            
+        # 4. Value consistency factor (coefficient of dispersion)
+        if num_comps >= 3:
+            # Get adjusted values
+            values = [comp.get("adjusted_price", 0) for comp in adjusted_comps]
+            median_value = statistics.median(values) if values else 0
+            
+            # Calculate average absolute deviation from median
+            if median_value > 0:
+                # This is a simplified COD calculation (Coefficient of Dispersion)
+                # Washington typically wants COD under 15% for residential properties
+                deviations = [abs(val - median_value) for val in values]
+                avg_deviation = sum(deviations) / len(deviations) if deviations else 0
+                cod = (avg_deviation / median_value) * 100 if median_value > 0 else 0
+                
+                if cod <= 10:
+                    consistency_factor = 1.0  # Excellent consistency
+                elif cod <= 15:
+                    consistency_factor = 0.9  # Good consistency
+                elif cod <= 20:
+                    consistency_factor = 0.8  # Fair consistency
+                else:
+                    consistency_factor = 0.6  # Poor consistency
+            else:
+                consistency_factor = 0.6
+        else:
+            consistency_factor = 0.7  # Default if not enough comps for statistical analysis
+            
+        # 5. Quality of comparables factor
+        # Count high reliability comps
+        high_reliability_count = sum(1 for comp in adjusted_comps 
+                                 if comp.get("reliability", "") == "high")
+        quality_factor = high_reliability_count / num_comps if num_comps > 0 else 0
+        
+        # Combine all factors with appropriate weights based on Washington practices
+        # Coefficients reflect Washington's emphasis on data quality and recency
+        confidence_score = (
+            num_factor * 0.15 +          # Number of comps
+            adj_factor * 0.25 +          # Adjustment size
+            time_factor * 0.20 +         # Time relevance
+            consistency_factor * 0.25 +  # Data consistency
+            quality_factor * 0.15        # Comp quality
+        )
+        
+        # Final score normalized to 0-1 range
+        return min(max(confidence_score, 0.0), 1.0)
