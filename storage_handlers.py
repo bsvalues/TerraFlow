@@ -8,6 +8,7 @@ local filesystem storage or Supabase storage, depending on configuration.
 import os
 import logging
 import shutil
+import datetime
 from werkzeug.utils import secure_filename
 from config_loader import is_supabase_enabled, get_storage_config
 from flask import current_app
@@ -148,7 +149,7 @@ def _store_file_supabase(file, filename, user_id, project_name):
     """Store a file in Supabase Storage"""
     try:
         # Import here to avoid circular imports
-        from supabase_client import upload_file_to_storage
+        from supabase_client import upload_file_to_storage, get_supabase_client
         
         # Save to temporary location first
         temp_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'temp')
@@ -165,6 +166,22 @@ def _store_file_supabase(file, filename, user_id, project_name):
         if hasattr(file, 'content_type') and file.content_type:
             content_type = file.content_type
             
+        # Check if bucket exists, if not create it
+        client = get_supabase_client()
+        if client:
+            try:
+                # Get list of buckets
+                buckets = client.storage.list_buckets()
+                bucket_exists = any(bucket.name == bucket_name for bucket in buckets)
+                
+                # Create bucket if it doesn't exist
+                if not bucket_exists:
+                    logger.info(f"Creating storage bucket: {bucket_name}")
+                    client.storage.create_bucket(bucket_name, {'public': True})
+            except Exception as e:
+                logger.warning(f"Error checking/creating bucket: {str(e)}")
+        
+        # Perform the upload
         public_url = upload_file_to_storage(temp_path, bucket_name, storage_path, content_type)
         
         # Clean up temporary file
@@ -174,11 +191,34 @@ def _store_file_supabase(file, filename, user_id, project_name):
             logger.error("Error uploading to Supabase: Failed to get public URL")
             return None
             
+        # Collect file metadata
+        file_size = os.path.getsize(temp_path) if os.path.exists(temp_path) else 0
+        metadata = {
+            'size': file_size,
+            'content_type': content_type,
+            'uploaded_at': datetime.datetime.utcnow().isoformat()
+        }
+        
+        # Add additional metadata depending on file type
+        if filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.bmp')):
+            metadata['type'] = 'image'
+            try:
+                from PIL import Image
+                img = Image.open(temp_path)
+                metadata['dimensions'] = f"{img.width}x{img.height}"
+            except:
+                pass
+        elif filename.lower().endswith(('.doc', '.docx', '.pdf', '.txt', '.rtf')):
+            metadata['type'] = 'document'
+        elif filename.lower().endswith(('.shp', '.geojson', '.kml', '.gml')):
+            metadata['type'] = 'geo'
+                 
         return {
             'provider': 'supabase',
             'bucket': bucket_name,
             'path': storage_path,
-            'url': public_url
+            'url': public_url,
+            'metadata': metadata
         }
     except Exception as e:
         logger.error(f"Error storing file in Supabase: {str(e)}")

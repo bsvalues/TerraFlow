@@ -300,3 +300,117 @@ def delete_record(table: str, record_id: str, id_column: str = "id") -> bool:
     except Exception as e:
         logger.error(f"Error deleting record from Supabase: {str(e)}")
         return False
+
+# Realtime subscription management
+_active_subscriptions = {}
+
+def subscribe_to_changes(
+    table_name: str,
+    callback: callable,
+    event: str = "*",
+    schema: str = "public"
+) -> Optional[str]:
+    """
+    Subscribe to table changes in real-time.
+    
+    Args:
+        table_name: The name of the table to monitor
+        callback: Function to call when changes occur
+        event: Event type to listen for ('INSERT', 'UPDATE', 'DELETE', or '*' for all)
+        schema: Database schema containing the table
+        
+    Returns:
+        Subscription ID or None on failure
+    """
+    client = get_supabase_client()
+    if not client:
+        logger.error("No Supabase client available for subscribing to changes")
+        return None
+    
+    try:
+        # Create a unique subscription ID
+        import uuid
+        subscription_id = str(uuid.uuid4())
+        
+        # Set up the realtime subscription
+        changes = {
+            "event": event,
+            "schema": schema,
+            "table": table_name
+        }
+        
+        # Create a channel for this subscription
+        channel = client.channel(f"table-changes:{subscription_id}")
+        
+        # Set up the subscription with the callback
+        channel.on(
+            "postgres_changes",
+            changes,
+            lambda payload: callback(payload)
+        )
+        
+        # Subscribe to the channel
+        channel.subscribe()
+        
+        # Store the subscription for later reference
+        _active_subscriptions[subscription_id] = {
+            "channel": channel,
+            "table": table_name,
+            "event": event,
+            "schema": schema
+        }
+        
+        logger.info(f"Subscribed to changes on {schema}.{table_name} (event: {event})")
+        return subscription_id
+    
+    except Exception as e:
+        logger.error(f"Error subscribing to changes: {str(e)}")
+        return None
+
+def unsubscribe(subscription_id: str) -> bool:
+    """
+    Unsubscribe from a realtime subscription.
+    
+    Args:
+        subscription_id: The subscription ID returned from subscribe_to_changes
+        
+    Returns:
+        True on success, False on failure
+    """
+    if subscription_id not in _active_subscriptions:
+        logger.warning(f"Subscription {subscription_id} not found")
+        return False
+    
+    try:
+        # Get the channel
+        subscription = _active_subscriptions[subscription_id]
+        channel = subscription["channel"]
+        
+        # Unsubscribe from the channel
+        channel.unsubscribe()
+        
+        # Remove from active subscriptions
+        del _active_subscriptions[subscription_id]
+        
+        logger.info(f"Unsubscribed from {subscription['schema']}.{subscription['table']}")
+        return True
+    
+    except Exception as e:
+        logger.error(f"Error unsubscribing: {str(e)}")
+        return False
+
+def get_active_subscriptions() -> Dict[str, Dict[str, Any]]:
+    """
+    Get all active realtime subscriptions.
+    
+    Returns:
+        Dictionary of active subscriptions by ID
+    """
+    return {
+        id: {
+            "table": sub["table"],
+            "event": sub["event"],
+            "schema": sub["schema"]
+        }
+        for id, sub in _active_subscriptions.items()
+    }
