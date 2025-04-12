@@ -1,383 +1,412 @@
 """
 Supabase Client Module
 
-This module provides functions to interact with Supabase for database, auth, storage, and realtime functionality.
+This module provides the interface to interact with Supabase services.
+It handles authentication, database, and storage operations.
 """
 
 import os
 import logging
-from supabase import create_client, Client
-from typing import Optional, Dict, Any, List
+from typing import Dict, Any, Optional, List, Union
+import json
+import requests
+from config_loader import get_config
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
-# Get Supabase credentials from environment variables
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY") 
+# Check if Supabase package is available
+try:
+    from supabase import create_client, Client
+    HAS_SUPABASE = True
+except ImportError:
+    logger.warning("Supabase package not available. Some functionality will be limited.")
+    HAS_SUPABASE = False
 
-# Initialize Supabase client
-_supabase_client: Optional[Client] = None
+# Global client instance
+_supabase_client = None
 
 def get_supabase_client() -> Optional[Client]:
     """
-    Get or initialize the Supabase client.
+    Get a Supabase client instance
     
     Returns:
-        Client: The Supabase client instance or None if credentials are missing
+        Supabase client or None if not available
     """
     global _supabase_client
     
-    if _supabase_client is not None:
-        return _supabase_client
-        
-    if not SUPABASE_URL or not SUPABASE_KEY:
-        logger.error("Supabase credentials not found in environment variables")
+    if not HAS_SUPABASE:
+        logger.error("Supabase package not installed")
         return None
+    
+    if _supabase_client is None:
+        # Get credentials from environment or config
+        supabase_url = os.environ.get("SUPABASE_URL") or get_config("supabase", "url")
+        supabase_key = os.environ.get("SUPABASE_KEY") or get_config("supabase", "api_key")
         
-    try:
-        _supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
-        logger.info("Supabase client initialized successfully")
-        return _supabase_client
-    except Exception as e:
-        logger.error(f"Error initializing Supabase client: {str(e)}")
-        return None
+        if not supabase_url or not supabase_key:
+            logger.error("Supabase URL or API key not configured")
+            return None
+        
+        try:
+            _supabase_client = create_client(supabase_url, supabase_key)
+            logger.info("Supabase client initialized successfully")
+        except Exception as e:
+            logger.error(f"Error initializing Supabase client: {str(e)}")
+            return None
+    
+    return _supabase_client
 
 # Authentication functions
-def sign_up(email: str, password: str, user_metadata: Dict[str, Any] = None) -> Dict[str, Any]:
+
+def sign_up(email: str, password: str, user_metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
-    Register a new user in Supabase Auth.
+    Sign up a new user with Supabase
     
     Args:
-        email: User's email address
-        password: User's password
-        user_metadata: Additional user metadata
+        email: User email
+        password: User password
+        user_metadata: Optional additional user data
         
     Returns:
-        Dict with user information or error
+        Dict with result or error
     """
     client = get_supabase_client()
     if not client:
         return {"error": "Supabase client not available"}
-        
+    
     try:
         response = client.auth.sign_up({
             "email": email,
             "password": password,
             "options": {
-                "data": user_metadata or {}
+                "data": user_metadata
             }
         })
-        return {"user": response.user, "session": response.session}
+        
+        return {
+            "user": response.user,
+            "session": response.session
+        }
     except Exception as e:
         logger.error(f"Error signing up user: {str(e)}")
         return {"error": str(e)}
 
 def sign_in(email: str, password: str) -> Dict[str, Any]:
     """
-    Sign in a user using email and password.
+    Sign in a user with Supabase
     
     Args:
-        email: User's email address
-        password: User's password
+        email: User email
+        password: User password
         
     Returns:
-        Dict with user information or error
+        Dict with result or error
     """
     client = get_supabase_client()
     if not client:
         return {"error": "Supabase client not available"}
-        
+    
     try:
-        response = client.auth.sign_in_with_password({"email": email, "password": password})
-        return {"user": response.user, "session": response.session}
+        response = client.auth.sign_in_with_password({
+            "email": email,
+            "password": password
+        })
+        
+        return {
+            "user": response.user,
+            "session": response.session
+        }
     except Exception as e:
         logger.error(f"Error signing in user: {str(e)}")
         return {"error": str(e)}
 
 def sign_out() -> Dict[str, Any]:
     """
-    Sign out the current user.
+    Sign out the current user
     
     Returns:
-        Dict with success or error message
+        Dict with result or error
     """
     client = get_supabase_client()
     if not client:
         return {"error": "Supabase client not available"}
-        
+    
     try:
         client.auth.sign_out()
         return {"success": True}
     except Exception as e:
-        logger.error(f"Error signing out user: {str(e)}")
+        logger.error(f"Error signing out: {str(e)}")
         return {"error": str(e)}
 
-# Database access functions
-def get_table_data(table_name: str, query_params: Dict[str, Any] = None) -> Dict[str, Any]:
+# Database functions
+
+def get_data(table: str, query_params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
-    Get data from a Supabase table with optional query parameters.
+    Get data from a Supabase table
     
     Args:
-        table_name: Name of the table to query
-        query_params: Dictionary of query parameters
-            - select: Fields to select
-            - order: Order by clause
-            - limit: Number of rows to return
-            - offset: Number of rows to skip
-            - filter: Dictionary of filter conditions
-            
+        table: Table name
+        query_params: Optional query parameters (limit, offset, etc.)
+        
     Returns:
         Dict with data or error
     """
     client = get_supabase_client()
     if not client:
         return {"error": "Supabase client not available"}
-        
+    
     try:
-        query = client.table(table_name).select(query_params.get("select", "*"))
+        query = client.table(table).select("*")
         
-        # Apply filters if provided
-        if "filter" in query_params:
-            for column, condition in query_params["filter"].items():
-                if isinstance(condition, dict):
-                    for operator, value in condition.items():
-                        if operator == "eq":
-                            query = query.eq(column, value)
-                        elif operator == "neq":
-                            query = query.neq(column, value)
-                        elif operator == "gt":
-                            query = query.gt(column, value)
-                        elif operator == "lt":
-                            query = query.lt(column, value)
-                        elif operator == "gte":
-                            query = query.gte(column, value)
-                        elif operator == "lte":
-                            query = query.lte(column, value)
-                        elif operator == "in":
-                            query = query.in_(column, value)
+        # Apply query parameters if provided
+        if query_params:
+            if "limit" in query_params:
+                query = query.limit(query_params["limit"])
+            if "offset" in query_params:
+                query = query.offset(query_params["offset"])
+            if "order" in query_params and "column" in query_params:
+                if query_params["order"].lower() == "asc":
+                    query = query.order(query_params["column"])
                 else:
-                    # Default to equality
-                    query = query.eq(column, condition)
+                    query = query.order(query_params["column"], desc=True)
+            if "filter" in query_params and "value" in query_params:
+                # Simple filter for now, can be extended
+                query = query.eq(query_params["filter"], query_params["value"])
         
-        # Apply ordering if provided
-        if "order" in query_params:
-            query = query.order(query_params["order"])
-            
-        # Apply limit and offset if provided
-        if "limit" in query_params:
-            query = query.limit(query_params["limit"])
-            
-        if "offset" in query_params:
-            query = query.offset(query_params["offset"])
-            
         response = query.execute()
+        
         return {"data": response.data}
     except Exception as e:
-        logger.error(f"Error querying table {table_name}: {str(e)}")
+        logger.error(f"Error getting data from {table}: {str(e)}")
         return {"error": str(e)}
 
-def insert_row(table_name: str, data: Dict[str, Any]) -> Dict[str, Any]:
+def insert_data(table: str, data: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Insert a new row into a Supabase table.
+    Insert data into a Supabase table
     
     Args:
-        table_name: Name of the table
-        data: Dictionary of column-value pairs
+        table: Table name
+        data: Data to insert
         
     Returns:
-        Dict with inserted data or error
+        Dict with result or error
     """
     client = get_supabase_client()
     if not client:
         return {"error": "Supabase client not available"}
-        
+    
     try:
-        response = client.table(table_name).insert(data).execute()
+        response = client.table(table).insert(data).execute()
         return {"data": response.data}
     except Exception as e:
-        logger.error(f"Error inserting into table {table_name}: {str(e)}")
+        logger.error(f"Error inserting data into {table}: {str(e)}")
         return {"error": str(e)}
 
-def update_row(table_name: str, data: Dict[str, Any], match_column: str, match_value: Any) -> Dict[str, Any]:
+def update_data(table: str, data: Dict[str, Any], match_column: str, match_value: Any) -> Dict[str, Any]:
     """
-    Update a row in a Supabase table.
+    Update data in a Supabase table
     
     Args:
-        table_name: Name of the table
-        data: Dictionary of column-value pairs to update
-        match_column: Column name to match for the update
-        match_value: Value to match for the update
+        table: Table name
+        data: Data to update
+        match_column: Column to match for update
+        match_value: Value to match for update
         
     Returns:
-        Dict with updated data or error
+        Dict with result or error
     """
     client = get_supabase_client()
     if not client:
         return {"error": "Supabase client not available"}
-        
+    
     try:
-        response = client.table(table_name).update(data).eq(match_column, match_value).execute()
+        response = client.table(table).update(data).eq(match_column, match_value).execute()
         return {"data": response.data}
     except Exception as e:
-        logger.error(f"Error updating table {table_name}: {str(e)}")
+        logger.error(f"Error updating data in {table}: {str(e)}")
         return {"error": str(e)}
 
-def delete_row(table_name: str, match_column: str, match_value: Any) -> Dict[str, Any]:
+def delete_data(table: str, match_column: str, match_value: Any) -> Dict[str, Any]:
     """
-    Delete a row from a Supabase table.
+    Delete data from a Supabase table
     
     Args:
-        table_name: Name of the table
-        match_column: Column name to match for the delete
-        match_value: Value to match for the delete
+        table: Table name
+        match_column: Column to match for deletion
+        match_value: Value to match for deletion
         
     Returns:
-        Dict with deleted data or error
+        Dict with result or error
     """
     client = get_supabase_client()
     if not client:
         return {"error": "Supabase client not available"}
-        
+    
     try:
-        response = client.table(table_name).delete().eq(match_column, match_value).execute()
-        return {"data": response.data}
+        response = client.table(table).delete().eq(match_column, match_value).execute()
+        return {"success": True, "count": len(response.data)}
     except Exception as e:
-        logger.error(f"Error deleting from table {table_name}: {str(e)}")
+        logger.error(f"Error deleting data from {table}: {str(e)}")
         return {"error": str(e)}
 
 # Storage functions
-def upload_file(bucket_name: str, file_path: str, destination_path: str) -> Dict[str, Any]:
+
+def list_buckets() -> Dict[str, Any]:
     """
-    Upload a file to Supabase Storage.
+    List all storage buckets
     
-    Args:
-        bucket_name: Name of the storage bucket
-        file_path: Path to the local file
-        destination_path: Path in the bucket to store the file
-        
     Returns:
-        Dict with success or error message
+        Dict with buckets or error
     """
     client = get_supabase_client()
     if not client:
         return {"error": "Supabase client not available"}
-        
+    
     try:
-        with open(file_path, "rb") as f:
-            file_data = f.read()
-            
-        response = client.storage.from_(bucket_name).upload(destination_path, file_data)
-        return {"success": True, "path": response}
+        response = client.storage.list_buckets()
+        return {"buckets": response}
     except Exception as e:
-        logger.error(f"Error uploading file to storage: {str(e)}")
+        logger.error(f"Error listing buckets: {str(e)}")
         return {"error": str(e)}
 
-def download_file(bucket_name: str, source_path: str, destination_path: str) -> Dict[str, Any]:
+def create_bucket(bucket_name: str, is_public: bool = False) -> Dict[str, Any]:
     """
-    Download a file from Supabase Storage.
+    Create a new storage bucket
     
     Args:
-        bucket_name: Name of the storage bucket
-        source_path: Path of the file in the bucket
+        bucket_name: Name of the bucket
+        is_public: Whether the bucket should be public
+        
+    Returns:
+        Dict with result or error
+    """
+    client = get_supabase_client()
+    if not client:
+        return {"error": "Supabase client not available"}
+    
+    try:
+        client.storage.create_bucket(bucket_name, {'public': is_public})
+        return {"success": True, "bucket": bucket_name}
+    except Exception as e:
+        logger.error(f"Error creating bucket {bucket_name}: {str(e)}")
+        return {"error": str(e)}
+
+def list_files(bucket_name: str, path: str = "") -> Dict[str, Any]:
+    """
+    List files in a bucket
+    
+    Args:
+        bucket_name: Name of the bucket
+        path: Path within the bucket
+        
+    Returns:
+        Dict with files or error
+    """
+    client = get_supabase_client()
+    if not client:
+        return {"error": "Supabase client not available"}
+    
+    try:
+        response = client.storage.from_(bucket_name).list(path)
+        return {"files": response}
+    except Exception as e:
+        logger.error(f"Error listing files in {bucket_name}/{path}: {str(e)}")
+        return {"error": str(e)}
+
+def upload_file(bucket_name: str, file_path: str, destination_path: str) -> Dict[str, Any]:
+    """
+    Upload a file to Supabase storage
+    
+    Args:
+        bucket_name: Name of the bucket
+        file_path: Local path to the file
+        destination_path: Path in the bucket
+        
+    Returns:
+        Dict with result or error
+    """
+    client = get_supabase_client()
+    if not client:
+        return {"error": "Supabase client not available"}
+    
+    try:
+        with open(file_path, "rb") as f:
+            file_content = f.read()
+            
+        response = client.storage.from_(bucket_name).upload(destination_path, file_content)
+        return {"path": response.get("path", "")}
+    except Exception as e:
+        logger.error(f"Error uploading file to {bucket_name}/{destination_path}: {str(e)}")
+        return {"error": str(e)}
+
+def download_file(bucket_name: str, file_path: str, destination_path: str) -> Dict[str, Any]:
+    """
+    Download a file from Supabase storage
+    
+    Args:
+        bucket_name: Name of the bucket
+        file_path: Path to the file in the bucket
         destination_path: Local path to save the file
         
     Returns:
-        Dict with success or error message
+        Dict with result or error
     """
     client = get_supabase_client()
     if not client:
         return {"error": "Supabase client not available"}
-        
+    
     try:
-        response = client.storage.from_(bucket_name).download(source_path)
+        response = client.storage.from_(bucket_name).download(file_path)
         
+        # Save the file
         with open(destination_path, "wb") as f:
             f.write(response)
             
         return {"success": True, "path": destination_path}
     except Exception as e:
-        logger.error(f"Error downloading file from storage: {str(e)}")
+        logger.error(f"Error downloading file from {bucket_name}/{file_path}: {str(e)}")
+        return {"error": str(e)}
+
+def delete_file(bucket_name: str, file_path: str) -> Dict[str, Any]:
+    """
+    Delete a file from Supabase storage
+    
+    Args:
+        bucket_name: Name of the bucket
+        file_path: Path to the file in the bucket
+        
+    Returns:
+        Dict with result or error
+    """
+    client = get_supabase_client()
+    if not client:
+        return {"error": "Supabase client not available"}
+    
+    try:
+        client.storage.from_(bucket_name).remove([file_path])
+        return {"success": True}
+    except Exception as e:
+        logger.error(f"Error deleting file from {bucket_name}/{file_path}: {str(e)}")
         return {"error": str(e)}
 
 def get_public_url(bucket_name: str, file_path: str) -> str:
     """
-    Get a public URL for a file in Supabase Storage.
+    Get a public URL for a file
     
     Args:
-        bucket_name: Name of the storage bucket
-        file_path: Path of the file in the bucket
+        bucket_name: Name of the bucket
+        file_path: Path to the file in the bucket
         
     Returns:
-        Public URL or empty string on error
+        Public URL for the file
     """
     client = get_supabase_client()
     if not client:
         return ""
-        
+    
     try:
         return client.storage.from_(bucket_name).get_public_url(file_path)
     except Exception as e:
-        logger.error(f"Error getting public URL for file: {str(e)}")
+        logger.error(f"Error getting public URL for {bucket_name}/{file_path}: {str(e)}")
         return ""
-
-# Realtime subscription functions
-def subscribe_to_table(table_name: str, callback, event_types: List[str] = None) -> Optional[str]:
-    """
-    Subscribe to changes on a table.
-    
-    Args:
-        table_name: Name of the table to subscribe to
-        callback: Function to call when an event occurs
-        event_types: List of event types to subscribe to (default: ["INSERT", "UPDATE", "DELETE"])
-        
-    Returns:
-        Subscription ID or None on error
-    """
-    client = get_supabase_client()
-    if not client:
-        return None
-        
-    event_types = event_types or ["INSERT", "UPDATE", "DELETE"]
-    
-    try:
-        channel = client.channel('table-filter')
-        
-        # Set up the subscription
-        channel = channel.on(
-            'postgres_changes',
-            {
-                'event': '*',  # or specific events: 'INSERT', 'UPDATE', 'DELETE'
-                'schema': 'public',
-                'table': table_name
-            },
-            callback
-        )
-        
-        # Subscribe
-        channel.subscribe()
-        return channel.id
-    except Exception as e:
-        logger.error(f"Error subscribing to table changes: {str(e)}")
-        return None
-
-def unsubscribe(subscription_id: str) -> bool:
-    """
-    Unsubscribe from realtime changes.
-    
-    Args:
-        subscription_id: ID of the subscription to cancel
-        
-    Returns:
-        True if successful, False otherwise
-    """
-    client = get_supabase_client()
-    if not client:
-        return False
-        
-    try:
-        client.remove_channel(subscription_id)
-        return True
-    except Exception as e:
-        logger.error(f"Error unsubscribing from channel: {str(e)}")
-        return False
