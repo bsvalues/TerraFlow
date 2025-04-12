@@ -35,4 +35,6 @@ dependencies = [
     "sendgrid>=6.11.0",
     "weasyprint>=65.0",
     "selenium>=4.31.0",
+    "supabase>=2.15.0",
+    "alembic>=1.15.2",
 ]
