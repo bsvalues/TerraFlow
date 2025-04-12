@@ -17,15 +17,15 @@ from auth import login_required, permission_required
 # Configure logging
 logger = logging.getLogger(__name__)
 
-# Create blueprint
-data_quality_bp = Blueprint('data_quality', __name__, url_prefix='/data-quality')
+# Create blueprint with a unique name
+data_quality_bp = Blueprint('data_quality_management', __name__, url_prefix='/data-quality')
 
 @data_quality_bp.route('/', methods=['GET'])
 @login_required
 def data_quality_dashboard():
     """Render the data quality dashboard page"""
     return render_template(
-        'data_quality_dashboard.html',
+        'data_quality_management/dashboard.html',
         title="Data Quality Dashboard",
         description="Monitor and manage data quality across the platform"
     )
@@ -36,7 +36,7 @@ def alerts_page():
     """Render the data quality alerts page"""
     alerts = alert_manager.get_all_alerts()
     return render_template(
-        'data_quality_alerts.html',
+        'data_quality_management/alerts.html',
         title="Data Quality Alerts",
         alerts=alerts
     )
@@ -46,7 +46,7 @@ def alerts_page():
 def checks_page():
     """Render the data quality checks page"""
     return render_template(
-        'data_quality_checks.html',
+        'data_quality_management/checks.html',
         title="Data Quality Checks"
     )
 
@@ -55,7 +55,7 @@ def checks_page():
 def reports_page():
     """Render the data quality reports page"""
     return render_template(
-        'data_quality_reports.html',
+        'data_quality_management/reports.html',
         title="Data Quality Reports"
     )
 

@@ -1,0 +1,380 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="h3 mb-4">{{ title }}</h1>
+            <p class="text-muted">{{ description }}</p>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <!-- Data Quality Overview -->
+        <div class="col-md-6 col-xl-3 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Overall Quality</h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-center">
+                        <div class="display-4 mb-3">92%</div>
+                        <div class="progress mb-3" style="height: 20px;">
+                            <div class="progress-bar bg-success" role="progressbar" style="width: 92%;" aria-valuenow="92" aria-valuemin="0" aria-valuemax="100">92%</div>
+                        </div>
+                        <p class="text-muted">Overall data quality score across all metrics</p>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <a href="{{ url_for('data_quality_management.reports_page') }}" class="btn btn-sm btn-outline-primary">View Report</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alerts -->
+        <div class="col-md-6 col-xl-3 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">Alerts</h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-center">
+                        <div class="display-4 mb-3">3</div>
+                        <div class="d-flex justify-content-around mb-3">
+                            <div>
+                                <span class="badge bg-danger p-2">High: 1</span>
+                            </div>
+                            <div>
+                                <span class="badge bg-warning p-2">Medium: 2</span>
+                            </div>
+                            <div>
+                                <span class="badge bg-info p-2">Low: 0</span>
+                            </div>
+                        </div>
+                        <p class="text-muted">Active data quality alerts requiring attention</p>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <a href="{{ url_for('data_quality_management.alerts_page') }}" class="btn btn-sm btn-outline-warning">View Alerts</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Completeness -->
+        <div class="col-md-6 col-xl-3 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Completeness</h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-center">
+                        <div class="display-4 mb-3">98%</div>
+                        <div class="progress mb-3" style="height: 20px;">
+                            <div class="progress-bar bg-info" role="progressbar" style="width: 98%;" aria-valuenow="98" aria-valuemin="0" aria-valuemax="100">98%</div>
+                        </div>
+                        <p class="text-muted">Data completeness across all data sources</p>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <a href="{{ url_for('data_quality_management.checks_page') }}?type=completeness" class="btn btn-sm btn-outline-info">View Details</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Accuracy -->
+        <div class="col-md-6 col-xl-3 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Accuracy</h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-center">
+                        <div class="display-4 mb-3">89%</div>
+                        <div class="progress mb-3" style="height: 20px;">
+                            <div class="progress-bar bg-success" role="progressbar" style="width: 89%;" aria-valuenow="89" aria-valuemin="0" aria-valuemax="100">89%</div>
+                        </div>
+                        <p class="text-muted">Data accuracy and validation score</p>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <a href="{{ url_for('data_quality_management.checks_page') }}?type=accuracy" class="btn btn-sm btn-outline-success">View Details</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <!-- Recent Alerts -->
+        <div class="col-xl-6 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Recent Alerts</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Alert</th>
+                                    <th>Type</th>
+                                    <th>Severity</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Property Data Inconsistency</td>
+                                    <td>Consistency</td>
+                                    <td><span class="badge bg-danger">High</span></td>
+                                    <td><span class="badge bg-warning">Active</span></td>
+                                    <td>
+                                        <a href="#" class="btn btn-sm btn-primary">View</a>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Missing Address Data</td>
+                                    <td>Completeness</td>
+                                    <td><span class="badge bg-warning">Medium</span></td>
+                                    <td><span class="badge bg-warning">Active</span></td>
+                                    <td>
+                                        <a href="#" class="btn btn-sm btn-primary">View</a>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Valuation Outliers</td>
+                                    <td>Range</td>
+                                    <td><span class="badge bg-warning">Medium</span></td>
+                                    <td><span class="badge bg-warning">Active</span></td>
+                                    <td>
+                                        <a href="#" class="btn btn-sm btn-primary">View</a>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Parcel ID Format</td>
+                                    <td>Format</td>
+                                    <td><span class="badge bg-warning">Medium</span></td>
+                                    <td><span class="badge bg-success">Resolved</span></td>
+                                    <td>
+                                        <a href="#" class="btn btn-sm btn-primary">View</a>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <a href="{{ url_for('data_quality_management.alerts_page') }}" class="btn btn-sm btn-outline-primary">View All Alerts</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Quality Trend -->
+        <div class="col-xl-6 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Quality Trend</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="qualityTrendChart" width="400" height="250"></canvas>
+                </div>
+                <div class="card-footer">
+                    <a href="{{ url_for('data_quality_management.reports_page') }}" class="btn btn-sm btn-outline-primary">View Detailed Trends</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <!-- Data Source Quality -->
+        <div class="col-12 mb-4">
+            <div class="card shadow">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Data Source Quality</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Data Source</th>
+                                    <th>Completeness</th>
+                                    <th>Accuracy</th>
+                                    <th>Format</th>
+                                    <th>Consistency</th>
+                                    <th>Overall</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Property Database</td>
+                                    <td>
+                                        <div class="progress" style="height: 10px;">
+                                            <div class="progress-bar bg-success" role="progressbar" style="width: 95%;" aria-valuenow="95" aria-valuemin="0" aria-valuemax="100">95%</div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="progress" style="height: 10px;">
+                                            <div class="progress-bar bg-success" role="progressbar" style="width: 92%;" aria-valuenow="92" aria-valuemin="0" aria-valuemax="100">92%</div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="progress" style="height: 10px;">
+                                            <div class="progress-bar bg-success" role="progressbar" style="width: 97%;" aria-valuenow="97" aria-valuemin="0" aria-valuemax="100">97%</div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="progress" style="height: 10px;">
+                                            <div class="progress-bar bg-warning" role="progressbar" style="width: 85%;" aria-valuenow="85" aria-valuemin="0" aria-valuemax="100">85%</div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="progress" style="height: 10px;">
+                                            <div class="progress-bar bg-success" role="progressbar" style="width: 92%;" aria-valuenow="92" aria-valuemin="0" aria-valuemax="100">92%</div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <a href="#" class="btn btn-sm btn-primary">Details</a>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>GIS Database</td>
+                                    <td>
+                                        <div class="progress" style="height: 10px;">
+                                            <div class="progress-bar bg-success" role="progressbar" style="width: 98%;" aria-valuenow="98" aria-valuemin="0" aria-valuemax="100">98%</div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="progress" style="height: 10px;">
+                                            <div class="progress-bar bg-success" role="progressbar" style="width: 95%;" aria-valuenow="95" aria-valuemin="0" aria-valuemax="100">95%</div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="progress" style="height: 10px;">
+                                            <div class="progress-bar bg-success" role="progressbar" style="width: 99%;" aria-valuenow="99" aria-valuemin="0" aria-valuemax="100">99%</div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="progress" style="height: 10px;">
+                                            <div class="progress-bar bg-success" role="progressbar" style="width: 97%;" aria-valuenow="97" aria-valuemin="0" aria-valuemax="100">97%</div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="progress" style="height: 10px;">
+                                            <div class="progress-bar bg-success" role="progressbar" style="width: 97%;" aria-valuenow="97" aria-valuemin="0" aria-valuemax="100">97%</div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <a href="#" class="btn btn-sm btn-primary">Details</a>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>CAMA System</td>
+                                    <td>
+                                        <div class="progress" style="height: 10px;">
+                                            <div class="progress-bar bg-warning" role="progressbar" style="width: 88%;" aria-valuenow="88" aria-valuemin="0" aria-valuemax="100">88%</div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="progress" style="height: 10px;">
+                                            <div class="progress-bar bg-danger" role="progressbar" style="width: 75%;" aria-valuenow="75" aria-valuemin="0" aria-valuemax="100">75%</div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="progress" style="height: 10px;">
+                                            <div class="progress-bar bg-warning" role="progressbar" style="width: 85%;" aria-valuenow="85" aria-valuemin="0" aria-valuemax="100">85%</div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="progress" style="height: 10px;">
+                                            <div class="progress-bar bg-warning" role="progressbar" style="width: 82%;" aria-valuenow="82" aria-valuemin="0" aria-valuemax="100">82%</div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="progress" style="height: 10px;">
+                                            <div class="progress-bar bg-warning" role="progressbar" style="width: 83%;" aria-valuenow="83" aria-valuemin="0" aria-valuemax="100">83%</div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <a href="#" class="btn btn-sm btn-primary">Details</a>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Quality Trend Chart
+        var ctx = document.getElementById('qualityTrendChart').getContext('2d');
+        var chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                datasets: [{
+                    label: 'Overall Quality',
+                    backgroundColor: 'rgba(78, 115, 223, 0.05)',
+                    borderColor: 'rgba(78, 115, 223, 1)',
+                    pointBackgroundColor: 'rgba(78, 115, 223, 1)',
+                    data: [86, 87, 88, 89, 90, 91, 91, 92, 92, 93, 93, 92],
+                }, {
+                    label: 'Completeness',
+                    backgroundColor: 'rgba(54, 185, 204, 0.05)',
+                    borderColor: 'rgba(54, 185, 204, 1)',
+                    pointBackgroundColor: 'rgba(54, 185, 204, 1)',
+                    data: [92, 93, 94, 95, 95, 96, 97, 97, 98, 98, 98, 98],
+                }, {
+                    label: 'Accuracy',
+                    backgroundColor: 'rgba(28, 200, 138, 0.05)',
+                    borderColor: 'rgba(28, 200, 138, 1)',
+                    pointBackgroundColor: 'rgba(28, 200, 138, 1)',
+                    data: [80, 82, 83, 84, 85, 86, 87, 88, 88, 89, 89, 89],
+                }]
+            },
+            options: {
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    },
+                    y: {
+                        ticks: {
+                            min: 70,
+                            max: 100
+                        },
+                        grid: {
+                            color: "rgba(0, 0, 0, 0.05)"
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        backgroundColor: "rgb(255,255,255)",
+                        bodyColor: "#858796",
+                        titleMarginBottom: 10,
+                        titleColor: '#6e707e',
+                        titleFontSize: 14,
+                        borderColor: '#dddfeb',
+                        borderWidth: 1,
+                        padding: 15,
+                        displayColors: false
+                    }
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}
