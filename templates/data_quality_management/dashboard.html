@@ -517,7 +517,7 @@
             this.disabled = true;
             
             // Make AJAX request to run all checks
-            fetch('{{ url_for("data_quality_management.api_check_all_alerts") }}', {
+            fetch('/data-quality/api/alerts/check-all', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
