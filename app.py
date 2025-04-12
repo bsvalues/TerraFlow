@@ -754,5 +754,13 @@ try:
 except Exception as e:
     app.logger.error(f"Error registering data quality routes: {str(e)}")
 
+# Initialize API for third-party and microservice integration
+try:
+    from api import init_api
+    init_api(app)
+    app.logger.info("API initialized successfully")
+except Exception as e:
+    app.logger.error(f"Error initializing API: {str(e)}")
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
