@@ -151,6 +151,12 @@ def api_update_alert(alert_id):
         # Get the updated alert
         alert = alert_manager.get_alert(alert_id)
         
+        if not alert:
+            return jsonify({
+                "success": False,
+                "error": f"Alert not found after update: {alert_id}"
+            }), 404
+        
         return jsonify({
             "success": True,
             "alert": alert.to_dict()
