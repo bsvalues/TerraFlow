@@ -14,10 +14,10 @@
                             <p class="text-sm mb-0">Monitor and manage data quality across the platform</p>
                         </div>
                         <div class="col-6 text-end">
-                            <a href="{{ url_for('data_quality.api_check_all_alerts') }}" class="btn btn-sm btn-light" id="check-all-alerts">
+                            <button class="btn btn-sm btn-light" id="check-all-alerts">
                                 Run All Checks
-                            </a>
-                            <a href="{{ url_for('data_quality.alerts_page') }}" class="btn btn-sm btn-light">
+                            </button>
+                            <a href="{{ url_for('data_quality_management.alerts_page') }}" class="btn btn-sm btn-light">
                                 Manage Alerts
                             </a>
                         </div>
@@ -33,7 +33,7 @@
                                             <div class="numbers">
                                                 <p class="text-sm mb-0 text-uppercase font-weight-bold">Quality Score</p>
                                                 <h5 class="font-weight-bolder" id="quality-score">
-                                                    94%
+                                                    {{ quality_data.overall_score }}%
                                                 </h5>
                                                 <p class="mb-0 text-sm">
                                                     <span class="text-success text-sm font-weight-bolder">+3%</span>
@@ -58,7 +58,7 @@
                                             <div class="numbers">
                                                 <p class="text-sm mb-0 text-uppercase font-weight-bold">Active Alerts</p>
                                                 <h5 class="font-weight-bolder" id="active-alerts">
-                                                    5
+                                                    {{ active_alerts }}
                                                 </h5>
                                                 <p class="mb-0 text-sm">
                                                     <span class="text-danger text-sm font-weight-bolder">+2</span>
@@ -83,7 +83,7 @@
                                             <div class="numbers">
                                                 <p class="text-sm mb-0 text-uppercase font-weight-bold">Completeness</p>
                                                 <h5 class="font-weight-bolder" id="completeness-score">
-                                                    97%
+                                                    {{ quality_data.completeness_score }}%
                                                 </h5>
                                                 <p class="mb-0 text-sm">
                                                     <span class="text-success text-sm font-weight-bolder">+5%</span>
@@ -108,7 +108,7 @@
                                             <div class="numbers">
                                                 <p class="text-sm mb-0 text-uppercase font-weight-bold">Format Compliance</p>
                                                 <h5 class="font-weight-bolder" id="format-compliance">
-                                                    99%
+                                                    {{ quality_data.format_compliance }}%
                                                 </h5>
                                                 <p class="mb-0 text-sm">
                                                     <span class="text-success text-sm font-weight-bolder">+1%</span>
@@ -133,8 +133,8 @@
                                 <div class="card-header pb-0 p-3">
                                     <div class="d-flex justify-content-between">
                                         <h6 class="mb-0">Data Quality Trends</h6>
-                                        <button type="button" class="btn btn-sm btn-outline-primary">
-                                            <i class="ni ni-calendar-grid-58"></i> Filter
+                                        <button type="button" class="btn btn-sm btn-outline-primary" id="refresh-trends">
+                                            <i class="ni ni-refresh-02"></i> Refresh
                                         </button>
                                     </div>
                                 </div>
