@@ -806,6 +806,14 @@ try:
 except Exception as e:
     app.logger.error(f"Error registering data quality routes: {str(e)}")
 
+# Register Supabase configuration blueprint
+try:
+    from api.supabase_config import supabase_config_bp
+    app.register_blueprint(supabase_config_bp)
+    app.logger.info("Supabase config routes registered successfully")
+except Exception as e:
+    app.logger.error(f"Error registering Supabase config routes: {str(e)}")
+
 # Initialize API for third-party and microservice integration
 try:
     # Add test API key for development
