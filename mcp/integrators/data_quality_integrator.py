@@ -13,6 +13,17 @@ from mcp.agents.data_quality_agent import data_quality_agent
 # Configure logging
 logger = logging.getLogger(__name__)
 
+# Function to register the data quality agent with the MCP system
+def register_data_quality_agent(agent_manager):
+    """Register the data quality agent with the MCP system"""
+    try:
+        agent_manager.register_agent("data_quality", data_quality_agent)
+        logger.info("Data Quality Agent registered successfully")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to register Data Quality Agent: {str(e)}")
+        return False
+
 class DataQualityIntegrator:
     """
     Integrates data quality services with the MCP system

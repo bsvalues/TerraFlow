@@ -73,13 +73,13 @@ class QualityAlert:
         """Create alert from dictionary"""
         alert = cls(
             id=data.get("id"),
-            name=data.get("name"),
-            description=data.get("description"),
-            check_type=data.get("check_type"),
-            parameters=data.get("parameters"),
-            threshold=data.get("threshold"),
-            severity=data.get("severity"),
-            notification_channels=data.get("notification_channels"),
+            name=data.get("name", ""),
+            description=data.get("description", ""),
+            check_type=data.get("check_type", ""),
+            parameters=data.get("parameters", {}),
+            threshold=data.get("threshold", 0.95),
+            severity=data.get("severity", "medium"),
+            notification_channels=data.get("notification_channels", ["log"]),
             enabled=data.get("enabled", True)
         )
         

@@ -731,5 +731,13 @@ try:
 except Exception as e:
     app.logger.error(f"Error registering valuation routes: {str(e)}")
 
+# Register data quality blueprint
+try:
+    from data_quality_routes import data_quality_bp
+    app.register_blueprint(data_quality_bp)
+    app.logger.info("Data Quality routes registered successfully")
+except Exception as e:
+    app.logger.error(f"Error registering data quality routes: {str(e)}")
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
