@@ -34,8 +34,23 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
+# Load configuration from environment and config files
+from config_loader import load_config, get_database_config, is_supabase_enabled
+
+# Initialize configuration
+config = load_config()
+db_config = get_database_config()
+
 # Configure database
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", "sqlite:///benton_gis.db")
+# If Supabase is configured, use the PostgreSQL connection string
+if is_supabase_enabled():
+    logger.info("Using Supabase PostgreSQL database")
+    app.config["SQLALCHEMY_DATABASE_URI"] = db_config.get("connection_string")
+else:
+    # Fall back to the environment variable or SQLite
+    logger.info("Using standard database connection")
+    app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", "sqlite:///benton_gis.db")
+
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_recycle": 300,
     "pool_pre_ping": True,

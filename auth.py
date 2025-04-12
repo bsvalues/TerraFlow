@@ -23,6 +23,15 @@ except ImportError:
     HAS_MSAL = False
     logging.getLogger(__name__).warning("MSAL module not available, Azure AD authentication will be disabled")
 
+# Conditionally import Supabase client
+try:
+    from supabase_client import sign_in, sign_up, sign_out, get_supabase_client
+    from config_loader import is_supabase_enabled
+    HAS_SUPABASE = True
+except ImportError:
+    HAS_SUPABASE = False
+    logging.getLogger(__name__).warning("Supabase client not available, Supabase authentication will be disabled")
+
 logger = logging.getLogger(__name__)
 
 # LDAP configuration - get from environment variables or use defaults
@@ -44,7 +53,7 @@ AZURE_AD_REDIRECT_URI = os.environ.get('AZURE_AD_REDIRECT_URI', 'http://localhos
 # This should be set to False in production
 BYPASS_LDAP = os.environ.get('BYPASS_LDAP', 'True').lower() == 'true'  # Enable bypass for testing
 
-# Set authentication mode (ldap, azure_ad, or local)
+# Set authentication mode (ldap, azure_ad, supabase, or local)
 AUTH_MODE = os.environ.get('AUTH_MODE', 'ldap')
 
 def login_required(f):
@@ -185,6 +194,8 @@ def authenticate_user(username, password):
         return _authenticate_azure_ad()
     elif auth_method == 'ldap' and HAS_LDAP:
         return _authenticate_ldap(username, password)
+    elif auth_method == 'supabase' and HAS_SUPABASE:
+        return _authenticate_supabase(username, password)
     else:
         # If we don't have a working authentication method, log and fail
         logger.error(f"No valid authentication method available: {auth_method}")
@@ -388,6 +399,78 @@ def _authenticate_azure_ad():
     logger.warning("Azure AD authentication not yet implemented")
     return False
 
+def _authenticate_supabase(username, password):
+    """Authenticate user using Supabase Authentication"""
+    if not HAS_SUPABASE:
+        logger.error("Supabase client not available")
+        return False
+        
+    if not username or not password:
+        return False
+    
+    try:
+        # Try to sign in using Supabase
+        auth_result = sign_in(username, password)
+        
+        if "error" in auth_result:
+            logger.warning(f"Supabase authentication failed: {auth_result['error']}")
+            
+            # Log failed login attempt
+            from models import User, AuditLog
+            user = User.query.filter_by(username=username).first()
+            if user:
+                audit_log = AuditLog(
+                    user_id=user.id,
+                    action='login_failed',
+                    details={'method': 'supabase', 'reason': auth_result['error']},
+                    ip_address=request.remote_addr,
+                    user_agent=request.user_agent.string
+                )
+                db.session.add(audit_log)
+                db.session.commit()
+                
+            return False
+        
+        # Extract user info from Supabase response
+        supabase_user = auth_result.get('user')
+        if not supabase_user:
+            logger.error("Supabase authentication returned no user data")
+            return False
+            
+        # Prepare user info to return
+        user_info = {
+            'email': supabase_user.get('email'),
+            'supabase_id': supabase_user.get('id'),
+            'full_name': supabase_user.get('user_metadata', {}).get('full_name', ''),
+            'department': supabase_user.get('user_metadata', {}).get('department', ''),
+        }
+        
+        # Log successful authentication
+        from models import User, AuditLog
+        user = User.query.filter_by(username=username).first()
+        if user:
+            audit_log = AuditLog(
+                user_id=user.id,
+                action='login',
+                details={'method': 'supabase', 'success': True},
+                ip_address=request.remote_addr,
+                user_agent=request.user_agent.string
+            )
+            db.session.add(audit_log)
+            
+            # Update the user's last login time
+            user.last_login = datetime.datetime.utcnow()
+            db.session.commit()
+        
+        logger.info(f"Successfully authenticated user with Supabase: {username}")
+        
+        # Return success and user_info for account creation/update
+        return True, user_info
+        
+    except Exception as e:
+        logger.error(f"Error during Supabase authentication: {str(e)}")
+        return False
+
 def logout_user():
     """Remove user from session and log the logout"""
     
@@ -405,6 +488,11 @@ def logout_user():
             )
             db.session.add(audit_log)
             db.session.commit()
+            
+            # If Supabase auth is enabled, also sign out there
+            if is_supabase_enabled() and HAS_SUPABASE:
+                sign_out()
+                
         except Exception as e:
             logger.error(f"Error logging logout: {str(e)}")
     
