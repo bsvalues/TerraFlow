@@ -37,4 +37,5 @@ dependencies = [
     "selenium>=4.31.0",
     "supabase>=2.15.0",
     "alembic>=1.15.2",
+    "requests>=2.32.3",
 ]
