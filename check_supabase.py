@@ -189,8 +189,14 @@ def main():
     """Main function to run all checks."""
     if not HAS_SUPABASE:
         sys.exit(1)
-        
+    
+    # Ensure Supabase environment variables are set for testing
+    if "SUPABASE_URL" not in os.environ or not os.environ["SUPABASE_URL"]:
+        logger.info("Setting SUPABASE_URL for testing...")
+        os.environ["SUPABASE_URL"] = "https://romjfbwktyxljvgcthmk.supabase.co"
+    
     logger.info("=== Supabase Connection Checker ===")
+    logger.info(f"Using Supabase URL: {os.environ.get('SUPABASE_URL')}")
     
     checks = [
         check_environment_variables,

@@ -61,10 +61,16 @@ def load_config() -> Dict[str, Any]:
         config["database"]["connection_string"] = os.environ.get("DATABASE_URL", "")
         config["database"]["supabase_url"] = os.environ.get("SUPABASE_URL")
         config["database"]["supabase_key"] = os.environ.get("SUPABASE_KEY")
+        config["database"]["supabase_service_key"] = os.environ.get("SUPABASE_SERVICE_KEY", "")
+        
+        # Set use_supabase flag to true
+        config["use_supabase"] = True
         
         # If Supabase is configured, also use it for auth and storage
         config["auth"]["provider"] = "supabase"
         config["storage"]["provider"] = "supabase"
+        
+        logger.info("Supabase configuration detected and enabled")
         
     # Allow bypassing authentication for development
     if os.environ.get("BYPASS_LDAP", "").lower() == "true":
@@ -170,6 +176,11 @@ def is_supabase_enabled() -> bool:
     Returns:
         True if Supabase is configured, False otherwise
     """
+    # First check for the top-level use_supabase flag
+    if get_config().get("use_supabase") is True:
+        return True
+        
+    # Fallback to checking database configuration
     db_config = get_database_config()
     if not db_config:
         return False
