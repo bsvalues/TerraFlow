@@ -1,40 +1,45 @@
 import os
 import sys
-from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
-from sqlalchemy.orm import DeclarativeBase
+import subprocess
+import time
 
-# Set up Flask app for migrations
-class Base(DeclarativeBase):
-    pass
-
-db = SQLAlchemy(model_class=Base)
-app = Flask(__name__)
-
-# Use the DATABASE_URL environment variable
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-
-# Initialize the database and migrations
-db.init_app(app)
-migrate = Migrate(app, db)
-
-# Import models to make them available to the migration
-with app.app_context():
-    # Import all models to ensure they are registered with the metadata
-    from models import *
+def run_migration():
+    """
+    Run Flask-Migrate commands directly using subprocess
+    to avoid circular import issues
+    """
+    print("Setting up database migration...")
     
-    print("Models imported successfully")
-    
-    # Initialize migrations directory if it doesn't exist
-    from flask_migrate import init, migrate as migrate_cmd
-    
+    # Check if migrations directory exists
     if not os.path.exists('migrations'):
         print("Initializing Flask-Migrate...")
-        init()
+        subprocess.run(['flask', 'db', 'init'], check=True)
+        # Give a moment for the file system to update
+        time.sleep(1)
     
     print("Creating migration...")
-    migrate_cmd(message="Initial database schema")
+    result = subprocess.run(
+        ['flask', 'db', 'migrate', '-m', 'Initial database schema'],
+        capture_output=True,
+        text=True
+    )
     
-    print("Migration created successfully")
+    print(f"Migration stdout: {result.stdout}")
+    if result.stderr:
+        print(f"Migration stderr: {result.stderr}")
+    
+    print("Running migration...")
+    result = subprocess.run(
+        ['flask', 'db', 'upgrade'],
+        capture_output=True,
+        text=True
+    )
+    
+    print(f"Upgrade stdout: {result.stdout}")
+    if result.stderr:
+        print(f"Upgrade stderr: {result.stderr}")
+    
+    print("Migration process completed")
+
+if __name__ == "__main__":
+    run_migration()
