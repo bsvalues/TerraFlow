@@ -199,7 +199,7 @@ class SupabaseAgent(BaseAgent):
         
         # Execute the query
         try:
-            result = execute_query(table, select, filters, order, limit)
+            result = execute_query(table, select, filters)
             
             if result is not None:
                 # Cache the result
@@ -494,31 +494,23 @@ class SupabaseAgent(BaseAgent):
             }
         
         if not storage_path:
-            # Use filename as storage path if not provided
-            import os
+            # Use filename as storage path if not specified
             storage_path = os.path.basename(file_path)
         
-        # Check if bucket exists
-        if bucket not in self.buckets:
-            return {
-                "success": False,
-                "error": f"Unknown bucket: {bucket}. Available buckets: {', '.join(self.buckets.keys())}"
-            }
-        
         try:
-            public_url = upload_file_to_storage(file_path, bucket, storage_path, content_type)
+            url = upload_file_to_storage(file_path, bucket, storage_path, content_type)
             
-            if public_url:
+            if url:
                 return {
                     "success": True,
-                    "public_url": public_url,
+                    "url": url,
                     "bucket": bucket,
-                    "storage_path": storage_path
+                    "path": storage_path
                 }
             else:
                 return {
                     "success": False,
-                    "error": "Failed to upload file to storage"
+                    "error": "File upload failed"
                 }
         except Exception as e:
             self.logger.error(f"Storage upload error: {str(e)}")
@@ -557,31 +549,23 @@ class SupabaseAgent(BaseAgent):
             }
         
         if not destination_path:
-            # Use current directory and filename if destination not specified
-            import os
+            # Use current directory and filename from storage path
             destination_path = os.path.basename(storage_path)
         
-        # Check if bucket exists
-        if bucket not in self.buckets:
-            return {
-                "success": False,
-                "error": f"Unknown bucket: {bucket}. Available buckets: {', '.join(self.buckets.keys())}"
-            }
-        
         try:
-            result = download_file_from_storage(bucket, storage_path, destination_path)
+            success = download_file_from_storage(bucket, storage_path, destination_path)
             
-            if result:
+            if success:
                 return {
                     "success": True,
-                    "destination_path": destination_path,
                     "bucket": bucket,
-                    "storage_path": storage_path
+                    "storage_path": storage_path,
+                    "destination_path": destination_path
                 }
             else:
                 return {
                     "success": False,
-                    "error": "Failed to download file from storage"
+                    "error": "File download failed"
                 }
         except Exception as e:
             self.logger.error(f"Storage download error: {str(e)}")
@@ -611,28 +595,21 @@ class SupabaseAgent(BaseAgent):
                 "error": "Missing required parameter: bucket"
             }
         
-        # Check if bucket exists
-        if bucket not in self.buckets:
-            return {
-                "success": False,
-                "error": f"Unknown bucket: {bucket}. Available buckets: {', '.join(self.buckets.keys())}"
-            }
-        
         try:
             files = list_files_in_storage(bucket, path)
             
             if files is not None:
                 return {
                     "success": True,
-                    "files": files,
-                    "count": len(files),
                     "bucket": bucket,
-                    "path": path
+                    "path": path,
+                    "files": files,
+                    "count": len(files)
                 }
             else:
                 return {
                     "success": False,
-                    "error": "Failed to list files in storage"
+                    "error": "Failed to list files"
                 }
         except Exception as e:
             self.logger.error(f"Storage list error: {str(e)}")
@@ -668,36 +645,29 @@ class SupabaseAgent(BaseAgent):
                 "error": "Missing required parameter: paths"
             }
         
-        # Check if bucket exists
-        if bucket not in self.buckets:
-            return {
-                "success": False,
-                "error": f"Unknown bucket: {bucket}. Available buckets: {', '.join(self.buckets.keys())}"
-            }
+        # Convert to list if a single string was provided
+        if isinstance(paths, str):
+            paths = [paths]
         
         try:
-            success_count = 0
-            failed_paths = []
-            
-            # Handle both single path and list of paths
-            if isinstance(paths, str):
-                paths = [paths]
+            results = {
+                "success": True,
+                "bucket": bucket,
+                "deleted": [],
+                "failed": []
+            }
             
             for path in paths:
-                result = delete_file_from_storage(bucket, path)
-                if result:
-                    success_count += 1
+                success = delete_file_from_storage(bucket, path)
+                if success:
+                    results["deleted"].append(path)
                 else:
-                    failed_paths.append(path)
+                    results["failed"].append(path)
             
-            return {
-                "success": success_count > 0,
-                "total": len(paths),
-                "success_count": success_count,
-                "failed_count": len(failed_paths),
-                "failed_paths": failed_paths,
-                "bucket": bucket
-            }
+            # Overall success is true only if all deletions succeeded
+            results["success"] = len(results["failed"]) == 0
+            
+            return results
         except Exception as e:
             self.logger.error(f"Storage delete error: {str(e)}")
             return {
@@ -717,7 +687,6 @@ class SupabaseAgent(BaseAgent):
         Returns:
             Auth status
         """
-        # Get client
         client = get_supabase_client()
         if not client:
             return {
@@ -726,23 +695,14 @@ class SupabaseAgent(BaseAgent):
             }
         
         try:
-            # Check auth session
-            session = client.auth.get_session()
+            # Get the auth status - just check if we can access the client's auth property
+            has_auth = hasattr(client, 'auth')
             
-            if session:
-                return {
-                    "success": True,
-                    "authenticated": True,
-                    "session_info": {
-                        "user_id": session.user.id if hasattr(session, 'user') else None,
-                        "expires_at": session.expires_at if hasattr(session, 'expires_at') else None
-                    }
-                }
-            else:
-                return {
-                    "success": True,
-                    "authenticated": False
-                }
+            return {
+                "success": True,
+                "auth_available": has_auth,
+                "status": "operational" if has_auth else "not_configured"
+            }
         except Exception as e:
             self.logger.error(f"Auth check error: {str(e)}")
             return {
@@ -769,13 +729,11 @@ class SupabaseAgent(BaseAgent):
         check_auth = parameters.get("check_auth", True)
         check_database = parameters.get("check_database", True)
         
-        # Get client
         client = get_supabase_client()
         if not client:
             return {
                 "success": False,
-                "error": "Failed to get Supabase client",
-                "status": "unavailable"
+                "error": "Failed to get Supabase client"
             }
         
         results = {
@@ -788,10 +746,7 @@ class SupabaseAgent(BaseAgent):
         if check_database:
             try:
                 # Simple query to check database availability
-                response = client.from_('information_schema.tables')
-                                .select('table_name')
-                                .limit(1)
-                                .execute()
+                response = client.from_('information_schema.tables').select('table_name').limit(1).execute()
                 
                 results["checks"]["database"] = {
                     "status": "operational" if hasattr(response, 'data') else "issue",
@@ -803,57 +758,53 @@ class SupabaseAgent(BaseAgent):
                     "status": "issue",
                     "error": str(e)
                 }
-                results["status"] = "partial_outage"
         
-        # Check authentication if requested
+        # Check storage buckets if requested
+        if check_buckets:
+            results["checks"]["buckets"] = {}
+            
+            for bucket_name in self.buckets.keys():
+                try:
+                    response = client.storage.get_bucket(bucket_name)
+                    results["checks"]["buckets"][bucket_name] = {
+                        "status": "exists",
+                        "error": None
+                    }
+                except Exception as e:
+                    results["checks"]["buckets"][bucket_name] = {
+                        "status": "missing",
+                        "error": str(e)
+                    }
+        
+        # Check auth if requested
         if check_auth:
             try:
-                client.auth.get_session()
+                # Just check if auth is available
+                has_auth = hasattr(client, 'auth')
                 results["checks"]["auth"] = {
-                    "status": "operational",
-                    "error": None
+                    "status": "operational" if has_auth else "not_configured",
+                    "error": None if has_auth else "Auth not available"
                 }
             except Exception as e:
-                self.logger.warning(f"Auth check failed: {str(e)}")
                 results["checks"]["auth"] = {
                     "status": "issue",
                     "error": str(e)
                 }
-                results["status"] = "partial_outage"
         
-        # Check storage buckets if requested
-        if check_buckets:
-            bucket_results = {}
-            all_buckets_ok = True
-            
-            for bucket in self.buckets.keys():
-                try:
-                    files = list_files_in_storage(bucket, limit=1)
-                    bucket_results[bucket] = {
-                        "status": "operational" if files is not None else "issue",
-                        "error": None
-                    }
-                except Exception as e:
-                    self.logger.warning(f"Bucket check failed for {bucket}: {str(e)}")
-                    bucket_results[bucket] = {
-                        "status": "issue",
-                        "error": str(e)
-                    }
-                    all_buckets_ok = False
-            
-            results["checks"]["storage"] = {
-                "status": "operational" if all_buckets_ok else "partial_outage",
-                "buckets": bucket_results
-            }
-            
-            if not all_buckets_ok and results["status"] != "unavailable":
-                results["status"] = "partial_outage"
-        
-        # Overall status
-        if not client:
-            results["status"] = "unavailable"
-        elif "partial_outage" in results["status"]:
-            results["status"] = "partial_outage"
+        # If any check has issues, update the overall status
+        for check_type, check_data in results["checks"].items():
+            if isinstance(check_data, dict) and check_data.get("status") != "operational" and check_data.get("status") != "exists":
+                if check_type == "buckets":
+                    # For buckets, only set issue if all buckets have issues
+                    all_issue = True
+                    for bucket_status in check_data.values():
+                        if bucket_status.get("status") == "exists":
+                            all_issue = False
+                            break
+                    if all_issue:
+                        results["status"] = "issue"
+                else:
+                    results["status"] = "issue"
         
         return results
     
@@ -864,178 +815,165 @@ class SupabaseAgent(BaseAgent):
         Returns:
             True if configuration is complete, False otherwise
         """
-        required_vars = ["SUPABASE_URL", "SUPABASE_KEY", "SUPABASE_SERVICE_KEY"]
-        missing_vars = []
+        # Check for Supabase URL and key in environment variables
+        supabase_url = os.environ.get("SUPABASE_URL")
+        supabase_key = os.environ.get("SUPABASE_KEY") or os.environ.get("SUPABASE_SERVICE_KEY")
         
-        for var in required_vars:
-            if not os.environ.get(var):
-                missing_vars.append(var)
-        
-        if missing_vars:
-            self.logger.error(f"Missing Supabase environment variables: {', '.join(missing_vars)}")
+        if not supabase_url or not supabase_key:
+            self.logger.warning("Supabase environment variables not set")
             return False
         
         return True
     
-    # Agent-to-Agent Protocol Implementation
+    # Message handling (for inter-agent communication)
+    
+    def handle_message(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Handle message from another agent
+        
+        Args:
+            message: Dictionary containing message details
+                - type: Message type (query, request, update, etc.)
+                - from_agent: Agent ID of sender
+                - content: Message content
+                
+        Returns:
+            Response to the message
+        """
+        message_type = message.get("type")
+        content = message.get("content", {})
+        
+        if message_type == "query":
+            return self._handle_query(content)
+        elif message_type == "request":
+            return self._handle_request(content)
+        
+        return {
+            "success": False,
+            "error": f"Unsupported message type: {message_type}"
+        }
     
     def _handle_query(self, message: Dict[str, Any]) -> Dict[str, Any]:
         """Handle query message from another agent"""
-        content = message.get("content", {})
-        query = content.get("query", "")
-        context = content.get("context", {})
+        query_type = message.get("query_type")
         
-        if "database" in query.lower():
-            # Handle database-related queries
+        if query_type == "status":
             return {
-                "message_type": "inform",
-                "content": {
-                    "information": self._get_database_info(),
-                    "query": query
-                },
-                "sender_id": self.agent_id,
-                "receiver_id": message.get("sender_id"),
-                "conversation_id": message.get("conversation_id"),
-                "reply_to": message.get("id")
+                "success": True,
+                "status": self.status,
+                "capabilities": self.capabilities
             }
-        elif "storage" in query.lower():
-            # Handle storage-related queries
-            return {
-                "message_type": "inform",
-                "content": {
-                    "information": self._get_storage_info(),
-                    "query": query
-                },
-                "sender_id": self.agent_id,
-                "receiver_id": message.get("sender_id"),
-                "conversation_id": message.get("conversation_id"),
-                "reply_to": message.get("id")
-            }
-        elif "status" in query.lower():
-            # Handle status-related queries
-            status_info = self._handle_status_check({})
-            return {
-                "message_type": "inform",
-                "content": {
-                    "information": status_info,
-                    "query": query
-                },
-                "sender_id": self.agent_id,
-                "receiver_id": message.get("sender_id"),
-                "conversation_id": message.get("conversation_id"),
-                "reply_to": message.get("id")
-            }
-        else:
-            # Default response
-            return super()._handle_query(message)
+        elif query_type == "database_info":
+            return self._get_database_info()
+        elif query_type == "storage_info":
+            return self._get_storage_info()
+        
+        return {
+            "success": False,
+            "error": f"Unsupported query type: {query_type}"
+        }
     
     def _handle_request(self, message: Dict[str, Any]) -> Dict[str, Any]:
         """Handle request message from another agent"""
-        content = message.get("content", {})
-        action = content.get("action", "")
-        parameters = content.get("parameters", {})
+        request_type = message.get("request_type")
+        parameters = message.get("parameters", {})
         
-        # Map common request actions to task types
-        action_mapping = {
-            "database.query": "supabase.database.query",
-            "database.insert": "supabase.database.insert",
-            "database.update": "supabase.database.update",
-            "database.delete": "supabase.database.delete",
-            "storage.upload": "supabase.storage.upload",
-            "storage.download": "supabase.storage.download",
-            "storage.list": "supabase.storage.list",
-            "storage.delete": "supabase.storage.delete",
-            "check_status": "supabase.status.check"
+        if request_type == "db_query":
+            return self._handle_db_query(parameters)
+        elif request_type == "storage_upload":
+            return self._handle_storage_upload(parameters)
+        elif request_type == "storage_list":
+            return self._handle_storage_list(parameters)
+        
+        return {
+            "success": False,
+            "error": f"Unsupported request type: {request_type}"
         }
-        
-        # Process the request if it maps to a supported task type
-        if action in action_mapping:
-            task_type = action_mapping[action]
-            task_result = self.process_task({
-                "task_type": task_type,
-                "parameters": parameters
-            })
-            
-            # Convert task result to agent message
-            return {
-                "message_type": "inform",
-                "content": {
-                    "information": task_result,
-                    "action": action
-                },
-                "sender_id": self.agent_id,
-                "receiver_id": message.get("sender_id"),
-                "conversation_id": message.get("conversation_id"),
-                "reply_to": message.get("id")
-            }
-        else:
-            # Default response for unsupported actions
-            return super()._handle_request(message)
-    
-    # Utility methods
     
     def _get_database_info(self) -> Dict[str, Any]:
         """Get information about the Supabase database"""
-        info = {
-            "tables": {}
-        }
-        
         client = get_supabase_client()
         if not client:
-            return {"error": "Supabase client not available"}
+            return {
+                "success": False,
+                "error": "Failed to get Supabase client"
+            }
         
         try:
-            response = client.from_('information_schema.tables')
-                            .select('table_name, table_schema')
-                            .eq('table_schema', 'public')
-                            .execute()
+            # Get information about tables
+            response = client.from_('information_schema.tables').select('table_name, table_schema').execute()
             
+            tables = []
             if hasattr(response, 'data'):
-                tables = response.data
-                for table in tables:
-                    table_name = table.get('table_name')
-                    if table_name:
-                        # Get column information for each table
-                        col_response = client.from_('information_schema.columns')
-                                            .select('column_name, data_type')
-                                            .eq('table_schema', 'public')
-                                            .eq('table_name', table_name)
-                                            .execute()
+                for table in response.data:
+                    if table['table_schema'] == 'public':
+                        # For public tables, get column information
+                        col_response = client.from_('information_schema.columns').select('column_name, data_type, is_nullable').eq('table_name', table['table_name']).eq('table_schema', 'public').execute()
                         
-                        columns = {}
+                        columns = []
                         if hasattr(col_response, 'data'):
-                            for col in col_response.data:
-                                columns[col.get('column_name')] = col.get('data_type')
-                                
-                        info["tables"][table_name] = {
-                            "columns": columns
-                        }
+                            columns = col_response.data
+                        
+                        tables.append({
+                            'name': table['table_name'],
+                            'schema': table['table_schema'],
+                            'columns': columns
+                        })
+            
+            return {
+                "success": True,
+                "tables": tables,
+                "count": len(tables)
+            }
         except Exception as e:
-            info["error"] = str(e)
-        
-        return info
+            self.logger.error(f"Error fetching database info: {str(e)}")
+            return {
+                "success": False,
+                "error": f"Error fetching database info: {str(e)}"
+            }
     
     def _get_storage_info(self) -> Dict[str, Any]:
         """Get information about Supabase storage buckets"""
-        info = {
-            "buckets": {}
-        }
+        client = get_supabase_client()
+        if not client:
+            return {
+                "success": False,
+                "error": "Failed to get Supabase client"
+            }
         
-        for bucket_name, bucket_info in self.buckets.items():
-            try:
-                files = list_files_in_storage(bucket_name)
-                info["buckets"][bucket_name] = {
-                    "description": bucket_info["description"],
-                    "public": bucket_info["public"],
-                    "file_count": len(files) if files else 0,
-                    "accessible": files is not None
-                }
-            except Exception as e:
-                info["buckets"][bucket_name] = {
-                    "description": bucket_info["description"],
-                    "public": bucket_info["public"],
-                    "accessible": False,
-                    "error": str(e)
-                }
-        
-        return info
+        try:
+            buckets_info = {}
+            
+            for bucket_name, config in self.buckets.items():
+                try:
+                    # Try to get bucket details
+                    bucket_response = client.storage.get_bucket(bucket_name)
+                    
+                    # List files in bucket
+                    files_response = client.storage.from_(bucket_name).list()
+                    
+                    buckets_info[bucket_name] = {
+                        "exists": True,
+                        "description": config["description"],
+                        "public": config["public"],
+                        "files_count": len(files_response) if isinstance(files_response, list) else 0
+                    }
+                except Exception as e:
+                    buckets_info[bucket_name] = {
+                        "exists": False,
+                        "description": config["description"],
+                        "public": config["public"],
+                        "error": str(e)
+                    }
+            
+            return {
+                "success": True,
+                "buckets": buckets_info,
+                "count": len(buckets_info)
+            }
+        except Exception as e:
+            self.logger.error(f"Error fetching storage info: {str(e)}")
+            return {
+                "success": False,
+                "error": f"Error fetching storage info: {str(e)}"
+            }
