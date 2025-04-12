@@ -331,4 +331,3 @@ class CurrentUseValuationService:
 
 # Singleton instance
 current_use_service = CurrentUseValuationService()
-"""

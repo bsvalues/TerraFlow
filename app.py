@@ -723,5 +723,13 @@ try:
 except Exception as e:
     app.logger.error(f"Error registering knowledge base routes: {str(e)}")
 
+# Register valuation blueprint
+try:
+    from valuation_routes import valuation_bp
+    app.register_blueprint(valuation_bp)
+    app.logger.info("Valuation routes registered successfully")
+except Exception as e:
+    app.logger.error(f"Error registering valuation routes: {str(e)}")
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
