@@ -420,13 +420,19 @@ def delete_file_route(file_id):
 @app.route('/map-viewer')
 @login_required
 def map_viewer():
-    # Get GeoJSON files for the user
-    geojson_files = File.query.filter(
-        File.user_id == session['user']['id'], 
-        File.filename.like('%.geojson')
+    # Get GIS files (GeoJSON and Shapefile) for the user
+    gis_files = File.query.filter(
+        File.user_id == session['user']['id'],
+        db.or_(
+            File.filename.like('%.geojson'),
+            File.filename.like('%.shp')
+        )
     ).all()
     
-    return render_template('map_viewer.html', geojson_files=geojson_files)
+    # Get projects to organize files
+    projects = GISProject.query.filter_by(user_id=session['user']['id']).all()
+    
+    return render_template('map_viewer.html', gis_files=gis_files, projects=projects)
 
 @app.route('/map-data/<int:file_id>')
 @login_required
@@ -437,19 +443,65 @@ def map_data(file_id):
     if file_record.user_id != session['user']['id']:
         return jsonify({'error': 'Access denied'}), 403
     
-    # Only serve GeoJSON files
-    if not file_record.filename.endswith('.geojson'):
-        return jsonify({'error': 'File is not GeoJSON'}), 400
-    
     file_path = os.path.join(app.config['UPLOAD_FOLDER'], str(file_id), file_record.filename)
     
-    try:
-        with open(file_path, 'r') as f:
-            geojson_data = f.read()
-        return geojson_data, 200, {'Content-Type': 'application/json'}
-    except Exception as e:
-        logger.error(f"Error reading GeoJSON file: {str(e)}")
-        return jsonify({'error': f'Error reading file: {str(e)}'}), 500
+    # Handle different file types
+    if file_record.filename.endswith('.geojson'):
+        # Directly serve GeoJSON files
+        try:
+            with open(file_path, 'r') as f:
+                geojson_data = f.read()
+            return geojson_data, 200, {'Content-Type': 'application/json'}
+        except Exception as e:
+            logger.error(f"Error reading GeoJSON file: {str(e)}")
+            return jsonify({'error': f'Error reading file: {str(e)}'}), 500
+            
+    elif file_record.filename.endswith('.shp'):
+        # Convert Shapefile to GeoJSON
+        try:
+            # Import required libraries
+            import geopandas as gpd
+            from shapely.geometry import mapping
+            import json
+            
+            # Read the shapefile
+            gdf = gpd.read_file(file_path)
+            
+            # Convert to GeoJSON
+            geojson_data = {
+                "type": "FeatureCollection",
+                "features": []
+            }
+            
+            for _, row in gdf.iterrows():
+                feature = {
+                    "type": "Feature",
+                    "properties": {},
+                    "geometry": mapping(row.geometry)
+                }
+                
+                # Add all non-geometry columns as properties
+                for col in gdf.columns:
+                    if col != 'geometry':
+                        # Convert any non-serializable objects to strings
+                        try:
+                            value = row[col]
+                            if isinstance(value, (int, float, str, bool)) or value is None:
+                                feature["properties"][col] = value
+                            else:
+                                feature["properties"][col] = str(value)
+                        except:
+                            feature["properties"][col] = str(row[col])
+                
+                geojson_data["features"].append(feature)
+            
+            return jsonify(geojson_data)
+            
+        except Exception as e:
+            logger.error(f"Error converting Shapefile to GeoJSON: {str(e)}")
+            return jsonify({'error': f'Error converting Shapefile: {str(e)}'}), 500
+    else:
+        return jsonify({'error': 'Unsupported file type. Only GeoJSON and Shapefile formats are supported.'}), 400
 
 @app.route('/search')
 @login_required

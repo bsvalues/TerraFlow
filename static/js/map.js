@@ -15,6 +15,12 @@ document.addEventListener('DOMContentLoaded', () => {
         attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
         maxZoom: 19
     });
+    
+    // Add USGS Topo layer
+    const usgsTopoLayer = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles &copy; USGS &mdash; National Map',
+        maxZoom: 20
+    });
 
     // Add layer control
     const baseMaps = {
@@ -22,11 +28,16 @@ document.addEventListener('DOMContentLoaded', () => {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
             maxZoom: 19
         }),
-        "Satellite": esriSatellite
+        "Satellite": esriSatellite,
+        "USGS Topo": usgsTopoLayer
     };
 
-    // Add layer controls
-    const layerControl = L.control.layers(baseMaps, {}, { collapsed: false }).addTo(map);
+    // Add layer controls with different sections
+    const layerControl = L.control.layers(baseMaps, {}, { 
+        collapsed: false,
+        position: 'topright',
+        sortLayers: true
+    }).addTo(map);
 
     // GeoJSON layers storage
     const geoJsonLayers = {};

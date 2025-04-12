@@ -43,19 +43,46 @@
                     </div>
                     <div class="card-body">
                         <div class="mb-3">
-                            <label for="file-select" class="form-label">Select GeoJSON File</label>
+                            <label for="file-select" class="form-label">Select GIS File</label>
                             <select id="file-select" class="form-select">
                                 <option value="">Choose a file...</option>
-                                {% for file in geojson_files %}
-                                    <option value="{{ file.id }}">{{ file.filename }}</option>
-                                {% endfor %}
+                                {% if projects %}
+                                    {% for project in projects %}
+                                        <optgroup label="{{ project.name }}">
+                                            {% for file in gis_files %}
+                                                {% if file.project_id == project.id %}
+                                                    <option value="{{ file.id }}" data-file-type="{{ file.filename.split('.')[-1] }}">
+                                                        {{ file.filename }}
+                                                    </option>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </optgroup>
+                                    {% endfor %}
+                                    
+                                    <!-- Files without a project -->
+                                    <optgroup label="Unsorted Files">
+                                        {% for file in gis_files %}
+                                            {% if not file.project_id %}
+                                                <option value="{{ file.id }}" data-file-type="{{ file.filename.split('.')[-1] }}">
+                                                    {{ file.filename }}
+                                                </option>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </optgroup>
+                                {% else %}
+                                    {% for file in gis_files %}
+                                        <option value="{{ file.id }}" data-file-type="{{ file.filename.split('.')[-1] }}">
+                                            {{ file.filename }}
+                                        </option>
+                                    {% endfor %}
+                                {% endif %}
                             </select>
                         </div>
                         
-                        {% if not geojson_files %}
+                        {% if not gis_files %}
                             <div class="alert alert-info" role="alert">
                                 <i class="fas fa-info-circle me-2"></i>
-                                No GeoJSON files available. Upload GeoJSON files in the File Manager.
+                                No GIS files available. Upload GeoJSON or Shapefile files in the File Manager.
                             </div>
                         {% endif %}
                     </div>
