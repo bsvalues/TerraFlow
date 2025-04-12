@@ -463,9 +463,9 @@ class Appeal(db.Model):
     def __repr__(self):
         return f'<Appeal for {self.property_id} on {self.appeal_date}>'
 
-class DataQualityAlert(db.Model):
-    """Data quality alert from the AI system."""
-    __tablename__ = 'data_quality_alerts'
+class PropertyDataQualityAlert(db.Model):
+    """Data quality alert for property data from the AI system."""
+    __tablename__ = 'property_data_quality_alerts'
     
     id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     property_id = db.Column(UUID(as_uuid=True), db.ForeignKey('properties.id'), nullable=True)
@@ -491,7 +491,7 @@ class DataQualityAlert(db.Model):
     resolution_notes = db.Column(db.Text)
     
     # Relationships
-    resolver = db.relationship('User', backref=db.backref('resolved_alerts', lazy='dynamic'))
+    resolver = db.relationship('User', backref=db.backref('resolved_property_alerts', lazy='dynamic'))
     
     def __repr__(self):
-        return f'<DataQualityAlert {self.alert_type} - {self.severity}>'
+        return f'<PropertyDataQualityAlert {self.alert_type} - {self.severity}>'
