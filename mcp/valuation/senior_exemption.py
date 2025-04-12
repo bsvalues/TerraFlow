@@ -349,4 +349,3 @@ class SeniorExemptionService:
 
 # Singleton instance
 senior_exemption_service = SeniorExemptionService()
-"""

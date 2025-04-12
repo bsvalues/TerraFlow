@@ -1202,4 +1202,3 @@ class DataQualityAgent(BaseAgent):
 
 # Singleton instance
 data_quality_agent = DataQualityAgent()
-"""

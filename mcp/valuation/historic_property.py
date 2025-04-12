@@ -251,4 +251,3 @@ class HistoricPropertyValuationService:
 
 # Singleton instance
 historic_property_service = HistoricPropertyValuationService()
-"""

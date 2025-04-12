@@ -191,4 +191,3 @@ class ValuationIntegrator:
 
 # Singleton instance
 valuation_integrator = ValuationIntegrator()
-"""
