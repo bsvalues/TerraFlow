@@ -38,6 +38,16 @@ def initialize_integrators(*args, **kwargs):
         logger.error(f"Error initializing Data Quality integrator: {str(e)}")
     
     # Add additional integrators here as they're developed
+    try:
+        # Supabase Agent Integrator
+        from mcp.integrators.supabase_integrator import register_supabase_agent
+        if register_supabase_agent():
+            integrators_count += 1
+            logger.info(f"Initialized Supabase integrator")
+    except ImportError as e:
+        logger.warning(f"Could not load Supabase integrator: {e}")
+    except Exception as e:
+        logger.error(f"Error initializing Supabase integrator: {str(e)}")
     
     elapsed_time = time.time() - start_time
     logger.info(f"Initialized {integrators_count} agent integrators")
