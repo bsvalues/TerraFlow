@@ -29,9 +29,8 @@ except ImportError:
 # Import SQLAlchemy models and db connection
 from app import db
 from models import (
-    User, File, GISProject, ParcelData, SalesData, 
-    PropertyAssessment, AuditLog, DataQualityReport,
-    DataQualityAlert
+    User, File, GISProject, AuditLog, 
+    QueryLog, MFASetup, IndexedDocument
 )
 
 # Import config utilities
@@ -325,12 +324,10 @@ class DatabaseAPI:
             "users": User,
             "files": File,
             "gis_projects": GISProject,
-            "parcel_data": ParcelData,
-            "sales_data": SalesData,
-            "property_assessments": PropertyAssessment,
             "audit_logs": AuditLog,
-            "data_quality_reports": DataQualityReport,
-            "data_quality_alerts": DataQualityAlert,
+            "query_logs": QueryLog,
+            "mfa_setup": MFASetup,
+            "indexed_documents": IndexedDocument,
             # Add more models as needed
         }
         
@@ -342,12 +339,10 @@ class DatabaseAPI:
             "users": User,
             "files": File,
             "gis_projects": GISProject,
-            "parcel_data": ParcelData,
-            "sales_data": SalesData,
-            "property_assessments": PropertyAssessment,
             "audit_logs": AuditLog,
-            "data_quality_reports": DataQualityReport,
-            "data_quality_alerts": DataQualityAlert,
+            "query_logs": QueryLog,
+            "mfa_setup": MFASetup,
+            "indexed_documents": IndexedDocument,
             # Add more models as needed
         }
     
