@@ -48,19 +48,20 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
 ```
 
-### Database Schema
+### Database Schema and Functions
 
-The database schema can be created using the provided SQL script:
+The database schema can be created using the provided SQL scripts:
 
 1. Navigate to the SQL Editor in Supabase Dashboard
-2. Copy the content of `schema.sql` from the project
-3. Execute the SQL to create all required tables and functions
+2. Open the file `docs/supabase_sql_scripts.md` from the project
+3. Execute each SQL block in the file to create all required:
+   - Custom functions
+   - Database tables
+   - Security policies
 
-Alternatively, execute:
+> **Important**: The SQL scripts must be executed in the correct order. Start with extensions, then functions, then tables, and finally security policies.
 
-```bash
-cat schema.sql | psql "postgres://<USER>:<PASSWORD>@<HOST>:<PORT>/<DATABASE>"
-```
+For a full list of required SQL scripts, see [Supabase SQL Scripts](supabase_sql_scripts.md).
 
 ## Storage Buckets
 
