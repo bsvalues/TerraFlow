@@ -120,6 +120,9 @@ def get_file_url(file_id, filename):
     provider = get_storage_provider()
     
     if provider == 'supabase':
+        # Import here to avoid circular imports
+        from supabase_client import get_supabase_client
+        
         bucket_name = get_bucket_name()
         storage_path = f"{file_id}/{filename}"
         
@@ -144,6 +147,9 @@ def get_file_url(file_id, filename):
 def _store_file_supabase(file, filename, user_id, project_name):
     """Store a file in Supabase Storage"""
     try:
+        # Import here to avoid circular imports
+        from supabase_client import upload_file_to_storage
+        
         # Save to temporary location first
         temp_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'temp')
         os.makedirs(temp_dir, exist_ok=True)
@@ -155,7 +161,11 @@ def _store_file_supabase(file, filename, user_id, project_name):
         storage_path = f"{user_id}/{filename}" if not project_name else f"{user_id}/{project_name}/{filename}"
         
         # Upload to Supabase using our client
-        public_url = upload_file_to_storage(temp_path, bucket_name, storage_path)
+        content_type = None
+        if hasattr(file, 'content_type') and file.content_type:
+            content_type = file.content_type
+            
+        public_url = upload_file_to_storage(temp_path, bucket_name, storage_path, content_type)
         
         # Clean up temporary file
         os.unlink(temp_path)
@@ -177,6 +187,9 @@ def _store_file_supabase(file, filename, user_id, project_name):
 def _retrieve_file_supabase(file_id, filename, destination_path=None):
     """Retrieve a file from Supabase Storage"""
     try:
+        # Import here to avoid circular imports
+        from supabase_client import get_supabase_client
+        
         # Get Supabase client
         client = get_supabase_client()
         if not client:

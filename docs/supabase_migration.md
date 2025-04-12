@@ -64,7 +64,7 @@ cat schema.sql | psql "postgres://<USER>:<PASSWORD>@<HOST>:<PORT>/<DATABASE>"
 
 ## Storage Buckets
 
-Create the following storage buckets in the Supabase Dashboard:
+You need to create the following storage buckets in the Supabase Dashboard:
 
 | Bucket Name | Public Access | Description |
 |-------------|---------------|-------------|
@@ -73,13 +73,59 @@ Create the following storage buckets in the Supabase Dashboard:
 | images      | Yes (public)  | Images and graphics for the application |
 | exports     | No (private)  | Data exports and backups |
 
-### Steps to Create Buckets:
+### Steps to Create Buckets Manually:
 
-1. Go to the Storage section in the Supabase Dashboard
-2. Click "Create a new bucket"
-3. Enter the bucket name
-4. Set public/private access
-5. Repeat for each required bucket
+1. Log in to the Supabase Dashboard
+2. Navigate to the "Storage" section
+3. Click "Create a new bucket"
+4. Enter the bucket name (e.g., "documents")
+5. Toggle the "Public bucket" option as needed:
+   - Enable for public buckets (maps, images)
+   - Disable for private buckets (documents, exports)
+6. Click "Create bucket"
+7. Repeat for each required bucket
+
+### Setting Bucket Policies:
+
+After creating buckets, set appropriate access policies:
+
+#### For Public Buckets (maps, images):
+
+1. Select the bucket
+2. Go to the "Policies" tab
+3. Click "Create a policy"
+4. Select "Add a custom policy"
+5. Name: "Allow public read access"
+6. Policy definition:
+   ```sql
+   ((bucket_id = 'maps'::text) AND (auth.role() = 'anon'::text))
+   ```
+7. Operation: SELECT (this allows reading files)
+8. Click "Save policy"
+
+#### For Private Buckets (documents, exports):
+
+1. Select the bucket
+2. Go to the "Policies" tab
+3. Click "Create a policy"
+4. Select "Add a custom policy"
+5. Name: "Allow authenticated read access"
+6. Policy definition:
+   ```sql
+   ((bucket_id = 'documents'::text) AND (auth.role() = 'authenticated'::text))
+   ```
+7. Operation: SELECT
+8. Click "Save policy"
+9. Add another policy for upload:
+   - Name: "Allow authenticated upload"
+   - Policy definition: 
+     ```sql
+     ((bucket_id = 'documents'::text) AND (auth.role() = 'authenticated'::text))
+     ```
+   - Operation: INSERT
+10. Add policies for UPDATE and DELETE as needed
+
+> **Note**: Bucket creation via the API requires elevated permissions that may not be available with the current service role key. Creating buckets through the Supabase Dashboard is the recommended approach.
 
 ## Custom Functions
 
