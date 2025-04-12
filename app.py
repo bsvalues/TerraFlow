@@ -756,6 +756,9 @@ except Exception as e:
 
 # Initialize API for third-party and microservice integration
 try:
+    # Add test API key for development
+    app.config['API_KEYS'] = ['test_api_key_123', os.environ.get('API_KEY', '')]
+    
     from api import init_api
     init_api(app)
     app.logger.info("API initialized successfully")

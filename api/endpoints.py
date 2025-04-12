@@ -25,7 +25,7 @@ from auth import is_authenticated, has_permission
 from config_loader import get_config
 
 # Create Blueprint
-api_bp = Blueprint('api', __name__, url_prefix='/api/v1')
+api_bp = Blueprint('api_gateway', __name__, url_prefix='/api/v1')
 
 # API Key validation
 def api_key_required(f):
