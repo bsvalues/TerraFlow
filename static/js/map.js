@@ -218,13 +218,11 @@ function initMapControls(map) {
         zoomOutTitle: 'Zoom out'
     }).addTo(map);
     
-    // Add measurement tools
-    new L.Control.Measure({
-        position: 'bottomleft',
-        primaryLengthUnit: 'feet',
-        secondaryLengthUnit: 'miles',
-        primaryAreaUnit: 'acres',
-        secondaryAreaUnit: 'sqmiles'
+    // Add simple scale control instead of measurement tool
+    L.control.scale({
+        imperial: true,
+        metric: true,
+        position: 'bottomleft'
     }).addTo(map);
     
     // Add coordinate display
