@@ -18,10 +18,17 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 import os
 import sys
+from logging.config import fileConfig
+
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-from app import db
-from models import *
+try:
+    from app import db
+    from models import *
+    print("Successfully imported models")
+except Exception as e:
+    print(f"Error importing models: {e}")
+    raise
 
 target_metadata = db.metadata
 

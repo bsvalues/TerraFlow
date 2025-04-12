@@ -76,6 +76,10 @@ os.makedirs(temp_upload_dir, exist_ok=True)
 # Initialize the database
 db.init_app(app)
 
+# Configure Flask-Migrate
+from flask_migrate import Migrate
+migrate = Migrate(app, db)
+
 # Add template context processors
 @app.context_processor
 def inject_now():
