@@ -17,7 +17,12 @@ logger = logging.getLogger(__name__)
 
 # Import Supabase client conditionally
 try:
-    from supabase_client import upload_file, download_file, get_public_url
+    from supabase_client import (
+        upload_file_to_storage, 
+        list_files_in_storage, 
+        delete_file_from_storage,
+        get_supabase_client
+    )
     HAS_SUPABASE = True
 except ImportError:
     HAS_SUPABASE = False
@@ -117,7 +122,19 @@ def get_file_url(file_id, filename):
     if provider == 'supabase':
         bucket_name = get_bucket_name()
         storage_path = f"{file_id}/{filename}"
-        return get_public_url(bucket_name, storage_path)
+        
+        # Get Supabase client
+        client = get_supabase_client()
+        if client:
+            try:
+                # Use the client to generate a public URL
+                public_url = client.storage.from_(bucket_name).get_public_url(storage_path)
+                return public_url
+            except Exception as e:
+                logger.error(f"Error getting public URL from Supabase: {str(e)}")
+        
+        # Fallback to local URL if Supabase fails
+        return f"/download/{file_id}"
     else:
         # For local files, we'll return a relative URL that can be used with Flask's send_from_directory
         return f"/download/{file_id}"
@@ -137,24 +154,21 @@ def _store_file_supabase(file, filename, user_id, project_name):
         bucket_name = get_bucket_name()
         storage_path = f"{user_id}/{filename}" if not project_name else f"{user_id}/{project_name}/{filename}"
         
-        # Upload to Supabase
-        result = upload_file(bucket_name, temp_path, storage_path)
+        # Upload to Supabase using our client
+        public_url = upload_file_to_storage(temp_path, bucket_name, storage_path)
         
         # Clean up temporary file
         os.unlink(temp_path)
         
-        if "error" in result:
-            logger.error(f"Error uploading to Supabase: {result['error']}")
+        if not public_url:
+            logger.error("Error uploading to Supabase: Failed to get public URL")
             return None
             
-        # Get public URL
-        file_url = get_public_url(bucket_name, storage_path)
-        
         return {
             'provider': 'supabase',
             'bucket': bucket_name,
             'path': storage_path,
-            'url': file_url
+            'url': public_url
         }
     except Exception as e:
         logger.error(f"Error storing file in Supabase: {str(e)}")
@@ -163,6 +177,12 @@ def _store_file_supabase(file, filename, user_id, project_name):
 def _retrieve_file_supabase(file_id, filename, destination_path=None):
     """Retrieve a file from Supabase Storage"""
     try:
+        # Get Supabase client
+        client = get_supabase_client()
+        if not client:
+            logger.error("Supabase client not available")
+            return None
+            
         # Determine storage path in Supabase
         bucket_name = get_bucket_name()
         storage_path = f"{file_id}/{filename}"
@@ -174,13 +194,15 @@ def _retrieve_file_supabase(file_id, filename, destination_path=None):
             destination_path = os.path.join(temp_dir, filename)
         
         # Download from Supabase
-        result = download_file(bucket_name, storage_path, destination_path)
-        
-        if "error" in result:
-            logger.error(f"Error downloading from Supabase: {result['error']}")
-            return None
-            
-        return destination_path
+        with open(destination_path, 'wb') as f:
+            # Get the file data
+            try:
+                response = client.storage.from_(bucket_name).download(storage_path)
+                f.write(response)
+                return destination_path
+            except Exception as e:
+                logger.error(f"Error downloading from Supabase: {str(e)}")
+                return None
     except Exception as e:
         logger.error(f"Error retrieving file from Supabase: {str(e)}")
         return None
