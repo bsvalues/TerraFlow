@@ -177,9 +177,64 @@
         
         // Clear all layers
         document.getElementById('clear-layers').addEventListener('click', () => {
-            // Implementation would be in map.js
-            const layerCount = document.getElementById('layer-count');
-            layerCount.textContent = '0';
+            // Get all loaded layer IDs
+            const layerIds = Object.keys(window.geoJsonLayers);
+            
+            if (layerIds.length === 0) {
+                // Show a toast notification
+                const alertsContainer = document.getElementById('map-alerts');
+                const alert = document.createElement('div');
+                alert.className = 'alert alert-info alert-dismissible fade show';
+                alert.innerHTML = `
+                    <i class="fas fa-info-circle me-2"></i>
+                    No layers to clear.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                `;
+                alertsContainer.appendChild(alert);
+                
+                // Auto dismiss after 3 seconds
+                setTimeout(() => {
+                    alert.classList.remove('show');
+                    setTimeout(() => {
+                        alertsContainer.removeChild(alert);
+                    }, 150);
+                }, 3000);
+                
+                return;
+            }
+            
+            // Remove each layer
+            layerIds.forEach(id => {
+                const layer = window.geoJsonLayers[id];
+                window.map.removeLayer(layer);
+                window.layerControl.removeLayer(layer);
+                delete window.geoJsonLayers[id];
+            });
+            
+            // Update count
+            document.getElementById('layer-count').textContent = '0';
+            
+            // Reset layer info panel
+            document.getElementById('layer-info').innerHTML = '<p class="text-muted">Select a layer to see information</p>';
+            
+            // Show success message
+            const alertsContainer = document.getElementById('map-alerts');
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-success alert-dismissible fade show';
+            alert.innerHTML = `
+                <i class="fas fa-check-circle me-2"></i>
+                All layers have been cleared.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+            alertsContainer.appendChild(alert);
+            
+            // Auto dismiss after 3 seconds
+            setTimeout(() => {
+                alert.classList.remove('show');
+                setTimeout(() => {
+                    alertsContainer.removeChild(alert);
+                }, 150);
+            }, 3000);
         });
         
         // Export map view

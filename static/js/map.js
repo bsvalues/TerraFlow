@@ -33,14 +33,20 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // Add layer controls with different sections
-    const layerControl = L.control.layers(baseMaps, {}, { 
+    window.layerControl = L.control.layers(baseMaps, {}, { 
         collapsed: false,
         position: 'topright',
         sortLayers: true
     }).addTo(map);
+    
+    // Local reference for convenience
+    const layerControl = window.layerControl;
 
-    // GeoJSON layers storage
-    const geoJsonLayers = {};
+    // GeoJSON layers storage (global for layer management)
+    window.geoJsonLayers = {};
+    
+    // Local reference for convenience
+    const geoJsonLayers = window.geoJsonLayers;
     
     // Style function for GeoJSON features
     function styleFeature(feature) {
@@ -128,10 +134,45 @@ document.addEventListener('DOMContentLoaded', () => {
     // File selection handler
     document.getElementById('file-select').addEventListener('change', function() {
         const fileId = this.value;
-        const fileName = this.options[this.selectedIndex].text;
+        if (!fileId) return;
+        
+        const selectedOption = this.options[this.selectedIndex];
+        const fileName = selectedOption.text;
+        const fileType = selectedOption.getAttribute('data-file-type');
         
         if (fileId) {
+            // First remove the layer if it was already loaded
+            if (geoJsonLayers[fileId]) {
+                map.removeLayer(geoJsonLayers[fileId]);
+                layerControl.removeLayer(geoJsonLayers[fileId]);
+                delete geoJsonLayers[fileId];
+                updateLayerCount();
+            }
+            
+            // Display a loading indicator
+            showAlert(`Loading ${fileName}...`, 'info');
+            
+            // Load the data (server handles both GeoJSON and Shapefile)
             loadGeoJSON(fileId, fileName);
+            
+            // Update layer info panel
+            document.getElementById('layer-info').innerHTML = `
+                <div class="mb-3">
+                    <strong>File:</strong> ${fileName}
+                </div>
+                <div class="mb-3">
+                    <strong>Type:</strong> ${fileType.toUpperCase()}
+                </div>
+                <div class="mb-3">
+                    <strong>ID:</strong> ${fileId}
+                </div>
+                <div class="mb-3">
+                    <button class="btn btn-sm btn-outline-danger" 
+                            onclick="removeLayer(${fileId})">
+                        <i class="fas fa-trash-alt me-1"></i> Remove Layer
+                    </button>
+                </div>
+            `;
         }
     });
 
@@ -192,4 +233,47 @@ function initMapControls(map) {
         const lng = e.latlng.lng.toFixed(6);
         document.getElementById('map-coordinates').textContent = `Lat: ${lat}, Long: ${lng}`;
     });
+}
+
+// Global function to remove a layer by ID
+function removeLayer(fileId) {
+    const map = window.map;
+    const layerControl = window.layerControl;
+    
+    if (window.geoJsonLayers && window.geoJsonLayers[fileId]) {
+        // Remove from map
+        map.removeLayer(window.geoJsonLayers[fileId]);
+        
+        // Remove from control
+        layerControl.removeLayer(window.geoJsonLayers[fileId]);
+        
+        // Delete from storage
+        delete window.geoJsonLayers[fileId];
+        
+        // Update the count
+        const count = Object.keys(window.geoJsonLayers).length;
+        document.getElementById('layer-count').textContent = count;
+        
+        // Reset layer info panel
+        document.getElementById('layer-info').innerHTML = '<p class="text-muted">Select a layer to see information</p>';
+        
+        // Show success message
+        const alertsContainer = document.getElementById('map-alerts');
+        const alert = document.createElement('div');
+        alert.className = 'alert alert-success alert-dismissible fade show';
+        alert.innerHTML = `
+            <i class="fas fa-check-circle me-2"></i>
+            Layer removed successfully.
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+        alertsContainer.appendChild(alert);
+        
+        // Auto dismiss after 3 seconds
+        setTimeout(() => {
+            alert.classList.remove('show');
+            setTimeout(() => {
+                alertsContainer.removeChild(alert);
+            }, 150);
+        }, 3000);
+    }
 }
