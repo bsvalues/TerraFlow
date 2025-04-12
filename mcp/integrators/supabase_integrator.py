@@ -6,7 +6,7 @@ registration and communication between the Supabase agent and other components.
 """
 
 import logging
-from typing import Dict, Any, Optional, Union, Tuple, List, bool
+from typing import Dict, Any, Optional, Union, Tuple, List
 
 from mcp.agents.supabase_agent import SupabaseAgent
 

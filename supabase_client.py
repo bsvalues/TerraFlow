@@ -150,6 +150,34 @@ def delete_file_from_storage(bucket: str, path: str) -> bool:
         logger.error(f"Error deleting file from Supabase: {str(e)}")
         return False
 
+def download_file_from_storage(bucket: str, storage_path: str, destination_path: str) -> bool:
+    """
+    Download a file from Supabase Storage.
+    
+    Args:
+        bucket: Storage bucket name
+        storage_path: Path to the file within the bucket
+        destination_path: Local path to save the file
+        
+    Returns:
+        True on success, False on failure
+    """
+    client = get_supabase_client()
+    if not client:
+        return False
+    
+    try:
+        # Download the file to the destination
+        with open(destination_path, 'wb') as f:
+            response = client.storage.from_(bucket).download(storage_path)
+            f.write(response)
+        
+        logger.info(f"Downloaded {bucket}/{storage_path} to {destination_path}")
+        return True
+    except Exception as e:
+        logger.error(f"Error downloading file from Supabase: {str(e)}")
+        return False
+
 def execute_query(table: str, select: str = "*", filters: Optional[Dict[str, Any]] = None) -> Optional[List[Dict[str, Any]]]:
     """
     Execute a query against a Supabase table.
