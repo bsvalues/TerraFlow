@@ -3,6 +3,7 @@ from flask_login import UserMixin
 import datetime
 import uuid
 import json
+from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY
 
 # Association table for role-permissions relationship
 role_permissions = db.Table('role_permissions',
@@ -117,7 +118,7 @@ class AuditLog(db.Model):
     action = db.Column(db.String(64), nullable=False)  # login, logout, api_access, etc.
     resource_type = db.Column(db.String(64))  # file, project, etc.
     resource_id = db.Column(db.Integer)  # ID of the resource being acted upon
-    details = db.Column(db.JSON)  # Additional details about the action
+    details = db.Column(JSONB)  # Additional details about the action (using PostgreSQL JSONB)
     ip_address = db.Column(db.String(45))  # Supports IPv6
     user_agent = db.Column(db.String(256))
     
@@ -138,7 +139,10 @@ class File(db.Model):
     file_type = db.Column(db.String(64))  # MIME type or file extension
     upload_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     description = db.Column(db.Text)
-    file_metadata = db.Column(db.JSON)  # For storing extracted metadata
+    file_metadata = db.Column(JSONB)  # For storing extracted metadata (using PostgreSQL JSONB)
+    storage_bucket = db.Column(db.String(64))  # Supabase Storage bucket name
+    storage_path = db.Column(db.String(512))  # Path in Supabase Storage
+    storage_url = db.Column(db.String(1024))  # Public URL (if available)
     
     # Foreign Keys
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
@@ -184,7 +188,7 @@ class MFASetup(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, unique=True)
-    backup_codes = db.Column(db.JSON)  # Store hashed backup codes
+    backup_codes = db.Column(JSONB)  # Store hashed backup codes (using PostgreSQL JSONB)
     verified = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
@@ -210,3 +214,284 @@ class IndexedDocument(db.Model):
     
     def __repr__(self):
         return f'<IndexedDocument file_id={self.file_id}>'
+
+# New models for property assessment and valuation
+
+class Property(db.Model):
+    """Property model for storing property records."""
+    __tablename__ = 'properties'
+    
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    parcel_id = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    address = db.Column(db.String(256), nullable=False, index=True)
+    city = db.Column(db.String(64))
+    state = db.Column(db.String(2), default='WA')
+    zip_code = db.Column(db.String(10))
+    property_type = db.Column(db.String(32), index=True)  # residential, commercial, agricultural, etc.
+    
+    # Property attributes
+    lot_size = db.Column(db.Float)  # Size in square feet
+    year_built = db.Column(db.Integer)
+    bedrooms = db.Column(db.Integer)
+    bathrooms = db.Column(db.Float)
+    total_area = db.Column(db.Float)  # Total living area in square feet
+    
+    # Ownership information
+    owner_name = db.Column(db.String(256))
+    owner_address = db.Column(db.String(256))
+    purchase_date = db.Column(db.Date)
+    purchase_price = db.Column(db.Numeric(precision=12, scale=2))
+    
+    # Additional data
+    features = db.Column(JSONB)  # Property features and amenities
+    location = db.Column(JSONB)  # GeoJSON for property location
+    property_metadata = db.Column(JSONB)  # Additional metadata
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    
+    # Relationships
+    tax_records = db.relationship('TaxRecord', backref='property', lazy='dynamic')
+    assessments = db.relationship('Assessment', backref='property', lazy='dynamic')
+    inspections = db.relationship('Inspection', backref='property', lazy='dynamic')
+    
+    def __repr__(self):
+        return f'<Property {self.parcel_id} - {self.address}>'
+
+class TaxRecord(db.Model):
+    """Tax record for a property."""
+    __tablename__ = 'tax_records'
+    
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    property_id = db.Column(UUID(as_uuid=True), db.ForeignKey('properties.id'), nullable=False)
+    tax_year = db.Column(db.Integer, nullable=False)
+    
+    # Assessed values
+    land_value = db.Column(db.Numeric(precision=12, scale=2))
+    improvement_value = db.Column(db.Numeric(precision=12, scale=2))
+    total_value = db.Column(db.Numeric(precision=12, scale=2))
+    
+    # Tax amounts
+    tax_amount = db.Column(db.Numeric(precision=12, scale=2))
+    tax_rate = db.Column(db.Numeric(precision=7, scale=6))  # Tax rate as a decimal (e.g., 0.010345)
+    
+    # Tax status
+    status = db.Column(db.String(32))  # paid, unpaid, partial, exempt
+    exemptions = db.Column(JSONB)  # Tax exemptions
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    
+    # Unique constraint for property_id + tax_year
+    __table_args__ = (
+        db.UniqueConstraint('property_id', 'tax_year', name='uix_tax_record_property_year'),
+    )
+    
+    def __repr__(self):
+        return f'<TaxRecord for {self.property_id} - {self.tax_year}>'
+
+class Assessment(db.Model):
+    """Property assessment record."""
+    __tablename__ = 'assessments'
+    
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    property_id = db.Column(UUID(as_uuid=True), db.ForeignKey('properties.id'), nullable=False)
+    assessment_date = db.Column(db.Date, nullable=False)
+    assessor_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    
+    # Assessment values
+    land_value = db.Column(db.Numeric(precision=12, scale=2))
+    improvement_value = db.Column(db.Numeric(precision=12, scale=2))
+    total_value = db.Column(db.Numeric(precision=12, scale=2))
+    
+    # Market analysis
+    comparable_properties = db.Column(JSONB)  # List of comparable property IDs and details
+    market_conditions = db.Column(JSONB)  # Market condition factors applied
+    
+    # Assessment details
+    valuation_method = db.Column(db.String(32))  # cost, income, market
+    notes = db.Column(db.Text)
+    documents = db.Column(ARRAY(db.Integer))  # Array of file IDs
+    
+    # Status
+    status = db.Column(db.String(32), default='draft')  # draft, review, complete, appealed
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    
+    # Relationship with assessor (optional)
+    assessor = db.relationship('User', backref=db.backref('assessments', lazy='dynamic'))
+    
+    def __repr__(self):
+        return f'<Assessment for {self.property_id} on {self.assessment_date}>'
+
+class Inspection(db.Model):
+    """Property inspection record."""
+    __tablename__ = 'inspections'
+    
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    property_id = db.Column(UUID(as_uuid=True), db.ForeignKey('properties.id'), nullable=False)
+    inspection_date = db.Column(db.Date, nullable=False)
+    inspector_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    
+    # Inspection details
+    inspection_type = db.Column(db.String(32))  # initial, periodic, appeal, complaint
+    condition = db.Column(db.String(32))  # excellent, good, fair, poor
+    findings = db.Column(db.Text)
+    recommendations = db.Column(db.Text)
+    
+    # Property changes observed
+    changes_noted = db.Column(JSONB)  # Changes observed since last inspection
+    
+    # Images and documents
+    photos = db.Column(ARRAY(db.Integer))  # Array of file IDs
+    documents = db.Column(ARRAY(db.Integer))  # Array of file IDs
+    
+    # Status
+    status = db.Column(db.String(32), default='scheduled')  # scheduled, completed, cancelled
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    
+    # Relationship with inspector
+    inspector = db.relationship('User', backref=db.backref('inspections', lazy='dynamic'))
+    
+    def __repr__(self):
+        return f'<Inspection for {self.property_id} on {self.inspection_date}>'
+
+class ComparableSale(db.Model):
+    """Comparable property sale record for market analysis."""
+    __tablename__ = 'comparable_sales'
+    
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    property_id = db.Column(UUID(as_uuid=True), db.ForeignKey('properties.id'), nullable=True)  # Optional link to property
+    
+    # Sale details
+    address = db.Column(db.String(256), nullable=False)
+    city = db.Column(db.String(64))
+    state = db.Column(db.String(2), default='WA')
+    zip_code = db.Column(db.String(10))
+    sale_date = db.Column(db.Date, nullable=False)
+    sale_price = db.Column(db.Numeric(precision=12, scale=2), nullable=False)
+    
+    # Property details
+    property_type = db.Column(db.String(32))  # residential, commercial, agricultural, etc.
+    lot_size = db.Column(db.Float)
+    year_built = db.Column(db.Integer)
+    bedrooms = db.Column(db.Integer)
+    bathrooms = db.Column(db.Float)
+    total_area = db.Column(db.Float)
+    
+    # Sale attributes
+    sale_type = db.Column(db.String(32))  # arm's length, foreclosure, family, etc.
+    verified = db.Column(db.Boolean, default=False)
+    verification_source = db.Column(db.String(256))
+    
+    # Additional data
+    features = db.Column(JSONB)  # Property features and amenities
+    location = db.Column(JSONB)  # GeoJSON for property location
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<ComparableSale {self.address} - ${self.sale_price}>'
+
+class MarketArea(db.Model):
+    """Market area or neighborhood definition."""
+    __tablename__ = 'market_areas'
+    
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = db.Column(db.String(128), nullable=False)
+    code = db.Column(db.String(32), unique=True)
+    description = db.Column(db.Text)
+    
+    # Geographic data
+    boundary = db.Column(JSONB)  # GeoJSON boundary
+    
+    # Market data
+    current_trend = db.Column(db.String(32))  # increasing, stable, decreasing
+    market_factors = db.Column(JSONB)  # Market condition factors
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<MarketArea {self.name}>'
+
+class Appeal(db.Model):
+    """Property tax assessment appeal."""
+    __tablename__ = 'appeals'
+    
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    property_id = db.Column(UUID(as_uuid=True), db.ForeignKey('properties.id'), nullable=False)
+    assessment_id = db.Column(UUID(as_uuid=True), db.ForeignKey('assessments.id'), nullable=False)
+    
+    # Appeal details
+    appeal_date = db.Column(db.Date, nullable=False)
+    appellant_name = db.Column(db.String(256))
+    appellant_contact = db.Column(db.String(256))
+    reason = db.Column(db.Text)
+    requested_value = db.Column(db.Numeric(precision=12, scale=2))
+    
+    # Appeal process
+    hearing_date = db.Column(db.Date)
+    decision_date = db.Column(db.Date)
+    decision = db.Column(db.String(32))  # granted, denied, partial
+    adjusted_value = db.Column(db.Numeric(precision=12, scale=2))
+    decision_notes = db.Column(db.Text)
+    
+    # Documents
+    documents = db.Column(ARRAY(db.Integer))  # Array of file IDs
+    
+    # Status
+    status = db.Column(db.String(32), default='submitted')  # submitted, scheduled, heard, decided
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    
+    # Relationships
+    assessment = db.relationship('Assessment', backref=db.backref('appeals', lazy='dynamic'))
+    
+    def __repr__(self):
+        return f'<Appeal for {self.property_id} on {self.appeal_date}>'
+
+class DataQualityAlert(db.Model):
+    """Data quality alert from the AI system."""
+    __tablename__ = 'data_quality_alerts'
+    
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    property_id = db.Column(UUID(as_uuid=True), db.ForeignKey('properties.id'), nullable=True)
+    
+    # Alert details
+    alert_type = db.Column(db.String(64), nullable=False)  # value_anomaly, missing_data, etc.
+    severity = db.Column(db.String(16), nullable=False)  # critical, high, medium, low
+    description = db.Column(db.Text, nullable=False)
+    
+    # Alert context
+    data_source = db.Column(db.String(128))
+    field_name = db.Column(db.String(128))
+    detected_value = db.Column(db.String(256))
+    expected_range = db.Column(db.String(256))
+    
+    # Temporal information
+    detection_time = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    
+    # Resolution
+    status = db.Column(db.String(32), default='new')  # new, investigating, resolved, false_positive
+    resolved_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    resolution_time = db.Column(db.DateTime)
+    resolution_notes = db.Column(db.Text)
+    
+    # Relationships
+    resolver = db.relationship('User', backref=db.backref('resolved_alerts', lazy='dynamic'))
+    
+    def __repr__(self):
+        return f'<DataQualityAlert {self.alert_type} - {self.severity}>'
