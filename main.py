@@ -10,10 +10,16 @@ try:
     from set_supabase_env import ensure_supabase_env
     
     # Set up Supabase environment variables
-    supabase_config = ensure_supabase_env()
+    ensure_supabase_env()
     
-    logger.info(f"Supabase environment: {supabase_config['environment']}")
-    logger.info(f"Supabase configured: {supabase_config['configured']}")
+    # Get the current environment
+    from supabase_env_manager import get_current_environment, is_configured
+    
+    env = get_current_environment() or "development"
+    configured = is_configured()
+    
+    logger.info(f"Supabase environment: {env}")
+    logger.info(f"Supabase configured: {configured}")
 except Exception as e:
     logger.warning(f"Failed to initialize Supabase environment: {str(e)}")
     logger.warning("Continuing without Supabase configuration")
