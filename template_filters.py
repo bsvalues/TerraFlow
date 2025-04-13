@@ -6,8 +6,9 @@ numbers, and other values in templates.
 """
 
 import datetime
+import json
 from flask import Flask
-from typing import Union, Optional
+from typing import Union, Optional, Any, Dict, List
 
 
 def register_template_filters(app: Flask) -> None:
@@ -275,3 +276,71 @@ def relative_time(value: Union[datetime.datetime, str, float, int, None]) -> str
             return f"{diff.seconds // 60} minutes ago"
         else:
             return "just now"
+
+
+def dateformat(value: Union[datetime.date, datetime.datetime, str, None], format_string: str = '%Y-%m-%d') -> str:
+    """
+    Format a date value (shorthand alias for format_date)
+    
+    Args:
+        value: Date value to format
+        format_string: strftime format string
+        
+    Returns:
+        Formatted date string or empty string if value is None
+    """
+    return format_date(value, format_string)
+
+
+def datetimeformat(value: Union[datetime.datetime, str, None], format_string: str = '%Y-%m-%d %H:%M:%S') -> str:
+    """
+    Format a datetime value (shorthand alias for format_datetime)
+    
+    Args:
+        value: Datetime value to format
+        format_string: strftime format string
+        
+    Returns:
+        Formatted datetime string or empty string if value is None
+    """
+    return format_datetime(value, format_string)
+
+
+def commaformat(value: Union[float, int, str, None], decimals: int = 2) -> str:
+    """
+    Format a number with thousand separators (shorthand alias for format_number)
+    
+    Args:
+        value: Number to format
+        decimals: Number of decimal places
+        
+    Returns:
+        Formatted number string with commas or empty string if value is None
+    """
+    return format_number(value, decimals)
+
+
+def to_json(value: Any) -> str:
+    """
+    Convert a Python object to a JSON string
+    
+    Args:
+        value: Python object to convert
+        
+    Returns:
+        JSON string representation of the object
+    """
+    try:
+        return json.dumps(value)
+    except (TypeError, ValueError):
+        return '{}'
+
+
+def now() -> datetime.datetime:
+    """
+    Get the current datetime
+    
+    Returns:
+        Current datetime object
+    """
+    return datetime.datetime.now()

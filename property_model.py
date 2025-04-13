@@ -1,569 +1,848 @@
 """
 Property Model Module
 
-This module defines the Property model and related models for property assessment.
+This module provides the property model for interacting with the property data in Supabase.
+It includes functions for CRUD operations on properties and related assessments.
 """
 
+import os
+import datetime
 import uuid
-import logging
-from datetime import datetime
-from typing import Dict, Any, List, Optional, Union
+from typing import List, Dict, Any, Optional, Union, Tuple
 
-from supabase_client import (
-    get_supabase_client, execute_query, insert_record, update_record, delete_record
-)
+from supabase_client import get_supabase_client, handle_supabase_error
+from service_supabase_client import get_service_supabase_client
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
-class Property:
+# Schema Constants
+PROPERTY_SCHEMA = "property"
+PROPERTY_TABLE = "properties"
+ASSESSMENT_TABLE = "property_assessments"
+FILE_TABLE = "property_files"
+
+
+def get_properties(
+    page: int = 1,
+    per_page: int = 10,
+    filters: Optional[Dict[str, Any]] = None,
+    user_id: Optional[str] = None
+) -> Tuple[List[Dict[str, Any]], int, bool]:
     """
-    Property model for managing property data in Supabase.
+    Get a list of properties with pagination and filtering
+    
+    Args:
+        page: Page number (starting from 1)
+        per_page: Number of items per page
+        filters: Optional dictionary of filters
+        user_id: Optional user ID for access control
+        
+    Returns:
+        Tuple of (list of properties, total count, has more)
     """
-    
-    TABLE_NAME = "properties"
-    
-    def __init__(self, data: Dict[str, Any] = None):
-        """
-        Initialize a property object.
+    try:
+        client = get_supabase_client()
+        if client is None:
+            return [], 0, False
         
-        Args:
-            data: Optional dictionary of property data
-        """
-        self.id = None
-        self.parcel_id = None
-        self.account_number = None
-        self.legal_description = None
-        self.address = None
-        self.city = None
-        self.state = "WA"
-        self.zip_code = None
-        self.latitude = None
-        self.longitude = None
-        self.geometry = None
-        self.property_class = None
-        self.zoning = None
-        self.land_area = None
-        self.land_value = None
-        self.improvement_value = None
-        self.total_value = None
-        self.year_built = None
-        self.bedrooms = None
-        self.bathrooms = None
-        self.living_area = None
-        self.lot_size = None
-        self.owner_name = None
-        self.owner_address = None
-        self.owner_city = None
-        self.owner_state = None
-        self.owner_zip = None
-        self.last_sale_date = None
-        self.last_sale_price = None
-        self.last_sale_document = None
-        self.status = "active"
-        self.created_at = None
-        self.updated_at = None
-        self.data = {}
+        # Start query
+        query = client.table(f"{PROPERTY_SCHEMA}.{PROPERTY_TABLE}")
         
-        # Load data if provided
-        if data:
-            self.load_data(data)
+        # Apply access control if user_id is provided
+        if user_id:
+            query = query.eq("created_by", user_id)
+        
+        # Apply filters
+        if filters:
+            query = _apply_property_filters(query, filters)
+        
+        # Get total count for pagination
+        count_query = query
+        total_count = len(count_query.execute().data)
+        
+        # Apply pagination
+        start = (page - 1) * per_page
+        end = start + per_page - 1
+        
+        # Get data with pagination
+        query = query.order("created_at", desc=True).range(start, end)
+        response = query.execute()
+        
+        properties = response.data
+        
+        # Check if there are more pages
+        has_more = total_count > (page * per_page)
+        
+        return properties, total_count, has_more
+    except Exception as e:
+        handle_supabase_error(e, "Error fetching properties")
+        return [], 0, False
+
+
+def get_property(property_id: str, user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """
+    Get a single property by ID
     
-    def load_data(self, data: Dict[str, Any]) -> None:
-        """
-        Load property data from a dictionary.
+    Args:
+        property_id: Property ID
+        user_id: Optional user ID for access control
         
-        Args:
-            data: Dictionary of property data
-        """
-        # Map dictionary keys to object attributes
-        for key, value in data.items():
-            if hasattr(self, key):
-                setattr(self, key, value)
+    Returns:
+        Property data or None if not found
+    """
+    try:
+        client = get_supabase_client()
+        if client is None:
+            return None
+        
+        query = client.table(f"{PROPERTY_SCHEMA}.{PROPERTY_TABLE}").eq("id", property_id)
+        
+        # Apply access control if user_id is provided
+        if user_id:
+            query = query.eq("created_by", user_id)
+        
+        response = query.execute()
+        
+        if not response.data:
+            return None
+        
+        return response.data[0]
+    except Exception as e:
+        handle_supabase_error(e, f"Error fetching property {property_id}")
+        return None
+
+
+def create_property(property_data: Dict[str, Any], user_id: str) -> Optional[str]:
+    """
+    Create a new property
     
-    def to_dict(self) -> Dict[str, Any]:
-        """
-        Convert the property to a dictionary.
+    Args:
+        property_data: Property data
+        user_id: User ID of the creator
         
-        Returns:
-            Dictionary representation of the property
-        """
-        # Get all properties of the object that don't start with _
-        return {
-            key: value 
-            for key, value in self.__dict__.items()
-            if not key.startswith('_') and value is not None
-        }
+    Returns:
+        New property ID or None on error
+    """
+    try:
+        client = get_supabase_client()
+        if client is None:
+            return None
+        
+        # Set created_by and created_at
+        property_data["created_by"] = user_id
+        property_data["created_at"] = datetime.datetime.now().isoformat()
+        property_data["updated_at"] = datetime.datetime.now().isoformat()
+        
+        # Set default status if not provided
+        if "status" not in property_data:
+            property_data["status"] = "active"
+        
+        # Calculate total value if not provided
+        if "total_value" not in property_data and "land_value" in property_data and "improvement_value" in property_data:
+            land_value = float(property_data.get("land_value", 0) or 0)
+            improvement_value = float(property_data.get("improvement_value", 0) or 0)
+            property_data["total_value"] = land_value + improvement_value
+        
+        response = client.table(f"{PROPERTY_SCHEMA}.{PROPERTY_TABLE}").insert(property_data).execute()
+        
+        if not response.data:
+            return None
+        
+        return response.data[0]["id"]
+    except Exception as e:
+        handle_supabase_error(e, "Error creating property")
+        return None
+
+
+def update_property(property_id: str, property_data: Dict[str, Any], user_id: Optional[str] = None) -> bool:
+    """
+    Update a property
     
-    def save(self) -> bool:
-        """
-        Save the property to the database.
+    Args:
+        property_id: Property ID
+        property_data: Updated property data
+        user_id: Optional user ID for access control
         
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            data = self.to_dict()
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        client = get_supabase_client()
+        if client is None:
+            return False
+        
+        # Set updated_at
+        property_data["updated_at"] = datetime.datetime.now().isoformat()
+        
+        # Calculate total value if not provided
+        if "total_value" not in property_data and "land_value" in property_data and "improvement_value" in property_data:
+            land_value = float(property_data.get("land_value", 0) or 0)
+            improvement_value = float(property_data.get("improvement_value", 0) or 0)
+            property_data["total_value"] = land_value + improvement_value
+        
+        query = client.table(f"{PROPERTY_SCHEMA}.{PROPERTY_TABLE}").eq("id", property_id)
+        
+        # Apply access control if user_id is provided
+        if user_id:
+            query = query.eq("created_by", user_id)
+        
+        response = query.update(property_data).execute()
+        
+        return bool(response.data)
+    except Exception as e:
+        handle_supabase_error(e, f"Error updating property {property_id}")
+        return False
+
+
+def delete_property(property_id: str, user_id: Optional[str] = None) -> bool:
+    """
+    Delete a property
+    
+    Args:
+        property_id: Property ID
+        user_id: Optional user ID for access control
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        client = get_supabase_client()
+        if client is None:
+            return False
+        
+        query = client.table(f"{PROPERTY_SCHEMA}.{PROPERTY_TABLE}").eq("id", property_id)
+        
+        # Apply access control if user_id is provided
+        if user_id:
+            query = query.eq("created_by", user_id)
+        
+        response = query.delete().execute()
+        
+        return bool(response.data)
+    except Exception as e:
+        handle_supabase_error(e, f"Error deleting property {property_id}")
+        return False
+
+
+def get_property_assessments(property_id: str, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    """
+    Get assessments for a property
+    
+    Args:
+        property_id: Property ID
+        user_id: Optional user ID for access control
+        
+    Returns:
+        List of assessments
+    """
+    try:
+        client = get_supabase_client()
+        if client is None:
+            return []
+        
+        # First check if user has access to the property
+        if user_id:
+            property_query = client.table(f"{PROPERTY_SCHEMA}.{PROPERTY_TABLE}").eq("id", property_id).eq("created_by", user_id)
+            property_response = property_query.execute()
             
-            # If the property has an ID, update it
-            if self.id:
-                result = update_record(self.TABLE_NAME, self.id, data)
-                if result:
-                    logger.info(f"Updated property: {self.parcel_id}")
-                    self.load_data(result)
-                    return True
+            if not property_response.data:
+                return []
+        
+        # Get assessments
+        query = client.table(f"{PROPERTY_SCHEMA}.{ASSESSMENT_TABLE}").eq("property_id", property_id).order("tax_year", desc=True)
+        response = query.execute()
+        
+        return response.data or []
+    except Exception as e:
+        handle_supabase_error(e, f"Error fetching assessments for property {property_id}")
+        return []
+
+
+def get_property_assessment(property_id: str, assessment_id: str, user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """
+    Get a specific assessment for a property
+    
+    Args:
+        property_id: Property ID
+        assessment_id: Assessment ID
+        user_id: Optional user ID for access control
+        
+    Returns:
+        Assessment data or None if not found
+    """
+    try:
+        client = get_supabase_client()
+        if client is None:
+            return None
+        
+        # First check if user has access to the property
+        if user_id:
+            property_query = client.table(f"{PROPERTY_SCHEMA}.{PROPERTY_TABLE}").eq("id", property_id).eq("created_by", user_id)
+            property_response = property_query.execute()
+            
+            if not property_response.data:
+                return None
+        
+        # Get assessment
+        query = client.table(f"{PROPERTY_SCHEMA}.{ASSESSMENT_TABLE}").eq("id", assessment_id).eq("property_id", property_id)
+        response = query.execute()
+        
+        if not response.data:
+            return None
+        
+        return response.data[0]
+    except Exception as e:
+        handle_supabase_error(e, f"Error fetching assessment {assessment_id} for property {property_id}")
+        return None
+
+
+def create_property_assessment(property_id: str, assessment_data: Dict[str, Any], user_id: str) -> Optional[str]:
+    """
+    Create a new assessment for a property
+    
+    Args:
+        property_id: Property ID
+        assessment_data: Assessment data
+        user_id: User ID of the creator
+        
+    Returns:
+        New assessment ID or None on error
+    """
+    try:
+        client = get_supabase_client()
+        if client is None:
+            return None
+        
+        # Check if user has access to the property
+        property_query = client.table(f"{PROPERTY_SCHEMA}.{PROPERTY_TABLE}").eq("id", property_id).eq("created_by", user_id)
+        property_response = property_query.execute()
+        
+        if not property_response.data:
+            return None
+        
+        # Set property_id, created_by, and created_at
+        assessment_data["property_id"] = property_id
+        assessment_data["created_by"] = user_id
+        assessment_data["created_at"] = datetime.datetime.now().isoformat()
+        assessment_data["updated_at"] = datetime.datetime.now().isoformat()
+        
+        # Set default status if not provided
+        if "assessment_status" not in assessment_data:
+            assessment_data["assessment_status"] = "pending"
+        
+        # Calculate taxable value if not provided
+        if "taxable_value" not in assessment_data and "total_value" in assessment_data and "exemption_value" in assessment_data:
+            total_value = float(assessment_data.get("total_value", 0) or 0)
+            exemption_value = float(assessment_data.get("exemption_value", 0) or 0)
+            assessment_data["taxable_value"] = max(0, total_value - exemption_value)
+        
+        response = client.table(f"{PROPERTY_SCHEMA}.{ASSESSMENT_TABLE}").insert(assessment_data).execute()
+        
+        if not response.data:
+            return None
+        
+        # Update property with latest assessment values
+        if "total_value" in assessment_data:
+            _update_property_value(property_id, assessment_data)
+        
+        return response.data[0]["id"]
+    except Exception as e:
+        handle_supabase_error(e, f"Error creating assessment for property {property_id}")
+        return None
+
+
+def update_property_assessment(property_id: str, assessment_id: str, assessment_data: Dict[str, Any], user_id: Optional[str] = None) -> bool:
+    """
+    Update a property assessment
+    
+    Args:
+        property_id: Property ID
+        assessment_id: Assessment ID
+        assessment_data: Updated assessment data
+        user_id: Optional user ID for access control
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        client = get_supabase_client()
+        if client is None:
+            return False
+        
+        # Check if user has access to the property
+        if user_id:
+            property_query = client.table(f"{PROPERTY_SCHEMA}.{PROPERTY_TABLE}").eq("id", property_id).eq("created_by", user_id)
+            property_response = property_query.execute()
+            
+            if not property_response.data:
                 return False
-            
-            # Otherwise, insert a new property
-            result = insert_record(self.TABLE_NAME, data)
-            if result:
-                logger.info(f"Created property: {self.parcel_id}")
-                self.load_data(result)
-                return True
-            return False
-        except Exception as e:
-            logger.error(f"Error saving property: {str(e)}")
-            return False
-    
-    def delete(self) -> bool:
-        """
-        Delete the property from the database.
         
-        Returns:
-            True if successful, False otherwise
-        """
-        if not self.id:
-            logger.error("Cannot delete property without ID")
+        # Set updated_at
+        assessment_data["updated_at"] = datetime.datetime.now().isoformat()
+        
+        # Calculate taxable value if not provided
+        if "taxable_value" not in assessment_data and "total_value" in assessment_data and "exemption_value" in assessment_data:
+            total_value = float(assessment_data.get("total_value", 0) or 0)
+            exemption_value = float(assessment_data.get("exemption_value", 0) or 0)
+            assessment_data["taxable_value"] = max(0, total_value - exemption_value)
+        
+        query = client.table(f"{PROPERTY_SCHEMA}.{ASSESSMENT_TABLE}").eq("id", assessment_id).eq("property_id", property_id)
+        response = query.update(assessment_data).execute()
+        
+        if not response.data:
             return False
         
-        try:
-            result = delete_record(self.TABLE_NAME, self.id)
-            if result:
-                logger.info(f"Deleted property: {self.parcel_id}")
-                return True
-            return False
-        except Exception as e:
-            logger.error(f"Error deleting property: {str(e)}")
-            return False
-    
-    @classmethod
-    def get_by_id(cls, property_id: Union[str, uuid.UUID]) -> Optional['Property']:
-        """
-        Get a property by ID.
+        # Update property with latest assessment values
+        if "total_value" in assessment_data:
+            _update_property_value(property_id, assessment_data)
         
-        Args:
-            property_id: Property ID
-            
-        Returns:
-            Property object or None if not found
-        """
-        try:
-            result = execute_query(cls.TABLE_NAME, "*", {"id": str(property_id)})
-            if result and len(result) > 0:
-                return cls(result[0])
-            return None
-        except Exception as e:
-            logger.error(f"Error getting property by ID: {str(e)}")
-            return None
-    
-    @classmethod
-    def get_by_parcel_id(cls, parcel_id: str) -> Optional['Property']:
-        """
-        Get a property by parcel ID.
-        
-        Args:
-            parcel_id: Parcel ID
-            
-        Returns:
-            Property object or None if not found
-        """
-        try:
-            result = execute_query(cls.TABLE_NAME, "*", {"parcel_id": parcel_id})
-            if result and len(result) > 0:
-                return cls(result[0])
-            return None
-        except Exception as e:
-            logger.error(f"Error getting property by parcel ID: {str(e)}")
-            return None
-    
-    @classmethod
-    def search(cls, query: Dict[str, Any], limit: int = 100, offset: int = 0) -> List['Property']:
-        """
-        Search for properties.
-        
-        Args:
-            query: Search query dictionary
-            limit: Maximum number of results
-            offset: Result offset
-            
-        Returns:
-            List of Property objects
-        """
-        try:
-            # Get a client for custom query
-            client = get_supabase_client()
-            if not client:
-                return []
-            
-            # Start building the query
-            db_query = client.table(cls.TABLE_NAME).select("*")
-            
-            # Apply filters
-            for key, value in query.items():
-                if isinstance(value, dict):
-                    # Handle operators
-                    for op, op_value in value.items():
-                        if op == "eq":
-                            db_query = db_query.eq(key, op_value)
-                        elif op == "neq":
-                            db_query = db_query.neq(key, op_value)
-                        elif op == "gt":
-                            db_query = db_query.gt(key, op_value)
-                        elif op == "gte":
-                            db_query = db_query.gte(key, op_value)
-                        elif op == "lt":
-                            db_query = db_query.lt(key, op_value)
-                        elif op == "lte":
-                            db_query = db_query.lte(key, op_value)
-                        elif op == "like":
-                            db_query = db_query.ilike(key, f"%{op_value}%")
-                else:
-                    # Simple equality
-                    db_query = db_query.eq(key, value)
-            
-            # Apply pagination
-            db_query = db_query.range(offset, offset + limit - 1)
-            
-            # Execute the query
-            result = db_query.execute()
-            
-            # Convert to Property objects
-            if result.data:
-                return [cls(item) for item in result.data]
-            return []
-        except Exception as e:
-            logger.error(f"Error searching properties: {str(e)}")
-            return []
-    
-    @classmethod
-    def find_nearby(cls, latitude: float, longitude: float, distance_meters: float = 1000, limit: int = 10) -> List[Dict[str, Any]]:
-        """
-        Find properties near a location.
-        
-        Args:
-            latitude: Latitude of the location
-            longitude: Longitude of the location
-            distance_meters: Maximum distance in meters
-            limit: Maximum number of results
-            
-        Returns:
-            List of nearby properties with distance
-        """
-        try:
-            # Get a client for custom function call
-            client = get_supabase_client()
-            if not client:
-                return []
-            
-            # Call the PostGIS-based function
-            result = client.rpc(
-                'find_nearby_properties',
-                {
-                    'p_latitude': latitude,
-                    'p_longitude': longitude,
-                    'p_distance_meters': distance_meters,
-                    'p_limit': limit
-                }
-            ).execute()
-            
-            if hasattr(result, 'data'):
-                return result.data
-            return []
-        except Exception as e:
-            logger.error(f"Error finding nearby properties: {str(e)}")
-            return []
-    
-    @classmethod
-    def find_comparables(cls, property_id: Union[str, uuid.UUID], limit: int = 10) -> List[Dict[str, Any]]:
-        """
-        Find comparable properties for a given property.
-        
-        Args:
-            property_id: ID of the property to find comparables for
-            limit: Maximum number of results
-            
-        Returns:
-            List of comparable properties with similarity scores
-        """
-        try:
-            # Get a client for custom function call
-            client = get_supabase_client()
-            if not client:
-                return []
-            
-            # Call the comparable properties function
-            result = client.rpc(
-                'find_comparable_properties',
-                {
-                    'p_property_id': str(property_id),
-                    'p_limit': limit
-                }
-            ).execute()
-            
-            if hasattr(result, 'data'):
-                return result.data
-            return []
-        except Exception as e:
-            logger.error(f"Error finding comparable properties: {str(e)}")
-            return []
-    
-    def get_assessments(self) -> List[Dict[str, Any]]:
-        """
-        Get all assessments for this property.
-        
-        Returns:
-            List of assessment records
-        """
-        if not self.id:
-            logger.error("Cannot get assessments without property ID")
-            return []
-        
-        try:
-            result = execute_query("assessments", "*", {"property_id": str(self.id)})
-            return result or []
-        except Exception as e:
-            logger.error(f"Error getting property assessments: {str(e)}")
-            return []
-    
-    def get_inspection_records(self) -> List[Dict[str, Any]]:
-        """
-        Get all inspection records for this property.
-        
-        Returns:
-            List of inspection records
-        """
-        if not self.id:
-            logger.error("Cannot get inspection records without property ID")
-            return []
-        
-        try:
-            result = execute_query("inspection_records", "*", {"property_id": str(self.id)})
-            return result or []
-        except Exception as e:
-            logger.error(f"Error getting property inspection records: {str(e)}")
-            return []
-    
-    def get_tax_appeals(self) -> List[Dict[str, Any]]:
-        """
-        Get all tax appeals for this property.
-        
-        Returns:
-            List of tax appeal records
-        """
-        if not self.id:
-            logger.error("Cannot get tax appeals without property ID")
-            return []
-        
-        try:
-            result = execute_query("tax_appeals", "*", {"property_id": str(self.id)})
-            return result or []
-        except Exception as e:
-            logger.error(f"Error getting property tax appeals: {str(e)}")
-            return []
-    
-    def get_files(self) -> List[Dict[str, Any]]:
-        """
-        Get all files for this property.
-        
-        Returns:
-            List of file records
-        """
-        if not self.id:
-            logger.error("Cannot get files without property ID")
-            return []
-        
-        try:
-            result = execute_query("property_files", "*", {"property_id": str(self.id)})
-            return result or []
-        except Exception as e:
-            logger.error(f"Error getting property files: {str(e)}")
-            return []
+        return True
+    except Exception as e:
+        handle_supabase_error(e, f"Error updating assessment {assessment_id} for property {property_id}")
+        return False
 
 
-class Assessment:
+def delete_property_assessment(property_id: str, assessment_id: str, user_id: Optional[str] = None) -> bool:
     """
-    Assessment model for managing property assessments in Supabase.
+    Delete a property assessment
+    
+    Args:
+        property_id: Property ID
+        assessment_id: Assessment ID
+        user_id: Optional user ID for access control
+        
+    Returns:
+        True if successful, False otherwise
     """
-    
-    TABLE_NAME = "assessments"
-    
-    def __init__(self, data: Dict[str, Any] = None):
-        """
-        Initialize an assessment object.
+    try:
+        client = get_supabase_client()
+        if client is None:
+            return False
         
-        Args:
-            data: Optional dictionary of assessment data
-        """
-        self.id = None
-        self.property_id = None
-        self.tax_year = None
-        self.assessment_date = None
-        self.land_value = None
-        self.improvement_value = None
-        self.total_value = None
-        self.exemption_value = 0
-        self.taxable_value = None
-        self.assessment_type = None
-        self.assessment_status = "pending"
-        self.assessor_id = None
-        self.notes = None
-        self.created_at = None
-        self.updated_at = None
-        self.data = {}
-        
-        # Load data if provided
-        if data:
-            self.load_data(data)
-    
-    def load_data(self, data: Dict[str, Any]) -> None:
-        """
-        Load assessment data from a dictionary.
-        
-        Args:
-            data: Dictionary of assessment data
-        """
-        # Map dictionary keys to object attributes
-        for key, value in data.items():
-            if hasattr(self, key):
-                setattr(self, key, value)
-    
-    def to_dict(self) -> Dict[str, Any]:
-        """
-        Convert the assessment to a dictionary.
-        
-        Returns:
-            Dictionary representation of the assessment
-        """
-        # Get all properties of the object that don't start with _
-        return {
-            key: value 
-            for key, value in self.__dict__.items()
-            if not key.startswith('_') and value is not None
-        }
-    
-    def calculate_taxable_value(self) -> float:
-        """
-        Calculate the taxable value of the property.
-        
-        Returns:
-            Calculated taxable value
-        """
-        if self.total_value is None:
-            return 0
-        
-        exemption = self.exemption_value or 0
-        return max(0, self.total_value - exemption)
-    
-    def save(self) -> bool:
-        """
-        Save the assessment to the database.
-        
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            # Calculate taxable value
-            if self.total_value is not None:
-                self.taxable_value = self.calculate_taxable_value()
+        # Check if user has access to the property
+        if user_id:
+            property_query = client.table(f"{PROPERTY_SCHEMA}.{PROPERTY_TABLE}").eq("id", property_id).eq("created_by", user_id)
+            property_response = property_query.execute()
             
-            data = self.to_dict()
-            
-            # If the assessment has an ID, update it
-            if self.id:
-                result = update_record(self.TABLE_NAME, self.id, data)
-                if result:
-                    logger.info(f"Updated assessment for property {self.property_id}, year {self.tax_year}")
-                    self.load_data(result)
-                    return True
+            if not property_response.data:
                 return False
-            
-            # Otherwise, insert a new assessment
-            result = insert_record(self.TABLE_NAME, data)
-            if result:
-                logger.info(f"Created assessment for property {self.property_id}, year {self.tax_year}")
-                self.load_data(result)
-                return True
-            return False
-        except Exception as e:
-            logger.error(f"Error saving assessment: {str(e)}")
-            return False
+        
+        query = client.table(f"{PROPERTY_SCHEMA}.{ASSESSMENT_TABLE}").eq("id", assessment_id).eq("property_id", property_id)
+        response = query.delete().execute()
+        
+        return bool(response.data)
+    except Exception as e:
+        handle_supabase_error(e, f"Error deleting assessment {assessment_id} for property {property_id}")
+        return False
+
+
+def get_property_files(property_id: str, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    """
+    Get files for a property
     
-    def delete(self) -> bool:
-        """
-        Delete the assessment from the database.
+    Args:
+        property_id: Property ID
+        user_id: Optional user ID for access control
         
-        Returns:
-            True if successful, False otherwise
-        """
-        if not self.id:
-            logger.error("Cannot delete assessment without ID")
-            return False
+    Returns:
+        List of files
+    """
+    try:
+        client = get_supabase_client()
+        if client is None:
+            return []
         
-        try:
-            result = delete_record(self.TABLE_NAME, self.id)
-            if result:
-                logger.info(f"Deleted assessment: {self.id}")
-                return True
-            return False
-        except Exception as e:
-            logger.error(f"Error deleting assessment: {str(e)}")
-            return False
-    
-    @classmethod
-    def get_by_id(cls, assessment_id: Union[str, uuid.UUID]) -> Optional['Assessment']:
-        """
-        Get an assessment by ID.
-        
-        Args:
-            assessment_id: Assessment ID
+        # First check if user has access to the property
+        if user_id:
+            property_query = client.table(f"{PROPERTY_SCHEMA}.{PROPERTY_TABLE}").eq("id", property_id).eq("created_by", user_id)
+            property_response = property_query.execute()
             
-        Returns:
-            Assessment object or None if not found
-        """
-        try:
-            result = execute_query(cls.TABLE_NAME, "*", {"id": str(assessment_id)})
-            if result and len(result) > 0:
-                return cls(result[0])
+            if not property_response.data:
+                return []
+        
+        # Get files
+        query = client.table(f"{PROPERTY_SCHEMA}.{FILE_TABLE}").eq("property_id", property_id).order("created_at", desc=True)
+        response = query.execute()
+        
+        files = response.data or []
+        
+        # Enhance with public URLs if storage is available
+        storage_client = get_service_supabase_client()
+        if storage_client:
+            bucket_name = f"{PROPERTY_SCHEMA}_files"
+            
+            for file in files:
+                file_path = f"{property_id}/{file['id']}/{file['file_name']}"
+                try:
+                    file["public_url"] = storage_client.storage.from_(bucket_name).get_public_url(file_path)
+                except Exception:
+                    file["public_url"] = ""
+        
+        return files
+    except Exception as e:
+        handle_supabase_error(e, f"Error fetching files for property {property_id}")
+        return []
+
+
+def create_property_file(property_id: str, file_data: Dict[str, Any], file_content: bytes, user_id: str) -> Optional[str]:
+    """
+    Create a new file for a property
+    
+    Args:
+        property_id: Property ID
+        file_data: File metadata
+        file_content: File binary content
+        user_id: User ID of the creator
+        
+    Returns:
+        New file ID or None on error
+    """
+    try:
+        client = get_supabase_client()
+        storage_client = get_service_supabase_client()
+        
+        if client is None or storage_client is None:
             return None
-        except Exception as e:
-            logger.error(f"Error getting assessment by ID: {str(e)}")
-            return None
-    
-    @classmethod
-    def get_by_property_and_year(cls, property_id: Union[str, uuid.UUID], tax_year: int) -> Optional['Assessment']:
-        """
-        Get an assessment by property ID and tax year.
         
-        Args:
-            property_id: Property ID
-            tax_year: Tax year
-            
-        Returns:
-            Assessment object or None if not found
-        """
+        # Check if user has access to the property
+        property_query = client.table(f"{PROPERTY_SCHEMA}.{PROPERTY_TABLE}").eq("id", property_id).eq("created_by", user_id)
+        property_response = property_query.execute()
+        
+        if not property_response.data:
+            return None
+        
+        # Create file record
+        file_id = str(uuid.uuid4())
+        file_data["id"] = file_id
+        file_data["property_id"] = property_id
+        file_data["created_by"] = user_id
+        file_data["created_at"] = datetime.datetime.now().isoformat()
+        
+        # Upload file to storage
+        bucket_name = f"{PROPERTY_SCHEMA}_files"
+        file_path = f"{property_id}/{file_id}/{file_data['file_name']}"
+        
         try:
-            result = execute_query(
-                cls.TABLE_NAME, 
-                "*", 
-                {
-                    "property_id": str(property_id),
-                    "tax_year": tax_year
-                }
+            # Ensure bucket exists
+            response = storage_client.storage.get_bucket(bucket_name)
+        except Exception:
+            # Create bucket if it doesn't exist
+            storage_client.storage.create_bucket(bucket_name, options={"public": True})
+        
+        # Upload file
+        storage_client.storage.from_(bucket_name).upload(file_path, file_content)
+        
+        # Generate public URL
+        file_data["public_url"] = storage_client.storage.from_(bucket_name).get_public_url(file_path)
+        
+        # Save file record
+        response = client.table(f"{PROPERTY_SCHEMA}.{FILE_TABLE}").insert(file_data).execute()
+        
+        if not response.data:
+            # Clean up storage if database insertion fails
+            storage_client.storage.from_(bucket_name).remove(file_path)
+            return None
+        
+        return file_id
+    except Exception as e:
+        handle_supabase_error(e, f"Error creating file for property {property_id}")
+        return None
+
+
+def delete_property_file(property_id: str, file_id: str, user_id: Optional[str] = None) -> bool:
+    """
+    Delete a property file
+    
+    Args:
+        property_id: Property ID
+        file_id: File ID
+        user_id: Optional user ID for access control
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        client = get_supabase_client()
+        storage_client = get_service_supabase_client()
+        
+        if client is None:
+            return False
+        
+        # Check if user has access to the property
+        if user_id:
+            property_query = client.table(f"{PROPERTY_SCHEMA}.{PROPERTY_TABLE}").eq("id", property_id).eq("created_by", user_id)
+            property_response = property_query.execute()
+            
+            if not property_response.data:
+                return False
+        
+        # Get file info to determine file name
+        file_query = client.table(f"{PROPERTY_SCHEMA}.{FILE_TABLE}").eq("id", file_id).eq("property_id", property_id)
+        file_response = file_query.execute()
+        
+        if not file_response.data:
+            return False
+        
+        file_name = file_response.data[0]["file_name"]
+        
+        # Delete file record
+        response = file_query.delete().execute()
+        
+        if not response.data:
+            return False
+        
+        # Delete from storage if client is available
+        if storage_client:
+            bucket_name = f"{PROPERTY_SCHEMA}_files"
+            file_path = f"{property_id}/{file_id}/{file_name}"
+            
+            try:
+                storage_client.storage.from_(bucket_name).remove(file_path)
+            except Exception:
+                # Continue even if storage deletion fails
+                pass
+        
+        return True
+    except Exception as e:
+        handle_supabase_error(e, f"Error deleting file {file_id} for property {property_id}")
+        return False
+
+
+def _apply_property_filters(query, filters: Dict[str, Any]):
+    """Apply filters to a property query"""
+    for key, value in filters.items():
+        if not value:
+            continue
+        
+        if key == "parcel_id":
+            query = query.eq("parcel_id", value)
+        elif key == "property_class":
+            query = query.eq("property_class", value)
+        elif key == "address_like":
+            query = query.ilike("address", f"%{value}%")
+        elif key == "city":
+            query = query.eq("city", value)
+        elif key == "state":
+            query = query.eq("state", value)
+        elif key == "status":
+            query = query.eq("status", value)
+        elif key == "zip_code":
+            query = query.eq("zip_code", value)
+        elif key == "total_value_gte":
+            query = query.gte("total_value", float(value))
+        elif key == "total_value_lte":
+            query = query.lte("total_value", float(value))
+        elif key == "year_built_gte":
+            query = query.gte("year_built", int(value))
+        elif key == "year_built_lte":
+            query = query.lte("year_built", int(value))
+        elif key == "land_area_gte":
+            query = query.gte("land_area", float(value))
+        elif key == "land_area_lte":
+            query = query.lte("land_area", float(value))
+        elif key == "living_area_gte":
+            query = query.gte("living_area", float(value))
+        elif key == "living_area_lte":
+            query = query.lte("living_area", float(value))
+    
+    return query
+
+
+def _update_property_value(property_id: str, assessment_data: Dict[str, Any]) -> bool:
+    """Update property with latest assessment values"""
+    try:
+        client = get_supabase_client()
+        if client is None:
+            return False
+        
+        update_data = {
+            "updated_at": datetime.datetime.now().isoformat()
+        }
+        
+        if "total_value" in assessment_data:
+            update_data["total_value"] = assessment_data["total_value"]
+        
+        if "land_value" in assessment_data:
+            update_data["land_value"] = assessment_data["land_value"]
+        
+        if "improvement_value" in assessment_data:
+            update_data["improvement_value"] = assessment_data["improvement_value"]
+        
+        response = client.table(f"{PROPERTY_SCHEMA}.{PROPERTY_TABLE}").eq("id", property_id).update(update_data).execute()
+        
+        return bool(response.data)
+    except Exception as e:
+        handle_supabase_error(e, f"Error updating property values for {property_id}")
+        return False
+
+
+def get_schema_setup_sql() -> str:
+    """
+    Get SQL for setting up the property schema and tables
+    
+    Returns:
+        SQL string for schema setup
+    """
+    return f"""
+    -- Create schema if it doesn't exist
+    CREATE SCHEMA IF NOT EXISTS {PROPERTY_SCHEMA};
+    
+    -- Create properties table
+    CREATE TABLE IF NOT EXISTS {PROPERTY_SCHEMA}.{PROPERTY_TABLE} (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        parcel_id TEXT NOT NULL,
+        account_number TEXT,
+        address TEXT,
+        city TEXT,
+        state TEXT,
+        zip_code TEXT,
+        property_class TEXT,
+        zoning TEXT,
+        legal_description TEXT,
+        land_area NUMERIC,
+        lot_size NUMERIC,
+        status TEXT DEFAULT 'active',
+        owner_name TEXT,
+        owner_address TEXT,
+        owner_city TEXT,
+        owner_state TEXT,
+        owner_zip TEXT,
+        year_built INTEGER,
+        living_area NUMERIC,
+        bedrooms INTEGER,
+        bathrooms NUMERIC,
+        latitude NUMERIC,
+        longitude NUMERIC,
+        land_value NUMERIC,
+        improvement_value NUMERIC,
+        total_value NUMERIC,
+        last_sale_date DATE,
+        last_sale_price NUMERIC,
+        last_sale_document TEXT,
+        created_by UUID NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+    
+    -- Create assessments table
+    CREATE TABLE IF NOT EXISTS {PROPERTY_SCHEMA}.{ASSESSMENT_TABLE} (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        property_id UUID NOT NULL REFERENCES {PROPERTY_SCHEMA}.{PROPERTY_TABLE}(id) ON DELETE CASCADE,
+        tax_year INTEGER NOT NULL,
+        assessment_date DATE,
+        land_value NUMERIC,
+        improvement_value NUMERIC,
+        total_value NUMERIC,
+        exemption_value NUMERIC DEFAULT 0,
+        taxable_value NUMERIC,
+        assessment_type TEXT,
+        assessment_status TEXT DEFAULT 'pending',
+        notes TEXT,
+        created_by UUID NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+    
+    -- Create files table
+    CREATE TABLE IF NOT EXISTS {PROPERTY_SCHEMA}.{FILE_TABLE} (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        property_id UUID NOT NULL REFERENCES {PROPERTY_SCHEMA}.{PROPERTY_TABLE}(id) ON DELETE CASCADE,
+        file_name TEXT NOT NULL,
+        file_size INTEGER,
+        file_type TEXT,
+        file_category TEXT,
+        description TEXT,
+        public_url TEXT,
+        created_by UUID NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+    
+    -- Create indexes
+    CREATE INDEX IF NOT EXISTS idx_{PROPERTY_TABLE}_parcel_id ON {PROPERTY_SCHEMA}.{PROPERTY_TABLE}(parcel_id);
+    CREATE INDEX IF NOT EXISTS idx_{PROPERTY_TABLE}_address ON {PROPERTY_SCHEMA}.{PROPERTY_TABLE}(address);
+    CREATE INDEX IF NOT EXISTS idx_{PROPERTY_TABLE}_created_by ON {PROPERTY_SCHEMA}.{PROPERTY_TABLE}(created_by);
+    CREATE INDEX IF NOT EXISTS idx_{PROPERTY_TABLE}_property_class ON {PROPERTY_SCHEMA}.{PROPERTY_TABLE}(property_class);
+    CREATE INDEX IF NOT EXISTS idx_{PROPERTY_TABLE}_status ON {PROPERTY_SCHEMA}.{PROPERTY_TABLE}(status);
+    
+    CREATE INDEX IF NOT EXISTS idx_{ASSESSMENT_TABLE}_property_id ON {PROPERTY_SCHEMA}.{ASSESSMENT_TABLE}(property_id);
+    CREATE INDEX IF NOT EXISTS idx_{ASSESSMENT_TABLE}_tax_year ON {PROPERTY_SCHEMA}.{ASSESSMENT_TABLE}(tax_year);
+    CREATE INDEX IF NOT EXISTS idx_{ASSESSMENT_TABLE}_assessment_status ON {PROPERTY_SCHEMA}.{ASSESSMENT_TABLE}(assessment_status);
+    
+    CREATE INDEX IF NOT EXISTS idx_{FILE_TABLE}_property_id ON {PROPERTY_SCHEMA}.{FILE_TABLE}(property_id);
+    CREATE INDEX IF NOT EXISTS idx_{FILE_TABLE}_file_category ON {PROPERTY_SCHEMA}.{FILE_TABLE}(file_category);
+    
+    -- Enable RLS
+    ALTER TABLE {PROPERTY_SCHEMA}.{PROPERTY_TABLE} ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE {PROPERTY_SCHEMA}.{ASSESSMENT_TABLE} ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE {PROPERTY_SCHEMA}.{FILE_TABLE} ENABLE ROW LEVEL SECURITY;
+    
+    -- Create policies
+    CREATE POLICY IF NOT EXISTS "Allow individual read access" ON {PROPERTY_SCHEMA}.{PROPERTY_TABLE}
+        FOR SELECT USING (auth.uid() = created_by);
+        
+    CREATE POLICY IF NOT EXISTS "Allow individual insert access" ON {PROPERTY_SCHEMA}.{PROPERTY_TABLE}
+        FOR INSERT WITH CHECK (auth.uid() = created_by);
+        
+    CREATE POLICY IF NOT EXISTS "Allow individual update access" ON {PROPERTY_SCHEMA}.{PROPERTY_TABLE}
+        FOR UPDATE USING (auth.uid() = created_by);
+        
+    CREATE POLICY IF NOT EXISTS "Allow individual delete access" ON {PROPERTY_SCHEMA}.{PROPERTY_TABLE}
+        FOR DELETE USING (auth.uid() = created_by);
+    
+    -- Assessment policies
+    CREATE POLICY IF NOT EXISTS "Allow individual read access" ON {PROPERTY_SCHEMA}.{ASSESSMENT_TABLE}
+        FOR SELECT USING (
+            auth.uid() IN (
+                SELECT created_by FROM {PROPERTY_SCHEMA}.{PROPERTY_TABLE}
+                WHERE id = property_id
             )
-            if result and len(result) > 0:
-                return cls(result[0])
-            return None
-        except Exception as e:
-            logger.error(f"Error getting assessment by property and year: {str(e)}")
-            return None
+        );
+        
+    CREATE POLICY IF NOT EXISTS "Allow individual insert access" ON {PROPERTY_SCHEMA}.{ASSESSMENT_TABLE}
+        FOR INSERT WITH CHECK (
+            auth.uid() IN (
+                SELECT created_by FROM {PROPERTY_SCHEMA}.{PROPERTY_TABLE}
+                WHERE id = property_id
+            )
+        );
+        
+    CREATE POLICY IF NOT EXISTS "Allow individual update access" ON {PROPERTY_SCHEMA}.{ASSESSMENT_TABLE}
+        FOR UPDATE USING (
+            auth.uid() IN (
+                SELECT created_by FROM {PROPERTY_SCHEMA}.{PROPERTY_TABLE}
+                WHERE id = property_id
+            )
+        );
+        
+    CREATE POLICY IF NOT EXISTS "Allow individual delete access" ON {PROPERTY_SCHEMA}.{ASSESSMENT_TABLE}
+        FOR DELETE USING (
+            auth.uid() IN (
+                SELECT created_by FROM {PROPERTY_SCHEMA}.{PROPERTY_TABLE}
+                WHERE id = property_id
+            )
+        );
+    
+    -- File policies
+    CREATE POLICY IF NOT EXISTS "Allow individual read access" ON {PROPERTY_SCHEMA}.{FILE_TABLE}
+        FOR SELECT USING (
+            auth.uid() IN (
+                SELECT created_by FROM {PROPERTY_SCHEMA}.{PROPERTY_TABLE}
+                WHERE id = property_id
+            )
+        );
+        
+    CREATE POLICY IF NOT EXISTS "Allow individual insert access" ON {PROPERTY_SCHEMA}.{FILE_TABLE}
+        FOR INSERT WITH CHECK (
+            auth.uid() IN (
+                SELECT created_by FROM {PROPERTY_SCHEMA}.{PROPERTY_TABLE}
+                WHERE id = property_id
+            )
+        );
+        
+    CREATE POLICY IF NOT EXISTS "Allow individual delete access" ON {PROPERTY_SCHEMA}.{FILE_TABLE}
+        FOR DELETE USING (
+            auth.uid() IN (
+                SELECT created_by FROM {PROPERTY_SCHEMA}.{PROPERTY_TABLE}
+                WHERE id = property_id
+            )
+        );
+    """
