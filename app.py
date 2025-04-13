@@ -84,7 +84,7 @@ migrate = Migrate(app, db)
 from flask_login import LoginManager, current_user
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.login_view = 'login'
+login_manager.login_view = 'auth.login'  # Update to use blueprint route
 login_manager.login_message_category = 'warning'
 
 @login_manager.user_loader

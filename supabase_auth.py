@@ -48,6 +48,14 @@ def login_user(email: str, password: str) -> Tuple[bool, str]:
                 user_id = auth_response.user.id
                 user_data_response = client.table('profiles').select('*').eq('id', user_id).execute()
                 
+                # Also login with Flask-Login
+                from flask_login import login_user as flask_login_user
+                from models import User
+                user = User.query.filter_by(email=email).first()
+                if user:
+                    flask_login_user(user)
+                    logger.info(f"User {email} logged in with Flask-Login")
+                
                 if user_data_response.data:
                     user_data = user_data_response.data[0]
                 else:
@@ -107,6 +115,10 @@ def logout_user() -> None:
         # Clear session
         session.pop('authenticated', None)
         session.pop('user', None)
+        
+        # Also logout with Flask-Login
+        from flask_login import logout_user as flask_logout_user
+        flask_logout_user()
         
         logger.info("User logged out")
     except Exception as e:

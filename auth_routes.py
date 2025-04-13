@@ -12,6 +12,7 @@ from typing import Dict, Any, List, Optional
 
 from flask import Blueprint, render_template, redirect, url_for, flash, request, session, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_login import current_user, login_required
 
 from supabase_auth import (
     login_user, logout_user, signup_user, reset_password_request, reset_password,
@@ -183,13 +184,11 @@ def reset_password_route(token):
     return render_template('reset_password.html', token=token)
 
 @auth_bp.route('/profile')
+@login_required
 def profile():
     """
     User profile page.
     """
-    if not is_authenticated():
-        return redirect(url_for('auth.login', next=request.url))
-    
     user = get_current_user()
     
     return render_template('profile.html', user=user)
