@@ -152,6 +152,15 @@ class SupabaseAuth:
         self.session_token = None
         self.refresh_token = None
         self.user_id = None
+        
+    @property
+    def client(self):
+        """Get a Supabase client"""
+        if not self.url or not self.key:
+            logger.error('Missing required environment variables: SUPABASE_URL, SUPABASE_KEY')
+            return None
+        
+        return get_connection(self.url, self.key)
     
     def sign_up(self, email: str, password: str, user_metadata: Optional[Dict[str, Any]] = None) -> Tuple[bool, Dict[str, Any]]:
         """

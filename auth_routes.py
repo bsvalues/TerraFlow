@@ -25,6 +25,120 @@ supabase_auth = SupabaseAuth()
 # Define roles
 ALL_ROLES = ['admin', 'editor', 'viewer', 'assessor', 'supervisor']
 
+# Define functions for user management
+def list_users(page=1, per_page=10):
+    """
+    List users with pagination.
+    
+    Args:
+        page: Page number (1-based)
+        per_page: Number of users per page
+        
+    Returns:
+        Tuple of (users, total_count)
+    """
+    try:
+        # Get a Supabase client
+        client = supabase_auth.client
+        
+        # Query users with pagination
+        response = client.from_('users').select('*').range((page-1)*per_page, page*per_page-1).execute()
+        users = response.data
+        
+        # Count total users
+        count_response = client.from_('users').select('id', count='exact').execute()
+        total_count = count_response.count or len(users)  # Fallback to current page count if exact count not available
+        
+        return users, total_count
+    except Exception as e:
+        logger.error(f"Error fetching users: {str(e)}")
+        return [], 0
+
+def update_user_roles(user_id, roles):
+    """
+    Update user roles.
+    
+    Args:
+        user_id: User ID
+        roles: List of role names
+        
+    Returns:
+        Tuple of (success, error_message)
+    """
+    try:
+        # Get a Supabase client
+        client = supabase_auth.client
+        
+        # First, get the current user data
+        response = client.from_('users').select('*').eq('id', user_id).single().execute()
+        if not response.data:
+            return False, 'User not found'
+            
+        # Update the user's roles
+        user_data = response.data
+        user_data['roles'] = roles
+        
+        # Update the user in Supabase
+        update_response = client.from_('users').update(user_data).eq('id', user_id).execute()
+        
+        if update_response.data:
+            return True, None
+        else:
+            return False, 'Failed to update user roles'
+            
+    except Exception as e:
+        logger.error(f"Error updating user roles: {str(e)}")
+        return False, str(e)
+
+def initialize_roles():
+    """
+    Initialize default roles in the database.
+    
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        # Get a Supabase client
+        client = supabase_auth.client
+        
+        # Define the default roles and their permissions
+        roles_and_permissions = {
+            'admin': ['manage_users', 'manage_properties', 'manage_assessments', 'view_reports', 'manage_system'],
+            'editor': ['manage_properties', 'manage_assessments', 'view_reports'],
+            'viewer': ['view_properties', 'view_assessments', 'view_reports'],
+            'assessor': ['manage_assessments', 'view_properties', 'view_reports'],
+            'supervisor': ['approve_assessments', 'manage_properties', 'view_reports']
+        }
+        
+        # Create a roles table if it doesn't exist
+        try:
+            client.from_('roles').select('*').limit(1).execute()
+        except Exception:
+            # Create roles table
+            client.rpc('create_roles_table').execute()
+        
+        # Insert roles and permissions
+        for role, permissions in roles_and_permissions.items():
+            # Check if role exists
+            role_exists = client.from_('roles').select('*').eq('name', role).execute()
+            
+            if not role_exists.data:
+                # Insert role if it doesn't exist
+                client.from_('roles').insert({
+                    'name': role,
+                    'permissions': permissions
+                }).execute()
+            else:
+                # Update existing role
+                client.from_('roles').update({
+                    'permissions': permissions
+                }).eq('name', role).execute()
+        
+        return True
+    except Exception as e:
+        logger.error(f"Error initializing roles: {str(e)}")
+        return False
+
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
