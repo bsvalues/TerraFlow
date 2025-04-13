@@ -1,20 +1,44 @@
 {% extends "layout.html" %}
 
-{% block title %}Property Files - {{ property.parcel_id }} - GeoAssessmentPro{% endblock %}
+{% block title %}Files & Documents | {{ property.parcel_id }}{% endblock %}
 
 {% block additionalcss %}
 <style>
-    .files-header {
+    .property-header {
+        padding: 20px;
         background-color: #f8f9fa;
         border-radius: 10px;
-        padding: 20px;
         margin-bottom: 20px;
+    }
+    
+    .property-title {
+        margin-bottom: 5px;
+        font-weight: 600;
+    }
+    
+    .property-address {
+        font-size: 1.1rem;
+        color: #495057;
+    }
+    
+    .property-id {
+        font-size: 0.9rem;
+        color: #6c757d;
+    }
+    
+    .section-header {
+        border-bottom: 1px solid #dee2e6;
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+        margin-top: 30px;
+        font-weight: 600;
     }
     
     .file-card {
         border-radius: 10px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        transition: transform 0.3s ease;
+        overflow: hidden;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        margin-bottom: 20px;
     }
     
     .file-card:hover {
@@ -27,68 +51,104 @@
         margin-bottom: 10px;
     }
     
-    .file-icon.image {
-        color: #20c997;
-    }
-    
-    .file-icon.document {
-        color: #0d6efd;
-    }
-    
-    .file-icon.pdf {
+    .file-pdf {
         color: #dc3545;
     }
     
-    .file-icon.spreadsheet {
+    .file-image {
         color: #198754;
     }
     
-    .file-icon.archive {
-        color: #fd7e14;
+    .file-excel {
+        color: #28a745;
     }
     
-    .file-icon.other {
+    .file-word {
+        color: #0d6efd;
+    }
+    
+    .file-zip {
         color: #6c757d;
     }
     
-    .file-metadata {
-        font-size: 0.9rem;
+    .file-other {
         color: #6c757d;
     }
     
-    .drop-zone {
-        border: 2px dashed #ced4da;
-        border-radius: 10px;
-        padding: 20px;
-        text-align: center;
-        cursor: pointer;
-        transition: border-color 0.3s ease;
-    }
-    
-    .drop-zone:hover, .drop-zone.dragover {
-        border-color: #0d6efd;
-    }
-    
-    .drop-zone-icon {
-        font-size: 3rem;
-        color: #6c757d;
-        margin-bottom: 10px;
-    }
-    
-    .drop-zone-text {
+    .file-meta {
+        font-size: 0.85rem;
         color: #6c757d;
     }
     
-    .file-action {
+    .file-category {
+        padding: 3px 10px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        background-color: #f0f0f0;
+        color: #495057;
+    }
+    
+    .file-actions {
         position: absolute;
         top: 10px;
         right: 10px;
+        opacity: 0;
+        transition: opacity 0.3s ease;
     }
     
-    .category-badge {
-        position: absolute;
-        top: 10px;
-        left: 10px;
+    .file-card:hover .file-actions {
+        opacity: 1;
+    }
+    
+    .dropzone {
+        border: 2px dashed #dee2e6;
+        border-radius: 10px;
+        padding: 30px;
+        text-align: center;
+        background-color: #f8f9fa;
+        cursor: pointer;
+        transition: border-color 0.3s ease, background-color 0.3s ease;
+    }
+    
+    .dropzone:hover {
+        border-color: #6c757d;
+        background-color: #e9ecef;
+    }
+    
+    .dropzone.dragover {
+        border-color: #0d6efd;
+        background-color: #e7f1ff;
+    }
+    
+    .file-preview {
+        max-width: 100%;
+        max-height: 300px;
+        margin-top: 20px;
+        display: none;
+    }
+    
+    .progress {
+        height: 3px;
+        margin-top: 10px;
+        display: none;
+    }
+    
+    .empty-state {
+        padding: 30px;
+        text-align: center;
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        margin: 20px 0;
+    }
+    
+    .category-filter {
+        margin-bottom: 20px;
+    }
+    
+    .category-filter .btn {
+        margin-right: 5px;
+        margin-bottom: 5px;
     }
 </style>
 {% endblock %}
@@ -96,33 +156,29 @@
 {% block content %}
 <div class="container mt-4">
     <!-- Breadcrumb Navigation -->
-    <nav aria-label="breadcrumb">
+    <nav aria-label="breadcrumb" class="mb-4">
         <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Home</a></li>
             <li class="breadcrumb-item"><a href="{{ url_for('property.property_list') }}">Properties</a></li>
             <li class="breadcrumb-item"><a href="{{ url_for('property.property_detail', property_id=property.id) }}">{{ property.parcel_id }}</a></li>
-            <li class="breadcrumb-item active" aria-current="page">Files</li>
+            <li class="breadcrumb-item active" aria-current="page">Files & Documents</li>
         </ol>
     </nav>
     
-    <!-- Files Header -->
-    <div class="files-header">
-        <div class="row">
+    <!-- Property Header -->
+    <div class="property-header">
+        <div class="row align-items-center">
             <div class="col-md-8">
-                <h1 class="h2">
-                    <i class="fas fa-file me-2"></i> Property Files
+                <h1 class="property-title h2">
+                    {{ property.address }}{% if property.city %}, {{ property.city }}{% endif %}{% if property.state %}, {{ property.state }}{% endif %}{% if property.zip_code %} {{ property.zip_code }}{% endif %}
                 </h1>
-                <h2 class="h4 text-muted">
-                    Parcel ID: {{ property.parcel_id }}
+                <div class="property-id">
+                    <span class="text-muted">Parcel ID:</span> {{ property.parcel_id }}
                     {% if property.account_number %}
-                    <span class="ms-3 small text-muted">Account #: {{ property.account_number }}</span>
+                    | <span class="text-muted">Account #:</span> {{ property.account_number }}
                     {% endif %}
-                </h2>
-                <p class="lead">
-                    {{ property.address }}, {{ property.city }}, {{ property.state }} {{ property.zip_code }}
-                </p>
+                </div>
             </div>
-            <div class="col-md-4 text-md-end mt-3 mt-md-0">
+            <div class="col-md-4 text-md-end">
                 <a href="{{ url_for('property.property_detail', property_id=property.id) }}" class="btn btn-outline-secondary">
                     <i class="fas fa-arrow-left me-1"></i> Back to Property
                 </a>
@@ -130,305 +186,368 @@
         </div>
     </div>
     
-    <!-- File Upload Section -->
-    {% if has_permission('property.file.upload') %}
-    <div class="card mb-4">
-        <div class="card-header bg-light">
-            <h2 class="h5 mb-0">
-                <i class="fas fa-upload me-2"></i> Upload Files
-            </h2>
-        </div>
-        <div class="card-body">
-            <form method="post" action="{{ url_for('property.property_file_upload', property_id=property.id) }}" enctype="multipart/form-data" id="upload-form" class="needs-validation" novalidate>
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <div class="drop-zone" id="drop-zone">
-                            <div class="drop-zone-icon">
-                                <i class="fas fa-cloud-upload-alt"></i>
+    <!-- Main Content -->
+    <div class="row">
+        <!-- Left Column: Files List -->
+        <div class="col-md-8">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="h4 mb-0">Property Files & Documents</h2>
+                
+                <div class="btn-group btn-group-sm" role="group" aria-label="View options">
+                    <button type="button" class="btn btn-outline-secondary active" id="gridViewBtn">
+                        <i class="fas fa-th-large me-1"></i> Grid
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" id="listViewBtn">
+                        <i class="fas fa-list me-1"></i> List
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Category Filter Buttons -->
+            <div class="category-filter">
+                <button type="button" class="btn btn-sm btn-outline-primary active" data-category="all">
+                    All Files
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-primary" data-category="deed">
+                    Deeds
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-primary" data-category="tax">
+                    Tax Documents
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-primary" data-category="survey">
+                    Surveys
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-primary" data-category="photo">
+                    Photos
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-primary" data-category="other">
+                    Other
+                </button>
+            </div>
+            
+            {% if files %}
+                <!-- Grid View (default) -->
+                <div class="row" id="gridView">
+                    {% for file in files %}
+                    <div class="col-md-4 mb-4 file-item" data-category="{{ file.file_category }}">
+                        <div class="card file-card h-100 position-relative">
+                            <div class="card-body text-center">
+                                <div class="file-icon">
+                                    {% set ext = file.file_name.split('.')[-1]|lower %}
+                                    {% if ext in ['pdf'] %}
+                                        <i class="fas fa-file-pdf file-pdf"></i>
+                                    {% elif ext in ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'] %}
+                                        <i class="fas fa-file-image file-image"></i>
+                                    {% elif ext in ['xls', 'xlsx', 'csv'] %}
+                                        <i class="fas fa-file-excel file-excel"></i>
+                                    {% elif ext in ['doc', 'docx', 'rtf'] %}
+                                        <i class="fas fa-file-word file-word"></i>
+                                    {% elif ext in ['zip', 'rar', '7z'] %}
+                                        <i class="fas fa-file-archive file-zip"></i>
+                                    {% else %}
+                                        <i class="fas fa-file file-other"></i>
+                                    {% endif %}
+                                </div>
+                                
+                                <h3 class="h6 mb-1 text-truncate" title="{{ file.file_name }}">
+                                    {{ file.file_name }}
+                                </h3>
+                                
+                                <div class="mb-2">
+                                    <span class="file-category">{{ file.file_category|title }}</span>
+                                </div>
+                                
+                                <div class="file-meta">
+                                    {{ (file.file_size / 1024)|round(1) }} KB
+                                    {% if file.created_at %}
+                                    <span class="ms-2">{{ file.created_at|format_date }}</span>
+                                    {% endif %}
+                                </div>
+                                
+                                {% if file.description %}
+                                <div class="text-muted small mt-2">{{ file.description }}</div>
+                                {% endif %}
+                                
+                                <div class="mt-3">
+                                    <a href="{{ file.public_url }}" class="btn btn-sm btn-outline-primary" target="_blank">
+                                        <i class="fas fa-download me-1"></i> Download
+                                    </a>
+                                </div>
                             </div>
-                            <div class="drop-zone-text">
-                                <p class="mb-1">Drop files here or click to upload</p>
-                                <p class="small text-muted">Supported formats: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX, ZIP</p>
+                            
+                            {% if has_permission('property.file.delete') %}
+                            <div class="file-actions">
+                                <button type="button" class="btn btn-sm btn-outline-danger rounded-circle" data-bs-toggle="modal" data-bs-target="#deleteFileModal{{ file.id }}">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
                             </div>
-                            <input type="file" name="file" id="file-upload" class="d-none" required>
-                        </div>
-                        <div class="invalid-feedback">
-                            Please select a file to upload.
+                            {% endif %}
                         </div>
                     </div>
-                    
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label for="file-name" class="form-label">File Display Name</label>
-                            <input type="text" class="form-control" id="file-name" name="file_name" placeholder="Enter a display name for the file">
-                            <div class="form-text">Optional. If left blank, the original filename will be used.</div>
+                    {% endfor %}
+                </div>
+                
+                <!-- List View (hidden by default) -->
+                <div class="table-responsive" id="listView" style="display: none;">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>File Name</th>
+                                <th>Category</th>
+                                <th>Size</th>
+                                <th>Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for file in files %}
+                            <tr class="file-item" data-category="{{ file.file_category }}">
+                                <td>
+                                    {% set ext = file.file_name.split('.')[-1]|lower %}
+                                    {% if ext in ['pdf'] %}
+                                        <i class="fas fa-file-pdf file-pdf me-2"></i>
+                                    {% elif ext in ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'] %}
+                                        <i class="fas fa-file-image file-image me-2"></i>
+                                    {% elif ext in ['xls', 'xlsx', 'csv'] %}
+                                        <i class="fas fa-file-excel file-excel me-2"></i>
+                                    {% elif ext in ['doc', 'docx', 'rtf'] %}
+                                        <i class="fas fa-file-word file-word me-2"></i>
+                                    {% elif ext in ['zip', 'rar', '7z'] %}
+                                        <i class="fas fa-file-archive file-zip me-2"></i>
+                                    {% else %}
+                                        <i class="fas fa-file file-other me-2"></i>
+                                    {% endif %}
+                                    <span class="text-truncate" style="max-width: 200px; display: inline-block;" title="{{ file.file_name }}">
+                                        {{ file.file_name }}
+                                    </span>
+                                </td>
+                                <td><span class="file-category">{{ file.file_category|title }}</span></td>
+                                <td>{{ (file.file_size / 1024)|round(1) }} KB</td>
+                                <td>{{ file.created_at|format_date }}</td>
+                                <td>
+                                    <a href="{{ file.public_url }}" class="btn btn-sm btn-outline-primary" target="_blank">
+                                        <i class="fas fa-download"></i>
+                                    </a>
+                                    
+                                    {% if has_permission('property.file.delete') %}
+                                    <button type="button" class="btn btn-sm btn-outline-danger ms-1" data-bs-toggle="modal" data-bs-target="#deleteFileModal{{ file.id }}">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Delete File Modals -->
+                {% for file in files %}
+                {% if has_permission('property.file.delete') %}
+                <div class="modal fade" id="deleteFileModal{{ file.id }}" tabindex="-1" aria-labelledby="deleteFileModalLabel{{ file.id }}" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="deleteFileModalLabel{{ file.id }}">Delete File</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>Are you sure you want to delete the file <strong>{{ file.file_name }}</strong>?</p>
+                                <p class="text-danger"><strong>Warning:</strong> This action cannot be undone.</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <form action="{{ url_for('property.property_file_delete', property_id=property.id, file_id=file.id) }}" method="post">
+                                    <button type="submit" class="btn btn-danger">Delete File</button>
+                                </form>
+                            </div>
                         </div>
-                        
+                    </div>
+                </div>
+                {% endif %}
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-file fa-3x text-muted mb-3"></i>
+                    <h3 class="h4">No Files Found</h3>
+                    <p class="text-muted">There are no files uploaded for this property yet.</p>
+                </div>
+            {% endif %}
+        </div>
+        
+        <!-- Right Column: Upload Panel -->
+        <div class="col-md-4">
+            {% if has_permission('property.file.upload') %}
+            <div class="card mb-4">
+                <div class="card-header bg-light">
+                    <h3 class="h5 mb-0">Upload New File</h3>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('property.property_file_upload', property_id=property.id) }}" method="post" enctype="multipart/form-data" id="uploadForm">
                         <div class="mb-3">
-                            <label for="file-category" class="form-label">File Category</label>
-                            <select class="form-select" id="file-category" name="file_category">
-                                <option value="photo">Photo</option>
-                                <option value="assessment">Assessment Document</option>
-                                <option value="deed">Deed/Title</option>
-                                <option value="survey">Survey</option>
+                            <label for="file_category" class="form-label">File Category</label>
+                            <select class="form-select" id="file_category" name="file_category" required>
+                                <option value="deed">Deed</option>
                                 <option value="tax">Tax Document</option>
-                                <option value="permit">Permit</option>
-                                <option value="inspection">Inspection Report</option>
+                                <option value="survey">Survey</option>
+                                <option value="photo">Photo</option>
+                                <option value="inspection">Inspection</option>
+                                <option value="assessment">Assessment</option>
+                                <option value="correspondence">Correspondence</option>
                                 <option value="other" selected>Other</option>
                             </select>
                         </div>
                         
                         <div class="mb-3">
-                            <label for="file-description" class="form-label">Description</label>
-                            <textarea class="form-control" id="file-description" name="description" rows="2" placeholder="Enter a description for this file"></textarea>
+                            <label for="description" class="form-label">Description (Optional)</label>
+                            <textarea class="form-control" id="description" name="description" rows="2"></textarea>
                         </div>
                         
-                        <div class="text-end">
-                            <button type="submit" class="btn btn-primary" id="upload-button" disabled>
+                        <div class="dropzone" id="dropZone">
+                            <input type="file" id="file" name="file" class="d-none" required>
+                            <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                            <h4 class="h5">Drag & Drop File Here</h4>
+                            <p class="text-muted">or</p>
+                            <button type="button" class="btn btn-outline-primary" id="browseBtn">
+                                Browse Files
+                            </button>
+                            <p class="text-muted small mt-2">
+                                Max file size: 10MB<br>
+                                Accepted formats: PDF, DOC, XLS, JPG, PNG, ZIP
+                            </p>
+                            
+                            <div class="progress">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%"></div>
+                            </div>
+                            
+                            <div class="mt-3">
+                                <img src="" alt="File preview" class="file-preview" id="imagePreview">
+                            </div>
+                        </div>
+                        
+                        <div class="mt-3 text-end">
+                            <button type="submit" class="btn btn-primary" id="uploadBtn" disabled>
                                 <i class="fas fa-upload me-1"></i> Upload File
                             </button>
                         </div>
-                    </div>
+                    </form>
                 </div>
-                
-                <div class="mt-3" id="file-preview-container" style="display: none;">
-                    <hr>
-                    <h3 class="h6 mb-3">File Preview</h3>
-                    <div class="row">
-                        <div class="col-md-2 text-center" id="file-icon-preview">
-                            <i class="fas fa-file fa-3x text-primary"></i>
-                        </div>
-                        <div class="col-md-10">
-                            <p class="mb-1" id="file-name-preview">filename.ext</p>
-                            <p class="small text-muted mb-1" id="file-size-preview">File size: 0 KB</p>
-                            <p class="small text-muted" id="file-type-preview">File type: Unknown</p>
-                        </div>
-                    </div>
-                </div>
-            </form>
-        </div>
-    </div>
-    {% endif %}
-    
-    <!-- File Category Filter -->
-    <div class="card mb-4">
-        <div class="card-header bg-light">
-            <h2 class="h5 mb-0">
-                <i class="fas fa-filter me-2"></i> Filter Files
-            </h2>
-        </div>
-        <div class="card-body">
-            <div class="btn-group w-100" role="group" aria-label="File category filter">
-                <input type="radio" class="btn-check" name="category-filter" id="all-files" value="all" autocomplete="off" checked>
-                <label class="btn btn-outline-primary" for="all-files">All Files</label>
-                
-                <input type="radio" class="btn-check" name="category-filter" id="photos" value="photo" autocomplete="off">
-                <label class="btn btn-outline-primary" for="photos">Photos</label>
-                
-                <input type="radio" class="btn-check" name="category-filter" id="assessment-docs" value="assessment" autocomplete="off">
-                <label class="btn btn-outline-primary" for="assessment-docs">Assessment</label>
-                
-                <input type="radio" class="btn-check" name="category-filter" id="deeds" value="deed" autocomplete="off">
-                <label class="btn btn-outline-primary" for="deeds">Deeds/Titles</label>
-                
-                <input type="radio" class="btn-check" name="category-filter" id="surveys" value="survey" autocomplete="off">
-                <label class="btn btn-outline-primary" for="surveys">Surveys</label>
-                
-                <input type="radio" class="btn-check" name="category-filter" id="tax-docs" value="tax" autocomplete="off">
-                <label class="btn btn-outline-primary" for="tax-docs">Tax</label>
-                
-                <input type="radio" class="btn-check" name="category-filter" id="other-docs" value="other" autocomplete="off">
-                <label class="btn btn-outline-primary" for="other-docs">Other</label>
             </div>
-        </div>
-    </div>
-    
-    <!-- Files List -->
-    <div class="mb-5">
-        <h2 class="h4 mb-3">
-            <i class="fas fa-paperclip me-2"></i> Property Files
-            <span class="badge bg-primary ms-2" id="file-count">{{ files|length }}</span>
-        </h2>
-        
-        <!-- No Files Placeholder -->
-        {% if not files or files|length == 0 %}
-        <div class="text-center py-5 border rounded bg-light" id="no-files-container">
-            <i class="fas fa-file-alt fa-3x text-muted mb-3"></i>
-            <h4>No Files Found</h4>
-            <p class="text-muted">This property does not have any files yet.</p>
-            {% if has_permission('property.file.upload') %}
-            <button type="button" class="btn btn-primary mt-2" onclick="document.getElementById('file-upload').click()">
-                <i class="fas fa-upload me-1"></i> Upload First File
-            </button>
             {% endif %}
-        </div>
-        
-        <!-- Empty Category Result Placeholder (initially hidden) -->
-        <div class="text-center py-5 border rounded bg-light d-none" id="no-filter-results">
-            <i class="fas fa-filter fa-3x text-muted mb-3"></i>
-            <h4>No Files in This Category</h4>
-            <p class="text-muted">No files match the selected category filter.</p>
-            <button type="button" class="btn btn-outline-primary mt-2" onclick="document.getElementById('all-files').click()">
-                <i class="fas fa-list me-1"></i> Show All Files
-            </button>
-        </div>
-        {% else %}
-        
-        <!-- Files Grid -->
-        <div class="row" id="files-container">
-            {% for file in files %}
-            <div class="col-md-6 col-lg-4 mb-4 file-item" data-category="{{ file.file_category }}">
-                <div class="card h-100 file-card">
-                    <!-- File Category Badge -->
-                    <span class="badge {% if file.file_category == 'photo' %}bg-success{% elif file.file_category == 'assessment' %}bg-primary{% elif file.file_category == 'deed' %}bg-danger{% elif file.file_category == 'survey' %}bg-info{% elif file.file_category == 'tax' %}bg-warning text-dark{% elif file.file_category == 'permit' %}bg-secondary{% elif file.file_category == 'inspection' %}bg-dark{% else %}bg-light text-dark{% endif %} category-badge">
-                        {{ file.file_category|title }}
-                    </span>
-                    
-                    <!-- Delete Button -->
-                    {% if has_permission('property.file.delete') %}
-                    <div class="file-action">
-                        <button type="button" class="btn btn-sm btn-outline-danger" 
-                                data-bs-toggle="modal" 
-                                data-bs-target="#deleteModal" 
-                                data-file-id="{{ file.id }}"
-                                data-file-name="{{ file.file_name }}">
-                            <i class="fas fa-trash-alt"></i>
-                        </button>
-                    </div>
-                    {% endif %}
-                    
-                    <div class="card-body text-center pt-5">
-                        <!-- File Icon -->
-                        <div class="file-icon 
-                            {% if file.file_type and file.file_type.startswith('image/') %}image
-                            {% elif file.file_type == 'application/pdf' %}pdf
-                            {% elif file.file_type and (file.file_type.startswith('application/vnd.ms-excel') or file.file_type.startswith('application/vnd.openxmlformats-officedocument.spreadsheet')) %}spreadsheet
-                            {% elif file.file_type and (file.file_type.startswith('application/msword') or file.file_type.startswith('application/vnd.openxmlformats-officedocument.word')) %}document
-                            {% elif file.file_type and (file.file_type == 'application/zip' or file.file_type == 'application/x-zip-compressed') %}archive
-                            {% else %}other{% endif %}">
-                            
-                            <i class="fas 
-                               {% if file.file_type and file.file_type.startswith('image/') %}fa-file-image
-                               {% elif file.file_type == 'application/pdf' %}fa-file-pdf
-                               {% elif file.file_type and (file.file_type.startswith('application/vnd.ms-excel') or file.file_type.startswith('application/vnd.openxmlformats-officedocument.spreadsheet')) %}fa-file-excel
-                               {% elif file.file_type and (file.file_type.startswith('application/msword') or file.file_type.startswith('application/vnd.openxmlformats-officedocument.word')) %}fa-file-word
-                               {% elif file.file_type and (file.file_type == 'application/zip' or file.file_type == 'application/x-zip-compressed') %}fa-file-archive
-                               {% else %}fa-file{% endif %}">
-                            </i>
-                        </div>
-                        
-                        <!-- File Name -->
-                        <h3 class="h5 mt-2">{{ file.file_name }}</h3>
-                        
-                        <!-- File Description (if any) -->
-                        {% if file.description %}
-                        <p class="mb-3">{{ file.description }}</p>
-                        {% endif %}
-                        
-                        <!-- File Metadata -->
-                        <div class="file-metadata mb-3">
-                            <p class="mb-1">
-                                <i class="fas fa-weight me-1"></i> 
-                                {{ file.file_size|filesizeformat if file.file_size else 'Unknown size' }}
-                            </p>
-                            <p class="mb-1">
-                                <i class="fas fa-calendar-alt me-1"></i> 
-                                {{ file.created_at|dateformat }}
-                            </p>
-                        </div>
-                        
-                        <!-- Download Button -->
-                        <a href="{{ file.public_url }}" class="btn btn-outline-primary" target="_blank" download>
-                            <i class="fas fa-download me-1"></i> Download
-                        </a>
-                    </div>
+            
+            <!-- Upload Guidelines -->
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h3 class="h5 mb-0">Upload Guidelines</h3>
                 </div>
-            </div>
-            {% endfor %}
-        </div>
-        {% endif %}
-    </div>
-</div>
-
-<!-- Delete File Modal -->
-{% if has_permission('property.file.delete') %}
-<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title" id="deleteModalLabel">
-                    <i class="fas fa-exclamation-triangle me-2"></i> Delete File
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p>Are you sure you want to delete the file <span id="deleteFileName"></span>?</p>
-                <div class="alert alert-warning">
-                    <i class="fas fa-exclamation-circle me-2"></i> This action cannot be undone. The file will be permanently deleted.
+                <div class="card-body">
+                    <ul class="mb-0">
+                        <li class="mb-2">
+                            <strong>File types:</strong> PDF, DOC, XLS, JPG, PNG, ZIP
+                        </li>
+                        <li class="mb-2">
+                            <strong>Maximum size:</strong> 10MB per file
+                        </li>
+                        <li class="mb-2">
+                            <strong>Naming convention:</strong> Use descriptive names without special characters
+                        </li>
+                        <li class="mb-2">
+                            <strong>Categories:</strong> Select the appropriate category for easier organization
+                        </li>
+                        <li>
+                            <strong>Sensitive information:</strong> Ensure documents don't contain unnecessary personal information
+                        </li>
+                    </ul>
                 </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    <i class="fas fa-times me-1"></i> Cancel
-                </button>
-                <form id="deleteForm" method="post" action="">
-                    <button type="submit" class="btn btn-danger">
-                        <i class="fas fa-trash-alt me-1"></i> Delete File
-                    </button>
-                </form>
             </div>
         </div>
     </div>
 </div>
-{% endif %}
 {% endblock %}
 
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // View toggle
+        const gridViewBtn = document.getElementById('gridViewBtn');
+        const listViewBtn = document.getElementById('listViewBtn');
+        const gridView = document.getElementById('gridView');
+        const listView = document.getElementById('listView');
         
-        // File upload preview
-        const fileUpload = document.getElementById('file-upload');
-        const uploadButton = document.getElementById('upload-button');
-        const dropZone = document.getElementById('drop-zone');
-        const filePreviewContainer = document.getElementById('file-preview-container');
-        const fileNamePreview = document.getElementById('file-name-preview');
-        const fileSizePreview = document.getElementById('file-size-preview');
-        const fileTypePreview = document.getElementById('file-type-preview');
-        const fileIconPreview = document.getElementById('file-icon-preview');
-        const fileNameInput = document.getElementById('file-name');
+        gridViewBtn.addEventListener('click', function() {
+            gridView.style.display = 'flex';
+            listView.style.display = 'none';
+            gridViewBtn.classList.add('active');
+            listViewBtn.classList.remove('active');
+        });
         
-        if (dropZone) {
-            // Prevent default drag behaviors
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                dropZone.addEventListener(eventName, preventDefaults, false);
-                document.body.addEventListener(eventName, preventDefaults, false);
+        listViewBtn.addEventListener('click', function() {
+            gridView.style.display = 'none';
+            listView.style.display = 'block';
+            listViewBtn.classList.add('active');
+            gridViewBtn.classList.remove('active');
+        });
+        
+        // Category filter
+        const categoryButtons = document.querySelectorAll('.category-filter button');
+        const fileItems = document.querySelectorAll('.file-item');
+        
+        categoryButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const category = this.getAttribute('data-category');
+                
+                // Toggle active class
+                categoryButtons.forEach(btn => btn.classList.remove('active'));
+                this.classList.add('active');
+                
+                // Filter files
+                fileItems.forEach(item => {
+                    if (category === 'all' || item.getAttribute('data-category') === category) {
+                        item.style.display = '';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
             });
-            
-            // Highlight drop zone when item is dragged over it
-            ['dragenter', 'dragover'].forEach(eventName => {
-                dropZone.addEventListener(eventName, highlight, false);
-            });
-            
-            ['dragleave', 'drop'].forEach(eventName => {
-                dropZone.addEventListener(eventName, unhighlight, false);
-            });
-            
-            // Handle dropped files
-            dropZone.addEventListener('drop', handleDrop, false);
-            
-            // Handle click to select files
-            dropZone.addEventListener('click', function() {
-                fileUpload.click();
-            });
-            
-            fileUpload.addEventListener('change', handleFiles);
-        }
+        });
+        
+        {% if has_permission('property.file.upload') %}
+        // File upload functionality
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('file');
+        const browseBtn = document.getElementById('browseBtn');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const imagePreview = document.getElementById('imagePreview');
+        const progressBar = document.querySelector('.progress');
+        const progressBarInner = document.querySelector('.progress-bar');
+        
+        // Browse button click
+        browseBtn.addEventListener('click', function() {
+            fileInput.click();
+        });
+        
+        // File selected
+        fileInput.addEventListener('change', function() {
+            handleFiles(this.files);
+        });
+        
+        // Drag and drop events
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
         
         function preventDefaults(e) {
             e.preventDefault();
             e.stopPropagation();
         }
+        
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, highlight, false);
+        });
+        
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, unhighlight, false);
+        });
         
         function highlight() {
             dropZone.classList.add('dragover');
@@ -438,138 +557,73 @@
             dropZone.classList.remove('dragover');
         }
         
-        function handleDrop(e) {
+        // Handle dropped files
+        dropZone.addEventListener('drop', function(e) {
             const dt = e.dataTransfer;
             const files = dt.files;
-            
-            if (files.length > 0) {
-                fileUpload.files = files;
-                handleFiles();
-            }
-        }
+            handleFiles(files);
+        });
         
-        function handleFiles() {
-            const files = fileUpload.files;
-            
+        // Process files
+        function handleFiles(files) {
             if (files.length > 0) {
                 const file = files[0];
                 
-                // Update file preview
-                fileNamePreview.textContent = file.name;
-                fileSizePreview.textContent = `File size: ${formatFileSize(file.size)}`;
-                fileTypePreview.textContent = `File type: ${file.type || 'Unknown'}`;
-                
-                // Update file icon
-                let iconClass = 'fa-file';
-                let iconColor = 'text-secondary';
-                
-                if (file.type.startsWith('image/')) {
-                    iconClass = 'fa-file-image';
-                    iconColor = 'text-success';
-                } else if (file.type === 'application/pdf') {
-                    iconClass = 'fa-file-pdf';
-                    iconColor = 'text-danger';
-                } else if (file.type.startsWith('application/vnd.ms-excel') || file.type.startsWith('application/vnd.openxmlformats-officedocument.spreadsheet')) {
-                    iconClass = 'fa-file-excel';
-                    iconColor = 'text-success';
-                } else if (file.type.startsWith('application/msword') || file.type.startsWith('application/vnd.openxmlformats-officedocument.word')) {
-                    iconClass = 'fa-file-word';
-                    iconColor = 'text-primary';
-                } else if (file.type === 'application/zip' || file.type === 'application/x-zip-compressed') {
-                    iconClass = 'fa-file-archive';
-                    iconColor = 'text-warning';
+                // Check file size (max 10MB)
+                if (file.size > 10 * 1024 * 1024) {
+                    alert('File is too large. Maximum size is 10MB.');
+                    return;
                 }
                 
-                fileIconPreview.innerHTML = `<i class="fas ${iconClass} fa-3x ${iconColor}"></i>`;
+                // Check file type
+                const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 
+                                     'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                                     'image/jpeg', 'image/png', 'image/gif', 'application/zip'];
                 
-                // If no filename provided, use the original filename without extension
-                if (!fileNameInput.value) {
-                    const nameParts = file.name.split('.');
-                    if (nameParts.length > 1) {
-                        nameParts.pop();
-                    }
-                    fileNameInput.value = nameParts.join('.');
+                if (!allowedTypes.includes(file.type) && !file.name.endsWith('.pdf') && !file.name.endsWith('.doc') && 
+                    !file.name.endsWith('.docx') && !file.name.endsWith('.xls') && !file.name.endsWith('.xlsx') && 
+                    !file.name.endsWith('.jpg') && !file.name.endsWith('.jpeg') && !file.name.endsWith('.png') && 
+                    !file.name.endsWith('.zip')) {
+                    alert('File type not allowed. Please upload PDF, DOC, XLS, JPG, PNG or ZIP files.');
+                    return;
                 }
                 
-                // Show preview and enable upload button
-                filePreviewContainer.style.display = 'block';
-                uploadButton.disabled = false;
+                // Update UI
+                uploadBtn.disabled = false;
+                
+                // Show preview for images
+                if (file.type.match('image.*')) {
+                    const reader = new FileReader();
+                    
+                    reader.onload = function(e) {
+                        imagePreview.src = e.target.result;
+                        imagePreview.style.display = 'block';
+                    };
+                    
+                    reader.readAsDataURL(file);
+                } else {
+                    imagePreview.style.display = 'none';
+                }
             }
         }
         
-        function formatFileSize(bytes) {
-            if (bytes === 0) return '0 Bytes';
+        // Handle form submission
+        document.getElementById('uploadForm').addEventListener('submit', function() {
+            progressBar.style.display = 'block';
             
-            const k = 1024;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-        }
-        
-        // Form validation
-        const form = document.getElementById('upload-form');
-        if (form) {
-            form.addEventListener('submit', function(event) {
-                if (!form.checkValidity()) {
-                    event.preventDefault();
-                    event.stopPropagation();
+            // Simulate upload progress (in a real app, use XMLHttpRequest or Fetch API with progress event)
+            let progress = 0;
+            const interval = setInterval(function() {
+                progress += 5;
+                progressBarInner.style.width = progress + '%';
+                progressBarInner.setAttribute('aria-valuenow', progress);
+                
+                if (progress >= 100) {
+                    clearInterval(interval);
                 }
-                
-                form.classList.add('was-validated');
-            });
-        }
-        
-        // Delete modal
-        const deleteModal = document.getElementById('deleteModal');
-        if (deleteModal) {
-            deleteModal.addEventListener('show.bs.modal', function(event) {
-                const button = event.relatedTarget;
-                const fileId = button.getAttribute('data-file-id');
-                const fileName = button.getAttribute('data-file-name');
-                
-                const deleteForm = document.getElementById('deleteForm');
-                const deleteFileName = document.getElementById('deleteFileName');
-                
-                deleteForm.action = `{{ url_for('property.property_file_delete', file_id='') }}${fileId}`;
-                deleteFileName.textContent = fileName;
-            });
-        }
-        
-        // Category filter
-        const categoryFilters = document.querySelectorAll('input[name="category-filter"]');
-        const fileItems = document.querySelectorAll('.file-item');
-        const noFilesContainer = document.getElementById('no-files-container');
-        const noFilterResults = document.getElementById('no-filter-results');
-        const fileCount = document.getElementById('file-count');
-        
-        categoryFilters.forEach(filter => {
-            filter.addEventListener('change', function() {
-                const category = this.value;
-                let visibleCount = 0;
-                
-                fileItems.forEach(item => {
-                    if (category === 'all' || item.dataset.category === category) {
-                        item.classList.remove('d-none');
-                        visibleCount++;
-                    } else {
-                        item.classList.add('d-none');
-                    }
-                });
-                
-                // Update file count
-                fileCount.textContent = visibleCount;
-                
-                // Show/hide no results message
-                if (visibleCount === 0 && category !== 'all') {
-                    if (noFilesContainer) noFilesContainer.classList.add('d-none');
-                    if (noFilterResults) noFilterResults.classList.remove('d-none');
-                } else {
-                    if (noFilesContainer) noFilesContainer.classList.remove('d-none');
-                    if (noFilterResults) noFilterResults.classList.add('d-none');
-                }
-            });
+            }, 100);
         });
+        {% endif %}
     });
 </script>
 {% endblock %}

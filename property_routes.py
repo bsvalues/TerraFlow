@@ -17,8 +17,9 @@ from typing import Dict, Any, List, Optional
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, send_file
 from werkzeug.utils import secure_filename
 
-from auth import login_required, permission_required, is_authenticated, get_user_id
+from auth import login_required, permission_required, is_authenticated
 import property_model as pm
+from property_model import get_user_id
 
 logger = logging.getLogger(__name__)
 

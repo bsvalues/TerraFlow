@@ -11,7 +11,20 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any, Union
 
 from supabase_connection_pool import get_supabase_client
-from auth import is_authenticated, get_user_id, has_permission
+from auth import is_authenticated, has_permission
+from flask import session
+
+def get_user_id():
+    """Get the current user ID from session"""
+    if not is_authenticated():
+        return None
+    
+    # Check if user info is in session
+    if 'user' in session and 'id' in session['user']:
+        return session['user']['id']
+    
+    # For development mode, return a default user ID
+    return 1  # Development user ID
 
 logger = logging.getLogger(__name__)
 
