@@ -43,28 +43,51 @@ def get_supabase_client(environment: Optional[str] = None) -> Optional[Client]:
         return None
     
     try:
-        # Get configuration
-        db_config = get_config("database")
-        env_mode = environment or get_config("env_mode")
-        
-        # Log the environment we're using for this client
-        logger.info(f"Getting Supabase client for environment: {env_mode}")
-        
-        url = db_config.get("supabase_url")
-        key = db_config.get("supabase_service_key", db_config.get("supabase_key"))
-        
-        # If we're using environment-specific credentials and they're available, use them
-        if environment and environment != "development":
-            env_url = os.environ.get(f"SUPABASE_URL_{environment.upper()}")
-            env_key = os.environ.get(f"SUPABASE_SERVICE_KEY_{environment.upper()}") or os.environ.get(f"SUPABASE_KEY_{environment.upper()}")
+        # Try to use the environment manager for better multi-environment support
+        try:
+            # Import here to avoid circular imports
+            from supabase_env_manager import get_environment_url, get_environment_key, get_current_environment
             
-            if env_url and env_key:
-                url = env_url
-                key = env_key
-                logger.info(f"Using environment-specific Supabase credentials for {environment}")
+            # If no environment specified, use current environment context
+            if environment is None:
+                environment = get_current_environment()
+                
+            logger.info(f"Getting Supabase client for environment: {environment}")
+            
+            # Get environment-specific URL and key
+            url = get_environment_url(environment)
+            key = get_environment_key(environment)
+            
+        except ImportError:
+            # Fall back to legacy configuration if environment manager not available
+            logger.warning("supabase_env_manager not available, falling back to config and environment variables")
+            
+            # Get configuration
+            db_config = get_config("database")
+            env_mode = environment or get_config("env_mode", "development")
+            
+            # Try getting URL and key from config first
+            url = db_config.get("supabase_url")
+            key = db_config.get("supabase_service_key", db_config.get("supabase_key"))
+            
+            # If we're using environment-specific credentials and they're available, use them
+            if environment and environment != "development":
+                env_url = os.environ.get(f"SUPABASE_URL_{environment.upper()}")
+                env_key = os.environ.get(f"SUPABASE_SERVICE_KEY_{environment.upper()}") or os.environ.get(f"SUPABASE_KEY_{environment.upper()}")
+                
+                if env_url and env_key:
+                    url = env_url
+                    key = env_key
+                    logger.info(f"Using environment-specific Supabase credentials for {environment}")
+            
+            # Fallback to standard environment variables
+            if not url:
+                url = os.environ.get('SUPABASE_URL')
+            if not key:
+                key = os.environ.get('SUPABASE_SERVICE_KEY', os.environ.get('SUPABASE_KEY'))
         
         if not url or not key:
-            logger.error("Missing Supabase URL or key in configuration")
+            logger.error(f"Missing Supabase URL or key for environment: {environment}")
             return None
         
         logger.debug(f"Creating Supabase client for {url}")
@@ -245,18 +268,19 @@ def execute_query(table: str, select: str = "*", filters: Optional[Dict[str, Any
         logger.error(f"Error executing Supabase query: {str(e)}")
         return None
 
-def insert_record(table: str, record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def insert_record(table: str, record: Dict[str, Any], environment: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """
     Insert a record into a Supabase table.
     
     Args:
         table: Table name
         record: Record to insert
+        environment: Environment to use (development, training, production)
         
     Returns:
         Inserted record or None on failure
     """
-    client = get_supabase_client()
+    client = get_supabase_client(environment)
     if not client:
         return None
     
@@ -271,7 +295,7 @@ def insert_record(table: str, record: Dict[str, Any]) -> Optional[Dict[str, Any]
         logger.error(f"Error inserting record into Supabase: {str(e)}")
         return None
 
-def update_record(table: str, record_id: str, updates: Dict[str, Any], id_column: str = "id") -> Optional[Dict[str, Any]]:
+def update_record(table: str, record_id: str, updates: Dict[str, Any], id_column: str = "id", environment: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """
     Update a record in a Supabase table.
     
@@ -280,11 +304,12 @@ def update_record(table: str, record_id: str, updates: Dict[str, Any], id_column
         record_id: ID of the record to update
         updates: Fields to update
         id_column: Name of the ID column
+        environment: Environment to use (development, training, production)
         
     Returns:
         Updated record or None on failure
     """
-    client = get_supabase_client()
+    client = get_supabase_client(environment)
     if not client:
         return None
     
@@ -299,7 +324,7 @@ def update_record(table: str, record_id: str, updates: Dict[str, Any], id_column
         logger.error(f"Error updating record in Supabase: {str(e)}")
         return None
 
-def delete_record(table: str, record_id: str, id_column: str = "id") -> bool:
+def delete_record(table: str, record_id: str, id_column: str = "id", environment: Optional[str] = None) -> bool:
     """
     Delete a record from a Supabase table.
     
@@ -307,11 +332,12 @@ def delete_record(table: str, record_id: str, id_column: str = "id") -> bool:
         table: Table name
         record_id: ID of the record to delete
         id_column: Name of the ID column
+        environment: Environment to use (development, training, production)
         
     Returns:
         True on success, False on failure
     """
-    client = get_supabase_client()
+    client = get_supabase_client(environment)
     if not client:
         return False
     
@@ -333,7 +359,8 @@ def subscribe_to_changes(
     table_name: str,
     callback: callable,
     event: str = "*",
-    schema: str = "public"
+    schema: str = "public",
+    environment: Optional[str] = None
 ) -> Optional[str]:
     """
     Subscribe to table changes in real-time.
@@ -343,11 +370,12 @@ def subscribe_to_changes(
         callback: Function to call when changes occur
         event: Event type to listen for ('INSERT', 'UPDATE', 'DELETE', or '*' for all)
         schema: Database schema containing the table
+        environment: Environment to use (development, training, production)
         
     Returns:
         Subscription ID or None on failure
     """
-    client = get_supabase_client()
+    client = get_supabase_client(environment)
     if not client:
         logger.error("No Supabase client available for subscribing to changes")
         return None
