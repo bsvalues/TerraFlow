@@ -8,7 +8,7 @@
         <div class="auth-container">
             <div class="card auth-card">
                 <div class="card-header bg-primary text-white">
-                    <h4 class="mb-0 text-center">Create an Account</h4>
+                    <h4 class="mb-0 text-center">Create Account</h4>
                 </div>
                 <div class="card-body p-4">
                     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -22,72 +22,95 @@
                         {% endif %}
                     {% endwith %}
                     
-                    <form method="POST" action="{{ url_for('auth.register') }}" id="registrationForm">
-                        <div class="mb-3">
-                            <label for="email" class="form-label">Email address</label>
-                            <div class="input-group">
-                                <span class="input-group-text"><i class="bi bi-envelope"></i></span>
-                                <input type="email" class="form-control" id="email" name="email" placeholder="Enter your email" required>
+                    <form method="POST" action="{{ url_for('auth.register') }}" id="registrationForm" class="needs-validation" novalidate>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="firstName" class="form-label">First Name</label>
+                                <input type="text" class="form-control" id="firstName" name="first_name" placeholder="Enter first name" required>
+                                <div class="invalid-feedback">
+                                    Please enter your first name.
+                                </div>
                             </div>
-                            <div class="form-text">Use your work email address</div>
+                            <div class="col-md-6">
+                                <label for="lastName" class="form-label">Last Name</label>
+                                <input type="text" class="form-control" id="lastName" name="last_name" placeholder="Enter last name" required>
+                                <div class="invalid-feedback">
+                                    Please enter your last name.
+                                </div>
+                            </div>
                         </div>
                         
                         <div class="mb-3">
-                            <label for="fullName" class="form-label">Full Name</label>
-                            <div class="input-group">
-                                <span class="input-group-text"><i class="bi bi-person"></i></span>
-                                <input type="text" class="form-control" id="fullName" name="full_name" placeholder="Enter your full name" required>
+                            <label for="email" class="form-label">Email address</label>
+                            <div class="input-group has-validation">
+                                <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+                                <input type="email" class="form-control" id="email" name="email" placeholder="Enter your email" required>
+                                <div class="invalid-feedback">
+                                    Please enter a valid email address.
+                                </div>
                             </div>
+                            <div class="form-text">We'll never share your email with anyone else.</div>
                         </div>
                         
                         <div class="mb-3">
                             <label for="department" class="form-label">Department</label>
-                            <div class="input-group">
-                                <span class="input-group-text"><i class="bi bi-building"></i></span>
-                                <select class="form-select" id="department" name="department">
-                                    <option value="" selected disabled>Select your department</option>
-                                    <option value="GIS">GIS</option>
-                                    <option value="Assessment">Assessment</option>
-                                    <option value="Records">Records</option>
-                                    <option value="Administration">Administration</option>
-                                    <option value="IT">IT</option>
-                                    <option value="Field Operations">Field Operations</option>
-                                </select>
+                            <select class="form-select" id="department" name="department" required>
+                                <option value="" selected disabled>Select your department</option>
+                                <option value="GIS">GIS</option>
+                                <option value="Assessment">Assessment</option>
+                                <option value="Records">Records</option>
+                                <option value="Administration">Administration</option>
+                                <option value="IT">IT</option>
+                                <option value="Field Operations">Field Operations</option>
+                            </select>
+                            <div class="invalid-feedback">
+                                Please select your department.
                             </div>
                         </div>
                         
                         <div class="mb-3">
                             <label for="password" class="form-label">Password</label>
-                            <div class="input-group">
+                            <div class="input-group has-validation">
                                 <span class="input-group-text"><i class="bi bi-key"></i></span>
-                                <input type="password" class="form-control" id="password" name="password" placeholder="Create a password" required>
+                                <input type="password" class="form-control" id="password" name="password" placeholder="Enter password" required>
                                 <button class="btn btn-outline-secondary toggle-password" type="button">
                                     <i class="bi bi-eye"></i>
                                 </button>
+                                <div class="invalid-feedback">
+                                    Please enter a password.
+                                </div>
                             </div>
                             <div class="form-text">Minimum 8 characters, include numbers and special characters</div>
                         </div>
                         
                         <div class="mb-3">
                             <label for="confirmPassword" class="form-label">Confirm Password</label>
-                            <div class="input-group">
+                            <div class="input-group has-validation">
                                 <span class="input-group-text"><i class="bi bi-key-fill"></i></span>
-                                <input type="password" class="form-control" id="confirmPassword" name="confirm_password" placeholder="Confirm your password" required>
+                                <input type="password" class="form-control" id="confirmPassword" name="confirm_password" placeholder="Confirm password" required>
                                 <button class="btn btn-outline-secondary toggle-password" type="button">
                                     <i class="bi bi-eye"></i>
                                 </button>
+                                <div class="invalid-feedback">
+                                    Please confirm your password.
+                                </div>
                             </div>
                         </div>
                         
-                        <div class="mb-3 form-check">
-                            <input type="checkbox" class="form-check-input" id="termsCheck" name="terms_check" required>
-                            <label class="form-check-label" for="termsCheck">
-                                I agree to the <a href="#" data-bs-toggle="modal" data-bs-target="#termsModal">Terms and Conditions</a>
-                            </label>
+                        <div class="mb-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="termsCheck" name="terms_agreement" required>
+                                <label class="form-check-label" for="termsCheck">
+                                    I agree to the <a href="#" data-bs-toggle="modal" data-bs-target="#termsModal">Terms and Conditions</a>
+                                </label>
+                                <div class="invalid-feedback">
+                                    You must agree to the terms and conditions.
+                                </div>
+                            </div>
                         </div>
                         
-                        <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-primary">Create Account</button>
+                        <div class="d-grid gap-2 mb-3">
+                            <button type="submit" class="btn btn-primary">Register</button>
                         </div>
                     </form>
                 </div>
@@ -110,111 +133,81 @@
 
 <!-- Terms and Conditions Modal -->
 <div class="modal fade" id="termsModal" tabindex="-1" aria-labelledby="termsModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="termsModalLabel">Terms and Conditions</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <h6>Acceptance of Terms</h6>
-                <p>By accessing and using the GeoAssessmentPro application, you agree to be bound by these Terms and Conditions, all applicable laws and regulations, and agree that you are responsible for compliance with any applicable local laws.</p>
+                <h6>GeoAssessmentPro Terms of Use</h6>
+                <p>Welcome to GeoAssessmentPro, a platform designed for the Benton County Assessor's Office to manage geographic information systems (GIS) data.</p>
                 
-                <h6>Use License</h6>
-                <p>Permission is granted to use GeoAssessmentPro for approved county business purposes only. This is the grant of a license, not a transfer of title.</p>
+                <h6>1. Acceptance of Terms</h6>
+                <p>By accessing and using GeoAssessmentPro, you agree to be bound by these Terms of Use and all applicable laws and regulations. If you do not agree with any of these terms, you are prohibited from using this platform.</p>
                 
-                <h6>Data Confidentiality</h6>
-                <p>Users must maintain the confidentiality of all sensitive data accessed through GeoAssessmentPro. Unauthorized disclosure of confidential information is strictly prohibited.</p>
+                <h6>2. County Data Use</h6>
+                <p>All data accessed through this platform is confidential and property of Benton County. Users may only access and use data for official county business purposes. Any unauthorized use, sharing, or distribution of data is strictly prohibited.</p>
                 
-                <h6>User Account</h6>
-                <p>Users are responsible for maintaining the confidentiality of their account and password information. Users agree to notify administrators of any unauthorized use of their account.</p>
+                <h6>3. Account Security</h6>
+                <p>You are responsible for maintaining the confidentiality of your account credentials. Any activity that occurs under your account is your responsibility. Notify administrators immediately if you suspect unauthorized access to your account.</p>
                 
-                <h6>Limitation of Liability</h6>
-                <p>Benton County shall not be held liable for any damages arising out of the use or inability to use GeoAssessmentPro.</p>
+                <h6>4. Privacy Policy</h6>
+                <p>Your use of GeoAssessmentPro is also governed by our Privacy Policy, which outlines how we collect, use, and protect your information. By using this platform, you consent to the data practices described in our Privacy Policy.</p>
                 
-                <h6>Privacy Policy</h6>
-                <p>Your use of GeoAssessmentPro is also governed by our Privacy Policy, which is incorporated by reference into these Terms and Conditions.</p>
+                <h6>5. Modifications</h6>
+                <p>Benton County reserves the right to modify these terms at any time. Changes will be effective immediately upon posting. Continued use of the platform constitutes acceptance of the modified terms.</p>
+                
+                <h6>6. Governing Law</h6>
+                <p>These Terms of Use shall be governed by and construed in accordance with the laws of the State of Washington, without regard to its conflict of law provisions.</p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary" data-bs-dismiss="modal" id="agreeTerms">I Agree</button>
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">I Understand</button>
             </div>
         </div>
     </div>
 </div>
 {% endblock %}
 
-{% block styles %}
-<style>
-    .auth-page {
-        min-height: calc(100vh - 76px);
-        display: flex;
-        align-items: center;
-        padding: 40px 0;
-    }
-    
-    .auth-container {
-        max-width: 450px;
-        margin: 0 auto;
-    }
-    
-    .auth-card {
-        border: none;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-    }
-</style>
-{% endblock %}
-
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Toggle password visibility
-        const togglePasswordButtons = document.querySelectorAll('.toggle-password');
-        
-        togglePasswordButtons.forEach(button => {
-            button.addEventListener('click', function() {
-                const passwordInput = this.parentElement.querySelector('input');
-                const icon = this.querySelector('i');
-                
-                if (passwordInput.type === 'password') {
-                    passwordInput.type = 'text';
-                    icon.classList.remove('bi-eye');
-                    icon.classList.add('bi-eye-slash');
-                } else {
-                    passwordInput.type = 'password';
-                    icon.classList.remove('bi-eye-slash');
-                    icon.classList.add('bi-eye');
-                }
-            });
-        });
-        
-        // Terms agreement
-        const agreeTermsButton = document.getElementById('agreeTerms');
-        const termsCheck = document.getElementById('termsCheck');
-        
-        agreeTermsButton.addEventListener('click', function() {
-            termsCheck.checked = true;
-        });
-        
-        // Password validation
-        const registrationForm = document.getElementById('registrationForm');
+        // Form validation
+        const form = document.getElementById('registrationForm');
         const password = document.getElementById('password');
         const confirmPassword = document.getElementById('confirmPassword');
         
-        registrationForm.addEventListener('submit', function(e) {
+        form.addEventListener('submit', function(e) {
+            if (!form.checkValidity()) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            
             if (password.value !== confirmPassword.value) {
                 e.preventDefault();
-                alert('Passwords do not match!');
-                return false;
+                confirmPassword.setCustomValidity("Passwords don't match");
+            } else {
+                confirmPassword.setCustomValidity('');
             }
             
             if (password.value.length < 8) {
                 e.preventDefault();
-                alert('Password must be at least 8 characters long!');
-                return false;
+                password.setCustomValidity("Password must be at least 8 characters long");
+            } else {
+                password.setCustomValidity('');
             }
             
-            return true;
+            form.classList.add('was-validated');
+        });
+        
+        // Reset custom validity when typing
+        password.addEventListener('input', function() {
+            password.setCustomValidity('');
+            confirmPassword.setCustomValidity('');
+        });
+        
+        confirmPassword.addEventListener('input', function() {
+            confirmPassword.setCustomValidity('');
         });
     });
 </script>
