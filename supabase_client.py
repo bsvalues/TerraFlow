@@ -21,8 +21,13 @@ from config_loader import get_config, is_supabase_enabled
 # Configure logging
 logger = logging.getLogger(__name__)
 
-# Cache the client creation with an environment parameter to handle different environments
-@lru_cache(maxsize=8)  # Increased cache size to handle multiple environments
+# Import connection pool functions if available
+try:
+    from supabase_connection_pool import get_client, release_client
+    CONNECTION_POOL_AVAILABLE = True
+except ImportError:
+    CONNECTION_POOL_AVAILABLE = False
+
 def get_supabase_client(environment: Optional[str] = None) -> Optional[Client]:
     """
     Get a Supabase client instance for a specific environment.
@@ -90,9 +95,14 @@ def get_supabase_client(environment: Optional[str] = None) -> Optional[Client]:
             logger.error(f"Missing Supabase URL or key for environment: {environment}")
             return None
         
-        logger.debug(f"Creating Supabase client for {url}")
-        client = create_client(url, key)
-        return client
+        # Use connection pool if available, otherwise create a new client directly
+        if CONNECTION_POOL_AVAILABLE:
+            logger.debug(f"Getting Supabase client from connection pool for {url}")
+            return get_client(url, key)
+        else:
+            logger.debug(f"Creating new Supabase client for {url}")
+            return create_client(url, key)
+            
     except Exception as e:
         logger.error(f"Error creating Supabase client: {str(e)}")
         return None

@@ -10,7 +10,7 @@ import uuid
 from datetime import datetime
 from typing import Dict, List, Optional, Any, Union
 
-from supabase_connection_pool import get_supabase_client
+from supabase_client import get_supabase_client
 from auth import is_authenticated, has_permission
 from flask import session
 from flask_login import current_user

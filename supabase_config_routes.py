@@ -1,298 +1,310 @@
 """
-Supabase Environment Management Routes
+Supabase Configuration Routes
 
-This module provides Flask routes for configuring and managing Supabase environments.
+This module provides Flask routes for managing Supabase environments
+and configuration through a web interface.
 """
 
 import os
 import logging
-import traceback
-from typing import Dict, Any, Optional
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session
+from typing import Dict, Any, Optional, List
+
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from auth import login_required, role_required
-from supabase_env_manager import (
-    get_current_environment, 
-    set_current_environment,
-    get_all_configured_environments,
-    get_environment_url,
-    get_environment_key,
-    get_environment_service_key,
-    check_environment_config
-)
-from supabase_client import get_supabase_client
+from config_loader import get_config
+from auth import login_required, permission_required
+
+# Import environment managers
+try:
+    from supabase_env_manager import (
+        get_all_environments,
+        get_current_environment,
+        get_environment_url,
+        get_environment_key,
+        set_current_environment
+    )
+    ENV_MANAGER_AVAILABLE = True
+except ImportError:
+    ENV_MANAGER_AVAILABLE = False
+
+# Import verification tools
+try:
+    from verify_supabase_env import (
+        check_environment_variables,
+        check_supabase_connection,
+        check_supabase_auth,
+        check_supabase_storage,
+        check_postgis_extension
+    )
+    VERIFY_TOOLS_AVAILABLE = True
+except ImportError:
+    VERIFY_TOOLS_AVAILABLE = False
 
 # Set up logging
 logger = logging.getLogger(__name__)
 
-# Create blueprint
-supabase_config_bp = Blueprint('supabase_config', __name__, url_prefix='/supabase')
+# Create Blueprint
+supabase_config = Blueprint("supabase_config", __name__)
 
-# Admin password for protecting sensitive operations
-ADMIN_PASSWORD_HASH = None
-
-@supabase_config_bp.route('/')
+@supabase_config.route("/supabase/environments", methods=["GET"])
 @login_required
-@role_required('admin')
-def index():
+@permission_required("admin")
+def environments_page():
     """
-    Supabase configuration home page.
+    Display Supabase environments configuration page.
     """
-    return redirect(url_for('supabase_config.environments'))
-
-@supabase_config_bp.route('/environments')
-@login_required
-@role_required('admin')
-def environments():
-    """
-    View and manage Supabase environments.
-    """
-    # Get environment status
-    configured_environments = get_all_configured_environments()
+    # Get all environment information
+    environments = {}
+    active_env = "development"
     
-    # Get current environment
-    current_env = get_current_environment()
-    
-    # Get environment details (masked)
-    environment_details = {
-        'development': {
-            'url': get_environment_url('development'),
-            'key': get_environment_key('development'),
-            'has_service_key': bool(get_environment_service_key('development'))
-        },
-        'training': {
-            'url': get_environment_url('training'),
-            'key': get_environment_key('training'),
-            'has_service_key': bool(get_environment_service_key('training'))
-        },
-        'production': {
-            'url': get_environment_url('production'),
-            'key': get_environment_key('production'),
-            'has_service_key': bool(get_environment_service_key('production'))
-        }
-    }
+    if ENV_MANAGER_AVAILABLE:
+        environments = get_all_environments()
+        active_env = get_current_environment()
+    else:
+        # Fallback to environment variables
+        for env in ["development", "training", "production"]:
+            url = os.environ.get(f"SUPABASE_URL_{env.upper()}")
+            key = os.environ.get(f"SUPABASE_KEY_{env.upper()}")
+            service_key = os.environ.get(f"SUPABASE_SERVICE_KEY_{env.upper()}")
+            
+            environments[env] = {
+                "configured": bool(url and key),
+                "url": url,
+                "key": key[:5] + "..." + key[-5:] if key else None,
+                "service_key": bool(service_key)
+            }
+        
+        active_env = os.environ.get("SUPABASE_ACTIVE_ENVIRONMENT", "development")
     
     return render_template(
-        'supabase/environments.html',
-        environments=configured_environments,
-        current_environment=current_env,
-        environment_details=environment_details
+        "supabase/environments.html",
+        environments=environments,
+        active_env=active_env,
+        env_manager_available=ENV_MANAGER_AVAILABLE,
+        verify_tools_available=VERIFY_TOOLS_AVAILABLE
     )
 
-@supabase_config_bp.route('/set-environment/<environment>')
+@supabase_config.route("/supabase/environments/set", methods=["POST"])
 @login_required
-@role_required('admin')
-def set_current_environment_route(environment):
+@permission_required("admin")
+def set_environment():
     """
-    Set the current active Supabase environment.
+    Set the active Supabase environment.
     """
-    if environment not in ['development', 'training', 'production']:
-        flash(f"Invalid environment: {environment}", 'danger')
-        return redirect(url_for('supabase_config.environments'))
+    environment = request.form.get("environment")
+    if not environment or environment not in ["development", "training", "production"]:
+        flash("Invalid environment specified", "error")
+        return redirect(url_for("supabase_config.environments_page"))
     
-    try:
-        set_current_environment(environment)
-        flash(f"Current Supabase environment set to: {environment}", 'success')
-    except Exception as e:
-        logger.error(f"Error setting environment to {environment}: {str(e)}")
-        flash(f"Error setting environment: {str(e)}", 'danger')
-    
-    return redirect(url_for('supabase_config.environments'))
-
-@supabase_config_bp.route('/setup-environment/<environment>', methods=['GET', 'POST'])
-@login_required
-@role_required('admin')
-def setup_environment(environment):
-    """
-    Set up a specific Supabase environment.
-    """
-    if environment not in ['development', 'training', 'production']:
-        flash(f"Invalid environment: {environment}", 'danger')
-        return redirect(url_for('supabase_config.environments'))
-    
-    if request.method == 'POST':
-        # Verify admin password
-        if not verify_admin_password(request.form.get('admin_password', '')):
-            flash("Invalid admin password", 'danger')
-            return render_template('supabase/setup_environment.html', environment=environment)
-        
-        # Get form data
-        url = request.form.get('url', '').strip()
-        key = request.form.get('api_key', '').strip()
-        service_key = request.form.get('service_key', '').strip()
-        
-        if not url or not key:
-            flash("URL and API key are required", 'danger')
-            return render_template('supabase/setup_environment.html', environment=environment)
-        
+    if ENV_MANAGER_AVAILABLE:
+        success = set_current_environment(environment)
+        if success:
+            flash(f"Active environment changed to {environment}", "success")
+        else:
+            flash(f"Failed to change active environment to {environment}", "error")
+    else:
         try:
-            # Set environment variables
-            os.environ[f"SUPABASE_URL_{environment.upper()}"] = url
-            os.environ[f"SUPABASE_KEY_{environment.upper()}"] = key
+            # Get environment-specific variables
+            url = os.environ.get(f"SUPABASE_URL_{environment.upper()}")
+            key = os.environ.get(f"SUPABASE_KEY_{environment.upper()}")
+            service_key = os.environ.get(f"SUPABASE_SERVICE_KEY_{environment.upper()}")
+            
+            if not url or not key:
+                flash(f"Environment {environment} is not configured", "error")
+                return redirect(url_for("supabase_config.environments_page"))
+            
+            # Update the base variables
+            os.environ["SUPABASE_URL"] = url
+            os.environ["SUPABASE_KEY"] = key
             if service_key:
-                os.environ[f"SUPABASE_SERVICE_KEY_{environment.upper()}"] = service_key
+                os.environ["SUPABASE_SERVICE_KEY"] = service_key
+            elif "SUPABASE_SERVICE_KEY" in os.environ:
+                del os.environ["SUPABASE_SERVICE_KEY"]
             
-            # If this is the development environment, also set the base variables
-            if environment == 'development':
-                os.environ["SUPABASE_URL"] = url
-                os.environ["SUPABASE_KEY"] = key
-                if service_key:
-                    os.environ["SUPABASE_SERVICE_KEY"] = service_key
+            # Set the active environment
+            os.environ["SUPABASE_ACTIVE_ENVIRONMENT"] = environment
             
-            # Update .env file if requested
-            if request.form.get('update_env_file') == 'yes':
-                update_env_file(environment, url, key, service_key)
-                flash(f"Environment variables for {environment} saved to .env file", 'success')
-            
-            flash(f"Supabase {environment} environment configured successfully", 'success')
-            return redirect(url_for('supabase_config.environments'))
-            
+            flash(f"Active environment changed to {environment}", "success")
         except Exception as e:
-            logger.error(f"Error configuring {environment} environment: {str(e)}")
-            logger.error(traceback.format_exc())
-            flash(f"Error configuring environment: {str(e)}", 'danger')
+            logger.error(f"Error setting environment: {str(e)}")
+            flash(f"Error setting environment: {str(e)}", "error")
     
-    return render_template('supabase/setup_environment.html', environment=environment)
+    return redirect(url_for("supabase_config.environments_page"))
 
-@supabase_config_bp.route('/test-environment/<environment>')
+@supabase_config.route("/supabase/environments/configure", methods=["POST"])
 @login_required
-@role_required('admin')
-def test_environment(environment):
+@permission_required("admin")
+def configure_environment():
     """
-    Test the connection to a Supabase environment.
+    Configure a Supabase environment with URL and keys.
     """
-    if environment not in ['development', 'training', 'production']:
-        flash(f"Invalid environment: {environment}", 'danger')
-        return redirect(url_for('supabase_config.environments'))
+    environment = request.form.get("environment")
+    url = request.form.get("url")
+    key = request.form.get("key")
+    service_key = request.form.get("service_key")
+    
+    if not environment or environment not in ["development", "training", "production"]:
+        flash("Invalid environment specified", "error")
+        return redirect(url_for("supabase_config.environments_page"))
+    
+    if not url or not key:
+        flash("URL and API key are required", "error")
+        return redirect(url_for("supabase_config.environments_page"))
     
     try:
-        # Check if environment is configured
-        if not check_environment_config(environment):
-            flash(f"Environment {environment} is not properly configured", 'danger')
-            return redirect(url_for('supabase_config.environments'))
+        # Set environment-specific variables
+        os.environ[f"SUPABASE_URL_{environment.upper()}"] = url
+        os.environ[f"SUPABASE_KEY_{environment.upper()}"] = key
+        if service_key:
+            os.environ[f"SUPABASE_SERVICE_KEY_{environment.upper()}"] = service_key
+        elif f"SUPABASE_SERVICE_KEY_{environment.upper()}" in os.environ:
+            del os.environ[f"SUPABASE_SERVICE_KEY_{environment.upper()}"]
         
-        # Try to get a client
-        client = get_supabase_client(environment)
-        if not client:
-            flash(f"Failed to create Supabase client for {environment} environment", 'danger')
-            return redirect(url_for('supabase_config.environments'))
+        # If this is the active environment, also update the base variables
+        if environment == os.environ.get("SUPABASE_ACTIVE_ENVIRONMENT", "development"):
+            os.environ["SUPABASE_URL"] = url
+            os.environ["SUPABASE_KEY"] = key
+            if service_key:
+                os.environ["SUPABASE_SERVICE_KEY"] = service_key
+            elif "SUPABASE_SERVICE_KEY" in os.environ:
+                del os.environ["SUPABASE_SERVICE_KEY"]
         
-        # Try a simple query
-        try:
-            # Try to query a system table or health check endpoint
-            result = client.table('_system').select('version').limit(1).execute()
-            flash(f"Successfully connected to Supabase {environment} environment!", 'success')
-        except Exception:
-            # Fallback to a more generic check
+        flash(f"Environment {environment} configured successfully", "success")
+        
+        # Try to save to .env file if we have the env manager
+        if ENV_MANAGER_AVAILABLE:
             try:
-                response = client.functions.invoke('health-check')
-                flash(f"Successfully connected to Supabase {environment} environment!", 'success')
-            except Exception as e:
-                # Last resort - just check if we can access the auth API
-                auth_response = client.auth.get_user()
-                flash(f"Successfully connected to Supabase {environment} environment!", 'success')
+                from set_supabase_env import set_env_vars
+                if set_env_vars(environment, url, key, service_key):
+                    flash("Environment variables saved to .env file", "success")
+                else:
+                    flash("Failed to save environment variables to .env file", "warning")
+            except ImportError:
+                flash("set_supabase_env module not available for saving to .env file", "warning")
+        
+    except Exception as e:
+        logger.error(f"Error configuring environment: {str(e)}")
+        flash(f"Error configuring environment: {str(e)}", "error")
+    
+    return redirect(url_for("supabase_config.environments_page"))
+
+@supabase_config.route("/supabase/environments/verify", methods=["POST"])
+@login_required
+@permission_required("admin")
+def verify_environment():
+    """
+    Verify a Supabase environment's connection and functionality.
+    """
+    environment = request.form.get("environment")
+    verify_type = request.form.get("verify_type", "connection")
+    
+    if not environment or environment not in ["development", "training", "production"]:
+        flash("Invalid environment specified", "error")
+        return redirect(url_for("supabase_config.environments_page"))
+    
+    results = {}
+    
+    if not VERIFY_TOOLS_AVAILABLE:
+        flash("Verification tools are not available", "error")
+        return redirect(url_for("supabase_config.environments_page"))
+    
+    try:
+        # Set the active environment for the duration of the verification
+        orig_env = os.environ.get("SUPABASE_ACTIVE_ENVIRONMENT")
+        
+        # Get environment-specific variables
+        url = os.environ.get(f"SUPABASE_URL_{environment.upper()}")
+        key = os.environ.get(f"SUPABASE_KEY_{environment.upper()}")
+        service_key = os.environ.get(f"SUPABASE_SERVICE_KEY_{environment.upper()}")
+        
+        # Temporarily set the environment for testing
+        os.environ["SUPABASE_URL"] = url
+        os.environ["SUPABASE_KEY"] = key
+        if service_key:
+            os.environ["SUPABASE_SERVICE_KEY"] = service_key
+        elif "SUPABASE_SERVICE_KEY" in os.environ:
+            del os.environ["SUPABASE_SERVICE_KEY"]
+        os.environ["SUPABASE_ACTIVE_ENVIRONMENT"] = environment
+        
+        try:
+            if verify_type == "variables":
+                results = check_environment_variables()
+            elif verify_type == "connection":
+                results = check_supabase_connection()
+            elif verify_type == "auth":
+                results = check_supabase_auth()
+            elif verify_type == "storage":
+                results = check_supabase_storage()
+            elif verify_type == "postgis":
+                results = check_postgis_extension()
+            elif verify_type == "all":
+                results = {
+                    "variables": check_environment_variables(),
+                    "connection": check_supabase_connection(),
+                    "auth": check_supabase_auth(),
+                    "storage": check_supabase_storage(),
+                    "postgis": check_postgis_extension()
+                }
+            else:
+                flash(f"Invalid verification type: {verify_type}", "error")
+        finally:
+            # Restore original environment
+            if orig_env:
+                os.environ["SUPABASE_ACTIVE_ENVIRONMENT"] = orig_env
+                
+                # Restore original base variables
+                orig_url = os.environ.get(f"SUPABASE_URL_{orig_env.upper()}")
+                orig_key = os.environ.get(f"SUPABASE_KEY_{orig_env.upper()}")
+                orig_service_key = os.environ.get(f"SUPABASE_SERVICE_KEY_{orig_env.upper()}")
+                
+                if orig_url:
+                    os.environ["SUPABASE_URL"] = orig_url
+                if orig_key:
+                    os.environ["SUPABASE_KEY"] = orig_key
+                if orig_service_key:
+                    os.environ["SUPABASE_SERVICE_KEY"] = orig_service_key
+                elif "SUPABASE_SERVICE_KEY" in os.environ:
+                    del os.environ["SUPABASE_SERVICE_KEY"]
+        
+        # Store results in session for display
+        if not results:
+            flash(f"No verification results for {environment}", "warning")
+        else:
+            flash(f"Verification completed for {environment}", "success")
+            if isinstance(results, dict):
+                verification_status = "success"
+                for k, v in results.items():
+                    if isinstance(v, dict) and not v.get("success", False):
+                        verification_status = "error"
+                        break
+                    elif not v:
+                        verification_status = "error"
+                        break
+                
+                flash(f"Verification status: {verification_status}", verification_status)
     
     except Exception as e:
-        logger.error(f"Error testing connection to {environment} environment: {str(e)}")
-        logger.error(traceback.format_exc())
-        flash(f"Error testing connection: {str(e)}", 'danger')
+        logger.error(f"Error verifying environment: {str(e)}")
+        flash(f"Error verifying environment: {str(e)}", "error")
     
-    return redirect(url_for('supabase_config.environments'))
+    return redirect(url_for("supabase_config.environments_page"))
 
-@supabase_config_bp.route('/setup-wizard')
+@supabase_config.route("/supabase/wizard", methods=["GET"])
 @login_required
-@role_required('admin')
+@permission_required("admin")
 def setup_wizard():
     """
-    Launch the Supabase environment setup wizard.
+    Show Supabase setup wizard.
     """
-    return render_template('supabase/setup_wizard.html')
+    return render_template("supabase/setup_wizard.html")
 
-@supabase_config_bp.route('/api/environments')
-@login_required
-@role_required('admin')
-def api_environments():
+def register_routes(app):
     """
-    Get environment status as JSON.
-    """
-    configured_environments = get_all_configured_environments()
-    current_env = get_current_environment()
-    
-    return jsonify({
-        'environments': configured_environments,
-        'current_environment': current_env
-    })
-
-def update_env_file(environment: str, url: str, key: str, service_key: Optional[str] = None) -> None:
-    """
-    Update .env file with environment-specific credentials
+    Register all routes with the Flask app.
     
     Args:
-        environment: Environment name
-        url: Supabase URL
-        key: Supabase API key
-        service_key: Optional Supabase service role key
+        app: Flask application instance
     """
-    env_path = ".env"
-    env_vars = {}
-    
-    # Read existing .env file
-    if os.path.exists(env_path):
-        with open(env_path, 'r') as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith('#') and '=' in line:
-                    name, value = line.split('=', 1)
-                    env_vars[name.strip()] = value.strip()
-    
-    # Update with new values
-    env_vars[f"SUPABASE_URL_{environment.upper()}"] = url
-    env_vars[f"SUPABASE_KEY_{environment.upper()}"] = key
-    if service_key:
-        env_vars[f"SUPABASE_SERVICE_KEY_{environment.upper()}"] = service_key
-    
-    # If this is the default environment, also set the base variables
-    if environment == "development":
-        env_vars["SUPABASE_URL"] = url
-        env_vars["SUPABASE_KEY"] = key
-        if service_key:
-            env_vars["SUPABASE_SERVICE_KEY"] = service_key
-    
-    # Write back to .env file
-    with open(env_path, 'w') as f:
-        for name, value in env_vars.items():
-            f.write(f"{name}={value}\n")
-
-def verify_admin_password(password: str) -> bool:
-    """
-    Verify the admin password for sensitive operations.
-    
-    Args:
-        password: Admin password to verify
-        
-    Returns:
-        True if password is valid, False otherwise
-    """
-    global ADMIN_PASSWORD_HASH
-    
-    # In development mode, always allow access
-    if os.environ.get('FLASK_ENV') == 'development':
-        return True
-    
-    # If admin password is not set, use a default for initial setup
-    if not ADMIN_PASSWORD_HASH:
-        default_password = os.environ.get('ADMIN_PASSWORD', 'admin')
-        ADMIN_PASSWORD_HASH = generate_password_hash(default_password)
-    
-    return check_password_hash(ADMIN_PASSWORD_HASH, password)
-
-def init_app(app):
-    """
-    Initialize the Supabase config routes with the Flask app.
-    
-    Args:
-        app: Flask application
-    """
-    app.register_blueprint(supabase_config_bp)
-    app.logger.info("Supabase config routes registered successfully")
+    app.register_blueprint(supabase_config)
+    logger.info("Supabase config routes registered successfully")
