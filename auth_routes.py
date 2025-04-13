@@ -37,9 +37,13 @@ def list_users(page=1, per_page=10):
     Returns:
         Tuple of (users, total_count)
     """
+    client = None
     try:
         # Get a Supabase client
-        client = supabase_auth.client
+        client = supabase_auth.client()
+        if not client:
+            logger.error("Could not get Supabase client")
+            return [], 0
         
         # Query users with pagination
         response = client.from_('users').select('*').range((page-1)*per_page, page*per_page-1).execute()
@@ -53,6 +57,11 @@ def list_users(page=1, per_page=10):
     except Exception as e:
         logger.error(f"Error fetching users: {str(e)}")
         return [], 0
+    finally:
+        # Release the client
+        if client:
+            from supabase_connection_pool import release_connection
+            release_connection(client)
 
 def update_user_roles(user_id, roles):
     """
@@ -65,9 +74,12 @@ def update_user_roles(user_id, roles):
     Returns:
         Tuple of (success, error_message)
     """
+    client = None
     try:
         # Get a Supabase client
-        client = supabase_auth.client
+        client = supabase_auth.client()
+        if not client:
+            return False, 'Could not get Supabase client'
         
         # First, get the current user data
         response = client.from_('users').select('*').eq('id', user_id).single().execute()
@@ -89,6 +101,11 @@ def update_user_roles(user_id, roles):
     except Exception as e:
         logger.error(f"Error updating user roles: {str(e)}")
         return False, str(e)
+    finally:
+        # Release the client
+        if client:
+            from supabase_connection_pool import release_connection
+            release_connection(client)
 
 def initialize_roles():
     """
@@ -97,9 +114,13 @@ def initialize_roles():
     Returns:
         True if successful, False otherwise
     """
+    client = None
     try:
         # Get a Supabase client
-        client = supabase_auth.client
+        client = supabase_auth.client()
+        if not client:
+            logger.error("Could not get Supabase client")
+            return False
         
         # Define the default roles and their permissions
         roles_and_permissions = {
@@ -138,6 +159,11 @@ def initialize_roles():
     except Exception as e:
         logger.error(f"Error initializing roles: {str(e)}")
         return False
+    finally:
+        # Release the client
+        if client:
+            from supabase_connection_pool import release_connection
+            release_connection(client)
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -323,9 +349,13 @@ def user_list():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
     
+    client = None
     try:
         # Get a Supabase client
-        client = supabase_auth.client
+        client = supabase_auth.client()
+        if not client:
+            flash('Could not get Supabase client', 'danger')
+            return redirect(url_for('index'))
         
         # Query users with pagination (if Supabase client provides this capability)
         response = client.from_('users').select('*').range((page-1)*per_page, page*per_page-1).execute()
@@ -340,6 +370,11 @@ def user_list():
         flash(f'Error fetching users: {str(e)}', 'danger')
         users = []
         total_count = 0
+    finally:
+        # Release the client
+        if client:
+            from supabase_connection_pool import release_connection
+            release_connection(client)
     
     total_pages = (total_count + per_page - 1) // per_page if total_count > 0 else 1
     
@@ -364,9 +399,12 @@ def update_roles_api(user_id):
     data = request.json
     roles = data.get('roles', [])
     
+    client = None
     try:
         # Get a Supabase client
-        client = supabase_auth.client
+        client = supabase_auth.client()
+        if not client:
+            return jsonify({'success': False, 'error': 'Could not get Supabase client'}), 500
         
         # First, get the current user data
         response = client.from_('users').select('*').eq('id', user_id).single().execute()
@@ -388,6 +426,11 @@ def update_roles_api(user_id):
     except Exception as e:
         logger.error(f"Error updating user roles: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        # Release the client
+        if client:
+            from supabase_connection_pool import release_connection
+            release_connection(client)
 
 @auth_bp.route('/initialize-roles')
 def initialize_roles_route():
@@ -398,9 +441,13 @@ def initialize_roles_route():
         flash('You do not have permission to access this page', 'danger')
         return redirect(url_for('index'))
     
+    client = None
     try:
         # Get a Supabase client
-        client = supabase_auth.client
+        client = supabase_auth.client()
+        if not client:
+            flash('Could not get Supabase client', 'danger')
+            return redirect(url_for('index'))
         
         # Define the default roles and their permissions
         roles_and_permissions = {
@@ -441,6 +488,11 @@ def initialize_roles_route():
         logger.error(f"Error initializing roles: {str(e)}")
         flash(f'Failed to initialize roles and permissions: {str(e)}', 'danger')
         success = False
+    finally:
+        # Release the client
+        if client:
+            from supabase_connection_pool import release_connection
+            release_connection(client)
     
     return redirect(url_for('auth.user_list'))
 

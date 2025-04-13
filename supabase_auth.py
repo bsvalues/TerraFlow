@@ -153,9 +153,22 @@ class SupabaseAuth:
         self.refresh_token = None
         self.user_id = None
         
-    @property
     def client(self):
-        """Get a Supabase client"""
+        """
+        Get a Supabase client. This should be used in a context manager or with proper release.
+        
+        Example:
+            client = supabase_auth.client()
+            try:
+                # Use client
+                result = client.from_('table').select('*').execute()
+            finally:
+                # Release client
+                release_connection(client)
+                
+        Returns:
+            Supabase client
+        """
         if not self.url or not self.key:
             logger.error('Missing required environment variables: SUPABASE_URL, SUPABASE_KEY')
             return None
