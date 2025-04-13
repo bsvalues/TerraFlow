@@ -7,25 +7,23 @@ and user management using Supabase Auth.
 
 import os
 import logging
-from typing import Dict, Any
-from functools import wraps
+import json
+from typing import Dict, Any, List, Optional
 
-from flask import (
-    Blueprint, render_template, request, flash, redirect, 
-    url_for, session, g, jsonify, current_app
-)
+from flask import Blueprint, render_template, redirect, url_for, flash, request, session, jsonify
+from werkzeug.security import generate_password_hash, check_password_hash
 
 from supabase_auth import (
-    login_user, logout_user, signup_user, reset_password_request,
-    reset_password, is_authenticated, has_role, get_current_user,
-    get_user_roles, initialize_roles, update_user_roles, list_users,
-    ROLE_ADMIN, ROLE_DATA_SETUP, ROLE_MOBILE_ASSESSOR, ROLE_ANALYST, ROLE_VIEWER
+    login_user, logout_user, signup_user, reset_password_request, reset_password,
+    is_authenticated, has_role, get_current_user, list_users, update_user_roles,
+    initialize_roles, ALL_ROLES
 )
 
 # Configure logging
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Create blueprint
+# Create the authentication blueprint
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
@@ -40,35 +38,27 @@ def login():
     if is_authenticated():
         return redirect(url_for('index'))
     
-    # Handle form submission
     if request.method == 'POST':
-        email = request.form.get('email', '').strip()
-        password = request.form.get('password', '')
+        email = request.form.get('email')
+        password = request.form.get('password')
         
         if not email or not password:
-            flash('Please provide both email and password', 'error')
+            flash('Please enter both email and password', 'danger')
             return render_template('login.html')
         
-        # Attempt to log in
+        # Attempt to login the user
         success, error_message = login_user(email, password)
         
         if success:
-            # Get redirect URL if any
-            next_url = request.form.get('next') or request.args.get('next')
-            
-            # Flash success message
-            flash('Login successful!', 'success')
-            
-            # Redirect to next URL or index
-            if next_url:
-                return redirect(next_url)
-            else:
-                return redirect(url_for('index'))
+            flash('Login successful', 'success')
+            # Redirect to requested page or default to home
+            next_page = request.args.get('next')
+            if next_page:
+                return redirect(next_page)
+            return redirect(url_for('index'))
         else:
-            # Flash error message
-            flash(f'Login failed: {error_message}', 'error')
+            flash(f'Login failed: {error_message}', 'danger')
     
-    # Render login template for GET request or failed login
     return render_template('login.html')
 
 @auth_bp.route('/logout')
@@ -77,7 +67,7 @@ def logout():
     Log the user out and redirect to login page.
     """
     logout_user()
-    flash('You have been logged out successfully', 'info')
+    flash('You have been logged out', 'info')
     return redirect(url_for('auth.login'))
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
@@ -92,42 +82,38 @@ def register():
     if is_authenticated():
         return redirect(url_for('index'))
     
-    # Handle form submission
     if request.method == 'POST':
-        email = request.form.get('email', '').strip()
-        password = request.form.get('password', '')
-        confirm_password = request.form.get('confirm_password', '')
-        full_name = request.form.get('full_name', '').strip()
-        department = request.form.get('department', '').strip()
+        email = request.form.get('email')
+        password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
+        full_name = request.form.get('full_name')
+        department = request.form.get('department')
         
-        # Validate input
+        # Validate form data
         if not email or not password or not confirm_password:
-            flash('Please fill in all required fields', 'error')
+            flash('Please fill in all required fields', 'danger')
             return render_template('register.html')
-        
+            
         if password != confirm_password:
-            flash('Passwords do not match', 'error')
+            flash('Passwords do not match', 'danger')
             return render_template('register.html')
         
-        # Create user data
+        # Prepare user data
         user_data = {
             'full_name': full_name,
             'department': department,
-            'roles': [ROLE_VIEWER]  # Default role for new users
+            'roles': ['viewer']  # Default role for new users
         }
         
-        # Attempt to register
-        success, error_message, user = signup_user(email, password, user_data)
+        # Attempt to register the user
+        success, error_message, user_info = signup_user(email, password, user_data)
         
         if success:
-            # Flash success message
-            flash('Registration successful! Please log in.', 'success')
+            flash('Registration successful! You can now log in.', 'success')
             return redirect(url_for('auth.login'))
         else:
-            # Flash error message
-            flash(f'Registration failed: {error_message}', 'error')
+            flash(f'Registration failed: {error_message}', 'danger')
     
-    # Render registration template for GET request or failed registration
     return render_template('register.html')
 
 @auth_bp.route('/reset-password', methods=['GET', 'POST'])
@@ -138,26 +124,26 @@ def reset_password_request_route():
     GET: Display reset password form
     POST: Process reset password request
     """
-    # Handle form submission
+    # If user is already logged in, redirect to home
+    if is_authenticated():
+        return redirect(url_for('index'))
+    
     if request.method == 'POST':
-        email = request.form.get('email', '').strip()
+        email = request.form.get('email')
         
         if not email:
-            flash('Please provide your email address', 'error')
+            flash('Please enter your email address', 'danger')
             return render_template('reset_password_request.html')
         
-        # Attempt to send reset password email
+        # Send password reset email
         success, error_message = reset_password_request(email)
         
         if success:
-            # Flash success message
-            flash('Password reset instructions have been sent to your email', 'success')
+            flash('Password reset link has been sent to your email', 'success')
             return redirect(url_for('auth.login'))
         else:
-            # Flash error message
-            flash(f'Password reset request failed: {error_message}', 'error')
+            flash(f'Password reset request failed: {error_message}', 'danger')
     
-    # Render reset password template for GET request or failed request
     return render_template('reset_password_request.html')
 
 @auth_bp.route('/reset-password/<token>', methods=['GET', 'POST'])
@@ -168,31 +154,32 @@ def reset_password_route(token):
     GET: Display reset password confirmation form
     POST: Process password reset
     """
-    # Handle form submission
+    # If user is already logged in, redirect to home
+    if is_authenticated():
+        return redirect(url_for('index'))
+    
     if request.method == 'POST':
-        password = request.form.get('password', '')
-        confirm_password = request.form.get('confirm_password', '')
+        new_password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
         
-        if not password or not confirm_password:
-            flash('Please provide a new password', 'error')
+        if not new_password or not confirm_password:
+            flash('Please fill in all fields', 'danger')
+            return render_template('reset_password.html', token=token)
+            
+        if new_password != confirm_password:
+            flash('Passwords do not match', 'danger')
             return render_template('reset_password.html', token=token)
         
-        if password != confirm_password:
-            flash('Passwords do not match', 'error')
-            return render_template('reset_password.html', token=token)
-        
-        # Attempt to reset password
-        success, error_message = reset_password(token, password)
+        # Process password reset
+        success, error_message = reset_password(token, new_password)
         
         if success:
-            # Flash success message
-            flash('Password has been reset successfully. Please log in with your new password.', 'success')
+            flash('Your password has been reset successfully. You can now log in.', 'success')
             return redirect(url_for('auth.login'))
         else:
-            # Flash error message
-            flash(f'Password reset failed: {error_message}', 'error')
+            flash(f'Password reset failed: {error_message}', 'danger')
+            return render_template('reset_password.html', token=token)
     
-    # Render reset password confirmation template
     return render_template('reset_password.html', token=token)
 
 @auth_bp.route('/profile')
@@ -201,102 +188,83 @@ def profile():
     User profile page.
     """
     if not is_authenticated():
-        return redirect(url_for('auth.login'))
+        return redirect(url_for('auth.login', next=request.url))
     
     user = get_current_user()
-    roles = get_user_roles()
     
-    return render_template('profile.html', user=user, roles=roles)
+    return render_template('profile.html', user=user)
 
 @auth_bp.route('/users')
 def user_list():
     """
     User management page (admin only).
     """
-    if not is_authenticated() or not has_role(ROLE_ADMIN):
-        flash('Access denied. Admin privileges required.', 'error')
+    if not is_authenticated() or not has_role('admin'):
+        flash('You do not have permission to access this page', 'danger')
         return redirect(url_for('index'))
     
-    # Get page number from query string
     page = request.args.get('page', 1, type=int)
-    per_page = 20
+    per_page = request.args.get('per_page', 10, type=int)
     
-    # Get users with pagination
     users, total_count = list_users(page, per_page)
     
-    # Calculate pagination values
     total_pages = (total_count + per_page - 1) // per_page
     
-    return render_template('user_list.html', 
-                          users=users, 
-                          page=page, 
-                          per_page=per_page,
-                          total_pages=total_pages,
-                          total_count=total_count)
+    return render_template(
+        'user_list.html', 
+        users=users, 
+        page=page, 
+        per_page=per_page, 
+        total_pages=total_pages,
+        total_count=total_count,
+        all_roles=ALL_ROLES
+    )
 
-@auth_bp.route('/api/users/<user_id>/roles', methods=['PUT'])
+@auth_bp.route('/users/<user_id>/roles', methods=['POST'])
 def update_roles_api(user_id):
     """
     API to update user roles (admin only).
     """
-    if not is_authenticated() or not has_role(ROLE_ADMIN):
-        return jsonify({
-            'success': False,
-            'error': 'Access denied. Admin privileges required.'
-        }), 403
+    if not is_authenticated() or not has_role('admin'):
+        return jsonify({'success': False, 'error': 'Permission denied'}), 403
     
-    # Get roles from request
-    data = request.get_json()
+    data = request.json
     roles = data.get('roles', [])
     
-    # Update roles
     success, error_message = update_user_roles(user_id, roles)
     
     if success:
         return jsonify({'success': True})
     else:
-        return jsonify({
-            'success': False,
-            'error': error_message
-        }), 400
+        return jsonify({'success': False, 'error': error_message}), 400
 
 @auth_bp.route('/initialize-roles')
 def initialize_roles_route():
     """
     Initialize default roles in the database (admin only).
     """
-    if not is_authenticated() or not has_role(ROLE_ADMIN):
-        flash('Access denied. Admin privileges required.', 'error')
+    if not is_authenticated() or not has_role('admin'):
+        flash('You do not have permission to access this page', 'danger')
         return redirect(url_for('index'))
     
-    # Initialize roles
     success = initialize_roles()
     
     if success:
-        flash('Roles initialized successfully', 'success')
+        flash('Roles and permissions initialized successfully', 'success')
     else:
-        flash('Failed to initialize roles', 'error')
+        flash('Failed to initialize roles and permissions', 'danger')
     
     return redirect(url_for('auth.user_list'))
 
-# API endpoint to check if user is authenticated
-@auth_bp.route('/api/check-auth')
+@auth_bp.route('/check-auth')
 def check_auth_api():
     """
     API to check if user is authenticated.
     """
     if is_authenticated():
-        user = get_current_user()
-        roles = get_user_roles()
-        
         return jsonify({
             'authenticated': True,
-            'user': {
-                'id': user.get('id'),
-                'email': user.get('email'),
-                'full_name': user.get('full_name', '')
-            },
-            'roles': roles
+            'user': get_current_user()
         })
     else:
         return jsonify({

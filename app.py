@@ -810,6 +810,22 @@ try:
 except Exception as e:
     app.logger.error(f"Error registering data quality routes: {str(e)}")
 
+# Register authentication routes
+try:
+    from auth_routes import auth_bp
+    app.register_blueprint(auth_bp)
+    app.logger.info("Authentication routes registered successfully")
+except Exception as e:
+    app.logger.error(f"Error registering authentication routes: {str(e)}")
+
+# Register template filters
+try:
+    from template_filters import register_template_filters
+    register_template_filters(app)
+    app.logger.info("Template filters registered successfully")
+except Exception as e:
+    app.logger.error(f"Error registering template filters: {str(e)}")
+
 # Register Supabase configuration blueprint
 try:
     from api.supabase_config import supabase_config_bp
