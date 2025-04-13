@@ -137,4 +137,138 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+    
+    // Feedback form functionality
+    const feedbackModal = document.getElementById('feedbackModal');
+    if (feedbackModal) {
+        // Set current page URL when feedback modal is opened
+        feedbackModal.addEventListener('show.bs.modal', function () {
+            const currentPageInput = document.getElementById('currentPage');
+            if (currentPageInput) {
+                currentPageInput.value = window.location.pathname;
+            }
+        });
+        
+        // Handle feedback form submission
+        const feedbackForm = document.getElementById('feedbackForm');
+        if (feedbackForm) {
+            feedbackForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const formData = new FormData(feedbackForm);
+                
+                // Get screenshot if permission is given
+                const screenshotPermission = formData.get('screenshot_permission');
+                if (screenshotPermission === 'on') {
+                    // In a real implementation, this would capture a screenshot
+                    // For now, we just add a placeholder
+                    formData.append('screenshot', 'screenshot_placeholder');
+                }
+                
+                // Submit the feedback via fetch API
+                fetch(feedbackForm.action, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Show success message
+                    const feedbackButton = document.querySelector('.feedback-button');
+                    const modal = bootstrap.Modal.getInstance(feedbackModal);
+                    modal.hide();
+                    
+                    // Create and show success toast
+                    showToast('Feedback Submitted', 'Thank you for your feedback! Your input helps us improve the system.', 'success');
+                    
+                    // Reset form
+                    feedbackForm.reset();
+                })
+                .catch(error => {
+                    console.error('Error submitting feedback:', error);
+                    showToast('Submission Error', 'There was a problem submitting your feedback. Please try again.', 'danger');
+                });
+            });
+        }
+    }
+    
+    // Toast notification system
+    function showToast(title, message, type = 'info') {
+        const toastContainer = document.getElementById('toast-container');
+        
+        // Create toast container if it doesn't exist
+        if (!toastContainer) {
+            const container = document.createElement('div');
+            container.id = 'toast-container';
+            container.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+            container.style.zIndex = '1090';
+            document.body.appendChild(container);
+        }
+        
+        // Create toast element
+        const toastEl = document.createElement('div');
+        toastEl.className = `toast align-items-center text-white bg-${type} border-0`;
+        toastEl.setAttribute('role', 'alert');
+        toastEl.setAttribute('aria-live', 'assertive');
+        toastEl.setAttribute('aria-atomic', 'true');
+        
+        // Create toast content
+        toastEl.innerHTML = `
+            <div class="d-flex">
+                <div class="toast-body">
+                    <strong>${title}</strong><br>
+                    ${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        `;
+        
+        // Add toast to container
+        document.getElementById('toast-container').appendChild(toastEl);
+        
+        // Initialize and show toast
+        const toast = new bootstrap.Toast(toastEl, { autohide: true, delay: 5000 });
+        toast.show();
+        
+        // Remove toast from DOM after it's hidden
+        toastEl.addEventListener('hidden.bs.toast', function () {
+            toastEl.remove();
+        });
+    }
+    
+    // Test scenario guide functionality
+    const testGuides = document.querySelectorAll('.test-guide');
+    testGuides.forEach(guide => {
+        const steps = guide.querySelectorAll('.test-step');
+        steps.forEach((step, index) => {
+            // Add completed checkbox to each step
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'form-check-input step-checkbox ms-2';
+            checkbox.id = `step-${guide.id}-${index}`;
+            
+            // Load state from localStorage if available
+            const savedState = localStorage.getItem(checkbox.id);
+            if (savedState === 'true') {
+                checkbox.checked = true;
+                step.classList.add('text-muted');
+            }
+            
+            // Save state to localStorage when changed
+            checkbox.addEventListener('change', function() {
+                localStorage.setItem(this.id, this.checked);
+                if (this.checked) {
+                    step.classList.add('text-muted');
+                } else {
+                    step.classList.remove('text-muted');
+                }
+            });
+            
+            step.appendChild(checkbox);
+        });
+    });
 });
