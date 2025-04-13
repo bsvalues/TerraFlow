@@ -22,21 +22,21 @@
                         {% endif %}
                     {% endwith %}
                     
-                    <form method="POST" action="{{ url_for('auth.register') }}">
+                    <form method="POST" action="{{ url_for('auth.register') }}" id="registrationForm">
                         <div class="mb-3">
-                            <label for="email" class="form-label">Email address *</label>
+                            <label for="email" class="form-label">Email address</label>
                             <div class="input-group">
                                 <span class="input-group-text"><i class="bi bi-envelope"></i></span>
                                 <input type="email" class="form-control" id="email" name="email" placeholder="Enter your email" required>
                             </div>
-                            <div class="form-text">This will be used as your login</div>
+                            <div class="form-text">Use your work email address</div>
                         </div>
                         
                         <div class="mb-3">
-                            <label for="full_name" class="form-label">Full Name *</label>
+                            <label for="fullName" class="form-label">Full Name</label>
                             <div class="input-group">
                                 <span class="input-group-text"><i class="bi bi-person"></i></span>
-                                <input type="text" class="form-control" id="full_name" name="full_name" placeholder="Enter your full name" required>
+                                <input type="text" class="form-control" id="fullName" name="full_name" placeholder="Enter your full name" required>
                             </div>
                         </div>
                         
@@ -44,43 +44,57 @@
                             <label for="department" class="form-label">Department</label>
                             <div class="input-group">
                                 <span class="input-group-text"><i class="bi bi-building"></i></span>
-                                <input type="text" class="form-control" id="department" name="department" placeholder="Enter your department">
+                                <select class="form-select" id="department" name="department">
+                                    <option value="" selected disabled>Select your department</option>
+                                    <option value="GIS">GIS</option>
+                                    <option value="Assessment">Assessment</option>
+                                    <option value="Records">Records</option>
+                                    <option value="Administration">Administration</option>
+                                    <option value="IT">IT</option>
+                                    <option value="Field Operations">Field Operations</option>
+                                </select>
                             </div>
                         </div>
                         
                         <div class="mb-3">
-                            <label for="password" class="form-label">Password *</label>
+                            <label for="password" class="form-label">Password</label>
                             <div class="input-group">
                                 <span class="input-group-text"><i class="bi bi-key"></i></span>
-                                <input type="password" class="form-control" id="password" name="password" placeholder="Enter your password" required>
+                                <input type="password" class="form-control" id="password" name="password" placeholder="Create a password" required>
+                                <button class="btn btn-outline-secondary toggle-password" type="button">
+                                    <i class="bi bi-eye"></i>
+                                </button>
                             </div>
                             <div class="form-text">Minimum 8 characters, include numbers and special characters</div>
                         </div>
                         
-                        <div class="mb-4">
-                            <label for="confirm_password" class="form-label">Confirm Password *</label>
+                        <div class="mb-3">
+                            <label for="confirmPassword" class="form-label">Confirm Password</label>
                             <div class="input-group">
                                 <span class="input-group-text"><i class="bi bi-key-fill"></i></span>
-                                <input type="password" class="form-control" id="confirm_password" name="confirm_password" placeholder="Confirm your password" required>
+                                <input type="password" class="form-control" id="confirmPassword" name="confirm_password" placeholder="Confirm your password" required>
+                                <button class="btn btn-outline-secondary toggle-password" type="button">
+                                    <i class="bi bi-eye"></i>
+                                </button>
                             </div>
                         </div>
                         
-                        <div class="mb-3">
-                            <div class="form-check">
-                                <input type="checkbox" class="form-check-input" id="agree_terms" name="agree_terms" required>
-                                <label class="form-check-label" for="agree_terms">
-                                    I agree to the <a href="#" class="text-decoration-none">Terms of Service</a> and <a href="#" class="text-decoration-none">Privacy Policy</a>
-                                </label>
-                            </div>
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="termsCheck" name="terms_check" required>
+                            <label class="form-check-label" for="termsCheck">
+                                I agree to the <a href="#" data-bs-toggle="modal" data-bs-target="#termsModal">Terms and Conditions</a>
+                            </label>
                         </div>
                         
                         <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-primary">Register</button>
+                            <button type="submit" class="btn btn-primary">Create Account</button>
                         </div>
                     </form>
                 </div>
                 <div class="card-footer text-center">
-                    <p class="mb-0">Already have an account? <a href="{{ url_for('auth.login') }}" class="text-decoration-none">Login</a></p>
+                    <p class="mb-0">
+                        Already have an account? <a href="{{ url_for('auth.login') }}" class="text-decoration-none">Login</a>
+                    </p>
                 </div>
             </div>
             
@@ -93,4 +107,115 @@
         </div>
     </div>
 </div>
+
+<!-- Terms and Conditions Modal -->
+<div class="modal fade" id="termsModal" tabindex="-1" aria-labelledby="termsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="termsModalLabel">Terms and Conditions</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <h6>Acceptance of Terms</h6>
+                <p>By accessing and using the GeoAssessmentPro application, you agree to be bound by these Terms and Conditions, all applicable laws and regulations, and agree that you are responsible for compliance with any applicable local laws.</p>
+                
+                <h6>Use License</h6>
+                <p>Permission is granted to use GeoAssessmentPro for approved county business purposes only. This is the grant of a license, not a transfer of title.</p>
+                
+                <h6>Data Confidentiality</h6>
+                <p>Users must maintain the confidentiality of all sensitive data accessed through GeoAssessmentPro. Unauthorized disclosure of confidential information is strictly prohibited.</p>
+                
+                <h6>User Account</h6>
+                <p>Users are responsible for maintaining the confidentiality of their account and password information. Users agree to notify administrators of any unauthorized use of their account.</p>
+                
+                <h6>Limitation of Liability</h6>
+                <p>Benton County shall not be held liable for any damages arising out of the use or inability to use GeoAssessmentPro.</p>
+                
+                <h6>Privacy Policy</h6>
+                <p>Your use of GeoAssessmentPro is also governed by our Privacy Policy, which is incorporated by reference into these Terms and Conditions.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal" id="agreeTerms">I Agree</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+    .auth-page {
+        min-height: calc(100vh - 76px);
+        display: flex;
+        align-items: center;
+        padding: 40px 0;
+    }
+    
+    .auth-container {
+        max-width: 450px;
+        margin: 0 auto;
+    }
+    
+    .auth-card {
+        border: none;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Toggle password visibility
+        const togglePasswordButtons = document.querySelectorAll('.toggle-password');
+        
+        togglePasswordButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const passwordInput = this.parentElement.querySelector('input');
+                const icon = this.querySelector('i');
+                
+                if (passwordInput.type === 'password') {
+                    passwordInput.type = 'text';
+                    icon.classList.remove('bi-eye');
+                    icon.classList.add('bi-eye-slash');
+                } else {
+                    passwordInput.type = 'password';
+                    icon.classList.remove('bi-eye-slash');
+                    icon.classList.add('bi-eye');
+                }
+            });
+        });
+        
+        // Terms agreement
+        const agreeTermsButton = document.getElementById('agreeTerms');
+        const termsCheck = document.getElementById('termsCheck');
+        
+        agreeTermsButton.addEventListener('click', function() {
+            termsCheck.checked = true;
+        });
+        
+        // Password validation
+        const registrationForm = document.getElementById('registrationForm');
+        const password = document.getElementById('password');
+        const confirmPassword = document.getElementById('confirmPassword');
+        
+        registrationForm.addEventListener('submit', function(e) {
+            if (password.value !== confirmPassword.value) {
+                e.preventDefault();
+                alert('Passwords do not match!');
+                return false;
+            }
+            
+            if (password.value.length < 8) {
+                e.preventDefault();
+                alert('Password must be at least 8 characters long!');
+                return false;
+            }
+            
+            return true;
+        });
+    });
+</script>
 {% endblock %}
