@@ -1,204 +1,179 @@
 """
 Supabase Environment Manager
 
-This module provides utility functions for managing environment-specific connections
-to Supabase, making it easier to switch between development, training, and production
-environments for database operations, authentication, and storage.
+This module provides utilities for managing multiple Supabase environments
+(development, training, production) and switching between them.
 """
 
 import os
 import logging
-from typing import Optional, Dict, Any
-from contextlib import contextmanager
-from config_loader import get_config, is_development_mode
+from typing import Dict, Any, Optional, List
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Current thread-local environment context
-_current_environment = None
+# Current active environment (default to 'development')
+_current_environment = 'development'
 
 def get_current_environment() -> str:
     """
-    Get the current environment context.
+    Get the currently active Supabase environment.
     
     Returns:
-        Current environment name (development, training, production)
+        String name of the current environment
     """
-    global _current_environment
-    
-    # If no specific environment is set, use the default from config
-    if _current_environment is None:
-        default_env = "development" if is_development_mode() else "production"
-        return default_env
-    
     return _current_environment
 
-def set_current_environment(environment: str) -> None:
+def set_current_environment(environment: str) -> bool:
     """
-    Set the current environment context.
+    Set the current active Supabase environment.
     
     Args:
-        environment: Environment name (development, training, production)
+        environment: Name of the environment to set as active
+        
+    Returns:
+        True if successful, False otherwise
     """
+    if environment not in ['development', 'training', 'production']:
+        logger.error(f"Invalid environment: {environment}")
+        return False
+    
     global _current_environment
-    
-    if environment not in ["development", "training", "production"]:
-        logger.warning(f"Invalid environment: {environment}. Using development instead.")
-        environment = "development"
-    
-    logger.info(f"Setting current Supabase environment to: {environment}")
     _current_environment = environment
+    
+    # Set base environment variables to the selected environment
+    url = get_environment_url(environment)
+    key = get_environment_key(environment)
+    service_key = get_environment_service_key(environment)
+    
+    if url:
+        os.environ['SUPABASE_URL'] = url
+    if key:
+        os.environ['SUPABASE_KEY'] = key
+    if service_key:
+        os.environ['SUPABASE_SERVICE_KEY'] = service_key
+    
+    logger.info(f"Set current Supabase environment to: {environment}")
+    return True
 
-@contextmanager
-def environment_context(environment: str):
+def get_environment_url(environment: str) -> Optional[str]:
     """
-    Context manager for temporarily switching environments.
+    Get the Supabase URL for the specified environment.
     
     Args:
-        environment: Environment name to use within the context
+        environment: Environment name
         
-    Example:
-        with environment_context('production'):
-            # Code here uses production environment
-            result = supabase_client.execute_query('my_table')
+    Returns:
+        URL string or None if not configured
     """
-    previous_env = get_current_environment()
-    try:
-        set_current_environment(environment)
-        yield
-    finally:
-        set_current_environment(previous_env)
+    return os.environ.get(f"SUPABASE_URL_{environment.upper()}")
 
-def get_environment_config(environment: Optional[str] = None) -> Dict[str, Any]:
+def get_environment_key(environment: str) -> Optional[str]:
     """
-    Get configuration for a specific environment.
+    Get the Supabase API key for the specified environment.
     
     Args:
-        environment: Optional environment name (development, training, production)
-                    If None, uses the current environment
-    
-    Returns:
-        Dictionary with environment-specific configuration
-    """
-    if environment is None:
-        environment = get_current_environment()
+        environment: Environment name
         
-    # Get base Supabase configuration
-    config = get_config('supabase')
-    if not config:
-        config = {}
-    
-    # Get environment-specific overrides
-    env_config = config.get(environment, {})
-    
-    # Merge with base configuration
-    result = {**config, **env_config}
-    
-    # Remove environment-specific sections
-    for env in ['development', 'training', 'production']:
-        if env in result:
-            del result[env]
-    
-    return result
-
-def get_environment_url(environment: Optional[str] = None) -> Optional[str]:
+    Returns:
+        API key string or None if not configured
     """
-    Get Supabase URL for a specific environment.
+    return os.environ.get(f"SUPABASE_KEY_{environment.upper()}")
+
+def get_environment_service_key(environment: str) -> Optional[str]:
+    """
+    Get the Supabase service role key for the specified environment.
     
     Args:
-        environment: Optional environment name (development, training, production)
-                    If None, uses the current environment
-    
+        environment: Environment name
+        
     Returns:
-        Supabase URL for the specified environment
+        Service role key string or None if not configured
     """
-    env_config = get_environment_config(environment)
-    
-    # Try environment-specific URL first
-    url = env_config.get('url')
-    
-    # Fallback to environment variable
-    if not url:
-        url = os.environ.get('SUPABASE_URL')
-    
-    return url
+    return os.environ.get(f"SUPABASE_SERVICE_KEY_{environment.upper()}")
 
-def get_environment_key(environment: Optional[str] = None) -> Optional[str]:
+def check_environment_config(environment: str) -> bool:
     """
-    Get Supabase API key for a specific environment.
+    Check if an environment is properly configured.
     
     Args:
-        environment: Optional environment name (development, training, production)
-                    If None, uses the current environment
-    
+        environment: Environment name
+        
     Returns:
-        Supabase API key for the specified environment
+        True if the environment has the required configuration, False otherwise
     """
-    env_config = get_environment_config(environment)
-    
-    # Try environment-specific key first
-    key = env_config.get('key')
-    
-    # Fallback to environment variable
-    if not key:
-        key = os.environ.get('SUPABASE_KEY')
-    
-    return key
-
-def get_environment_service_key(environment: Optional[str] = None) -> Optional[str]:
-    """
-    Get Supabase service role key for a specific environment.
-    
-    Args:
-        environment: Optional environment name (development, training, production)
-                    If None, uses the current environment
-    
-    Returns:
-        Supabase service role key for the specified environment
-    """
-    env_config = get_environment_config(environment)
-    
-    # Try environment-specific service key first
-    service_key = env_config.get('service_key')
-    
-    # Fallback to environment variable
-    if not service_key:
-        service_key = os.environ.get('SUPABASE_SERVICE_KEY')
-    
-    return service_key
-
-def check_environment_config(environment: Optional[str] = None) -> bool:
-    """
-    Check if a specific environment is properly configured.
-    
-    Args:
-        environment: Optional environment name (development, training, production)
-                    If None, uses the current environment
-    
-    Returns:
-        True if the environment is properly configured, False otherwise
-    """
-    if environment is None:
-        environment = get_current_environment()
-    
     url = get_environment_url(environment)
     key = get_environment_key(environment)
     
-    if not url or not key:
-        logger.warning(f"Supabase environment '{environment}' is not properly configured. Missing URL or API key.")
-        return False
-    
-    return True
+    return bool(url and key)
 
 def get_all_configured_environments() -> Dict[str, bool]:
     """
-    Get all available environments and their configuration status.
+    Get a dictionary of all environments and their configuration status.
     
     Returns:
-        Dictionary mapping environment names to their configuration status (True if configured)
+        Dict mapping environment names to boolean configuration status
     """
     return {
-        env: check_environment_config(env)
-        for env in ['development', 'training', 'production']
+        'development': check_environment_config('development'),
+        'training': check_environment_config('training'),
+        'production': check_environment_config('production')
     }
+
+def get_environment_details(environment: str) -> Dict[str, Any]:
+    """
+    Get details about a specific environment.
+    
+    Args:
+        environment: Environment name
+        
+    Returns:
+        Dict with environment details
+    """
+    if environment not in ['development', 'training', 'production']:
+        return {'error': 'Invalid environment'}
+    
+    return {
+        'url': get_environment_url(environment),
+        'key': get_environment_key(environment),
+        'has_service_key': bool(get_environment_service_key(environment)),
+        'is_configured': check_environment_config(environment),
+        'is_current': (environment == get_current_environment())
+    }
+
+def load_environment_from_env(environment: str = None) -> bool:
+    """
+    Load environment configuration from .env file.
+    
+    Args:
+        environment: Optional environment name to load specifically
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        load_dotenv()
+        
+        if environment:
+            if environment not in ['development', 'training', 'production']:
+                logger.error(f"Invalid environment: {environment}")
+                return False
+            
+            environments = [environment]
+        else:
+            environments = ['development', 'training', 'production']
+        
+        for env in environments:
+            if check_environment_config(env):
+                logger.info(f"Loaded {env} environment configuration from .env file")
+        
+        return True
+    
+    except Exception as e:
+        logger.error(f"Error loading environment configuration: {str(e)}")
+        return False
