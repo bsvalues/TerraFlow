@@ -1,271 +1,133 @@
 #!/usr/bin/env python3
 """
-Supabase Connection Checker
+Check Supabase Connection
 
-This script verifies Supabase configuration and connectivity.
+This script checks if the Supabase connection is working.
+It verifies the environment variables, connection, and related services.
 """
 
-import os
 import sys
-import json
 import logging
-from typing import Dict, Any, List, Optional, Tuple
+import argparse
+from typing import Dict, Any, Optional, List
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger("supabase_check")
+# Import local modules
+from set_supabase_env import ensure_supabase_env, get_current_environment
+from verify_supabase_env import run_all_checks, check_environment_variables, check_supabase_connection
 
-# Import Supabase environment setup
-from set_supabase_env import ensure_supabase_env
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
-# Import Supabase
-try:
-    from supabase import create_client, Client
-    SUPABASE_AVAILABLE = True
-except ImportError:
-    SUPABASE_AVAILABLE = False
-    logger.error("❌ Supabase package not installed. Run: pip install supabase")
-
-def check_environment_variables():
-    """Check if required environment variables are set."""
-    logger.info("Checking environment variables...")
+def check_and_report() -> bool:
+    """
+    Check Supabase connection and report the results.
     
-    required_vars = ["SUPABASE_URL", "SUPABASE_KEY"]
-    optional_vars = ["SUPABASE_SERVICE_KEY"]
-    
-    missing = []
-    for var in required_vars:
-        if not os.environ.get(var):
-            missing.append(var)
-            logger.error(f"❌ {var} is not set")
-        else:
-            logger.info(f"✅ {var} is set")
-    
-    for var in optional_vars:
-        if os.environ.get(var):
-            logger.info(f"✅ {var} is set")
-        else:
-            logger.warning(f"⚠️ {var} is not set (optional)")
-    
-    if missing:
-        return False
-    return True
-
-def check_supabase_connection():
-    """Check connection to Supabase."""
-    if not SUPABASE_AVAILABLE:
-        return False
-    
-    logger.info("Checking Supabase connection...")
-    
-    url = os.environ.get("SUPABASE_URL")
-    key = os.environ.get("SUPABASE_KEY")
-    
-    if not url or not key:
-        logger.error("❌ Missing Supabase URL or key")
-        return False
-    
-    try:
-        client = create_client(url, key)
-        
-        # Test connection with a simple query
-        response = client.table("users").select("count").limit(1).execute()
-        logger.info(f"✅ Connected to Supabase: {url}")
-        return True
-    except Exception as e:
-        # If users table doesn't exist yet, that's okay
-        if "relation" in str(e) and "does not exist" in str(e):
-            logger.info(f"✅ Connected to Supabase: {url}")
-            logger.warning("⚠️ Users table does not exist yet")
-            return True
-        else:
-            logger.error(f"❌ Failed to connect to Supabase: {str(e)}")
-            return False
-
-def check_supabase_auth():
-    """Check Supabase Auth functionality."""
-    if not SUPABASE_AVAILABLE:
-        return False
-    
-    logger.info("Checking Supabase Auth...")
-    
-    url = os.environ.get("SUPABASE_URL")
-    key = os.environ.get("SUPABASE_KEY")
-    
-    try:
-        client = create_client(url, key)
-        
-        # Just check if auth client is accessible
-        # Skip actual API calls since they depend on auth settings
-        if hasattr(client, 'auth'):
-            logger.info(f"✅ Supabase Auth is accessible")
-            return True
-        else:
-            logger.error("❌ Supabase Auth client is not available")
-            return False
-    except Exception as e:
-        logger.error(f"❌ Error accessing Supabase Auth: {str(e)}")
-        return False
-
-def check_supabase_storage():
-    """Check Supabase Storage functionality."""
-    if not SUPABASE_AVAILABLE:
-        return False
-    
-    logger.info("Checking Supabase Storage...")
-    
-    url = os.environ.get("SUPABASE_URL")
-    key = os.environ.get("SUPABASE_KEY")
-    
-    try:
-        client = create_client(url, key)
-        
-        # List buckets
-        buckets = client.storage.list_buckets()
-        bucket_names = [b["name"] for b in buckets]
-        logger.info(f"✅ Successfully accessed Supabase Storage")
-        logger.info(f"  Found {len(bucket_names)} buckets: {', '.join(bucket_names) if bucket_names else 'None'}")
-        
-        required_buckets = ["documents", "maps", "images", "exports"]
-        missing_buckets = [b for b in required_buckets if b not in bucket_names]
-        
-        if missing_buckets:
-            logger.warning(f"⚠️ Missing required buckets: {', '.join(missing_buckets)}")
-            logger.warning("  You need to create these buckets in the Supabase Dashboard")
-            logger.warning("  or run setup_supabase_storage.py")
-        else:
-            logger.info("✅ All required buckets exist")
-        
-        return True
-    except Exception as e:
-        logger.error(f"❌ Error accessing Supabase Storage: {str(e)}")
-        return False
-
-def check_postgis_extension():
-    """Check if PostGIS extension is enabled."""
-    if not SUPABASE_AVAILABLE:
-        return False
-    
-    logger.info("Checking PostGIS extension...")
-    
-    url = os.environ.get("SUPABASE_URL")
-    key = os.environ.get("SUPABASE_SERVICE_KEY", os.environ.get("SUPABASE_KEY"))
-    
-    if not key:
-        logger.error("❌ Missing Supabase key")
-        return False
-    
-    try:
-        client = create_client(url, key)
-        
-        # Try to use extension check function we created
-        try:
-            # First check if our function exists
-            response = client.rpc('check_extension', {'extension_name': 'postgis'}).execute()
-            if response.data:
-                logger.info("✅ PostGIS extension is enabled")
-                return True
-            else:
-                logger.warning("⚠️ PostGIS extension is not enabled")
-                return False
-        except Exception:
-            # Function might not exist, try setting it up
-            setup_extension_check_function()
-            logger.warning("⚠️ Could not check PostGIS extension. Please run again.")
-            return False
-    except Exception as e:
-        logger.error(f"❌ Error checking PostGIS extension: {str(e)}")
-        return False
-
-def setup_extension_check_function():
-    """Create a function to check for extensions."""
-    if not SUPABASE_AVAILABLE:
-        return False
-    
-    logger.info("Setting up extension check function...")
-    
-    url = os.environ.get("SUPABASE_URL")
-    key = os.environ.get("SUPABASE_SERVICE_KEY", os.environ.get("SUPABASE_KEY"))
-    
-    try:
-        client = create_client(url, key)
-        
-        # Create function via SQL query
-        # Note: This requires SERVICE_KEY or accessing SQL Editor in Supabase Dashboard
-        query = """
-        CREATE OR REPLACE FUNCTION check_extension(extension_name TEXT)
-        RETURNS BOOLEAN AS $$
-        DECLARE
-            ext_exists BOOLEAN;
-        BEGIN
-            SELECT EXISTS(
-                SELECT 1 FROM pg_extension WHERE extname = extension_name
-            ) INTO ext_exists;
-            RETURN ext_exists;
-        END;
-        $$ LANGUAGE plpgsql;
-        """
-        
-        # This will usually not work due to permission issues
-        try:
-            response = client.rpc('exec_sql', {'query': query}).execute()
-            logger.info("✅ Created extension check function")
-            return True
-        except Exception as e:
-            logger.warning(f"⚠️ Could not create extension check function: {str(e)}")
-            logger.warning("  Please run this SQL in the Supabase SQL Editor:")
-            logger.warning(query)
-            return False
-    except Exception as e:
-        logger.error(f"❌ Error setting up extension check function: {str(e)}")
-        return False
-
-def main():
-    """Main function to run all checks."""
-    logger.info("=== Supabase Configuration Check ===")
-    
-    if not SUPABASE_AVAILABLE:
-        logger.error("❌ Supabase package not installed. Run: pip install supabase")
-        sys.exit(1)
+    Returns:
+        True if successful, False otherwise
+    """
+    # Get current environment
+    environment = get_current_environment()
     
     # Ensure environment variables are set
-    config = ensure_supabase_env()
-    logger.info(f"Using Supabase URL: {config['url']}")
-    
-    results = {
-        "Environment Variables": check_environment_variables(),
-        "Connection": check_supabase_connection(),
-        "Auth": check_supabase_auth(),
-        "Storage": check_supabase_storage(),
-        "PostGIS": check_postgis_extension()
-    }
-    
-    # Summary
-    logger.info("\n=== Summary ===")
-    success_count = sum(1 for r in results.values() if r)
-    total_count = len(results)
-    
-    for check, result in results.items():
-        status = "✅" if result else "❌"
-        logger.info(f"{status} {check}")
-    
-    logger.info(f"\n{success_count}/{total_count} checks passed")
-    
-    if success_count == total_count:
-        logger.info("✅ Supabase is properly configured!")
-        return True
-    else:
-        if results["Environment Variables"] and results["Connection"]:
-            logger.warning("⚠️ Basic Supabase configuration is working, but some features may be limited")
-        else:
-            logger.error("❌ Supabase is not properly configured")
+    if not ensure_supabase_env(environment):
+        logger.error(f"Failed to ensure Supabase environment: {environment}")
         return False
+    
+    # Run all checks
+    all_checks = run_all_checks()
+    success = all_checks["overall_success"]
+    
+    # Print results
+    print(f"\n=== Supabase Connection Check ({environment}) ===\n")
+    print(f"Overall: {'✅' if success else '❌'} {all_checks['overall_status']}")
+    print("\nDetailed results:")
+    
+    for check_name, check_result in all_checks["checks"].items():
+        check_success = check_result.get("success", False)
+        message = check_result.get("message", "No message")
+        print(f"{check_name.capitalize()}: {'✅' if check_success else '❌'} {message}")
+    
+    # Return overall success
+    return success
+
+def get_simple_connection_status() -> Dict[str, Any]:
+    """
+    Get a simple status report of the Supabase connection.
+    
+    Returns:
+        Dictionary with status information
+    """
+    # Get current environment
+    environment = get_current_environment()
+    
+    # Check environment variables
+    env_check = check_environment_variables()
+    
+    # Check connection if environment variables are set
+    if env_check["success"]:
+        connection_check = check_supabase_connection()
+    else:
+        connection_check = {
+            "success": False,
+            "message": "Missing required environment variables",
+            "error": env_check["message"]
+        }
+    
+    # Build status
+    return {
+        "environment": environment,
+        "connected": connection_check["success"],
+        "message": connection_check["message"],
+        "url_available": env_check["url"],
+        "key_available": env_check["key"],
+        "service_key_available": env_check["service_key"]
+    }
+
+def main():
+    """Main function"""
+    parser = argparse.ArgumentParser(description="Check Supabase connection")
+    parser.add_argument("--environment", "-e", choices=["development", "training", "production"],
+                     help="Supabase environment to check")
+    parser.add_argument("--simple", "-s", action="store_true", help="Simple output")
+    parser.add_argument("--json", "-j", action="store_true", help="JSON output")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
+    
+    args = parser.parse_args()
+    
+    # Set log level based on verbose flag
+    if args.verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
+    
+    # Use specified environment if provided
+    if args.environment:
+        from set_supabase_env import set_environment_variables
+        set_environment_variables(args.environment)
+    
+    # Get simple status if requested
+    if args.simple:
+        status = get_simple_connection_status()
+        
+        if args.json:
+            import json
+            print(json.dumps(status, indent=2))
+        else:
+            # Simple output
+            print(f"Environment: {status['environment']}")
+            print(f"Connected: {'Yes' if status['connected'] else 'No'}")
+            print(f"Message: {status['message']}")
+            print(f"URL Available: {'Yes' if status['url_available'] else 'No'}")
+            print(f"Key Available: {'Yes' if status['key_available'] else 'No'}")
+            print(f"Service Key Available: {'Yes' if status['service_key_available'] else 'No'}")
+        
+        # Exit with success if connected
+        sys.exit(0 if status['connected'] else 1)
+    
+    # Run full check and report
+    success = check_and_report()
+    
+    # Exit with success if all checks passed
+    sys.exit(0 if success else 1)
 
 if __name__ == "__main__":
-    if main():
-        sys.exit(0)
-    else:
-        sys.exit(1)
+    main()

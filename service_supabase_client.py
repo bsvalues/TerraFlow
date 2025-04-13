@@ -1,442 +1,370 @@
 """
-Service-Specific Supabase Client
+Service-specific Supabase Client
 
-This module provides a Supabase client for a specific service or component,
-which uses the connection pool for efficient connection management.
+This module provides service-specific Supabase clients that use the connection pool
+to efficiently manage connections for different services in the application.
 """
 
 import os
 import logging
-import json
-from typing import Dict, Any, Optional, List, Tuple, Union, TypeVar, Generic, cast
+import inspect
+from typing import Dict, Any, Optional, List, Tuple, TypeVar, Generic, cast, Callable, Union, Type
 
 try:
-    from supabase import create_client, Client
+    from supabase import Client
     SUPABASE_AVAILABLE = True
 except ImportError:
     SUPABASE_AVAILABLE = False
 
-from supabase_connection_pool import get_connection, release_connection, with_connection
-from supabase_env_manager import get_environment_variables
+from supabase_connection_pool import get_connection, release_connection
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Type variables for generic functions
+# Type variable for generic functions
 T = TypeVar('T')
-U = TypeVar('U')
 
-class ServiceSupabaseClient:
+# Service-specific clients
+_service_clients = {}
+
+def get_service_client(service_name: str) -> Any:
     """
-    Service-specific Supabase client class that uses the connection pool.
+    Get a Supabase client for a specific service.
+    
+    Args:
+        service_name: Name of the service (e.g., "property", "valuation", etc.)
+        
+    Returns:
+        ServiceClient instance
+    """
+    if service_name not in _service_clients:
+        _service_clients[service_name] = ServiceClient(service_name)
+    
+    return _service_clients[service_name]
+
+class ServiceClient:
+    """
+    A Supabase client for a specific service.
+    
+    This client uses the connection pool to efficiently manage connections
+    to Supabase, while providing a service-specific interface.
     """
     
-    def __init__(self, service_name: str, environment: Optional[str] = None):
+    def __init__(self, service_name: str):
         """
-        Initialize the service-specific Supabase client.
+        Initialize a new service client.
         
         Args:
-            service_name: Name of the service or component
-            environment: Environment name (development, training, production)
+            service_name: Name of the service (e.g., "property", "valuation", etc.)
         """
         self.service_name = service_name
-        self.environment = environment
-        self.client = None
         
-        logger.info(f"Initialized ServiceSupabaseClient for {service_name}")
-    
-    def _get_client(self) -> Optional[Client]:
-        """
-        Get a Supabase client from the connection pool.
-        
-        Returns:
-            Supabase client or None if not available
-        """
         # Get environment variables
-        env_vars = get_environment_variables(self.environment)
+        self.url = os.environ.get("SUPABASE_URL")
+        self.key = os.environ.get("SUPABASE_KEY")
+        self.service_key = os.environ.get("SUPABASE_SERVICE_KEY")
         
-        if not env_vars["configured"]:
-            logger.warning(f"Supabase environment {self.environment} not configured")
-            return None
+        if not self.url or not self.key:
+            logger.error(f"Missing required environment variables for {service_name} service client")
         
-        # Get client from connection pool
-        client = get_connection(env_vars["url"], env_vars["key"])
-        
-        return client
+        # Log initialization
+        logger.info(f"Initialized {service_name} service client")
     
-    def execute_query(self, table: str, 
-                      query_builder: Optional[callable] = None, 
-                      **kwargs) -> Dict[str, Any]:
+    def _with_client(self, func: Callable) -> Callable:
         """
-        Execute a query on a Supabase table.
+        Decorator to provide a Supabase client to a function.
+        
+        Args:
+            func: Function to decorate
+            
+        Returns:
+            Decorated function
+        """
+        def wrapper(*args, **kwargs):
+            if not self.url or not self.key:
+                logger.error(f"Missing required environment variables for {self.service_name} service client")
+                raise ValueError("Missing required environment variables (URL or key)")
+            
+            # Get a client from the pool
+            client = get_connection(self.url, self.key)
+            
+            try:
+                # Call the function with the client
+                return func(client, *args, **kwargs)
+            finally:
+                # Release the client back to the pool
+                release_connection(client)
+        
+        return wrapper
+    
+    def _with_service_client(self, func: Callable) -> Callable:
+        """
+        Decorator to provide a Supabase service client to a function.
+        
+        Args:
+            func: Function to decorate
+            
+        Returns:
+            Decorated function
+        """
+        def wrapper(*args, **kwargs):
+            if not self.url or not self.service_key:
+                logger.error(f"Missing required environment variables for {self.service_name} service client (service role)")
+                raise ValueError("Missing required environment variables (URL or service key)")
+            
+            # Get a client from the pool
+            client = get_connection(self.url, self.service_key)
+            
+            try:
+                # Call the function with the client
+                return func(client, *args, **kwargs)
+            finally:
+                # Release the client back to the pool
+                release_connection(client)
+        
+        return wrapper
+    
+    def execute(self, func: Callable[[Client, Any], T], *args, **kwargs) -> T:
+        """
+        Execute a function with a Supabase client.
+        
+        Args:
+            func: Function to execute with client as first argument
+            *args: Additional arguments to pass to the function
+            **kwargs: Additional keyword arguments to pass to the function
+            
+        Returns:
+            Result of the function
+        """
+        decorated = self._with_client(func)
+        return decorated(*args, **kwargs)
+    
+    def execute_with_service_role(self, func: Callable[[Client, Any], T], *args, **kwargs) -> T:
+        """
+        Execute a function with a Supabase service client.
+        
+        Args:
+            func: Function to execute with client as first argument
+            *args: Additional arguments to pass to the function
+            **kwargs: Additional keyword arguments to pass to the function
+            
+        Returns:
+            Result of the function
+        """
+        decorated = self._with_service_client(func)
+        return decorated(*args, **kwargs)
+    
+    def select(self, table: str, query: Optional[Dict[str, Any]] = None, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """
+        Select data from a table.
         
         Args:
             table: Table name
-            query_builder: Function that takes a table query and returns a modified query
-            **kwargs: Additional arguments for the query builder
+            query: Query parameters (optional)
+            limit: Maximum number of rows to return (optional)
             
         Returns:
-            Dictionary with query results
+            List of rows
         """
-        client = self._get_client()
-        if not client:
-            logger.warning("Failed to get Supabase client")
-            return {"data": [], "error": "Failed to get Supabase client"}
+        def _select(client, table, query, limit):
+            # Build query
+            q = client.table(table).select("*")
+            
+            # Apply query parameters
+            if query:
+                for key, value in query.items():
+                    q = q.eq(key, value)
+            
+            # Apply limit
+            if limit:
+                q = q.limit(limit)
+            
+            # Execute
+            response = q.execute()
+            
+            return response.data
         
-        try:
-            # Start with the table query
-            query = client.table(table)
-            
-            # Apply query builder if provided
-            if query_builder:
-                query = query_builder(query, **kwargs)
-            else:
-                # Default select all
-                query = query.select("*")
-            
-            # Execute the query
-            response = query.execute()
-            
-            result = {
-                "data": response.data,
-                "error": response.error
-            }
-            
-            return result
-        except Exception as e:
-            logger.error(f"Error executing Supabase query: {str(e)}")
-            return {"data": [], "error": str(e)}
-        finally:
-            release_connection(client)
+        return self.execute(_select, table, query, limit)
     
-    def insert_data(self, table: str, data: Union[Dict[str, Any], List[Dict[str, Any]]]) -> Dict[str, Any]:
+    def insert(self, table: str, data: Union[Dict[str, Any], List[Dict[str, Any]]]) -> Dict[str, Any]:
         """
-        Insert data into a Supabase table.
+        Insert data into a table.
         
         Args:
             table: Table name
-            data: Dictionary or list of dictionaries to insert
+            data: Data to insert (dict or list of dicts)
             
         Returns:
-            Dictionary with insert results
+            Response data
         """
-        client = self._get_client()
-        if not client:
-            logger.warning("Failed to get Supabase client")
-            return {"data": [], "error": "Failed to get Supabase client"}
-        
-        try:
-            # Insert the data
+        def _insert(client, table, data):
             response = client.table(table).insert(data).execute()
-            
-            result = {
+            return {
+                "success": len(response.data) > 0,
                 "data": response.data,
-                "error": response.error
+                "count": len(response.data)
             }
-            
-            return result
-        except Exception as e:
-            logger.error(f"Error inserting data into Supabase: {str(e)}")
-            return {"data": [], "error": str(e)}
-        finally:
-            release_connection(client)
+        
+        return self.execute(_insert, table, data)
     
-    def update_data(self, table: str, data: Dict[str, Any], match_column: str, match_value: Any) -> Dict[str, Any]:
+    def update(self, table: str, data: Dict[str, Any], query: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Update data in a Supabase table.
+        Update data in a table.
         
         Args:
             table: Table name
-            data: Dictionary with the data to update
-            match_column: Column name to match for the update
-            match_value: Value to match for the update
+            data: Data to update
+            query: Query parameters to identify rows to update
             
         Returns:
-            Dictionary with update results
+            Response data
         """
-        client = self._get_client()
-        if not client:
-            logger.warning("Failed to get Supabase client")
-            return {"data": [], "error": "Failed to get Supabase client"}
-        
-        try:
-            # Update the data
-            response = client.table(table).update(data).eq(match_column, match_value).execute()
+        def _update(client, table, data, query):
+            # Build query
+            q = client.table(table).update(data)
             
-            result = {
+            # Apply query parameters
+            for key, value in query.items():
+                q = q.eq(key, value)
+            
+            # Execute
+            response = q.execute()
+            
+            return {
+                "success": len(response.data) > 0,
                 "data": response.data,
-                "error": response.error
+                "count": len(response.data)
             }
-            
-            return result
-        except Exception as e:
-            logger.error(f"Error updating data in Supabase: {str(e)}")
-            return {"data": [], "error": str(e)}
-        finally:
-            release_connection(client)
+        
+        return self.execute(_update, table, data, query)
     
-    def delete_data(self, table: str, match_column: str, match_value: Any) -> Dict[str, Any]:
+    def delete(self, table: str, query: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Delete data from a Supabase table.
+        Delete data from a table.
         
         Args:
             table: Table name
-            match_column: Column name to match for the delete
-            match_value: Value to match for the delete
+            query: Query parameters to identify rows to delete
             
         Returns:
-            Dictionary with delete results
+            Response data
         """
-        client = self._get_client()
-        if not client:
-            logger.warning("Failed to get Supabase client")
-            return {"data": [], "error": "Failed to get Supabase client"}
-        
-        try:
-            # Delete the data
-            response = client.table(table).delete().eq(match_column, match_value).execute()
+        def _delete(client, table, query):
+            # Build query
+            q = client.table(table).delete()
             
-            result = {
+            # Apply query parameters
+            for key, value in query.items():
+                q = q.eq(key, value)
+            
+            # Execute
+            response = q.execute()
+            
+            return {
+                "success": True,
                 "data": response.data,
-                "error": response.error
+                "count": len(response.data)
             }
-            
-            return result
-        except Exception as e:
-            logger.error(f"Error deleting data from Supabase: {str(e)}")
-            return {"data": [], "error": str(e)}
-        finally:
-            release_connection(client)
-    
-    def execute_sql(self, sql: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """
-        Execute a raw SQL query via the Supabase RPC function.
         
-        Args:
-            sql: SQL query to execute
-            params: Query parameters
-            
-        Returns:
-            Dictionary with query results
-        """
-        client = self._get_client()
-        if not client:
-            logger.warning("Failed to get Supabase client")
-            return {"data": None, "error": "Failed to get Supabase client"}
-        
-        try:
-            # Execute the SQL query
-            response = client.rpc("run_sql", {"query": sql, "params": params or {}}).execute()
-            
-            result = {
-                "data": response.data,
-                "error": response.error
-            }
-            
-            return result
-        except Exception as e:
-            logger.error(f"Error executing SQL in Supabase: {str(e)}")
-            return {"data": None, "error": str(e)}
-        finally:
-            release_connection(client)
+        return self.execute(_delete, table, query)
     
-    def call_function(self, function_name: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def rpc(self, function_name: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
-        Call a Supabase Edge Function.
+        Call a remote procedure (RPC function).
         
         Args:
             function_name: Name of the function to call
-            params: Function parameters
+            params: Parameters to pass to the function (optional)
             
         Returns:
-            Dictionary with function results
+            Response data
         """
-        client = self._get_client()
-        if not client:
-            logger.warning("Failed to get Supabase client")
-            return {"data": None, "error": "Failed to get Supabase client"}
-        
-        try:
-            # Call the Edge Function
-            response = client.functions.invoke(function_name, params or {})
+        def _rpc(client, function_name, params):
+            response = client.rpc(function_name, params or {}).execute()
             
-            result = {
-                "data": response.data,
-                "error": response.error
+            return {
+                "success": True,
+                "data": response.data
             }
-            
-            return result
-        except Exception as e:
-            logger.error(f"Error calling Supabase function: {str(e)}")
-            return {"data": None, "error": str(e)}
-        finally:
-            release_connection(client)
-    
-    def authenticate_user(self, email: str, password: str) -> Dict[str, Any]:
-        """
-        Authenticate a user with Supabase Auth.
         
-        Args:
-            email: User's email
-            password: User's password
-            
+        return self.execute(_rpc, function_name, params)
+    
+    def storage_list_buckets(self) -> List[Dict[str, Any]]:
+        """
+        List all storage buckets.
+        
         Returns:
-            Dictionary with authentication results
+            List of buckets
         """
-        client = self._get_client()
-        if not client:
-            logger.warning("Failed to get Supabase client")
-            return {"user": None, "session": None, "error": "Failed to get Supabase client"}
+        def _list_buckets(client):
+            return client.storage.list_buckets()
         
-        try:
-            # Sign in the user
-            response = client.auth.sign_in_with_password({"email": email, "password": password})
-            
-            result = {
-                "user": response.user,
-                "session": response.session,
-                "error": None
-            }
-            
-            return result
-        except Exception as e:
-            logger.error(f"Error authenticating user with Supabase: {str(e)}")
-            return {"user": None, "session": None, "error": str(e)}
-        finally:
-            release_connection(client)
+        return self.execute(_list_buckets)
     
-    def upload_file(self, bucket: str, path: str, file_data: bytes, content_type: str = "application/octet-stream") -> Dict[str, Any]:
+    def storage_upload(self, bucket: str, path: str, file_data: bytes, content_type: str) -> Dict[str, Any]:
         """
-        Upload a file to Supabase Storage.
+        Upload a file to storage.
         
         Args:
             bucket: Bucket name
-            path: File path within the bucket
-            file_data: File data as bytes
-            content_type: MIME type of the file
+            path: File path in bucket
+            file_data: File data
+            content_type: Content type of the file
             
         Returns:
-            Dictionary with upload results
+            Response data
         """
-        client = self._get_client()
-        if not client:
-            logger.warning("Failed to get Supabase client")
-            return {"data": None, "error": "Failed to get Supabase client"}
-        
-        try:
-            # Upload the file
-            response = client.storage.from_(bucket).upload(path, file_data, {"content-type": content_type})
+        def _upload(client, bucket, path, file_data, content_type):
+            response = client.storage.from_(bucket).upload(
+                path,
+                file_data,
+                {"content-type": content_type}
+            )
             
-            result = {
-                "data": response,
-                "error": None
+            return {
+                "success": True,
+                "path": response
             }
-            
-            return result
-        except Exception as e:
-            logger.error(f"Error uploading file to Supabase Storage: {str(e)}")
-            return {"data": None, "error": str(e)}
-        finally:
-            release_connection(client)
+        
+        return self.execute(_upload, bucket, path, file_data, content_type)
     
-    def download_file(self, bucket: str, path: str) -> Dict[str, Any]:
+    def storage_download(self, bucket: str, path: str) -> bytes:
         """
-        Download a file from Supabase Storage.
+        Download a file from storage.
         
         Args:
             bucket: Bucket name
-            path: File path within the bucket
+            path: File path in bucket
             
         Returns:
-            Dictionary with download results
+            File data
         """
-        client = self._get_client()
-        if not client:
-            logger.warning("Failed to get Supabase client")
-            return {"data": None, "error": "Failed to get Supabase client"}
+        def _download(client, bucket, path):
+            return client.storage.from_(bucket).download(path)
         
-        try:
-            # Download the file
-            response = client.storage.from_(bucket).download(path)
-            
-            result = {
-                "data": response,
-                "error": None
-            }
-            
-            return result
-        except Exception as e:
-            logger.error(f"Error downloading file from Supabase Storage: {str(e)}")
-            return {"data": None, "error": str(e)}
-        finally:
-            release_connection(client)
+        return self.execute(_download, bucket, path)
     
-    def get_file_url(self, bucket: str, path: str) -> Dict[str, Any]:
+    def storage_delete(self, bucket: str, paths: Union[str, List[str]]) -> Dict[str, Any]:
         """
-        Get a public URL for a file in Supabase Storage.
+        Delete a file or files from storage.
         
         Args:
             bucket: Bucket name
-            path: File path within the bucket
+            paths: File path(s) in bucket (string or list of strings)
             
         Returns:
-            Dictionary with URL results
+            Response data
         """
-        client = self._get_client()
-        if not client:
-            logger.warning("Failed to get Supabase client")
-            return {"url": None, "error": "Failed to get Supabase client"}
-        
-        try:
-            # Get the public URL
-            url = client.storage.from_(bucket).get_public_url(path)
+        def _delete(client, bucket, paths):
+            if isinstance(paths, str):
+                paths = [paths]
             
-            result = {
-                "url": url,
-                "error": None
+            response = client.storage.from_(bucket).remove(paths)
+            
+            return {
+                "success": True,
+                "paths": paths
             }
-            
-            return result
-        except Exception as e:
-            logger.error(f"Error getting file URL from Supabase Storage: {str(e)}")
-            return {"url": None, "error": str(e)}
-        finally:
-            release_connection(client)
-
-
-# Factory function to create a service-specific client
-def create_service_client(service_name: str, environment: Optional[str] = None) -> ServiceSupabaseClient:
-    """
-    Create a service-specific Supabase client.
-    
-    Args:
-        service_name: Name of the service or component
-        environment: Environment name (development, training, production)
         
-    Returns:
-        ServiceSupabaseClient instance
-    """
-    return ServiceSupabaseClient(service_name, environment)
-
-
-# Decorator for functions that need a service-specific client
-def with_service_client(service_name: str, environment: Optional[str] = None):
-    """
-    Decorator for functions that need a service-specific Supabase client.
-    
-    The decorated function will receive a ServiceSupabaseClient as its first argument.
-    
-    Args:
-        service_name: Name of the service or component
-        environment: Environment name (development, training, production)
-        
-    Returns:
-        Decorator function
-    """
-    def decorator(func):
-        def wrapper(*args, **kwargs):
-            client = create_service_client(service_name, environment)
-            return func(client, *args, **kwargs)
-        return wrapper
-    return decorator
+        return self.execute(_delete, bucket, paths)

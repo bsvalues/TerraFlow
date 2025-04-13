@@ -1,405 +1,483 @@
 """
-Supabase Authentication Module
+Supabase Authentication Helper
 
-This module provides authentication functions using Supabase Auth.
-It handles login, registration, password reset, and user management.
+This module provides functionality for authenticating users with Supabase,
+and integrating Supabase Auth with Flask-Login.
 """
 
 import os
 import logging
 import json
-from typing import Dict, Any, List, Optional, Tuple, Union
+import time
+from typing import Dict, Any, Optional, Tuple, Union, List, cast
+from functools import wraps
 
-from flask import session, current_app
-from werkzeug.security import generate_password_hash, check_password_hash
+# Local modules
+from supabase_connection_pool import get_connection, release_connection
+from set_supabase_env import ensure_supabase_env
 
-from supabase_client import get_supabase_client
-
-# Configure logging
-logging.basicConfig(level=logging.DEBUG)
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Define roles
-ALL_ROLES = ['admin', 'manager', 'analyst', 'editor', 'viewer']
-
-def login_user(email: str, password: str) -> Tuple[bool, str]:
-    """
-    Authenticate a user with email and password
+# Define User class for Flask-Login
+class SupabaseUser:
+    """User class for Flask-Login integration with Supabase Auth"""
     
-    Args:
-        email: User's email
-        password: User's password
+    def __init__(self, user_data: Dict[str, Any]):
+        """
+        Initialize a new Supabase user.
         
-    Returns:
-        Tuple of (success, error_message)
+        Args:
+            user_data: User data from Supabase
+        """
+        self.id = user_data.get('id')
+        self.email = user_data.get('email')
+        self.phone = user_data.get('phone')
+        self.last_sign_in_at = user_data.get('last_sign_in_at')
+        self.created_at = user_data.get('created_at')
+        self.updated_at = user_data.get('updated_at')
+        self.confirmed_at = user_data.get('confirmed_at')
+        self.email_confirmed_at = user_data.get('email_confirmed_at')
+        self.phone_confirmed_at = user_data.get('phone_confirmed_at')
+        self.app_metadata = user_data.get('app_metadata', {})
+        self.user_metadata = user_data.get('user_metadata', {})
+        self.identities = user_data.get('identities', [])
+        self.aud = user_data.get('aud')
+        self.role = user_data.get('role')
+        self.is_anonymous = False
+        self.is_authenticated = True
+        self.is_active = True
+    
+    def get_id(self) -> str:
+        """Get the user ID as a string (for Flask-Login)"""
+        return str(self.id)
+    
+    def get_roles(self) -> List[str]:
+        """Get the roles of the user"""
+        # Get roles from user_metadata or app_metadata
+        roles = self.user_metadata.get('roles', [])
+        if not roles and isinstance(self.app_metadata, dict):
+            roles = self.app_metadata.get('roles', [])
+        
+        # Ensure it's a list
+        if isinstance(roles, str):
+            roles = [roles]
+        
+        return roles
+    
+    def has_role(self, role: str) -> bool:
+        """
+        Check if the user has a specific role.
+        
+        Args:
+            role: Role name
+            
+        Returns:
+            True if the user has the role, False otherwise
+        """
+        roles = self.get_roles()
+        return role in roles
+    
+    def has_permission(self, permission: str) -> bool:
+        """
+        Check if the user has a specific permission.
+        
+        Args:
+            permission: Permission name
+            
+        Returns:
+            True if the user has the permission, False otherwise
+        """
+        # Get permissions from user_metadata or app_metadata
+        permissions = self.user_metadata.get('permissions', [])
+        if not permissions and isinstance(self.app_metadata, dict):
+            permissions = self.app_metadata.get('permissions', [])
+        
+        # Ensure it's a list
+        if isinstance(permissions, str):
+            permissions = [permissions]
+        
+        return permission in permissions
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert the user to a dictionary"""
+        return {
+            'id': self.id,
+            'email': self.email,
+            'phone': self.phone,
+            'last_sign_in_at': self.last_sign_in_at,
+            'created_at': self.created_at,
+            'updated_at': self.updated_at,
+            'confirmed_at': self.confirmed_at,
+            'email_confirmed_at': self.email_confirmed_at,
+            'phone_confirmed_at': self.phone_confirmed_at,
+            'app_metadata': self.app_metadata,
+            'user_metadata': self.user_metadata,
+            'identities': self.identities,
+            'aud': self.aud,
+            'role': self.role
+        }
+
+class SupabaseAuth:
     """
-    try:
-        # Try to authenticate with Supabase
-        client = get_supabase_client()
-        if client:
-            # Use Supabase Auth
-            auth_response = client.auth.sign_in_with_password({
-                "email": email,
-                "password": password
+    Supabase Auth Helper
+    
+    This class provides functionality for authenticating users with Supabase,
+    and integrating Supabase Auth with Flask-Login.
+    """
+    
+    def __init__(self):
+        """Initialize the Supabase Auth helper"""
+        # Ensure environment variables are set
+        ensure_supabase_env()
+        
+        # Get environment variables
+        self.url = os.environ.get('SUPABASE_URL')
+        self.key = os.environ.get('SUPABASE_KEY')
+        
+        if not self.url or not self.key:
+            logger.error('Missing required environment variables: SUPABASE_URL, SUPABASE_KEY')
+        
+        # Initialize session
+        self.session_token = None
+        self.refresh_token = None
+        self.user_id = None
+    
+    def sign_up(self, email: str, password: str, user_metadata: Optional[Dict[str, Any]] = None) -> Tuple[bool, Dict[str, Any]]:
+        """
+        Sign up a new user with email and password.
+        
+        Args:
+            email: User email
+            password: User password
+            user_metadata: Optional user metadata
+            
+        Returns:
+            Tuple of (success, data)
+        """
+        if not self.url or not self.key:
+            return False, {'error': 'Missing required environment variables: SUPABASE_URL, SUPABASE_KEY'}
+        
+        # Get a client
+        client = get_connection(self.url, self.key)
+        
+        try:
+            # Sign up
+            response = client.auth.sign_up({
+                'email': email,
+                'password': password,
+                'options': {
+                    'data': user_metadata or {}
+                }
             })
             
-            if auth_response.user:
-                # Get user data from profiles table
-                user_id = auth_response.user.id
-                user_data_response = client.table('profiles').select('*').eq('id', user_id).execute()
+            # Check if successful
+            if response.user and response.session:
+                # Store session
+                self.session_token = response.session.access_token
+                self.refresh_token = response.session.refresh_token
+                self.user_id = response.user.id
                 
-                # Also login with Flask-Login
-                from flask_login import login_user as flask_login_user
-                from models import User
-                user = User.query.filter_by(email=email).first()
-                if user:
-                    flask_login_user(user)
-                    logger.info(f"User {email} logged in with Flask-Login")
-                
-                if user_data_response.data:
-                    user_data = user_data_response.data[0]
-                else:
-                    # Create a basic profile if it doesn't exist
-                    user_data = {
-                        'id': user_id,
-                        'email': email,
-                        'roles': ['viewer']
+                # Return success
+                return True, {
+                    'user': response.user.model_dump(),
+                    'session': {
+                        'access_token': response.session.access_token,
+                        'expires_at': response.session.expires_at,
+                        'refresh_token': response.session.refresh_token
                     }
-                    client.table('profiles').insert(user_data).execute()
-                
-                # Store user info in session
-                session['authenticated'] = True
-                session['user'] = {
-                    'id': user_id,
-                    'email': email,
-                    'full_name': user_data.get('full_name', ''),
-                    'department': user_data.get('department', ''),
-                    'roles': user_data.get('roles', ['viewer'])
                 }
-                
-                logger.info(f"User {email} logged in successfully")
-                return True, ""
             else:
-                logger.warning(f"Failed login attempt for {email}")
-                return False, "Invalid email or password"
-        else:
-            # If Supabase is not available, use development fallback
-            # This is only for testing and should be removed in production
-            if current_app.config.get('ENV') == 'development':
-                logger.warning("Using development test user for authentication bypass")
-                session['authenticated'] = True
-                session['user'] = {
-                    'id': '123456789',
-                    'email': email,
-                    'full_name': 'Test User',
-                    'department': 'GIS',
-                    'roles': ['admin', 'viewer']
-                }
-                return True, ""
-            
-            return False, "Authentication service unavailable"
-            
-    except Exception as e:
-        logger.error(f"Error in login_user: {str(e)}")
-        return False, str(e)
-
-def logout_user() -> None:
-    """
-    Log out the current user
-    """
-    try:
-        client = get_supabase_client()
-        if client and session.get('authenticated'):
-            client.auth.sign_out()
-        
-        # Clear session
-        session.pop('authenticated', None)
-        session.pop('user', None)
-        
-        # Also logout with Flask-Login
-        from flask_login import logout_user as flask_logout_user
-        flask_logout_user()
-        
-        logger.info("User logged out")
-    except Exception as e:
-        logger.error(f"Error in logout_user: {str(e)}")
-
-def signup_user(email: str, password: str, user_data: Dict[str, Any]) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
-    """
-    Register a new user
+                # Return error
+                return False, {'error': 'Failed to sign up user', 'user': None, 'session': None}
+        except Exception as e:
+            logger.error(f'Error signing up user: {str(e)}')
+            return False, {'error': str(e)}
+        finally:
+            # Release the client
+            release_connection(client)
     
-    Args:
-        email: User's email
-        password: User's password
-        user_data: Additional user data (full_name, department, etc.)
+    def sign_in(self, email: str, password: str) -> Tuple[bool, Dict[str, Any]]:
+        """
+        Sign in a user with email and password.
         
-    Returns:
-        Tuple of (success, error_message, user_info)
-    """
-    try:
-        client = get_supabase_client()
-        if client:
-            # Create the user in Supabase Auth
-            auth_response = client.auth.sign_up({
-                "email": email,
-                "password": password
+        Args:
+            email: User email
+            password: User password
+            
+        Returns:
+            Tuple of (success, data)
+        """
+        if not self.url or not self.key:
+            return False, {'error': 'Missing required environment variables: SUPABASE_URL, SUPABASE_KEY'}
+        
+        # Get a client
+        client = get_connection(self.url, self.key)
+        
+        try:
+            # Sign in
+            response = client.auth.sign_in_with_password({
+                'email': email,
+                'password': password
             })
             
-            if auth_response.user:
-                user_id = auth_response.user.id
+            # Check if successful
+            if response.user and response.session:
+                # Store session
+                self.session_token = response.session.access_token
+                self.refresh_token = response.session.refresh_token
+                self.user_id = response.user.id
                 
-                # Add user data to profiles table
-                profile_data = {
-                    'id': user_id,
-                    'email': email,
-                    'full_name': user_data.get('full_name', ''),
-                    'department': user_data.get('department', ''),
-                    'roles': user_data.get('roles', ['viewer'])
-                }
-                
-                client.table('profiles').insert(profile_data).execute()
-                
-                logger.info(f"User {email} registered successfully")
-                return True, "", profile_data
-            else:
-                logger.warning(f"Failed registration attempt for {email}")
-                return False, "Registration failed", None
-        else:
-            # If Supabase is not available, use development fallback
-            if current_app.config.get('ENV') == 'development':
-                logger.warning("Using development test registration")
-                test_user = {
-                    'id': '123456789',
-                    'email': email,
-                    'full_name': user_data.get('full_name', ''),
-                    'department': user_data.get('department', ''),
-                    'roles': user_data.get('roles', ['viewer'])
-                }
-                return True, "", test_user
-            
-            return False, "Registration service unavailable", None
-            
-    except Exception as e:
-        logger.error(f"Error in signup_user: {str(e)}")
-        return False, str(e), None
-
-def reset_password_request(email: str) -> Tuple[bool, str]:
-    """
-    Send a password reset email
-    
-    Args:
-        email: User's email
-        
-    Returns:
-        Tuple of (success, error_message)
-    """
-    try:
-        client = get_supabase_client()
-        if client:
-            client.auth.reset_password_email(email)
-            logger.info(f"Password reset email sent to {email}")
-            return True, ""
-        else:
-            # If Supabase is not available, use development fallback
-            if current_app.config.get('ENV') == 'development':
-                logger.warning(f"Development password reset for {email}")
-                return True, ""
-            
-            return False, "Password reset service unavailable"
-            
-    except Exception as e:
-        logger.error(f"Error in reset_password_request: {str(e)}")
-        return False, str(e)
-
-def reset_password(token: str, new_password: str) -> Tuple[bool, str]:
-    """
-    Reset a user's password using a reset token
-    
-    Args:
-        token: Password reset token
-        new_password: New password
-        
-    Returns:
-        Tuple of (success, error_message)
-    """
-    try:
-        client = get_supabase_client()
-        if client:
-            client.auth.verify_otp({
-                "token_hash": token,
-                "type": "recovery",
-                "new_password": new_password
-            })
-            
-            logger.info("Password reset successful")
-            return True, ""
-        else:
-            # If Supabase is not available, use development fallback
-            if current_app.config.get('ENV') == 'development':
-                logger.warning("Development password reset")
-                return True, ""
-            
-            return False, "Password reset service unavailable"
-            
-    except Exception as e:
-        logger.error(f"Error in reset_password: {str(e)}")
-        return False, str(e)
-
-def is_authenticated() -> bool:
-    """
-    Check if the current user is authenticated
-    
-    Returns:
-        True if user is authenticated, False otherwise
-    """
-    return session.get('authenticated', False)
-
-def has_role(role_name: str) -> bool:
-    """
-    Check if the current user has a specific role
-    
-    Args:
-        role_name: Role to check
-        
-    Returns:
-        True if user has the role, False otherwise
-    """
-    if not is_authenticated():
-        return False
-    
-    user_roles = session.get('user', {}).get('roles', [])
-    return role_name in user_roles or 'admin' in user_roles
-
-def get_current_user() -> Optional[Dict[str, Any]]:
-    """
-    Get the current user's information
-    
-    Returns:
-        User information or None if not authenticated
-    """
-    if not is_authenticated():
-        return None
-    
-    return session.get('user', {})
-
-def list_users(page: int = 1, per_page: int = 10) -> Tuple[List[Dict[str, Any]], int]:
-    """
-    Get a list of users
-    
-    Args:
-        page: Page number (starting from 1)
-        per_page: Number of users per page
-        
-    Returns:
-        Tuple of (users, total_count)
-    """
-    try:
-        client = get_supabase_client()
-        if client:
-            # Calculate pagination
-            from_idx = (page - 1) * per_page
-            to_idx = from_idx + per_page - 1
-            
-            # Get users from profiles table
-            response = client.table('profiles').select('*').range(from_idx, to_idx).execute()
-            
-            # Get total count
-            count_response = client.table('profiles').select('id', count='exact').execute()
-            total_count = count_response.count or 0
-            
-            return response.data, total_count
-        else:
-            # If Supabase is not available, use development fallback
-            if current_app.config.get('ENV') == 'development':
-                logger.warning("Using development test user list")
-                test_users = [
-                    {
-                        'id': '123456789',
-                        'email': 'admin@example.com',
-                        'full_name': 'Admin User',
-                        'department': 'GIS',
-                        'roles': ['admin', 'viewer']
-                    },
-                    {
-                        'id': '987654321',
-                        'email': 'analyst@example.com',
-                        'full_name': 'Analyst User',
-                        'department': 'Assessment',
-                        'roles': ['analyst', 'viewer']
+                # Return success
+                return True, {
+                    'user': response.user.model_dump(),
+                    'session': {
+                        'access_token': response.session.access_token,
+                        'expires_at': response.session.expires_at,
+                        'refresh_token': response.session.refresh_token
                     }
-                ]
-                return test_users, len(test_users)
-            
-            return [], 0
-            
-    except Exception as e:
-        logger.error(f"Error in list_users: {str(e)}")
-        return [], 0
-
-def update_user_roles(user_id: str, roles: List[str]) -> Tuple[bool, str]:
-    """
-    Update a user's roles
+                }
+            else:
+                # Return error
+                return False, {'error': 'Failed to sign in user', 'user': None, 'session': None}
+        except Exception as e:
+            logger.error(f'Error signing in user: {str(e)}')
+            return False, {'error': str(e)}
+        finally:
+            # Release the client
+            release_connection(client)
     
-    Args:
-        user_id: User ID
-        roles: List of roles
+    def sign_out(self) -> bool:
+        """
+        Sign out the current user.
         
-    Returns:
-        Tuple of (success, error_message)
-    """
-    try:
-        # Validate roles
-        valid_roles = [role for role in roles if role in ALL_ROLES]
-        
-        client = get_supabase_client()
-        if client:
-            # Update user roles in profiles table
-            client.table('profiles').update({'roles': valid_roles}).eq('id', user_id).execute()
-            
-            logger.info(f"Roles updated for user {user_id}: {valid_roles}")
-            return True, ""
-        else:
-            # If Supabase is not available, use development fallback
-            if current_app.config.get('ENV') == 'development':
-                logger.warning(f"Development role update for user {user_id}: {valid_roles}")
-                return True, ""
-            
-            return False, "User management service unavailable"
-            
-    except Exception as e:
-        logger.error(f"Error in update_user_roles: {str(e)}")
-        return False, str(e)
-
-def initialize_roles() -> bool:
-    """
-    Initialize default roles in the database
-    
-    Returns:
-        True if successful, False otherwise
-    """
-    try:
-        client = get_supabase_client()
-        if client:
-            # First, check if roles table exists
-            response = client.table('roles').select('name').execute()
-            
-            existing_roles = [r['name'] for r in response.data] if response.data else []
-            
-            # Add missing roles
-            for role_name in ALL_ROLES:
-                if role_name not in existing_roles:
-                    client.table('roles').insert({'name': role_name}).execute()
-            
-            logger.info(f"Roles initialized: {ALL_ROLES}")
-            return True
-        else:
-            # If Supabase is not available, use development fallback
-            if current_app.config.get('ENV') == 'development':
-                logger.warning("Development role initialization")
-                return True
-            
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.url or not self.key:
             return False
+        
+        # Get a client
+        client = get_connection(self.url, self.key)
+        
+        try:
+            # Sign out
+            client.auth.sign_out()
             
-    except Exception as e:
-        logger.error(f"Error in initialize_roles: {str(e)}")
-        return False
+            # Clear session
+            self.session_token = None
+            self.refresh_token = None
+            self.user_id = None
+            
+            # Return success
+            return True
+        except Exception as e:
+            logger.error(f'Error signing out user: {str(e)}')
+            return False
+        finally:
+            # Release the client
+            release_connection(client)
+    
+    def get_user(self) -> Optional[SupabaseUser]:
+        """
+        Get the current user.
+        
+        Returns:
+            User object if authenticated, None otherwise
+        """
+        if not self.url or not self.key:
+            return None
+        
+        # Get a client
+        client = get_connection(self.url, self.key)
+        
+        try:
+            # Get user
+            response = client.auth.get_user()
+            
+            # Check if successful
+            if response and response.user:
+                # Return user
+                return SupabaseUser(response.user.model_dump())
+            else:
+                # Return None
+                return None
+        except Exception as e:
+            logger.error(f'Error getting user: {str(e)}')
+            return None
+        finally:
+            # Release the client
+            release_connection(client)
+    
+    def get_session(self) -> Optional[Dict[str, Any]]:
+        """
+        Get the current session.
+        
+        Returns:
+            Session object if authenticated, None otherwise
+        """
+        if not self.url or not self.key:
+            return None
+        
+        # Get a client
+        client = get_connection(self.url, self.key)
+        
+        try:
+            # Get session
+            response = client.auth.get_session()
+            
+            # Check if successful
+            if response and response.session:
+                # Return session
+                return {
+                    'access_token': response.session.access_token,
+                    'expires_at': response.session.expires_at,
+                    'refresh_token': response.session.refresh_token
+                }
+            else:
+                # Return None
+                return None
+        except Exception as e:
+            logger.error(f'Error getting session: {str(e)}')
+            return None
+        finally:
+            # Release the client
+            release_connection(client)
+    
+    def refresh_session(self) -> bool:
+        """
+        Refresh the current session.
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.url or not self.key or not self.refresh_token:
+            return False
+        
+        # Get a client
+        client = get_connection(self.url, self.key)
+        
+        try:
+            # Refresh session
+            response = client.auth.refresh_session()
+            
+            # Check if successful
+            if response and response.session:
+                # Store session
+                self.session_token = response.session.access_token
+                self.refresh_token = response.session.refresh_token
+                
+                # Return success
+                return True
+            else:
+                # Return error
+                return False
+        except Exception as e:
+            logger.error(f'Error refreshing session: {str(e)}')
+            return False
+        finally:
+            # Release the client
+            release_connection(client)
+    
+    def reset_password(self, email: str) -> bool:
+        """
+        Reset a user's password.
+        
+        Args:
+            email: User email
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.url or not self.key:
+            return False
+        
+        # Get a client
+        client = get_connection(self.url, self.key)
+        
+        try:
+            # Reset password
+            client.auth.reset_password_email(email)
+            
+            # Return success
+            return True
+        except Exception as e:
+            logger.error(f'Error resetting password: {str(e)}')
+            return False
+        finally:
+            # Release the client
+            release_connection(client)
+    
+    def update_user(self, user_metadata: Dict[str, Any]) -> Tuple[bool, Dict[str, Any]]:
+        """
+        Update the current user's metadata.
+        
+        Args:
+            user_metadata: User metadata
+            
+        Returns:
+            Tuple of (success, data)
+        """
+        if not self.url or not self.key:
+            return False, {'error': 'Missing required environment variables: SUPABASE_URL, SUPABASE_KEY'}
+        
+        # Get a client
+        client = get_connection(self.url, self.key)
+        
+        try:
+            # Update user
+            response = client.auth.update_user({
+                'data': user_metadata
+            })
+            
+            # Check if successful
+            if response and response.user:
+                # Return success
+                return True, {'user': response.user.model_dump()}
+            else:
+                # Return error
+                return False, {'error': 'Failed to update user', 'user': None}
+        except Exception as e:
+            logger.error(f'Error updating user: {str(e)}')
+            return False, {'error': str(e)}
+        finally:
+            # Release the client
+            release_connection(client)
+    
+    def get_user_by_id(self, user_id: str) -> Optional[SupabaseUser]:
+        """
+        Get a user by ID.
+        
+        Args:
+            user_id: User ID
+            
+        Returns:
+            User object if found, None otherwise
+        """
+        if not self.url or not self.key:
+            return None
+        
+        # Get a client
+        client = get_connection(self.url, self.key)
+        
+        try:
+            # Get user
+            response = client.from_('users').select('*').eq('id', user_id).execute()
+            
+            # Check if successful
+            if response and response.data and len(response.data) > 0:
+                # Return user
+                return SupabaseUser(response.data[0])
+            else:
+                # Return None
+                return None
+        except Exception as e:
+            logger.error(f'Error getting user by ID: {str(e)}')
+            return None
+        finally:
+            # Release the client
+            release_connection(client)
+
+# Create a singleton instance
+supabase_auth = SupabaseAuth()
