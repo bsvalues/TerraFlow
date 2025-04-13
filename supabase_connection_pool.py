@@ -14,6 +14,7 @@ import time
 import logging
 import threading
 import queue
+import weakref
 from typing import Dict, Any, Optional, List, Callable, Tuple, Union
 
 # Configure logging
@@ -297,6 +298,41 @@ def with_connection(service_name: str):
                 return func(client, *args, **kwargs)
         return wrapper
     return decorator
+
+
+def get_supabase_client(service_name: str = "default") -> Optional[Client]:
+    """
+    Get a Supabase client from the connection pool.
+    
+    Args:
+        service_name: Name of the service (defaults to "default")
+        
+    Returns:
+        A Supabase client or None if unavailable
+    """
+    if not SUPABASE_AVAILABLE:
+        logger.error("Supabase package not installed")
+        return None
+    
+    pool = get_connection_pool(service_name)
+    conn = pool.get_connection()
+    
+    if conn:
+        client = conn.client
+        
+        # Create a finalizer to release the connection when the client is garbage collected
+        def release_callback(weak_conn=weakref.ref(conn)):
+            connection = weak_conn()
+            if connection:
+                connection.release()
+        
+        # Attach the connection and release method to the client
+        setattr(client, "_pooled_connection", conn)
+        setattr(client, "release", conn.release)
+        
+        return client
+    
+    return None
 
 
 def get_stats() -> Dict[str, Dict[str, Any]]:
