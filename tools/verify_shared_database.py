@@ -383,8 +383,17 @@ def check_service_connections() -> Tuple[int, int]:
     
     success_count = 0
     
+    # Try to import service client release function
+    service_client_release_available = False
+    try:
+        from service_supabase_client import release_service_supabase_client
+        service_client_release_available = True
+    except ImportError:
+        logger.warning("release_service_supabase_client not available, connections may not be properly closed")
+    
     # Check each service
     for service_name in SERVICE_ROLES:
+        client = None
         try:
             # Get client for service
             client = get_service_supabase_client(service_name)
@@ -403,6 +412,13 @@ def check_service_connections() -> Tuple[int, int]:
         except Exception as e:
             logger.error(f"Error checking service connection for {service_name}: {str(e)}")
             print_result(f"Service '{service_name}' connection failed", "fail")
+        finally:
+            # Clean up connection
+            if client and service_client_release_available:
+                try:
+                    release_service_supabase_client(client)
+                except Exception as release_error:
+                    logger.error(f"Error releasing service client for {service_name}: {str(release_error)}")
     
     return success_count, len(SERVICE_ROLES)
 
@@ -566,6 +582,7 @@ def main():
     parser = argparse.ArgumentParser(description="Verify shared Supabase database configuration")
     parser.add_argument("--url", "-u", help="Supabase URL")
     parser.add_argument("--key", "-k", help="Supabase service key")
+    parser.add_argument("--use-pool", "-p", action="store_true", help="Use connection pool instead of direct client")
     args = parser.parse_args()
     
     # Get Supabase credentials
@@ -579,15 +596,41 @@ def main():
         )
         return 1
     
-    # Get Supabase client
-    client = get_supabase_client(url, key)
-    if not client:
-        logger.error("Failed to create Supabase client")
-        return 1
+    client = None
+    try:
+        # Try to use connection pool if available and requested
+        if args.use_pool:
+            try:
+                # Import from parent directory
+                from supabase_client import get_supabase_client, release_supabase_client
+                client = get_supabase_client()
+                if not client:
+                    logger.error("Failed to get Supabase client from connection pool")
+                    return 1
+            except ImportError:
+                logger.warning("Connection pool not available, falling back to direct client")
+                client = get_supabase_client(url, key)
+        else:
+            # Get Supabase client directly
+            client = get_supabase_client(url, key)
+        
+        if not client:
+            logger.error("Failed to create Supabase client")
+            return 1
+        
+        # Run verification
+        run_verification(client)
+        return 0
     
-    # Run verification
-    run_verification(client)
-    return 0
+    finally:
+        # Release client if we're using the connection pool
+        if client and args.use_pool:
+            try:
+                release_supabase_client(client)
+                logger.info("Released Supabase client back to connection pool")
+            except (ImportError, NameError):
+                # If release_supabase_client isn't available, we didn't use the pool
+                pass
 
 if __name__ == "__main__":
     sys.exit(main())

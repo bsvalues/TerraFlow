@@ -16,6 +16,7 @@ from datetime import datetime
 from mcp.agents.base_agent import BaseAgent
 from supabase_client import (
     get_supabase_client,
+    release_supabase_client,
     execute_query,
     upload_file_to_storage,
     list_files_in_storage,
