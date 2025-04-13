@@ -255,14 +255,15 @@ class SupabaseAgent(BaseAgent):
             }
         
         # Get client
-        client = get_supabase_client()
-        if not client:
-            return {
-                "success": False,
-                "error": "Failed to get Supabase client"
-            }
-        
+        client = None
         try:
+            client = get_supabase_client()
+            if not client:
+                return {
+                    "success": False,
+                    "error": "Failed to get Supabase client"
+                }
+            
             response = client.from_(table).insert(data).execute()
             
             if hasattr(response, 'data'):
@@ -282,6 +283,14 @@ class SupabaseAgent(BaseAgent):
                 "success": False,
                 "error": f"Database insert error: {str(e)}"
             }
+        finally:
+            # Release client back to the pool
+            if client:
+                try:
+                    release_supabase_client(client)
+                except Exception as release_error:
+                    self.logger.error(f"Error releasing Supabase client: {str(release_error)}")
+                    # Continue execution even if release fails
     
     def _handle_db_update(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -313,14 +322,15 @@ class SupabaseAgent(BaseAgent):
             }
         
         # Get client
-        client = get_supabase_client()
-        if not client:
-            return {
-                "success": False,
-                "error": "Failed to get Supabase client"
-            }
-        
+        client = None
         try:
+            client = get_supabase_client()
+            if not client:
+                return {
+                    "success": False,
+                    "error": "Failed to get Supabase client"
+                }
+            
             query = client.from_(table).update(data)
             
             # Apply filters
@@ -372,6 +382,14 @@ class SupabaseAgent(BaseAgent):
                 "success": False,
                 "error": f"Database update error: {str(e)}"
             }
+        finally:
+            # Release client back to the pool
+            if client:
+                try:
+                    release_supabase_client(client)
+                except Exception as release_error:
+                    self.logger.error(f"Error releasing Supabase client: {str(release_error)}")
+                    # Continue execution even if release fails
     
     def _handle_db_delete(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -401,14 +419,15 @@ class SupabaseAgent(BaseAgent):
             }
         
         # Get client
-        client = get_supabase_client()
-        if not client:
-            return {
-                "success": False,
-                "error": "Failed to get Supabase client"
-            }
-        
+        client = None
         try:
+            client = get_supabase_client()
+            if not client:
+                return {
+                    "success": False,
+                    "error": "Failed to get Supabase client"
+                }
+            
             query = client.from_(table).delete()
             
             # Apply filters
@@ -460,6 +479,14 @@ class SupabaseAgent(BaseAgent):
                 "success": False,
                 "error": f"Database delete error: {str(e)}"
             }
+        finally:
+            # Release client back to the pool
+            if client:
+                try:
+                    release_supabase_client(client)
+                except Exception as release_error:
+                    self.logger.error(f"Error releasing Supabase client: {str(release_error)}")
+                    # Continue execution even if release fails
     
     # Storage Operations
     
@@ -688,14 +715,15 @@ class SupabaseAgent(BaseAgent):
         Returns:
             Auth status
         """
-        client = get_supabase_client()
-        if not client:
-            return {
-                "success": False,
-                "error": "Failed to get Supabase client"
-            }
-        
+        client = None
         try:
+            client = get_supabase_client()
+            if not client:
+                return {
+                    "success": False,
+                    "error": "Failed to get Supabase client"
+                }
+            
             # Get the auth status - just check if we can access the client's auth property
             has_auth = hasattr(client, 'auth')
             
@@ -710,6 +738,14 @@ class SupabaseAgent(BaseAgent):
                 "success": False,
                 "error": f"Auth check error: {str(e)}"
             }
+        finally:
+            # Release client back to the pool
+            if client:
+                try:
+                    release_supabase_client(client)
+                except Exception as release_error:
+                    self.logger.error(f"Error releasing Supabase client: {str(release_error)}")
+                    # Continue execution even if release fails
     
     # Status Operations
     
@@ -730,84 +766,100 @@ class SupabaseAgent(BaseAgent):
         check_auth = parameters.get("check_auth", True)
         check_database = parameters.get("check_database", True)
         
-        client = get_supabase_client()
-        if not client:
-            return {
-                "success": False,
-                "error": "Failed to get Supabase client"
-            }
-        
-        results = {
-            "success": True,
-            "status": "operational",
-            "checks": {}
-        }
-        
-        # Check database if requested
-        if check_database:
-            try:
-                # Simple query to check database availability
-                response = client.from_('information_schema.tables').select('table_name').limit(1).execute()
-                
-                results["checks"]["database"] = {
-                    "status": "operational" if hasattr(response, 'data') else "issue",
-                    "error": None
+        client = None
+        try:
+            client = get_supabase_client()
+            if not client:
+                return {
+                    "success": False,
+                    "error": "Failed to get Supabase client"
                 }
-            except Exception as e:
-                self.logger.warning(f"Database check failed: {str(e)}")
-                results["checks"]["database"] = {
-                    "status": "issue",
-                    "error": str(e)
-                }
-        
-        # Check storage buckets if requested
-        if check_buckets:
-            results["checks"]["buckets"] = {}
             
-            for bucket_name in self.buckets.keys():
+            results = {
+                "success": True,
+                "status": "operational",
+                "checks": {}
+            }
+            
+            # Check database if requested
+            if check_database:
                 try:
-                    response = client.storage.get_bucket(bucket_name)
-                    results["checks"]["buckets"][bucket_name] = {
-                        "status": "exists",
+                    # Simple query to check database availability
+                    response = client.from_('information_schema.tables').select('table_name').limit(1).execute()
+                    
+                    results["checks"]["database"] = {
+                        "status": "operational" if hasattr(response, 'data') else "issue",
                         "error": None
                     }
                 except Exception as e:
-                    results["checks"]["buckets"][bucket_name] = {
-                        "status": "missing",
+                    self.logger.warning(f"Database check failed: {str(e)}")
+                    results["checks"]["database"] = {
+                        "status": "issue",
                         "error": str(e)
                     }
-        
-        # Check auth if requested
-        if check_auth:
-            try:
-                # Just check if auth is available
-                has_auth = hasattr(client, 'auth')
-                results["checks"]["auth"] = {
-                    "status": "operational" if has_auth else "not_configured",
-                    "error": None if has_auth else "Auth not available"
-                }
-            except Exception as e:
-                results["checks"]["auth"] = {
-                    "status": "issue",
-                    "error": str(e)
-                }
-        
-        # If any check has issues, update the overall status
-        for check_type, check_data in results["checks"].items():
-            if isinstance(check_data, dict) and check_data.get("status") != "operational" and check_data.get("status") != "exists":
-                if check_type == "buckets":
-                    # For buckets, only set issue if all buckets have issues
-                    all_issue = True
-                    for bucket_status in check_data.values():
-                        if bucket_status.get("status") == "exists":
-                            all_issue = False
-                            break
-                    if all_issue:
+            
+            # Check storage buckets if requested
+            if check_buckets:
+                results["checks"]["buckets"] = {}
+                
+                for bucket_name in self.buckets.keys():
+                    try:
+                        response = client.storage.get_bucket(bucket_name)
+                        results["checks"]["buckets"][bucket_name] = {
+                            "status": "exists",
+                            "error": None
+                        }
+                    except Exception as e:
+                        results["checks"]["buckets"][bucket_name] = {
+                            "status": "missing",
+                            "error": str(e)
+                        }
+            
+            # Check auth if requested
+            if check_auth:
+                try:
+                    # Just check if auth is available
+                    has_auth = hasattr(client, 'auth')
+                    results["checks"]["auth"] = {
+                        "status": "operational" if has_auth else "not_configured",
+                        "error": None if has_auth else "Auth not available"
+                    }
+                except Exception as e:
+                    results["checks"]["auth"] = {
+                        "status": "issue",
+                        "error": str(e)
+                    }
+            
+            # If any check has issues, update the overall status
+            for check_type, check_data in results["checks"].items():
+                if isinstance(check_data, dict) and check_data.get("status") != "operational" and check_data.get("status") != "exists":
+                    if check_type == "buckets":
+                        # For buckets, only set issue if all buckets have issues
+                        all_issue = True
+                        for bucket_status in check_data.values():
+                            if bucket_status.get("status") == "exists":
+                                all_issue = False
+                                break
+                        if all_issue:
+                            results["status"] = "issue"
+                    else:
                         results["status"] = "issue"
-                else:
-                    results["status"] = "issue"
-        
-        return results
+            
+            return results
+        except Exception as e:
+            self.logger.error(f"Status check error: {str(e)}")
+            return {
+                "success": False,
+                "error": f"Status check error: {str(e)}"
+            }
+        finally:
+            # Release client back to the pool
+            if client:
+                try:
+                    release_supabase_client(client)
+                except Exception as release_error:
+                    self.logger.error(f"Error releasing Supabase client: {str(release_error)}")
+                    # Continue execution even if release fails
     
     def _check_supabase_config(self) -> bool:
         """
@@ -893,14 +945,15 @@ class SupabaseAgent(BaseAgent):
     
     def _get_database_info(self) -> Dict[str, Any]:
         """Get information about the Supabase database"""
-        client = get_supabase_client()
-        if not client:
-            return {
-                "success": False,
-                "error": "Failed to get Supabase client"
-            }
-        
+        client = None
         try:
+            client = get_supabase_client()
+            if not client:
+                return {
+                    "success": False,
+                    "error": "Failed to get Supabase client"
+                }
+            
             # Get information about tables
             response = client.from_('information_schema.tables').select('table_name, table_schema').execute()
             
@@ -932,17 +985,26 @@ class SupabaseAgent(BaseAgent):
                 "success": False,
                 "error": f"Error fetching database info: {str(e)}"
             }
+        finally:
+            # Release client back to the pool
+            if client:
+                try:
+                    release_supabase_client(client)
+                except Exception as release_error:
+                    self.logger.error(f"Error releasing Supabase client: {str(release_error)}")
+                    # Continue execution even if release fails
     
     def _get_storage_info(self) -> Dict[str, Any]:
         """Get information about Supabase storage buckets"""
-        client = get_supabase_client()
-        if not client:
-            return {
-                "success": False,
-                "error": "Failed to get Supabase client"
-            }
-        
+        client = None
         try:
+            client = get_supabase_client()
+            if not client:
+                return {
+                    "success": False,
+                    "error": "Failed to get Supabase client"
+                }
+            
             buckets_info = {}
             
             for bucket_name, config in self.buckets.items():
@@ -978,3 +1040,11 @@ class SupabaseAgent(BaseAgent):
                 "success": False,
                 "error": f"Error fetching storage info: {str(e)}"
             }
+        finally:
+            # Release client back to the pool
+            if client:
+                try:
+                    release_supabase_client(client)
+                except Exception as release_error:
+                    self.logger.error(f"Error releasing Supabase client: {str(release_error)}")
+                    # Continue execution even if release fails
