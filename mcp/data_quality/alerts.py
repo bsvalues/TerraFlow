@@ -485,10 +485,46 @@ class DataQualityAlertManager:
     
     def _load_alerts(self):
         """Load alerts from database"""
+        client = None
         try:
-            # Example implementation - in a real system, this would load from database
-            # For now, we'll create a few sample alerts for testing
+            # Get a Supabase client from the connection pool
+            from supabase_client import get_supabase_client
+            client = get_supabase_client()
             
+            if not client:
+                logger.error("Failed to get Supabase client")
+                # Fallback to sample alerts if we can't get a client
+                self._load_sample_alerts()
+                return
+                
+            # Query the data_quality.alerts table to load saved alerts
+            response = client.table('data_quality.alerts').select('*').execute()
+            
+            if response.data:
+                # Convert data to alert objects
+                for alert_data in response.data:
+                    alert = QualityAlert.from_dict(alert_data)
+                    self.alerts[alert.id] = alert
+                
+                logger.info(f"Loaded {len(self.alerts)} quality alerts from database")
+            else:
+                # If no alerts exist, load sample alerts
+                self._load_sample_alerts()
+        
+        except Exception as e:
+            logger.error(f"Error loading quality alerts: {str(e)}")
+            # Fallback to sample alerts
+            self._load_sample_alerts()
+        
+        finally:
+            # Release the Supabase client back to the connection pool
+            if client:
+                from supabase_client import release_supabase_client
+                release_supabase_client(client)
+    
+    def _load_sample_alerts(self):
+        """Load sample alerts for testing"""
+        try:
             # Open space valuation alerting on very low values
             open_space_alert = QualityAlert(
                 name="Open Space Valuation Check",
@@ -522,20 +558,45 @@ class DataQualityAlertManager:
             self.alerts[open_space_alert.id] = open_space_alert
             self.alerts[missing_data_alert.id] = missing_data_alert
             
-            logger.info(f"Loaded {len(self.alerts)} quality alerts")
+            logger.info(f"Loaded {len(self.alerts)} sample quality alerts")
         
         except Exception as e:
-            logger.error(f"Error loading quality alerts: {str(e)}")
+            logger.error(f"Error loading sample quality alerts: {str(e)}")
     
     def _save_alerts(self):
         """Save alerts to database"""
+        client = None
         try:
-            # Example implementation - in a real system, this would save to database
-            # For now, we'll just log the operation
-            logger.info(f"Saved {len(self.alerts)} quality alerts (simulation)")
+            # Get a Supabase client from the connection pool
+            from supabase_client import get_supabase_client
+            client = get_supabase_client()
+            
+            if not client:
+                logger.error("Failed to get Supabase client")
+                return False
+            
+            # Prepare data for database
+            alert_data = [alert.to_dict() for alert in self.alerts.values()]
+            
+            # Save to Supabase - first delete all existing alerts
+            client.table('data_quality.alerts').delete().neq('id', 'dummy_id').execute()
+            
+            # Then insert all current alerts if there are any
+            if alert_data:
+                client.table('data_quality.alerts').insert(alert_data).execute()
+            
+            logger.info(f"Saved {len(self.alerts)} quality alerts to database")
+            return True
         
         except Exception as e:
             logger.error(f"Error saving quality alerts: {str(e)}")
+            return False
+        
+        finally:
+            # Release the Supabase client back to the connection pool
+            if client:
+                from supabase_client import release_supabase_client
+                release_supabase_client(client)
 
 # Singleton instance
 alert_manager = DataQualityAlertManager()
