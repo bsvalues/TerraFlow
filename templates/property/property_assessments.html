@@ -1,11 +1,21 @@
-{% extends "base.html" %}
+{% extends "layout.html" %}
 
-{% block title %}Property Assessments{% endblock %}
+{% block title %}Property Assessments - {{ property.parcel_id }} - GeoAssessmentPro{% endblock %}
 
-{% block styles %}
+{% block additionalcss %}
 <style>
+    .assessment-header {
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    
     .assessment-card {
-        transition: transform 0.2s;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        transition: transform 0.3s ease;
     }
     
     .assessment-card:hover {
@@ -13,235 +23,256 @@
         box-shadow: 0 10px 20px rgba(0,0,0,0.1);
     }
     
-    .status-badge {
-        position: absolute;
-        top: 10px;
-        right: 10px;
+    .assessment-card .card-header {
+        background-color: #f8f9fa;
+        border-top-left-radius: 10px;
+        border-top-right-radius: 10px;
+        font-weight: 600;
     }
     
-    .assessment-chart {
+    .assessment-value {
+        font-size: 1.2rem;
+        font-weight: 600;
+    }
+    
+    .chart-container {
         height: 300px;
+        margin-bottom: 20px;
     }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h1 class="mb-1">Property Assessments</h1>
-            <p class="text-muted mb-0">{{ property.address or 'Property' }} | Parcel ID: {{ property.parcel_id }}</p>
-        </div>
-        
-        <div class="d-flex">
-            <a href="{{ url_for('property.property_detail', property_id=property.id) }}" class="btn btn-outline-secondary me-2">
-                <i class="bi bi-arrow-left"></i> Back to Property
-            </a>
-            
-            {% if has_role('admin') or has_role('editor') %}
-            <a href="{{ url_for('property.assessment_create', property_id=property.id) }}" class="btn btn-primary">
-                <i class="bi bi-plus-circle"></i> Add Assessment
-            </a>
-            {% endif %}
+    <!-- Breadcrumb Navigation -->
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Home</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('property.property_list') }}">Properties</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('property.property_detail', property_id=property.id) }}">{{ property.parcel_id }}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Assessments</li>
+        </ol>
+    </nav>
+    
+    <!-- Assessment Header -->
+    <div class="assessment-header">
+        <div class="row">
+            <div class="col-md-8">
+                <h1 class="h2">
+                    <i class="fas fa-chart-line me-2"></i> Property Assessments
+                </h1>
+                <h2 class="h4 text-muted">
+                    Parcel ID: {{ property.parcel_id }}
+                    {% if property.account_number %}
+                    <span class="ms-3 small text-muted">Account #: {{ property.account_number }}</span>
+                    {% endif %}
+                </h2>
+                <p class="lead">
+                    {{ property.address }}, {{ property.city }}, {{ property.state }} {{ property.zip_code }}
+                </p>
+            </div>
+            <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                {% if has_permission('property.assessment.create') %}
+                <a href="{{ url_for('property.assessment_create', property_id=property.id) }}" class="btn btn-primary">
+                    <i class="fas fa-plus-circle me-1"></i> Add Assessment
+                </a>
+                {% endif %}
+                
+                <a href="{{ url_for('property.property_detail', property_id=property.id) }}" class="btn btn-outline-secondary ms-2">
+                    <i class="fas fa-arrow-left me-1"></i> Back to Property
+                </a>
+            </div>
         </div>
     </div>
     
-    <!-- Flash Messages -->
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, message in messages %}
-                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            {% endfor %}
-        {% endif %}
-    {% endwith %}
-    
+    <!-- Content Area -->
     <div class="row">
-        <div class="col-md-8">
-            <div class="card mb-4">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0">Assessment History</h5>
+        <!-- Left Column: Assessment List -->
+        <div class="col-lg-7">
+            <h3 class="h4 mb-3">Assessment History</h3>
+            
+            <!-- No Assessments Placeholder -->
+            {% if not assessments or assessments|length == 0 %}
+            <div class="text-center py-5 border rounded bg-light">
+                <i class="fas fa-chart-bar fa-3x text-muted mb-3"></i>
+                <h4>No Assessments Found</h4>
+                <p class="text-muted">This property does not have any assessment records yet.</p>
+                {% if has_permission('property.assessment.create') %}
+                <a href="{{ url_for('property.assessment_create', property_id=property.id) }}" class="btn btn-primary mt-2">
+                    <i class="fas fa-plus-circle me-1"></i> Add First Assessment
+                </a>
+                {% endif %}
+            </div>
+            {% else %}
+            
+            <!-- Assessment Cards -->
+            {% for assessment in assessments %}
+            <div class="card assessment-card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="fas fa-calendar me-2"></i> Tax Year {{ assessment.tax_year }}
+                        <span class="badge {% if assessment.assessment_status == 'completed' %}bg-success{% elif assessment.assessment_status == 'pending' %}bg-warning text-dark{% else %}bg-info{% endif %} ms-2">
+                            {{ assessment.assessment_status|title }}
+                        </span>
+                    </div>
+                    <div class="btn-group btn-group-sm">
+                        {% if has_permission('property.assessment.edit') %}
+                        <a href="{{ url_for('property.assessment_edit', property_id=property.id, assessment_id=assessment.id) }}" class="btn btn-outline-primary">
+                            <i class="fas fa-edit"></i>
+                        </a>
+                        {% endif %}
+                        
+                        {% if has_permission('property.assessment.delete') %}
+                        <button type="button" class="btn btn-outline-danger" 
+                                data-bs-toggle="modal" 
+                                data-bs-target="#deleteModal" 
+                                data-assessment-id="{{ assessment.id }}"
+                                data-tax-year="{{ assessment.tax_year }}">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                        {% endif %}
+                    </div>
                 </div>
                 <div class="card-body">
-                    {% if assessments %}
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Tax Year</th>
-                                        <th>Assessment Date</th>
-                                        <th>Land Value</th>
-                                        <th>Improvement Value</th>
-                                        <th>Total Value</th>
-                                        <th>Status</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for assessment in assessments|sort(attribute='tax_year', reverse=True) %}
-                                        <tr>
-                                            <td>{{ assessment.tax_year }}</td>
-                                            <td>{{ assessment.assessment_date|dateformat if assessment.assessment_date else 'N/A' }}</td>
-                                            <td>${{ assessment.land_value|default(0)|round(2)|commaformat }}</td>
-                                            <td>${{ assessment.improvement_value|default(0)|round(2)|commaformat }}</td>
-                                            <td>${{ assessment.total_value|default(0)|round(2)|commaformat }}</td>
-                                            <td>
-                                                {% if assessment.assessment_status == 'approved' %}
-                                                <span class="badge bg-success">Approved</span>
-                                                {% elif assessment.assessment_status == 'pending' %}
-                                                <span class="badge bg-warning">Pending</span>
-                                                {% elif assessment.assessment_status == 'rejected' %}
-                                                <span class="badge bg-danger">Rejected</span>
-                                                {% else %}
-                                                <span class="badge bg-secondary">{{ assessment.assessment_status|capitalize }}</span>
-                                                {% endif %}
-                                            </td>
-                                            <td>
-                                                <div class="btn-group btn-group-sm">
-                                                    {% if has_role('admin') or has_role('editor') %}
-                                                    <a href="{{ url_for('property.assessment_edit', property_id=property.id, assessment_id=assessment.id) }}" class="btn btn-outline-primary">
-                                                        <i class="bi bi-pencil"></i>
-                                                    </a>
-                                                    <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteAssessmentModal" data-assessment-id="{{ assessment.id }}" data-assessment-year="{{ assessment.tax_year }}">
-                                                        <i class="bi bi-trash"></i>
-                                                    </button>
-                                                    {% else %}
-                                                    <a href="javascript:void(0)" class="btn btn-outline-secondary disabled">
-                                                        <i class="bi bi-eye"></i> View Only
-                                                    </a>
-                                                    {% endif %}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p class="mb-1">
+                                <strong class="text-muted">Assessment Date:</strong> 
+                                {{ assessment.assessment_date|dateformat or 'Not specified' }}
+                            </p>
+                            <p class="mb-1">
+                                <strong class="text-muted">Type:</strong>
+                                {{ assessment.assessment_type|title or 'Standard' }}
+                            </p>
+                            {% if assessment.notes %}
+                            <p class="mb-1">
+                                <strong class="text-muted">Notes:</strong>
+                                {{ assessment.notes }}
+                            </p>
+                            {% endif %}
                         </div>
-                    {% else %}
-                        <div class="alert alert-info">
-                            No assessments have been recorded for this property yet.
+                        <div class="col-md-6">
+                            <p class="mb-1">
+                                <strong class="text-muted">Land Value:</strong>
+                                <span class="assessment-value text-success">{{ assessment.land_value|format_currency or '$0' }}</span>
+                            </p>
+                            <p class="mb-1">
+                                <strong class="text-muted">Improvement Value:</strong>
+                                <span class="assessment-value text-primary">{{ assessment.improvement_value|format_currency or '$0' }}</span>
+                            </p>
+                            <p class="mb-1">
+                                <strong class="text-muted">Exemption Value:</strong>
+                                <span class="assessment-value text-warning">{{ assessment.exemption_value|format_currency or '$0' }}</span>
+                            </p>
+                            <p class="mb-1">
+                                <strong class="text-muted">Taxable Value:</strong>
+                                <span class="assessment-value text-danger">{{ assessment.taxable_value|format_currency or '$0' }}</span>
+                            </p>
+                            <p class="mb-1">
+                                <strong class="text-muted">Total Value:</strong>
+                                <span class="assessment-value">{{ assessment.total_value|format_currency or '$0' }}</span>
+                            </p>
                         </div>
-                    {% endif %}
+                    </div>
                 </div>
             </div>
+            {% endfor %}
+            {% endif %}
         </div>
         
-        <div class="col-md-4">
+        <!-- Right Column: Charts and Summary -->
+        <div class="col-lg-5">
+            {% if assessments and assessments|length > 0 %}
+            <!-- Value Trend Chart -->
             <div class="card mb-4">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0">Property Value Trend</h5>
+                <div class="card-header">
+                    <i class="fas fa-chart-line me-2"></i> Value Trend
                 </div>
                 <div class="card-body">
-                    {% if assessments %}
-                        <canvas id="valueTrendChart" class="assessment-chart"></canvas>
-                    {% else %}
-                        <div class="alert alert-info">
-                            No assessment data available to display trends.
-                        </div>
-                    {% endif %}
+                    <div class="chart-container">
+                        <canvas id="valueTrendChart"></canvas>
+                    </div>
                 </div>
             </div>
             
+            <!-- Value Distribution Chart -->
             <div class="card mb-4">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0">Current Year Summary</h5>
+                <div class="card-header">
+                    <i class="fas fa-chart-pie me-2"></i> Latest Value Distribution
                 </div>
                 <div class="card-body">
-                    {% set current_year = now().year %}
-                    {% set current_assessment = none %}
-                    {% for assessment in assessments %}
-                        {% if assessment.tax_year == current_year %}
-                            {% set current_assessment = assessment %}
-                        {% endif %}
-                    {% endfor %}
-                    
-                    {% if current_assessment %}
-                        <div class="mb-3">
-                            <span class="badge 
-                                {% if current_assessment.assessment_status == 'approved' %}bg-success
-                                {% elif current_assessment.assessment_status == 'pending' %}bg-warning
-                                {% elif current_assessment.assessment_status == 'rejected' %}bg-danger
-                                {% else %}bg-secondary{% endif %} mb-2">
-                                {{ current_assessment.assessment_status|capitalize }}
-                            </span>
-                            <h4 class="mb-0">${{ current_assessment.total_value|default(0)|round(2)|commaformat }}</h4>
-                            <p class="text-muted">Total Assessed Value</p>
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-6">
-                                <div class="mb-3">
-                                    <h5 class="mb-0">${{ current_assessment.land_value|default(0)|round(2)|commaformat }}</h5>
-                                    <p class="text-muted">Land Value</p>
-                                </div>
-                            </div>
-                            <div class="col-6">
-                                <div class="mb-3">
-                                    <h5 class="mb-0">${{ current_assessment.improvement_value|default(0)|round(2)|commaformat }}</h5>
-                                    <p class="text-muted">Improvement Value</p>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-6">
-                                <div class="mb-3">
-                                    <h5 class="mb-0">${{ current_assessment.exemption_value|default(0)|round(2)|commaformat }}</h5>
-                                    <p class="text-muted">Exemptions</p>
-                                </div>
-                            </div>
-                            <div class="col-6">
-                                <div class="mb-3">
-                                    <h5 class="mb-0">${{ current_assessment.taxable_value|default(0)|round(2)|commaformat }}</h5>
-                                    <p class="text-muted">Taxable Value</p>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        {% if current_assessment.notes %}
-                        <div class="mt-3">
-                            <h6>Notes:</h6>
-                            <p class="mb-0">{{ current_assessment.notes }}</p>
-                        </div>
-                        {% endif %}
-                    {% else %}
-                        <div class="alert alert-info">
-                            No assessment for the current tax year ({{ current_year }}).
-                        </div>
-                        
-                        {% if has_role('admin') or has_role('editor') %}
-                        <div class="d-grid">
-                            <a href="{{ url_for('property.assessment_create', property_id=property.id) }}" class="btn btn-primary">
-                                <i class="bi bi-plus-circle"></i> Add {{ current_year }} Assessment
-                            </a>
-                        </div>
-                        {% endif %}
-                    {% endif %}
+                    <div class="chart-container">
+                        <canvas id="valueDistributionChart"></canvas>
+                    </div>
                 </div>
             </div>
+            
+            <!-- Assessment Summary -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="fas fa-info-circle me-2"></i> Assessment Summary
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-6">
+                            <p class="mb-1"><strong class="text-muted">Total Assessments:</strong></p>
+                            <p class="h4 mb-3">{{ assessments|length }}</p>
+                        </div>
+                        <div class="col-6">
+                            <p class="mb-1"><strong class="text-muted">Latest Tax Year:</strong></p>
+                            <p class="h4 mb-3">{{ latest_assessment.tax_year if latest_assessment else 'N/A' }}</p>
+                        </div>
+                        <div class="col-12">
+                            <p class="mb-1"><strong class="text-muted">Value Change (Latest vs Previous):</strong></p>
+                            {% if assessments|length > 1 %}
+                            {% set current = latest_assessment.total_value|float or 0 %}
+                            {% set previous = second_latest_assessment.total_value|float or 0 %}
+                            {% if previous > 0 %}
+                            {% set percent_change = ((current - previous) / previous * 100)|round(2) %}
+                            <p class="h4 {% if percent_change > 0 %}text-success{% elif percent_change < 0 %}text-danger{% else %}text-muted{% endif %}">
+                                {% if percent_change > 0 %}+{% endif %}{{ percent_change }}%
+                                <small class="text-muted">({{ (current - previous)|format_currency }})</small>
+                            </p>
+                            {% else %}
+                            <p class="h4 text-muted">N/A</p>
+                            {% endif %}
+                            {% else %}
+                            <p class="h4 text-muted">N/A</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>
 
 <!-- Delete Assessment Modal -->
-{% if has_role('admin') or has_role('editor') %}
-<div class="modal fade" id="deleteAssessmentModal" tabindex="-1" aria-labelledby="deleteAssessmentModalLabel" aria-hidden="true">
+{% if has_permission('property.assessment.delete') %}
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title" id="deleteAssessmentModalLabel">Confirm Delete</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title" id="deleteModalLabel">
+                    <i class="fas fa-exclamation-triangle me-2"></i> Delete Assessment
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <p>Are you sure you want to delete this assessment? This action cannot be undone.</p>
-                <p><strong>Tax Year:</strong> <span id="deleteTaxYear"></span></p>
+                <p>Are you sure you want to delete the assessment for tax year <span id="deleteTaxYear"></span>?</p>
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-circle me-2"></i> This action cannot be undone. The assessment data will be permanently deleted.
+                </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <form id="deleteAssessmentForm" method="POST" action="">
-                    <button type="submit" class="btn btn-danger">Delete Assessment</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-1"></i> Cancel
+                </button>
+                <form id="deleteForm" method="post" action="">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash-alt me-1"></i> Delete Assessment
+                    </button>
                 </form>
             </div>
         </div>
@@ -251,100 +282,152 @@
 {% endblock %}
 
 {% block scripts %}
+{% if assessments and assessments|length > 0 %}
+<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        {% if assessments %}
-        // Extract assessment data for the chart
-        const assessmentData = {{ assessments|tojson }};
+        // Prepare data for charts
+        const assessments = {{ assessments|to_json }};
         
-        // Sort by tax year
-        assessmentData.sort((a, b) => a.tax_year - b.tax_year);
+        // Sort assessments by tax year
+        assessments.sort((a, b) => a.tax_year - b.tax_year);
         
-        // Extract years and values
-        const years = assessmentData.map(assessment => assessment.tax_year);
-        const landValues = assessmentData.map(assessment => assessment.land_value || 0);
-        const improvementValues = assessmentData.map(assessment => assessment.improvement_value || 0);
-        const totalValues = assessmentData.map(assessment => assessment.total_value || 0);
+        // Extract data for trend chart
+        const years = assessments.map(a => a.tax_year);
+        const landValues = assessments.map(a => a.land_value || 0);
+        const improvementValues = assessments.map(a => a.improvement_value || 0);
+        const totalValues = assessments.map(a => a.total_value || 0);
         
-        // Create the chart
-        const ctx = document.getElementById('valueTrendChart').getContext('2d');
-        new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: years,
-                datasets: [
-                    {
-                        label: 'Total Value',
-                        data: totalValues,
-                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                        borderColor: 'rgba(54, 162, 235, 1)',
-                        borderWidth: 2,
-                        tension: 0.1
-                    },
-                    {
-                        label: 'Land Value',
-                        data: landValues,
-                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                        borderColor: 'rgba(75, 192, 192, 1)',
-                        borderWidth: 2,
-                        tension: 0.1
-                    },
-                    {
-                        label: 'Improvement Value',
-                        data: improvementValues,
-                        backgroundColor: 'rgba(255, 159, 64, 0.2)',
-                        borderColor: 'rgba(255, 159, 64, 1)',
-                        borderWidth: 2,
-                        tension: 0.1
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            callback: function(value) {
-                                return '$' + value.toLocaleString();
+        // Value Trend Chart
+        const valueTrendChart = new Chart(
+            document.getElementById('valueTrendChart'),
+            {
+                type: 'line',
+                data: {
+                    labels: years,
+                    datasets: [
+                        {
+                            label: 'Total Value',
+                            data: totalValues,
+                            borderColor: '#6610f2',
+                            backgroundColor: '#6610f2',
+                            borderWidth: 3,
+                            tension: 0.2
+                        },
+                        {
+                            label: 'Land Value',
+                            data: landValues,
+                            borderColor: '#198754',
+                            backgroundColor: '#198754',
+                            borderWidth: 2,
+                            tension: 0.2
+                        },
+                        {
+                            label: 'Improvement Value',
+                            data: improvementValues,
+                            borderColor: '#0d6efd',
+                            backgroundColor: '#0d6efd',
+                            borderWidth: 2,
+                            tension: 0.2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                // Format as currency
+                                callback: function(value) {
+                                    return '$' + value.toLocaleString();
+                                }
                             }
                         }
-                    }
-                },
-                plugins: {
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                let label = context.dataset.label || '';
-                                if (label) {
-                                    label += ': ';
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed.y !== null) {
+                                        label += new Intl.NumberFormat('en-US', {
+                                            style: 'currency',
+                                            currency: 'USD'
+                                        }).format(context.parsed.y);
+                                    }
+                                    return label;
                                 }
-                                if (context.parsed.y !== null) {
-                                    label += '$' + context.parsed.y.toLocaleString();
-                                }
-                                return label;
                             }
                         }
                     }
                 }
             }
-        });
-        {% endif %}
+        );
         
-        // Handle delete modal
-        const deleteModal = document.getElementById('deleteAssessmentModal');
+        // Get latest assessment for pie chart
+        const latestAssessment = assessments[assessments.length - 1];
+        
+        // Value Distribution Chart
+        const valueDistributionChart = new Chart(
+            document.getElementById('valueDistributionChart'),
+            {
+                type: 'pie',
+                data: {
+                    labels: ['Land Value', 'Improvement Value'],
+                    datasets: [{
+                        data: [
+                            latestAssessment.land_value || 0,
+                            latestAssessment.improvement_value || 0
+                        ],
+                        backgroundColor: ['#198754', '#0d6efd'],
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const value = context.raw;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = Math.round((value / total) * 100);
+                                    
+                                    return `${context.label}: ${new Intl.NumberFormat('en-US', {
+                                        style: 'currency',
+                                        currency: 'USD'
+                                    }).format(value)} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        );
+        
+        // Set up delete modal
+        const deleteModal = document.getElementById('deleteModal');
         if (deleteModal) {
             deleteModal.addEventListener('show.bs.modal', function(event) {
                 const button = event.relatedTarget;
                 const assessmentId = button.getAttribute('data-assessment-id');
-                const taxYear = button.getAttribute('data-assessment-year');
+                const taxYear = button.getAttribute('data-tax-year');
                 
-                document.getElementById('deleteTaxYear').textContent = taxYear;
-                document.getElementById('deleteAssessmentForm').action = `{{ url_for('property.property_assessments', property_id=property.id) }}`.replace('assessments', `assessments/${assessmentId}/delete`);
+                const deleteForm = document.getElementById('deleteForm');
+                const deleteTaxYear = document.getElementById('deleteTaxYear');
+                
+                deleteForm.action = `{{ url_for('property.assessment_delete', property_id=property.id, assessment_id='') }}${assessmentId}`;
+                deleteTaxYear.textContent = taxYear;
             });
         }
     });
 </script>
+{% endif %}
 {% endblock %}

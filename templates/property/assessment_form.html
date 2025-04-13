@@ -1,174 +1,213 @@
-{% extends "base.html" %}
+{% extends "layout.html" %}
 
-{% block title %}{{ assessment.id and 'Edit Assessment' or 'Add Assessment' }}{% endblock %}
+{% block title %}{% if assessment.id %}Edit{% else %}New{% endif %} Assessment - GeoAssessmentPro{% endblock %}
 
-{% block styles %}
+{% block additionalcss %}
 <style>
     .form-section {
-        margin-bottom: 2rem;
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
     }
     
-    .section-header {
-        margin-bottom: 1rem;
-        padding-bottom: 0.5rem;
-        border-bottom: 1px solid #dee2e6;
+    .section-title {
+        font-size: 1.2rem;
+        font-weight: 600;
+        margin-bottom: 20px;
+        color: #495057;
     }
     
-    .required-field label::after {
-        content: " *";
+    .form-label {
+        font-weight: 500;
+    }
+    
+    .required-field::after {
+        content: "*";
         color: #dc3545;
+        margin-left: 4px;
     }
     
-    .status-badge {
-        padding: 0.5rem 1rem;
-        font-size: 1rem;
+    .form-text {
+        font-size: 0.8rem;
     }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h1 class="mb-1">{{ assessment.id and 'Edit Assessment' or 'Add Assessment' }}</h1>
-            <p class="text-muted mb-0">{{ property.address or 'Property' }} | Parcel ID: {{ property.parcel_id }}</p>
+    <!-- Breadcrumb Navigation -->
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Home</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('property.property_list') }}">Properties</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('property.property_detail', property_id=property.id) }}">{{ property.parcel_id }}</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('property.property_assessments', property_id=property.id) }}">Assessments</a></li>
+            <li class="breadcrumb-item active" aria-current="page">
+                {% if assessment.id %}Edit Assessment{% else %}New Assessment{% endif %}
+            </li>
+        </ol>
+    </nav>
+    
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="display-5">
+                <i class="fas {% if assessment.id %}fa-edit{% else %}fa-plus-circle{% endif %} me-2"></i>
+                {% if assessment.id %}Edit{% else %}Create{% endif %} Assessment
+            </h1>
+            <p class="lead text-muted">
+                {% if assessment.id %}
+                Update assessment information for Tax Year: {{ assessment.tax_year }}
+                {% else %}
+                Add a new assessment for {{ property.parcel_id }}
+                {% endif %}
+            </p>
         </div>
-        
-        <a href="{{ url_for('property.property_assessments', property_id=property.id) }}" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left"></i> Back to Assessments
-        </a>
     </div>
     
-    <!-- Flash Messages -->
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, message in messages %}
-                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    <!-- Property Summary -->
+    <div class="card mb-4">
+        <div class="card-header bg-light">
+            <h2 class="h5 mb-0">
+                <i class="fas fa-building me-2"></i> Property Information
+            </h2>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <p class="mb-1"><strong>Parcel ID:</strong> {{ property.parcel_id }}</p>
+                    <p class="mb-1"><strong>Address:</strong> {{ property.address }}, {{ property.city }}, {{ property.state }} {{ property.zip_code }}</p>
                 </div>
-            {% endfor %}
-        {% endif %}
-    {% endwith %}
-    
-    <form method="POST" id="assessmentForm" class="needs-validation" novalidate>
-        <div class="row">
-            <div class="col-md-8">
-                <div class="card mb-4">
-                    <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0">Assessment Information</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row g-3">
-                            <div class="col-md-6 required-field">
-                                <label for="taxYear" class="form-label">Tax Year</label>
-                                <input type="number" class="form-control" id="taxYear" name="tax_year" value="{{ assessment.tax_year or now().year }}" required>
-                                <div class="invalid-feedback">
-                                    Tax year is required.
-                                </div>
-                            </div>
-                            <div class="col-md-6 required-field">
-                                <label for="assessmentDate" class="form-label">Assessment Date</label>
-                                <input type="date" class="form-control" id="assessmentDate" name="assessment_date" value="{{ assessment.assessment_date|dateformat if assessment.assessment_date else now()|dateformat }}" required>
-                                <div class="invalid-feedback">
-                                    Assessment date is required.
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <label for="landValue" class="form-label">Land Value ($)</label>
-                                <input type="number" step="0.01" class="form-control" id="landValue" name="land_value" value="{{ assessment.land_value or property.land_value or '' }}">
-                            </div>
-                            <div class="col-md-4">
-                                <label for="improvementValue" class="form-label">Improvement Value ($)</label>
-                                <input type="number" step="0.01" class="form-control" id="improvementValue" name="improvement_value" value="{{ assessment.improvement_value or property.improvement_value or '' }}">
-                            </div>
-                            <div class="col-md-4">
-                                <label for="totalValue" class="form-label">Total Value ($)</label>
-                                <input type="number" step="0.01" class="form-control" id="totalValue" name="total_value" value="{{ assessment.total_value or property.total_value or '' }}">
-                            </div>
-                            <div class="col-md-6">
-                                <label for="exemptionValue" class="form-label">Exemption Value ($)</label>
-                                <input type="number" step="0.01" class="form-control" id="exemptionValue" name="exemption_value" value="{{ assessment.exemption_value or '0.00' }}">
-                            </div>
-                            <div class="col-md-6">
-                                <label for="taxableValue" class="form-label">Taxable Value ($)</label>
-                                <input type="number" step="0.01" class="form-control" id="taxableValue" name="taxable_value" value="{{ assessment.taxable_value or '' }}" readonly>
-                                <div class="form-text">Calculated as (Total Value - Exemption Value)</div>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="assessmentType" class="form-label">Assessment Type</label>
-                                <select class="form-select" id="assessmentType" name="assessment_type">
-                                    <option value="" {% if not assessment.assessment_type %}selected{% endif %}>-- Select --</option>
-                                    <option value="Regular" {% if assessment.assessment_type == 'Regular' %}selected{% endif %}>Regular</option>
-                                    <option value="Supplemental" {% if assessment.assessment_type == 'Supplemental' %}selected{% endif %}>Supplemental</option>
-                                    <option value="Appeal" {% if assessment.assessment_type == 'Appeal' %}selected{% endif %}>Appeal</option>
-                                    <option value="Correction" {% if assessment.assessment_type == 'Correction' %}selected{% endif %}>Correction</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="assessmentStatus" class="form-label">Status</label>
-                                <select class="form-select" id="assessmentStatus" name="assessment_status">
-                                    <option value="pending" {% if not assessment.assessment_status or assessment.assessment_status == 'pending' %}selected{% endif %}>Pending</option>
-                                    <option value="approved" {% if assessment.assessment_status == 'approved' %}selected{% endif %}>Approved</option>
-                                    <option value="rejected" {% if assessment.assessment_status == 'rejected' %}selected{% endif %}>Rejected</option>
-                                    <option value="on_hold" {% if assessment.assessment_status == 'on_hold' %}selected{% endif %}>On Hold</option>
-                                </select>
-                            </div>
-                            <div class="col-12">
-                                <label for="notes" class="form-label">Notes</label>
-                                <textarea class="form-control" id="notes" name="notes" rows="4">{{ assessment.notes or '' }}</textarea>
-                            </div>
-                        </div>
-                    </div>
+                <div class="col-md-6">
+                    <p class="mb-1"><strong>Property Class:</strong> {{ property.property_class|title or 'N/A' }}</p>
+                    <p class="mb-1"><strong>Status:</strong> {{ property.status|title or 'Active' }}</p>
                 </div>
             </div>
-            
-            <div class="col-md-4">
-                <div class="card mb-4">
-                    <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0">Property Overview</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <div class="text-muted">Parcel ID:</div>
-                            <div class="fw-bold">{{ property.parcel_id }}</div>
-                        </div>
-                        <div class="mb-3">
-                            <div class="text-muted">Address:</div>
-                            <div class="fw-bold">{{ property.address or 'Not available' }}</div>
-                        </div>
-                        <div class="mb-3">
-                            <div class="text-muted">Current Value:</div>
-                            <div class="fw-bold">${{ property.total_value|default(0)|round(2)|commaformat }}</div>
-                        </div>
-                        <div class="mb-3">
-                            <div class="text-muted">Previous Assessments:</div>
-                            <div id="previousAssessments">
-                                <!-- Previous assessments will be loaded via JavaScript -->
-                                <div class="spinner-border spinner-border-sm text-primary" role="status">
-                                    <span class="visually-hidden">Loading...</span>
-                                </div>
-                                Loading...
-                            </div>
-                        </div>
-                    </div>
+        </div>
+    </div>
+    
+    <!-- Assessment Form -->
+    <form method="post" id="assessment-form">
+        {% if assessment.id %}
+        <input type="hidden" name="id" value="{{ assessment.id }}">
+        {% endif %}
+        <input type="hidden" name="property_id" value="{{ property.id }}">
+        
+        <!-- Basic Information Section -->
+        <div class="form-section">
+            <h2 class="section-title">
+                <i class="fas fa-info-circle me-2"></i> Assessment Information
+            </h2>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label for="tax_year" class="form-label required-field">Tax Year</label>
+                    <input type="number" class="form-control" id="tax_year" name="tax_year" 
+                           value="{{ assessment.tax_year or current_year }}" required min="1900" max="2100">
                 </div>
                 
-                <div class="card">
-                    <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0">Actions</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-success">
-                                <i class="bi bi-save"></i> {{ assessment.id and 'Update Assessment' or 'Save Assessment' }}
-                            </button>
-                            <a href="{{ url_for('property.property_assessments', property_id=property.id) }}" class="btn btn-outline-secondary">
-                                Cancel
-                            </a>
-                        </div>
-                    </div>
+                <div class="col-md-4">
+                    <label for="assessment_date" class="form-label required-field">Assessment Date</label>
+                    <input type="date" class="form-control" id="assessment_date" name="assessment_date" 
+                           value="{{ assessment.assessment_date or today_date }}" required>
                 </div>
+                
+                <div class="col-md-4">
+                    <label for="assessment_type" class="form-label">Assessment Type</label>
+                    <select class="form-select" id="assessment_type" name="assessment_type">
+                        <option value="standard" {% if assessment.assessment_type == 'standard' or not assessment.assessment_type %}selected{% endif %}>Standard</option>
+                        <option value="annual" {% if assessment.assessment_type == 'annual' %}selected{% endif %}>Annual</option>
+                        <option value="special" {% if assessment.assessment_type == 'special' %}selected{% endif %}>Special</option>
+                        <option value="correction" {% if assessment.assessment_type == 'correction' %}selected{% endif %}>Correction</option>
+                        <option value="appeal" {% if assessment.assessment_type == 'appeal' %}selected{% endif %}>Appeal</option>
+                    </select>
+                </div>
+                
+                <div class="col-md-4">
+                    <label for="assessment_status" class="form-label">Assessment Status</label>
+                    <select class="form-select" id="assessment_status" name="assessment_status">
+                        <option value="pending" {% if assessment.assessment_status == 'pending' or not assessment.assessment_status %}selected{% endif %}>Pending</option>
+                        <option value="in_progress" {% if assessment.assessment_status == 'in_progress' %}selected{% endif %}>In Progress</option>
+                        <option value="under_review" {% if assessment.assessment_status == 'under_review' %}selected{% endif %}>Under Review</option>
+                        <option value="completed" {% if assessment.assessment_status == 'completed' %}selected{% endif %}>Completed</option>
+                        <option value="appealed" {% if assessment.assessment_status == 'appealed' %}selected{% endif %}>Appealed</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Valuation Section -->
+        <div class="form-section">
+            <h2 class="section-title">
+                <i class="fas fa-dollar-sign me-2"></i> Valuation
+            </h2>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label for="land_value" class="form-label">Land Value ($)</label>
+                    <input type="number" step="0.01" class="form-control" id="land_value" name="land_value" 
+                           value="{{ assessment.land_value or property.land_value or '' }}">
+                    <div class="form-text">Value of the land only</div>
+                </div>
+                
+                <div class="col-md-6">
+                    <label for="improvement_value" class="form-label">Improvement Value ($)</label>
+                    <input type="number" step="0.01" class="form-control" id="improvement_value" name="improvement_value" 
+                           value="{{ assessment.improvement_value or property.improvement_value or '' }}">
+                    <div class="form-text">Value of buildings and other improvements</div>
+                </div>
+                
+                <div class="col-md-4">
+                    <label for="total_value" class="form-label">Total Value ($)</label>
+                    <input type="number" step="0.01" class="form-control" id="total_value" name="total_value" 
+                           value="{{ assessment.total_value or property.total_value or '' }}" readonly>
+                    <div class="form-text">Land Value + Improvement Value</div>
+                </div>
+                
+                <div class="col-md-4">
+                    <label for="exemption_value" class="form-label">Exemption Value ($)</label>
+                    <input type="number" step="0.01" class="form-control" id="exemption_value" name="exemption_value" 
+                           value="{{ assessment.exemption_value or '0.00' }}">
+                    <div class="form-text">Value exempt from taxation</div>
+                </div>
+                
+                <div class="col-md-4">
+                    <label for="taxable_value" class="form-label">Taxable Value ($)</label>
+                    <input type="number" step="0.01" class="form-control" id="taxable_value" name="taxable_value" 
+                           value="{{ assessment.taxable_value or '' }}" readonly>
+                    <div class="form-text">Total Value - Exemption Value</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Notes Section -->
+        <div class="form-section">
+            <h2 class="section-title">
+                <i class="fas fa-sticky-note me-2"></i> Notes
+            </h2>
+            <div class="row g-3">
+                <div class="col-12">
+                    <label for="notes" class="form-label">Assessment Notes</label>
+                    <textarea class="form-control" id="notes" name="notes" rows="4">{{ assessment.notes or '' }}</textarea>
+                    <div class="form-text">Additional information, justification, or comments about this assessment</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Form Actions -->
+        <div class="d-flex justify-content-between mb-5">
+            <a href="{{ url_for('property.property_assessments', property_id=property.id) }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i> Cancel
+            </a>
+            
+            <div>
+                <button type="reset" class="btn btn-outline-warning me-2">
+                    <i class="fas fa-undo me-1"></i> Reset
+                </button>
+                
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas {% if assessment.id %}fa-save{% else %}fa-plus-circle{% endif %} me-1"></i>
+                    {% if assessment.id %}Update{% else %}Create{% endif %} Assessment
+                </button>
             </div>
         </div>
     </form>
@@ -178,9 +217,33 @@
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Form validation
-        const form = document.getElementById('assessmentForm');
+        // Calculate totals when values change
+        const landValueInput = document.getElementById('land_value');
+        const improvementValueInput = document.getElementById('improvement_value');
+        const totalValueInput = document.getElementById('total_value');
+        const exemptionValueInput = document.getElementById('exemption_value');
+        const taxableValueInput = document.getElementById('taxable_value');
         
+        function calculateValues() {
+            const landValue = parseFloat(landValueInput.value) || 0;
+            const improvementValue = parseFloat(improvementValueInput.value) || 0;
+            const totalValue = landValue + improvementValue;
+            const exemptionValue = parseFloat(exemptionValueInput.value) || 0;
+            const taxableValue = Math.max(0, totalValue - exemptionValue);
+            
+            totalValueInput.value = totalValue.toFixed(2);
+            taxableValueInput.value = taxableValue.toFixed(2);
+        }
+        
+        landValueInput.addEventListener('input', calculateValues);
+        improvementValueInput.addEventListener('input', calculateValues);
+        exemptionValueInput.addEventListener('input', calculateValues);
+        
+        // Initial calculation
+        calculateValues();
+        
+        // Form validation
+        const form = document.getElementById('assessment-form');
         form.addEventListener('submit', function(event) {
             if (!form.checkValidity()) {
                 event.preventDefault();
@@ -189,100 +252,6 @@
             
             form.classList.add('was-validated');
         });
-        
-        // Auto-calculate total value and taxable value
-        document.getElementById('landValue').addEventListener('input', calculateValues);
-        document.getElementById('improvementValue').addEventListener('input', calculateValues);
-        document.getElementById('totalValue').addEventListener('input', calculateTaxableValue);
-        document.getElementById('exemptionValue').addEventListener('input', calculateTaxableValue);
-        
-        function calculateValues() {
-            const landValue = parseFloat(document.getElementById('landValue').value) || 0;
-            const improvementValue = parseFloat(document.getElementById('improvementValue').value) || 0;
-            const totalValueField = document.getElementById('totalValue');
-            
-            totalValueField.value = (landValue + improvementValue).toFixed(2);
-            
-            calculateTaxableValue();
-        }
-        
-        function calculateTaxableValue() {
-            const totalValue = parseFloat(document.getElementById('totalValue').value) || 0;
-            const exemptionValue = parseFloat(document.getElementById('exemptionValue').value) || 0;
-            const taxableValueField = document.getElementById('taxableValue');
-            
-            taxableValueField.value = Math.max(0, totalValue - exemptionValue).toFixed(2);
-        }
-        
-        // Load previous assessments
-        function loadPreviousAssessments() {
-            fetch(`/property/api/properties/{{ property.id }}/assessments`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        displayPreviousAssessments(data.data);
-                    } else {
-                        document.getElementById('previousAssessments').innerHTML = `
-                            <div class="text-danger">Error loading assessments: ${data.error || 'Unknown error'}</div>
-                        `;
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    document.getElementById('previousAssessments').innerHTML = `
-                        <div class="text-danger">An error occurred while loading assessments.</div>
-                    `;
-                });
-        }
-        
-        function displayPreviousAssessments(assessments) {
-            const previousAssessmentsDiv = document.getElementById('previousAssessments');
-            
-            if (!assessments || assessments.length === 0) {
-                previousAssessmentsDiv.innerHTML = '<div class="text-muted">No previous assessments</div>';
-                return;
-            }
-            
-            // Sort assessments by tax year (descending)
-            assessments.sort((a, b) => b.tax_year - a.tax_year);
-            
-            // Create a list of previous assessments
-            let html = '<ul class="list-group">';
-            
-            // Don't show the current assessment being edited
-            const currentAssessmentId = '{{ assessment.id or "" }}';
-            
-            for (let i = 0; i < Math.min(assessments.length, 3); i++) {
-                const assessment = assessments[i];
-                
-                if (assessment.id !== currentAssessmentId) {
-                    let statusClass = 'secondary';
-                    if (assessment.assessment_status === 'approved') statusClass = 'success';
-                    if (assessment.assessment_status === 'pending') statusClass = 'warning';
-                    if (assessment.assessment_status === 'rejected') statusClass = 'danger';
-                    
-                    html += `
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            <div>
-                                <div><strong>${assessment.tax_year}</strong></div>
-                                <div>$${parseFloat(assessment.total_value || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
-                            </div>
-                            <span class="badge bg-${statusClass}">${assessment.assessment_status ? assessment.assessment_status.charAt(0).toUpperCase() + assessment.assessment_status.slice(1) : 'Unknown'}</span>
-                        </li>
-                    `;
-                }
-            }
-            
-            html += '</ul>';
-            
-            previousAssessmentsDiv.innerHTML = html;
-        }
-        
-        // Initial calculations
-        calculateValues();
-        
-        // Load previous assessments
-        loadPreviousAssessments();
     });
 </script>
 {% endblock %}

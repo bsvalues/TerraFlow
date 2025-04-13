@@ -122,7 +122,7 @@ def setup_property_tables(client: Client) -> bool:
         True if successful, False otherwise
     """
     try:
-        # Create properties table
+        # Create properties table in public schema
         properties_sql = """
         CREATE TABLE IF NOT EXISTS public.properties (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -183,7 +183,176 @@ def setup_property_tables(client: Client) -> bool:
             EXECUTE FUNCTION update_timestamp();
         """
         client.sql(properties_sql).execute()
-        logger.info("Created properties table")
+        logger.info("Created properties table in public schema")
+        
+        # Create property schema for dedicated property management
+        # This follows our property_model.py schema
+        property_schema_sql = """
+        -- Create property schema if it doesn't exist
+        CREATE SCHEMA IF NOT EXISTS property;
+        
+        -- Create properties table
+        CREATE TABLE IF NOT EXISTS property.properties (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            parcel_id TEXT NOT NULL,
+            account_number TEXT,
+            address TEXT,
+            city TEXT,
+            state TEXT,
+            zip_code TEXT,
+            property_class TEXT,
+            zoning TEXT,
+            legal_description TEXT,
+            land_area NUMERIC,
+            lot_size NUMERIC,
+            status TEXT DEFAULT 'active',
+            owner_name TEXT,
+            owner_address TEXT,
+            owner_city TEXT,
+            owner_state TEXT,
+            owner_zip TEXT,
+            year_built INTEGER,
+            living_area NUMERIC,
+            bedrooms INTEGER,
+            bathrooms NUMERIC,
+            latitude NUMERIC,
+            longitude NUMERIC,
+            land_value NUMERIC,
+            improvement_value NUMERIC,
+            total_value NUMERIC,
+            last_sale_date DATE,
+            last_sale_price NUMERIC,
+            last_sale_document TEXT,
+            created_by UUID NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+        
+        -- Create assessments table
+        CREATE TABLE IF NOT EXISTS property.property_assessments (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            property_id UUID NOT NULL REFERENCES property.properties(id) ON DELETE CASCADE,
+            tax_year INTEGER NOT NULL,
+            assessment_date DATE,
+            land_value NUMERIC,
+            improvement_value NUMERIC,
+            total_value NUMERIC,
+            exemption_value NUMERIC DEFAULT 0,
+            taxable_value NUMERIC,
+            assessment_type TEXT,
+            assessment_status TEXT DEFAULT 'pending',
+            notes TEXT,
+            created_by UUID NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+        
+        -- Create files table
+        CREATE TABLE IF NOT EXISTS property.property_files (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            property_id UUID NOT NULL REFERENCES property.properties(id) ON DELETE CASCADE,
+            file_name TEXT NOT NULL,
+            file_size INTEGER,
+            file_type TEXT,
+            file_category TEXT,
+            description TEXT,
+            public_url TEXT,
+            created_by UUID NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+        
+        -- Create indexes
+        CREATE INDEX IF NOT EXISTS idx_properties_parcel_id ON property.properties(parcel_id);
+        CREATE INDEX IF NOT EXISTS idx_properties_address ON property.properties(address);
+        CREATE INDEX IF NOT EXISTS idx_properties_created_by ON property.properties(created_by);
+        CREATE INDEX IF NOT EXISTS idx_properties_property_class ON property.properties(property_class);
+        CREATE INDEX IF NOT EXISTS idx_properties_status ON property.properties(status);
+        
+        CREATE INDEX IF NOT EXISTS idx_property_assessments_property_id ON property.property_assessments(property_id);
+        CREATE INDEX IF NOT EXISTS idx_property_assessments_tax_year ON property.property_assessments(tax_year);
+        CREATE INDEX IF NOT EXISTS idx_property_assessments_assessment_status ON property.property_assessments(assessment_status);
+        
+        CREATE INDEX IF NOT EXISTS idx_property_files_property_id ON property.property_files(property_id);
+        CREATE INDEX IF NOT EXISTS idx_property_files_file_category ON property.property_files(file_category);
+        
+        -- Enable RLS
+        ALTER TABLE property.properties ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE property.property_assessments ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE property.property_files ENABLE ROW LEVEL SECURITY;
+        
+        -- Create policies
+        CREATE POLICY IF NOT EXISTS "Allow individual read access" ON property.properties
+            FOR SELECT USING (auth.uid() = created_by);
+            
+        CREATE POLICY IF NOT EXISTS "Allow individual insert access" ON property.properties
+            FOR INSERT WITH CHECK (auth.uid() = created_by);
+            
+        CREATE POLICY IF NOT EXISTS "Allow individual update access" ON property.properties
+            FOR UPDATE USING (auth.uid() = created_by);
+            
+        CREATE POLICY IF NOT EXISTS "Allow individual delete access" ON property.properties
+            FOR DELETE USING (auth.uid() = created_by);
+        
+        -- Assessment policies
+        CREATE POLICY IF NOT EXISTS "Allow individual read access" ON property.property_assessments
+            FOR SELECT USING (
+                auth.uid() IN (
+                    SELECT created_by FROM property.properties
+                    WHERE id = property_id
+                )
+            );
+            
+        CREATE POLICY IF NOT EXISTS "Allow individual insert access" ON property.property_assessments
+            FOR INSERT WITH CHECK (
+                auth.uid() IN (
+                    SELECT created_by FROM property.properties
+                    WHERE id = property_id
+                )
+            );
+            
+        CREATE POLICY IF NOT EXISTS "Allow individual update access" ON property.property_assessments
+            FOR UPDATE USING (
+                auth.uid() IN (
+                    SELECT created_by FROM property.properties
+                    WHERE id = property_id
+                )
+            );
+            
+        CREATE POLICY IF NOT EXISTS "Allow individual delete access" ON property.property_assessments
+            FOR DELETE USING (
+                auth.uid() IN (
+                    SELECT created_by FROM property.properties
+                    WHERE id = property_id
+                )
+            );
+        
+        -- File policies
+        CREATE POLICY IF NOT EXISTS "Allow individual read access" ON property.property_files
+            FOR SELECT USING (
+                auth.uid() IN (
+                    SELECT created_by FROM property.properties
+                    WHERE id = property_id
+                )
+            );
+            
+        CREATE POLICY IF NOT EXISTS "Allow individual insert access" ON property.property_files
+            FOR INSERT WITH CHECK (
+                auth.uid() IN (
+                    SELECT created_by FROM property.properties
+                    WHERE id = property_id
+                )
+            );
+            
+        CREATE POLICY IF NOT EXISTS "Allow individual delete access" ON property.property_files
+            FOR DELETE USING (
+                auth.uid() IN (
+                    SELECT created_by FROM property.properties
+                    WHERE id = property_id
+                )
+            );
+        """
+        client.sql(property_schema_sql).execute()
+        logger.info("Created property schema and tables for property management")
         
         # Create assessments table
         assessments_sql = """
