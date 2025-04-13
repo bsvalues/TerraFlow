@@ -10,7 +10,15 @@ It supports:
 - PostgreSQL databases
 - SQL Server databases
 
-It handles schema mapping, data transformation, and validation during migration.
+It provides enhanced functionality for:
+- Full and incremental data migration
+- Dry-run mode to preview changes
+- Rollback capability via transaction logs
+- Detailed migration reports
+- Data validation and transformation
+- Change tracking for efficient incremental sync
+
+Use this tool to safely migrate data from your legacy/training systems to Supabase.
 """
 
 import os
@@ -22,12 +30,23 @@ import csv
 import sqlite3
 import datetime
 import uuid
-from typing import Dict, Any, List, Optional, Tuple, Callable, Union
+import time
+import hashlib
+import tempfile
+import shutil
+import threading
+from typing import Dict, Any, List, Optional, Tuple, Callable, Union, Set
+from concurrent.futures import ThreadPoolExecutor
 
-# Configure logging
+# Configure logging based on environment variable or default to INFO
+log_level = os.environ.get("SYNC_LOG_LEVEL", "INFO").upper()
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=getattr(logging, log_level),
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(os.path.join(os.path.dirname(__file__), 'data_migration.log'))
+    ]
 )
 logger = logging.getLogger("data_migrator")
 

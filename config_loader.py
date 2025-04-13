@@ -15,9 +15,18 @@ logger = logging.getLogger(__name__)
 
 # Default configuration
 DEFAULT_CONFIG = {
+    "env_mode": "development",  # development, training, production
     "database": {
         "engine": "postgresql",
         "connection_string": "postgresql://postgres:postgres@localhost:5432/postgres"
+    },
+    "training_db": {
+        "engine": "sqlserver",
+        "connection_string": "Driver={ODBC Driver 17 for SQL Server};Server=localhost;Database=training;UID=sa;PWD=password"
+    },
+    "production_db": {
+        "engine": "postgresql",
+        "connection_string": "postgresql://postgres:postgres@localhost:5432/production"
     },
     "auth": {
         "provider": "supabase",
@@ -31,8 +40,14 @@ DEFAULT_CONFIG = {
         "use_supabase_api": True
     },
     "sync": {
-        "interval": 15,  # minutes
-        "auto_sync": False
+        "interval": 60,  # minutes
+        "auto_sync": False,
+        "batch_size": 100,
+        "log_level": "INFO",
+        "enable_change_tracking": True,
+        "enable_rollback": True,
+        "rollback_retention_days": 7,
+        "tables": []  # List of tables to sync
     }
 }
 
@@ -54,6 +69,11 @@ def load_config() -> Dict[str, Any]:
     # Start with default config
     config = DEFAULT_CONFIG.copy()
     
+    # Determine environment mode (development, training, production)
+    env_mode = os.environ.get("ENV_MODE", "development").lower()
+    config["env_mode"] = env_mode
+    logger.info(f"Environment mode: {env_mode}")
+    
     # Override with environment variables
     if os.environ.get("SUPABASE_URL") and os.environ.get("SUPABASE_KEY"):
         config["database"]["engine"] = "postgresql"
@@ -71,7 +91,50 @@ def load_config() -> Dict[str, Any]:
         config["storage"]["provider"] = "supabase"
         
         logger.info("Supabase configuration detected and enabled")
-        
+    
+    # Configure training database
+    if os.environ.get("TRAINING_DB_URL"):
+        config["training_db"]["connection_string"] = os.environ.get("TRAINING_DB_URL")
+        config["training_db"]["engine"] = os.environ.get("TRAINING_DB_ENGINE", "sqlserver")
+        logger.info(f"Training database configured: {config['training_db']['engine']}")
+    
+    # Configure production database
+    if os.environ.get("PRODUCTION_DB_URL"):
+        config["production_db"]["connection_string"] = os.environ.get("PRODUCTION_DB_URL")
+        config["production_db"]["engine"] = os.environ.get("PRODUCTION_DB_ENGINE", "postgresql")
+        logger.info(f"Production database configured: {config['production_db']['engine']}")
+    
+    # Configure sync settings
+    if os.environ.get("SYNC_INTERVAL"):
+        try:
+            config["sync"]["interval"] = int(os.environ.get("SYNC_INTERVAL"))
+        except ValueError:
+            logger.warning(f"Invalid SYNC_INTERVAL value: {os.environ.get('SYNC_INTERVAL')}")
+    
+    if os.environ.get("SYNC_AUTO", "").lower() in ("true", "1", "yes"):
+        config["sync"]["auto_sync"] = True
+    
+    if os.environ.get("SYNC_BATCH_SIZE"):
+        try:
+            config["sync"]["batch_size"] = int(os.environ.get("SYNC_BATCH_SIZE"))
+        except ValueError:
+            logger.warning(f"Invalid SYNC_BATCH_SIZE value: {os.environ.get('SYNC_BATCH_SIZE')}")
+    
+    if os.environ.get("SYNC_LOG_LEVEL"):
+        config["sync"]["log_level"] = os.environ.get("SYNC_LOG_LEVEL").upper()
+    
+    if os.environ.get("SYNC_ENABLE_CHANGE_TRACKING", "").lower() in ("false", "0", "no"):
+        config["sync"]["enable_change_tracking"] = False
+    
+    if os.environ.get("SYNC_ENABLE_ROLLBACK", "").lower() in ("false", "0", "no"):
+        config["sync"]["enable_rollback"] = False
+    
+    if os.environ.get("SYNC_ROLLBACK_RETENTION_DAYS"):
+        try:
+            config["sync"]["rollback_retention_days"] = int(os.environ.get("SYNC_ROLLBACK_RETENTION_DAYS"))
+        except ValueError:
+            logger.warning(f"Invalid SYNC_ROLLBACK_RETENTION_DAYS value: {os.environ.get('SYNC_ROLLBACK_RETENTION_DAYS')}")
+    
     # Allow bypassing authentication for development
     if os.environ.get("BYPASS_LDAP", "").lower() == "true":
         config["auth"]["bypass_auth"] = True
@@ -96,6 +159,16 @@ def load_config() -> Dict[str, Any]:
             logger.info(f"Loaded configuration from {config_file}")
         except Exception as e:
             logger.error(f"Error loading config file {config_file}: {str(e)}")
+    
+    # Load sync tables configuration if specified by file path
+    sync_tables_file = os.environ.get("SYNC_TABLES_FILE")
+    if sync_tables_file and os.path.exists(sync_tables_file):
+        try:
+            with open(sync_tables_file, "r") as f:
+                config["sync"]["tables"] = json.load(f)
+            logger.info(f"Loaded sync tables configuration from {sync_tables_file}")
+        except Exception as e:
+            logger.error(f"Error loading sync tables file {sync_tables_file}: {str(e)}")
     
     _config = config
     return config
@@ -132,6 +205,37 @@ def get_database_config() -> Dict[str, Any]:
         Dict with database configuration
     """
     return get_config("database")
+
+def get_training_db_config() -> Dict[str, Any]:
+    """
+    Get training database configuration
+    
+    Returns:
+        Dict with training database configuration
+    """
+    return get_config("training_db")
+
+def get_production_db_config() -> Dict[str, Any]:
+    """
+    Get production database configuration
+    
+    Returns:
+        Dict with production database configuration
+    """
+    return get_config("production_db")
+    
+def get_source_db_config() -> Dict[str, Any]:
+    """
+    Get source database configuration based on environment mode
+    
+    Returns:
+        Dict with source database configuration
+    """
+    env_mode = get_config("env_mode")
+    if env_mode == "production":
+        return get_production_db_config()
+    else:
+        return get_training_db_config()
 
 def get_auth_config() -> Dict[str, Any]:
     """
