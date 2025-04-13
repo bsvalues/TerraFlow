@@ -707,6 +707,7 @@ def create_assessment(assessment_data: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dictionary with created assessment and success status
     """
+    supabase = None
     try:
         if not is_authenticated():
             logger.warning("User not authenticated to create assessment")
@@ -740,6 +741,10 @@ def create_assessment(assessment_data: Dict[str, Any]) -> Dict[str, Any]:
         data = {k: v for k, v in data.items() if v is not None and k != "id"}
         
         supabase = get_supabase_client()
+        if not supabase:
+            logger.error("Could not get Supabase client")
+            return {"success": False, "error": "Database connection error"}
+            
         response = supabase.table("property.property_assessments").insert(data).execute()
         
         if response.data and len(response.data) > 0:
@@ -750,6 +755,11 @@ def create_assessment(assessment_data: Dict[str, Any]) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Error creating assessment: {str(e)}")
         return {"success": False, "error": str(e)}
+    finally:
+        # Release the client
+        if supabase:
+            from supabase_connection_pool import release_connection
+            release_connection(supabase)
 
 
 def update_assessment(assessment_id: str, assessment_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -763,6 +773,7 @@ def update_assessment(assessment_id: str, assessment_data: Dict[str, Any]) -> Di
     Returns:
         Dictionary with updated assessment and success status
     """
+    supabase = None
     try:
         if not is_authenticated():
             logger.warning("User not authenticated to update assessment")
@@ -803,6 +814,10 @@ def update_assessment(assessment_id: str, assessment_data: Dict[str, Any]) -> Di
         data["updated_at"] = datetime.now().isoformat()
         
         supabase = get_supabase_client()
+        if not supabase:
+            logger.error("Could not get Supabase client")
+            return {"success": False, "error": "Database connection error"}
+            
         response = supabase.table("property.property_assessments").update(data).eq("id", assessment_id).execute()
         
         if response.data and len(response.data) > 0:
@@ -813,6 +828,11 @@ def update_assessment(assessment_id: str, assessment_data: Dict[str, Any]) -> Di
     except Exception as e:
         logger.error(f"Error updating assessment: {str(e)}")
         return {"success": False, "error": str(e)}
+    finally:
+        # Release the client
+        if supabase:
+            from supabase_connection_pool import release_connection
+            release_connection(supabase)
 
 
 def delete_assessment(assessment_id: str) -> Dict[str, bool]:
@@ -825,6 +845,7 @@ def delete_assessment(assessment_id: str) -> Dict[str, bool]:
     Returns:
         Dictionary with success status
     """
+    supabase = None
     try:
         if not is_authenticated():
             logger.warning("User not authenticated to delete assessment")
@@ -840,7 +861,10 @@ def delete_assessment(assessment_id: str) -> Dict[str, bool]:
             return {"success": False, "error": "Assessment not found"}
         
         supabase = get_supabase_client()
-        
+        if not supabase:
+            logger.error("Could not get Supabase client")
+            return {"success": False, "error": "Database connection error"}
+            
         # Delete assessment
         response = supabase.table("property.property_assessments").delete().eq("id", assessment_id).execute()
         
@@ -852,6 +876,11 @@ def delete_assessment(assessment_id: str) -> Dict[str, bool]:
     except Exception as e:
         logger.error(f"Error deleting assessment: {str(e)}")
         return {"success": False, "error": str(e)}
+    finally:
+        # Release the client
+        if supabase:
+            from supabase_connection_pool import release_connection
+            release_connection(supabase)
 
 
 # Database Operations for Property Files
@@ -866,13 +895,17 @@ def get_property_files(property_id: str) -> List[PropertyFile]:
     Returns:
         List of PropertyFile objects
     """
+    supabase = None
     try:
         if not is_authenticated():
             logger.warning("User not authenticated to get files")
             return []
         
         supabase = get_supabase_client()
-        
+        if not supabase:
+            logger.error("Could not get Supabase client")
+            return []
+            
         response = supabase.table("property.property_files") \
             .select("*") \
             .eq("property_id", property_id) \
@@ -887,6 +920,11 @@ def get_property_files(property_id: str) -> List[PropertyFile]:
     except Exception as e:
         logger.error(f"Error retrieving property files: {str(e)}")
         return []
+    finally:
+        # Release the client
+        if supabase:
+            from supabase_connection_pool import release_connection
+            release_connection(supabase)
 
 
 def get_file(file_id: str) -> Optional[PropertyFile]:
@@ -899,13 +937,17 @@ def get_file(file_id: str) -> Optional[PropertyFile]:
     Returns:
         PropertyFile object or None if not found
     """
+    supabase = None
     try:
         if not is_authenticated():
             logger.warning("User not authenticated to get file")
             return None
         
         supabase = get_supabase_client()
-        
+        if not supabase:
+            logger.error("Could not get Supabase client")
+            return None
+            
         response = supabase.table("property.property_files") \
             .select("*") \
             .eq("id", file_id) \
@@ -920,6 +962,11 @@ def get_file(file_id: str) -> Optional[PropertyFile]:
     except Exception as e:
         logger.error(f"Error retrieving file: {str(e)}")
         return None
+    finally:
+        # Release the client
+        if supabase:
+            from supabase_connection_pool import release_connection
+            release_connection(supabase)
 
 
 def create_property_file(file_data: Dict[str, Any], file_content: Any) -> Dict[str, Any]:
@@ -933,6 +980,7 @@ def create_property_file(file_data: Dict[str, Any], file_content: Any) -> Dict[s
     Returns:
         Dictionary with created file and success status
     """
+    supabase = None
     try:
         if not is_authenticated():
             logger.warning("User not authenticated to create file")
@@ -963,7 +1011,10 @@ def create_property_file(file_data: Dict[str, Any], file_content: Any) -> Dict[s
         
         # Upload file to storage
         supabase = get_supabase_client()
-        
+        if not supabase:
+            logger.error("Could not get Supabase client")
+            return {"success": False, "error": "Database connection error"}
+            
         storage_response = supabase.storage.from_("property-files").upload(
             storage_path, 
             file_content,
@@ -997,6 +1048,11 @@ def create_property_file(file_data: Dict[str, Any], file_content: Any) -> Dict[s
     except Exception as e:
         logger.error(f"Error creating property file: {str(e)}")
         return {"success": False, "error": str(e)}
+    finally:
+        # Release the client
+        if supabase:
+            from supabase_connection_pool import release_connection
+            release_connection(supabase)
 
 
 def delete_property_file(file_id: str) -> Dict[str, bool]:
@@ -1009,6 +1065,7 @@ def delete_property_file(file_id: str) -> Dict[str, bool]:
     Returns:
         Dictionary with success status
     """
+    supabase = None
     try:
         if not is_authenticated():
             logger.warning("User not authenticated to delete file")
@@ -1024,7 +1081,10 @@ def delete_property_file(file_id: str) -> Dict[str, bool]:
             return {"success": False, "error": "File not found"}
         
         supabase = get_supabase_client()
-        
+        if not supabase:
+            logger.error("Could not get Supabase client")
+            return {"success": False, "error": "Database connection error"}
+            
         # Extract storage path from URL
         if existing.public_url:
             storage_path = existing.public_url.split("/")[-1]
@@ -1046,3 +1106,8 @@ def delete_property_file(file_id: str) -> Dict[str, bool]:
     except Exception as e:
         logger.error(f"Error deleting property file: {str(e)}")
         return {"success": False, "error": str(e)}
+    finally:
+        # Release the client
+        if supabase:
+            from supabase_connection_pool import release_connection
+            release_connection(supabase)
