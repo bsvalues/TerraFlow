@@ -830,6 +830,118 @@ try:
 except Exception as e:
     app.logger.error(f"Error registering authentication routes: {str(e)}")
 
+# User Feedback Routes
+@app.route('/submit_feedback', methods=['POST'])
+@login_required
+def submit_feedback():
+    """Submit user feedback during testing"""
+    try:
+        feedback_type = request.form.get('feedback_type', '')
+        current_page = request.form.get('current_page', '')
+        description = request.form.get('description', '')
+        impact_level = request.form.get('impact_level', 3)
+        screenshot = request.form.get('screenshot', None)
+        
+        # Create a new feedback entry in the database
+        feedback = {
+            'user_id': current_user.id,
+            'feedback_type': feedback_type,
+            'current_page': current_page,
+            'description': description,
+            'impact_level': impact_level,
+            'created_at': datetime.datetime.now(),
+            'status': 'new'
+        }
+        
+        # In a real implementation, we would save to Supabase or database
+        # For testing purposes, just log the feedback
+        app.logger.info(f"User Feedback: {feedback}")
+        
+        # If we have Supabase enabled, save to the feedback table
+        if is_supabase_enabled():
+            from supabase_client import get_client
+            supabase = get_client()
+            if supabase:
+                result = supabase.table('user_feedback').insert(feedback).execute()
+                app.logger.info(f"Feedback saved to Supabase: {result}")
+        
+        return jsonify({'success': True, 'message': 'Feedback submitted successfully'})
+    except Exception as e:
+        app.logger.error(f"Error saving feedback: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/testing')
+@login_required
+def testing_dashboard():
+    """Show the main testing dashboard"""
+    return render_template('testing/dashboard.html')
+
+@app.route('/testing/scenario/<scenario_type>')
+@login_required
+def test_scenario(scenario_type):
+    """Show a specific test scenario guide"""
+    scenarios = {
+        'assessor': {
+            'title': 'County Assessor Test Scenario',
+            'persona': 'assessor',
+            'persona_name': 'County Assessor',
+            'description': 'Test administrative functions and system oversight capabilities.',
+            'steps': [
+                'Login and navigate to the Admin section',
+                'Review user management interface and try adding a test user',
+                'Check system control dashboard and review agent status',
+                'Navigate to data quality dashboard and review alerts',
+                'Test role-based access by switching to different user views'
+            ]
+        },
+        'appraiser': {
+            'title': 'Field Appraiser Test Scenario',
+            'persona': 'appraiser',
+            'persona_name': 'Field Appraiser',
+            'description': 'Test property assessment workflow and data collection.',
+            'steps': [
+                'Navigate to the property management section',
+                'Create a new property record with address and parcel details',
+                'Upload test photos or documents to the property record',
+                'Complete a property assessment form with valuation details',
+                'Verify the property shows up correctly in the map viewer'
+            ]
+        },
+        'analyst': {
+            'title': 'Data Analyst Test Scenario',
+            'persona': 'analyst', 
+            'persona_name': 'Data Analyst',
+            'description': 'Test reporting and analytics capabilities.',
+            'steps': [
+                'Navigate to the Power Query interface',
+                'Create a new data transformation query',
+                'Export results in different formats (CSV, Excel, etc.)',
+                'Use filters and sorting options in the property list view',
+                'Test search functionality with different parameters'
+            ]
+        },
+        'gis': {
+            'title': 'GIS Specialist Test Scenario',
+            'persona': 'gis',
+            'persona_name': 'GIS Specialist',  
+            'description': 'Test spatial data management and map visualization.',
+            'steps': [
+                'Open the map viewer and test navigation controls',
+                'Import a test GeoJSON or Shapefile',
+                'Create and manage multiple map layers',
+                'Test property search by location or coordinates',
+                'Verify spatial queries work correctly'
+            ]
+        }
+    }
+    
+    if scenario_type not in scenarios:
+        flash('Invalid test scenario type', 'error')
+        return redirect(url_for('index'))
+    
+    scenario = scenarios[scenario_type]
+    return render_template('testing/scenario.html', scenario=scenario)
+
 # Register template filters
 try:
     from template_filters import register_template_filters

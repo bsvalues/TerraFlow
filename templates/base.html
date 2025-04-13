@@ -49,6 +49,19 @@
                             <li><a class="dropdown-item" href="{{ url_for('data_quality_dashboard') }}"><i class="bi bi-check-circle"></i> Data Quality</a></li>
                         </ul>
                     </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="testingDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-clipboard-check"></i> Testing
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="testingDropdown">
+                            <li><a class="dropdown-item" href="{{ url_for('testing_dashboard') }}"><i class="bi bi-speedometer2"></i> Testing Dashboard</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('test_scenario', scenario_type='assessor') }}"><i class="bi bi-person-badge"></i> County Assessor</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('test_scenario', scenario_type='appraiser') }}"><i class="bi bi-house"></i> Field Appraiser</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('test_scenario', scenario_type='analyst') }}"><i class="bi bi-bar-chart"></i> Data Analyst</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('test_scenario', scenario_type='gis') }}"><i class="bi bi-map"></i> GIS Specialist</a></li>
+                        </ul>
+                    </li>
                     {% if has_role('admin') %}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
