@@ -74,14 +74,38 @@ def load_config() -> Dict[str, Any]:
     config["env_mode"] = env_mode
     logger.info(f"Environment mode: {env_mode}")
     
+    # Get environment-specific suffixes
+    env_suffix = "_" + env_mode.upper() if env_mode != "development" else ""
+    
+    # Look for environment-specific Supabase variables first, then fall back to default
+    supabase_url = (
+        os.environ.get(f"SUPABASE_URL{env_suffix}") or 
+        os.environ.get("SUPABASE_URL")
+    )
+    
+    supabase_key = (
+        os.environ.get(f"SUPABASE_KEY{env_suffix}") or 
+        os.environ.get("SUPABASE_KEY")
+    )
+    
+    supabase_service_key = (
+        os.environ.get(f"SUPABASE_SERVICE_KEY{env_suffix}") or 
+        os.environ.get("SUPABASE_SERVICE_KEY", "")
+    )
+    
+    database_url = (
+        os.environ.get(f"DATABASE_URL{env_suffix}") or 
+        os.environ.get("DATABASE_URL", "")
+    )
+    
     # Override with environment variables
-    if os.environ.get("SUPABASE_URL") and os.environ.get("SUPABASE_KEY"):
+    if supabase_url and supabase_key:
         config["database"]["engine"] = "postgresql"
         config["database"]["provider"] = "supabase"
-        config["database"]["connection_string"] = os.environ.get("DATABASE_URL", "")
-        config["database"]["supabase_url"] = os.environ.get("SUPABASE_URL")
-        config["database"]["supabase_key"] = os.environ.get("SUPABASE_KEY")
-        config["database"]["supabase_service_key"] = os.environ.get("SUPABASE_SERVICE_KEY", "")
+        config["database"]["connection_string"] = database_url
+        config["database"]["supabase_url"] = supabase_url
+        config["database"]["supabase_key"] = supabase_key
+        config["database"]["supabase_service_key"] = supabase_service_key
         
         # Set use_supabase flag to true
         config["use_supabase"] = True
@@ -90,7 +114,7 @@ def load_config() -> Dict[str, Any]:
         config["auth"]["provider"] = "supabase"
         config["storage"]["provider"] = "supabase"
         
-        logger.info("Supabase configuration detected and enabled")
+        logger.info(f"Supabase configuration detected and enabled for {env_mode} environment")
     
     # Configure training database
     if os.environ.get("TRAINING_DB_URL"):

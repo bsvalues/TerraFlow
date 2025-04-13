@@ -21,11 +21,15 @@ from config_loader import get_config, is_supabase_enabled
 # Configure logging
 logger = logging.getLogger(__name__)
 
-# Cache the client creation
-@lru_cache(maxsize=1)
-def get_supabase_client() -> Optional[Client]:
+# Cache the client creation with an environment parameter to handle different environments
+@lru_cache(maxsize=8)  # Increased cache size to handle multiple environments
+def get_supabase_client(environment: Optional[str] = None) -> Optional[Client]:
     """
-    Get a Supabase client instance.
+    Get a Supabase client instance for a specific environment.
+    
+    Args:
+        environment: Optional environment name (development, training, production)
+                    If None, uses the current environment from configuration
     
     Returns:
         Supabase client or None if not available
@@ -41,8 +45,23 @@ def get_supabase_client() -> Optional[Client]:
     try:
         # Get configuration
         db_config = get_config("database")
+        env_mode = environment or get_config("env_mode")
+        
+        # Log the environment we're using for this client
+        logger.info(f"Getting Supabase client for environment: {env_mode}")
+        
         url = db_config.get("supabase_url")
         key = db_config.get("supabase_service_key", db_config.get("supabase_key"))
+        
+        # If we're using environment-specific credentials and they're available, use them
+        if environment and environment != "development":
+            env_url = os.environ.get(f"SUPABASE_URL_{environment.upper()}")
+            env_key = os.environ.get(f"SUPABASE_SERVICE_KEY_{environment.upper()}") or os.environ.get(f"SUPABASE_KEY_{environment.upper()}")
+            
+            if env_url and env_key:
+                url = env_url
+                key = env_key
+                logger.info(f"Using environment-specific Supabase credentials for {environment}")
         
         if not url or not key:
             logger.error("Missing Supabase URL or key in configuration")
@@ -59,7 +78,8 @@ def upload_file_to_storage(
     file_path: str, 
     bucket: str, 
     destination_path: str, 
-    content_type: Optional[str] = None
+    content_type: Optional[str] = None,
+    environment: Optional[str] = None
 ) -> Optional[str]:
     """
     Upload a file to Supabase Storage.
@@ -69,11 +89,12 @@ def upload_file_to_storage(
         bucket: Storage bucket name
         destination_path: Path within the bucket
         content_type: MIME type of the file (optional)
+        environment: Environment to use (development, training, production)
         
     Returns:
         Public URL of the uploaded file or None on failure
     """
-    client = get_supabase_client()
+    client = get_supabase_client(environment)
     if not client:
         return None
     
@@ -102,18 +123,19 @@ def upload_file_to_storage(
         logger.error(f"Error uploading file to Supabase: {str(e)}")
         return None
 
-def list_files_in_storage(bucket: str, path: str = '') -> Optional[List[Dict[str, Any]]]:
+def list_files_in_storage(bucket: str, path: str = '', environment: Optional[str] = None) -> Optional[List[Dict[str, Any]]]:
     """
     List files in a Supabase Storage bucket.
     
     Args:
         bucket: Storage bucket name
         path: Path prefix within the bucket
+        environment: Environment to use (development, training, production)
         
     Returns:
         List of file metadata or None on failure
     """
-    client = get_supabase_client()
+    client = get_supabase_client(environment)
     if not client:
         return None
     
@@ -126,18 +148,19 @@ def list_files_in_storage(bucket: str, path: str = '') -> Optional[List[Dict[str
         logger.error(f"Error listing files in Supabase: {str(e)}")
         return None
 
-def delete_file_from_storage(bucket: str, path: str) -> bool:
+def delete_file_from_storage(bucket: str, path: str, environment: Optional[str] = None) -> bool:
     """
     Delete a file from Supabase Storage.
     
     Args:
         bucket: Storage bucket name
         path: Path to the file within the bucket
+        environment: Environment to use (development, training, production)
         
     Returns:
         True on success, False on failure
     """
-    client = get_supabase_client()
+    client = get_supabase_client(environment)
     if not client:
         return False
     
@@ -150,7 +173,7 @@ def delete_file_from_storage(bucket: str, path: str) -> bool:
         logger.error(f"Error deleting file from Supabase: {str(e)}")
         return False
 
-def download_file_from_storage(bucket: str, storage_path: str, destination_path: str) -> bool:
+def download_file_from_storage(bucket: str, storage_path: str, destination_path: str, environment: Optional[str] = None) -> bool:
     """
     Download a file from Supabase Storage.
     
@@ -158,11 +181,12 @@ def download_file_from_storage(bucket: str, storage_path: str, destination_path:
         bucket: Storage bucket name
         storage_path: Path to the file within the bucket
         destination_path: Local path to save the file
+        environment: Environment to use (development, training, production)
         
     Returns:
         True on success, False on failure
     """
-    client = get_supabase_client()
+    client = get_supabase_client(environment)
     if not client:
         return False
     
@@ -178,7 +202,7 @@ def download_file_from_storage(bucket: str, storage_path: str, destination_path:
         logger.error(f"Error downloading file from Supabase: {str(e)}")
         return False
 
-def execute_query(table: str, select: str = "*", filters: Optional[Dict[str, Any]] = None) -> Optional[List[Dict[str, Any]]]:
+def execute_query(table: str, select: str = "*", filters: Optional[Dict[str, Any]] = None, environment: Optional[str] = None) -> Optional[List[Dict[str, Any]]]:
     """
     Execute a query against a Supabase table.
     
@@ -186,11 +210,12 @@ def execute_query(table: str, select: str = "*", filters: Optional[Dict[str, Any
         table: Table name
         select: Select clause
         filters: Dictionary of filters to apply
+        environment: Environment to use (development, training, production)
         
     Returns:
         List of records or None on failure
     """
-    client = get_supabase_client()
+    client = get_supabase_client(environment)
     if not client:
         return None
     
