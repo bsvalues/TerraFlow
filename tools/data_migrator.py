@@ -1283,12 +1283,23 @@ def create_config_template() -> Dict[str, Any]:
     return {
         "source_type": "sqlite",  # sqlite, csv, json, postgres, sqlserver
         "source_path": "",  # Path to SQLite/CSV/JSON file or connection string for postgres/sqlserver
+        "sync": {
+            "dry_run": False,             # If True, preview changes without executing them
+            "incremental": False,         # If True, perform incremental sync (SQL Server only)
+            "enable_rollback": True,      # If True, enable transaction tracking for rollback
+            "enable_change_tracking": True, # If True, enable change tracking in SQL Server
+            "batch_size": 100,            # Default batch size for all tables
+            "parallelism": 1              # Number of parallel threads (0 = auto)
+        },
         "tables": [
             {
                 "source_table": "users",  # For SQLite
                 "source_query": "SELECT * FROM users",  # For postgres/sqlserver
                 "target_table": "users",
                 "target_schema": "core",
+                "key_column": "id",       # Primary key column for upsert operations
+                "modified_time_column": "modified_at", # Column for tracking changes in SQL Server
+                "upsert_on_key": True,    # If True, perform upsert instead of insert for SQL Server incremental sync
                 "field_mapping": {
                     "id": "id",
                     "username": "username",
@@ -1306,8 +1317,8 @@ def create_config_template() -> Dict[str, Any]:
                     "title_case": "lambda x: x.title() if x else x",
                     "to_iso_date": "lambda x: x.strftime('%Y-%m-%dT%H:%M:%S') if x else None"
                 },
-                "batch_size": 100,
-                "limit": 1000  # Optional limit for testing
+                "batch_size": 100,        # Override default batch size
+                "limit": 1000             # Optional limit for testing
             }
         ]
     }
@@ -1355,6 +1366,8 @@ def main():
     parser.add_argument("--key", "-k", help="Supabase service key")
     parser.add_argument("--config", "-c", help="Path to migration configuration file")
     parser.add_argument("--create-template", "-t", help="Create a template configuration file at specified path")
+    parser.add_argument("--dry-run", "-d", action="store_true", help="Dry run mode (preview changes without execution)")
+    parser.add_argument("--incremental", "-i", action="store_true", help="Incremental sync mode (SQL Server only)")
     args = parser.parse_args()
     
     # Check if we need to create a template
@@ -1372,6 +1385,22 @@ def main():
     if not config:
         logger.error("Failed to load configuration")
         return 1
+        
+    # Override configuration with command-line arguments
+    if args.dry_run or args.incremental:
+        # Initialize sync options if not present
+        if "sync" not in config:
+            config["sync"] = {}
+        
+        # Set dry run mode if specified
+        if args.dry_run:
+            config["sync"]["dry_run"] = True
+            logger.info("Dry run mode enabled via command line")
+            
+        # Set incremental sync mode if specified
+        if args.incremental:
+            config["sync"]["incremental"] = True
+            logger.info("Incremental sync mode enabled via command line")
     
     # Get Supabase credentials
     url = args.url or os.environ.get("SUPABASE_URL")
@@ -1521,15 +1550,36 @@ def main():
             transformer_defs = table_mapping.get("transformers", {})
             table_mapping["transformers"] = get_transformers(transformer_defs)
         
+        # Add sync options
+        dry_run = config.get("sync", {}).get("dry_run", False)
+        incremental = config.get("sync", {}).get("incremental", False)
+        
         try:
             # Perform migration
-            print_header("Migrating SQL Server Database")
-            results = migrate_postgres_to_supabase(sqlserver_conn, client, config)
+            mode = "INCREMENTAL" if incremental else "FULL"
+            status = "DRY RUN" if dry_run else "LIVE"
+            print_header(f"Migrating SQL Server Database ({status} {mode} SYNC)")
+            
+            results = migrate_sqlserver_to_supabase(
+                sqlserver_conn, 
+                client, 
+                config,
+                dry_run=dry_run,
+                incremental=incremental
+            )
             
             # Print summary
             print_header("Migration Summary")
-            print(f"Tables migrated: {results['tables_migrated']}")
-            print(f"Records migrated: {results['records_migrated']}")
+            if dry_run:
+                print(f"[DRY RUN] Would migrate {results['tables_migrated']} tables")
+                print(f"[DRY RUN] Would migrate {results['records_migrated']} records")
+                if incremental:
+                    print(f"[DRY RUN] Would update {results['records_updated']} records")
+            else:
+                print(f"Tables migrated: {results['tables_migrated']}")
+                print(f"Records migrated: {results['records_migrated']}")
+                if incremental:
+                    print(f"Records updated: {results['records_updated']}")
             
             return 0 if results["success"] else 1
         finally:
