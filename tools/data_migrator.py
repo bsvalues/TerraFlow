@@ -543,7 +543,10 @@ def insert_data(
     table: str,
     data: List[Dict[str, Any]],
     schema: str = "public",
-    batch_size: int = 100
+    batch_size: int = 100,
+    transaction_id: Optional[str] = None,
+    upsert: bool = False,
+    upsert_key: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Insert data into a Supabase table.
@@ -554,43 +557,108 @@ def insert_data(
         data: Data to insert
         schema: Schema name
         batch_size: Batch size for inserting data
+        transaction_id: Optional transaction ID for rollback tracking
+        upsert: If True, perform upsert operation instead of insert
+        upsert_key: Column to use as key for upsert operations
         
     Returns:
-        Result information
+        Result information with keys: success, inserted, updated, errors
     """
     if not data:
         return {
             "success": True,
             "inserted": 0,
+            "updated": 0,
             "errors": []
         }
     
     inserted = 0
+    updated = 0
     errors = []
     
     # Process in batches
     for i in range(0, len(data), batch_size):
         batch = data[i:i+batch_size]
+        batch_num = i//batch_size + 1
+        total_batches = (len(data) + batch_size - 1)//batch_size
         
         try:
             full_table_name = f"{schema}.{table}" if schema != "public" else table
-            response = client.table(full_table_name).insert(batch).execute()
             
-            if hasattr(response, 'data'):
-                inserted += len(response.data)
-                logger.info(f"Inserted batch {i//batch_size + 1}/{(len(data) + batch_size - 1)//batch_size}: {len(response.data)} records")
+            # If a transaction ID is provided, add it to the batch data for tracking
+            if transaction_id:
+                for record in batch:
+                    record["_sync_transaction_id"] = transaction_id
+            
+            # Perform upsert or insert based on configuration
+            if upsert and upsert_key:
+                # Check for existing records to count updates vs inserts
+                existing_keys = set()
+                if upsert_key and all(upsert_key in record for record in batch):
+                    # Extract keys from batch
+                    batch_keys = [record[upsert_key] for record in batch if record[upsert_key] is not None]
+                    
+                    if batch_keys:
+                        try:
+                            # Query for existing keys
+                            if len(batch_keys) == 1:
+                                query = client.table(full_table_name).select(upsert_key).eq(upsert_key, batch_keys[0])
+                            else:
+                                query = client.table(full_table_name).select(upsert_key).in_(upsert_key, batch_keys)
+                                
+                            response = query.execute()
+                            if hasattr(response, 'data'):
+                                existing_keys = {record[upsert_key] for record in response.data}
+                        except Exception as e:
+                            logger.warning(f"Could not determine existing keys: {str(e)}")
+                
+                # Perform upsert
+                response = client.table(full_table_name).upsert(batch, on_conflict=upsert_key).execute()
+                
+                if hasattr(response, 'data'):
+                    new_inserted = 0
+                    new_updated = 0
+                    
+                    # Count inserts vs updates based on existing keys
+                    if existing_keys:
+                        for record in response.data:
+                            if record[upsert_key] in existing_keys:
+                                new_updated += 1
+                            else:
+                                new_inserted += 1
+                    else:
+                        # If we couldn't determine existing keys, count all as inserts
+                        new_inserted = len(response.data)
+                    
+                    inserted += new_inserted
+                    updated += new_updated
+                    
+                    logger.info(f"Upsert batch {batch_num}/{total_batches}: {new_inserted} inserts, {new_updated} updates")
+                else:
+                    error_msg = f"Batch {batch_num}: Upsert returned invalid response"
+                    logger.error(error_msg)
+                    errors.append(error_msg)
             else:
-                error_msg = f"Batch {i//batch_size + 1}: Insert returned invalid response"
-                logger.error(error_msg)
-                errors.append(error_msg)
+                # Regular insert
+                response = client.table(full_table_name).insert(batch).execute()
+                
+                if hasattr(response, 'data'):
+                    inserted += len(response.data)
+                    logger.info(f"Inserted batch {batch_num}/{total_batches}: {len(response.data)} records")
+                else:
+                    error_msg = f"Batch {batch_num}: Insert returned invalid response"
+                    logger.error(error_msg)
+                    errors.append(error_msg)
+                    
         except Exception as e:
-            error_msg = f"Batch {i//batch_size + 1}: {str(e)}"
+            error_msg = f"Batch {batch_num}: {str(e)}"
             logger.error(error_msg)
             errors.append(error_msg)
     
     return {
-        "success": inserted == len(data),
+        "success": len(errors) == 0,
         "inserted": inserted,
+        "updated": updated,
         "total": len(data),
         "errors": errors
     }
@@ -902,6 +970,301 @@ def migrate_postgres_to_supabase(
     
     # Set overall success flag
     results["success"] = results["tables_migrated"] > 0
+    
+    return results
+
+def migrate_sqlserver_to_supabase(
+    sqlserver_conn: Any,
+    supabase_client: Client,
+    config: Dict[str, Any],
+    dry_run: bool = False,
+    incremental: bool = False
+) -> Dict[str, Any]:
+    """
+    Migrate data from SQL Server to Supabase, with support for incremental sync.
+    
+    Args:
+        sqlserver_conn: SQL Server connection
+        supabase_client: Supabase client
+        config: Migration configuration
+        dry_run: If True, only preview changes without executing them
+        incremental: If True, perform incremental sync based on last_sync table
+        
+    Returns:
+        Migration results
+    """
+    results = {
+        "success": False,
+        "tables_migrated": 0,
+        "records_migrated": 0,
+        "records_updated": 0,
+        "records_deleted": 0,
+        "tables": {},
+        "dry_run": dry_run,
+        "incremental": incremental
+    }
+    
+    # Create transaction log entry for rollback tracking if not in dry-run mode
+    transaction_id = None
+    if not dry_run and config.get("sync", {}).get("enable_rollback", True):
+        transaction_id = str(uuid.uuid4())
+        logger.info(f"Transaction ID for this migration: {transaction_id}")
+        try:
+            # Create sync_transactions table if it doesn't exist
+            supabase_client.sql("""
+            CREATE TABLE IF NOT EXISTS sync.transactions (
+                id UUID PRIMARY KEY,
+                timestamp TIMESTAMP WITH TIME ZONE DEFAULT now(),
+                operation TEXT NOT NULL,
+                source_type TEXT NOT NULL,
+                target_schema TEXT NOT NULL,
+                target_table TEXT NOT NULL,
+                record_count INTEGER DEFAULT 0,
+                metadata JSONB,
+                rollback_executed BOOLEAN DEFAULT false
+            );
+            """).execute()
+            
+            # Create last_sync table if it doesn't exist (for incremental sync)
+            if incremental:
+                supabase_client.sql("""
+                CREATE TABLE IF NOT EXISTS sync.last_sync (
+                    id SERIAL PRIMARY KEY,
+                    source_type TEXT NOT NULL,
+                    source_table TEXT NOT NULL,
+                    target_schema TEXT NOT NULL,
+                    target_table TEXT NOT NULL,
+                    last_sync_time TIMESTAMP WITH TIME ZONE DEFAULT now(),
+                    sync_key_column TEXT,
+                    last_key_value TEXT,
+                    record_count INTEGER DEFAULT 0
+                );
+                """).execute()
+        except Exception as e:
+            logger.warning(f"Could not ensure transaction tables exist: {str(e)}")
+    
+    # Enable change tracking in SQL Server if needed
+    if incremental and config.get("sync", {}).get("enable_change_tracking", True):
+        try:
+            # Check if change tracking is enabled at the database level
+            check_change_tracking = execute_pg_query(
+                sqlserver_conn,
+                "SELECT is_change_tracking_on FROM sys.change_tracking_databases WHERE database_id = DB_ID()"
+            )
+            
+            if not check_change_tracking or not check_change_tracking[0].get('is_change_tracking_on', 0):
+                logger.info("Enabling change tracking for the database...")
+                if not dry_run:
+                    sqlserver_conn.cursor().execute("ALTER DATABASE CURRENT SET CHANGE_TRACKING = ON (CHANGE_RETENTION = 7 DAYS, AUTO_CLEANUP = ON)")
+                    sqlserver_conn.commit()
+        except Exception as e:
+            logger.warning(f"Could not enable change tracking: {str(e)}")
+    
+    # Process each table mapping
+    for table_mapping in config.get("tables", []):
+        source_table = table_mapping.get("source_table")
+        source_query = table_mapping.get("source_query")
+        target_table = table_mapping.get("target_table")
+        target_schema = table_mapping.get("target_schema", "public")
+        field_mapping = table_mapping.get("field_mapping", {})
+        transformers = table_mapping.get("transformers", {})
+        key_column = table_mapping.get("key_column", "id")
+        batch_size = table_mapping.get("batch_size", config.get("sync", {}).get("batch_size", 100))
+        
+        # Determine sync mode message
+        sync_mode = "incremental" if incremental else "full"
+        exec_mode = "DRY RUN" if dry_run else "LIVE"
+        print_info(f"[{exec_mode}] {sync_mode.upper()} SYNC: SQL Server to {target_schema}.{target_table}...")
+        
+        # For incremental sync, get the last sync time and modify the query
+        last_sync_record = None
+        if incremental:
+            try:
+                last_sync_response = supabase_client.table("sync.last_sync").select("*") \
+                    .eq("source_table", source_table) \
+                    .eq("target_schema", target_schema) \
+                    .eq("target_table", target_table) \
+                    .limit(1).execute()
+                
+                if last_sync_response.data:
+                    last_sync_record = last_sync_response.data[0]
+                    logger.info(f"Last sync for {source_table} -> {target_schema}.{target_table}: {last_sync_record['last_sync_time']}")
+            except Exception as e:
+                logger.warning(f"Could not get last sync record: {str(e)}")
+        
+        # Load data from SQL Server
+        data = []
+        try:
+            if source_query:
+                # Use the provided query as is
+                if incremental and last_sync_record and "%LAST_SYNC_TIME%" in source_query:
+                    # Replace placeholder with actual last sync time
+                    modified_query = source_query.replace("%LAST_SYNC_TIME%", f"'{last_sync_record['last_sync_time']}'")
+                    logger.info(f"Using modified query for incremental sync: {modified_query}")
+                    data = execute_pg_query(sqlserver_conn, modified_query)
+                else:
+                    data = execute_pg_query(sqlserver_conn, source_query)
+            elif source_table:
+                # Build a query based on the source table
+                if incremental and last_sync_record:
+                    # Use last sync time if available
+                    modified_time_column = table_mapping.get("modified_time_column", "modified_at")
+                    query = f"SELECT * FROM {source_table} WHERE {modified_time_column} > '{last_sync_record['last_sync_time']}'"
+                    data = execute_pg_query(sqlserver_conn, query)
+                else:
+                    # Full table sync
+                    data = execute_pg_query(sqlserver_conn, f"SELECT * FROM {source_table}")
+        except Exception as e:
+            logger.error(f"Error executing SQL Server query: {str(e)}")
+            continue
+        
+        if not data:
+            print_warning(f"No data found for {source_table or source_query}")
+            # Record in results even if no data found
+            results["tables"][target_table] = {
+                "source": source_table or source_query,
+                "target_table": f"{target_schema}.{target_table}",
+                "records_total": 0,
+                "records_migrated": 0,
+                "records_updated": 0,
+                "records_deleted": 0,
+                "success": True,
+                "errors": []
+            }
+            continue
+        
+        print_info(f"Loaded {len(data)} records from SQL Server")
+        
+        # If no field mapping provided, create one from first record
+        if not field_mapping:
+            field_mapping = {key: key for key in data[0].keys()}
+        
+        # Map fields
+        mapped_data = map_fields(data, field_mapping, transformers)
+        
+        # Track latest key value for incremental sync
+        latest_key_value = None
+        if key_column and mapped_data:
+            # Find the max key value to store for next sync
+            try:
+                if key_column in mapped_data[0]:
+                    latest_values = [record.get(key_column) for record in mapped_data if record.get(key_column) is not None]
+                    if latest_values:
+                        if isinstance(latest_values[0], (int, float)):
+                            latest_key_value = str(max(latest_values))
+                        else:
+                            # For string keys, use the string with highest lexicographical value
+                            latest_key_value = max(latest_values)
+            except Exception as e:
+                logger.warning(f"Could not determine latest key value: {str(e)}")
+        
+        # Prepare result object
+        insert_result = {
+            "success": True,
+            "inserted": 0,
+            "updated": 0,
+            "deleted": 0,
+            "errors": [],
+            "dry_run": dry_run
+        }
+        
+        if dry_run:
+            # In dry-run mode, just report what would happen
+            insert_result["inserted"] = len(mapped_data)
+            print_info(f"[DRY RUN] Would migrate {len(mapped_data)} records to {target_schema}.{target_table}")
+        else:
+            # Determine if we're doing upsert or insert
+            upsert_mode = incremental and table_mapping.get("upsert_on_key", True)
+            
+            # Insert (or upsert) data into Supabase
+            insert_result = insert_data(
+                supabase_client,
+                target_table,
+                mapped_data,
+                target_schema,
+                batch_size,
+                transaction_id=transaction_id,
+                upsert=upsert_mode,
+                upsert_key=key_column if upsert_mode else None
+            )
+        
+        # Update last_sync record for incremental sync
+        if incremental and not dry_run and insert_result["success"]:
+            current_time = datetime.datetime.now().isoformat()
+            try:
+                # Handle case where last_sync record exists or not
+                if last_sync_record:
+                    supabase_client.table("sync.last_sync").update({
+                        "last_sync_time": current_time,
+                        "sync_key_column": key_column,
+                        "last_key_value": latest_key_value,
+                        "record_count": insert_result["inserted"] + insert_result["updated"]
+                    }).eq("id", last_sync_record["id"]).execute()
+                else:
+                    supabase_client.table("sync.last_sync").insert({
+                        "source_type": "sqlserver",
+                        "source_table": source_table or "custom_query",
+                        "target_schema": target_schema,
+                        "target_table": target_table,
+                        "last_sync_time": current_time,
+                        "sync_key_column": key_column,
+                        "last_key_value": latest_key_value,
+                        "record_count": insert_result["inserted"] + insert_result["updated"]
+                    }).execute()
+            except Exception as e:
+                logger.warning(f"Could not update last_sync record: {str(e)}")
+        
+        # Update results
+        table_result = {
+            "source": source_table or source_query,
+            "target_table": f"{target_schema}.{target_table}",
+            "records_total": len(data),
+            "records_migrated": insert_result["inserted"],
+            "records_updated": insert_result.get("updated", 0),
+            "records_deleted": insert_result.get("deleted", 0),
+            "success": insert_result["success"],
+            "errors": insert_result["errors"]
+        }
+        
+        results["tables"][target_table] = table_result
+        
+        if insert_result["success"]:
+            results["tables_migrated"] += 1
+            results["records_migrated"] += insert_result["inserted"]
+            results["records_updated"] += insert_result.get("updated", 0)
+            results["records_deleted"] += insert_result.get("deleted", 0)
+            
+            if dry_run:
+                print_info(f"[DRY RUN] Would migrate {insert_result['inserted']} records to {target_schema}.{target_table}")
+                if incremental and insert_result.get("updated", 0):
+                    print_info(f"[DRY RUN] Would update {insert_result.get('updated', 0)} records in {target_schema}.{target_table}")
+            else:
+                print_success(f"Successfully migrated {insert_result['inserted']} records to {target_schema}.{target_table}")
+                if incremental and insert_result.get("updated", 0):
+                    print_success(f"Updated {insert_result.get('updated', 0)} records in {target_schema}.{target_table}")
+        else:
+            print_error(f"Failed to migrate data to {target_schema}.{target_table}: {insert_result['errors']}")
+    
+    # Set overall success
+    results["success"] = results["tables_migrated"] > 0
+    
+    # Record transaction in the transactions table if not dry run
+    if transaction_id and not dry_run and results["success"]:
+        try:
+            supabase_client.table("sync.transactions").insert({
+                "id": transaction_id,
+                "operation": "incremental_sync" if incremental else "full_migration",
+                "source_type": "sqlserver",
+                "target_schema": config.get("target_schema", "public"),
+                "target_table": ", ".join(results["tables"].keys()),
+                "record_count": results["records_migrated"] + results["records_updated"],
+                "metadata": {
+                    "config": config,
+                    "results": results
+                }
+            }).execute()
+        except Exception as e:
+            logger.warning(f"Could not record transaction: {str(e)}")
     
     return results
 
