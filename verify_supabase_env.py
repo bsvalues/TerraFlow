@@ -1,15 +1,15 @@
 """
-Supabase Environment Verification Tool
+Supabase Environment Verification
 
-This module provides functions to verify Supabase environment configurations
-and test connectivity to Supabase services.
+This script verifies that Supabase environment variables are set correctly
+and that connections to Supabase services are working properly.
 """
 
 import os
-import json
+import sys
 import logging
-import time
-from typing import Dict, Any, Optional, List, Union, Tuple
+import json
+from typing import Dict, Any, Optional, List, Tuple
 
 try:
     import dotenv
@@ -27,15 +27,24 @@ except ImportError:
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Load environment variables from .env file
-def load_env_variables():
-    """Load environment variables from .env file if available."""
+def load_environment_variables() -> bool:
+    """
+    Load environment variables from .env file if available.
+    
+    Returns:
+        True if successful, False otherwise
+    """
     if DOTENV_AVAILABLE:
         try:
-            dotenv.load_dotenv()
-            logger.debug("Loaded environment variables from .env file")
+            dotenv.load_dotenv(".env")
+            logger.debug("Loaded environment variables from .env")
+            return True
         except Exception as e:
-            logger.warning(f"Failed to load environment variables from .env file: {str(e)}")
+            logger.warning(f"Failed to load environment variables from .env: {str(e)}")
+            return False
+    else:
+        logger.warning("dotenv package not installed, cannot load from .env file")
+        return False
 
 def check_environment_variables() -> Dict[str, Any]:
     """
@@ -44,40 +53,62 @@ def check_environment_variables() -> Dict[str, Any]:
     Returns:
         Dictionary with check results
     """
+    load_environment_variables()
+    
+    # Get active environment
     active_env = os.environ.get("SUPABASE_ACTIVE_ENVIRONMENT", "development")
-    env_prefix = f"{active_env.upper()}_" if active_env != "development" else ""
     
-    url_var = f"{env_prefix}SUPABASE_URL"
-    key_var = f"{env_prefix}SUPABASE_KEY"
-    service_key_var = f"{env_prefix}SUPABASE_SERVICE_KEY"
+    # Check for environment-specific variables
+    env_url_var = f"SUPABASE_URL_{active_env.upper()}"
+    env_key_var = f"SUPABASE_KEY_{active_env.upper()}"
+    env_service_key_var = f"SUPABASE_SERVICE_KEY_{active_env.upper()}"
     
-    # Try environment-specific variables first
-    url = os.environ.get(url_var)
-    key = os.environ.get(key_var)
-    service_key = os.environ.get(service_key_var)
+    env_url = os.environ.get(env_url_var)
+    env_key = os.environ.get(env_key_var)
+    env_service_key = os.environ.get(env_service_key_var)
     
-    # Fall back to base variables
-    if not url:
-        url = os.environ.get("SUPABASE_URL")
-    if not key:
-        key = os.environ.get("SUPABASE_KEY")
-    if not service_key:
-        service_key = os.environ.get("SUPABASE_SERVICE_KEY")
+    # Check for base variables
+    base_url = os.environ.get("SUPABASE_URL")
+    base_key = os.environ.get("SUPABASE_KEY")
+    base_service_key = os.environ.get("SUPABASE_SERVICE_KEY")
     
-    results = {
-        "success": bool(url and key),
-        "environment": active_env,
-        "url": url is not None,
-        "key": key is not None,
-        "service_key": service_key is not None,
-        "message": "All required variables are set" if url and key else "Missing required variables"
+    # Use environment-specific variables if available, otherwise fall back to base variables
+    url = env_url or base_url
+    key = env_key or base_key
+    service_key = env_service_key or base_service_key
+    
+    # Run checks
+    checks = {
+        "base_vars": {
+            "url": bool(base_url),
+            "key": bool(base_key),
+            "service_key": bool(base_service_key)
+        },
+        "env_vars": {
+            "url": bool(env_url),
+            "key": bool(env_key),
+            "service_key": bool(env_service_key)
+        },
+        "active_vars": {
+            "url": bool(url),
+            "key": bool(key),
+            "service_key": bool(service_key)
+        },
+        "active_environment": active_env
     }
     
-    return results
+    # Overall success
+    success = bool(url and key)
+    
+    return {
+        "success": success,
+        "message": "Environment variables are set correctly" if success else "Missing required environment variables",
+        "details": checks
+    }
 
 def check_supabase_connection() -> Dict[str, Any]:
     """
-    Check if the Supabase connection works.
+    Check if we can establish a connection to Supabase.
     
     Returns:
         Dictionary with check results
@@ -85,60 +116,44 @@ def check_supabase_connection() -> Dict[str, Any]:
     if not SUPABASE_AVAILABLE:
         return {
             "success": False,
-            "message": "Supabase package not installed"
+            "message": "Supabase package is not installed",
+            "details": {"supabase_available": False}
         }
     
-    active_env = os.environ.get("SUPABASE_ACTIVE_ENVIRONMENT", "development")
-    env_prefix = f"{active_env.upper()}_" if active_env != "development" else ""
-    
-    # Try environment-specific variables first
-    url = os.environ.get(f"{env_prefix}SUPABASE_URL", os.environ.get("SUPABASE_URL"))
-    key = os.environ.get(f"{env_prefix}SUPABASE_KEY", os.environ.get("SUPABASE_KEY"))
+    # Get Supabase URL and key
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_KEY")
     
     if not url or not key:
         return {
             "success": False,
-            "message": "Missing required environment variables"
+            "message": "Supabase URL or key not set",
+            "details": {"url_set": bool(url), "key_set": bool(key)}
         }
     
     try:
-        # Create Supabase client
+        # Try to create a client
         client = create_client(url, key)
         
-        # Try a simple query to check connection
-        start_time = time.time()
-        response = client.table("system_settings").select("key").limit(1).execute()
-        end_time = time.time()
+        # Try to make a simple query
+        response = client.table("_schema").select("*").limit(1).execute()
         
-        # Success criteria: No error and query time < 5 seconds
-        success = not hasattr(response, 'error') or not response.error
-        query_time = end_time - start_time
-        
-        if success:
-            return {
-                "success": True,
-                "message": f"Successfully connected to Supabase ({query_time:.2f}s)",
-                "query_time": f"{query_time:.2f}s",
-                "environment": active_env
-            }
-        else:
-            return {
-                "success": False,
-                "message": f"Connection established but query failed: {response.error}",
-                "environment": active_env
-            }
-    
+        return {
+            "success": True,
+            "message": "Successfully connected to Supabase",
+            "details": {"connection": "success", "url": url}
+        }
     except Exception as e:
-        logger.error(f"Supabase connection error: {str(e)}")
+        logger.warning(f"Failed to connect to Supabase: {str(e)}")
         return {
             "success": False,
-            "message": f"Connection error: {str(e)}",
-            "environment": active_env
+            "message": f"Failed to connect to Supabase: {str(e)}",
+            "details": {"connection": "failed", "error": str(e), "url": url}
         }
 
 def check_supabase_auth() -> Dict[str, Any]:
     """
-    Check if Supabase Auth service is working.
+    Check if Supabase Auth is working.
     
     Returns:
         Dictionary with check results
@@ -146,60 +161,56 @@ def check_supabase_auth() -> Dict[str, Any]:
     if not SUPABASE_AVAILABLE:
         return {
             "success": False,
-            "message": "Supabase package not installed"
+            "message": "Supabase package is not installed",
+            "details": {"supabase_available": False}
         }
     
-    active_env = os.environ.get("SUPABASE_ACTIVE_ENVIRONMENT", "development")
-    env_prefix = f"{active_env.upper()}_" if active_env != "development" else ""
-    
-    # Try environment-specific variables first
-    url = os.environ.get(f"{env_prefix}SUPABASE_URL", os.environ.get("SUPABASE_URL"))
-    key = os.environ.get(f"{env_prefix}SUPABASE_KEY", os.environ.get("SUPABASE_KEY"))
+    # Get Supabase URL and key
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_KEY")
     
     if not url or not key:
         return {
             "success": False,
-            "message": "Missing required environment variables"
+            "message": "Supabase URL or key not set",
+            "details": {"url_set": bool(url), "key_set": bool(key)}
         }
     
     try:
-        # Create Supabase client
+        # Try to create a client
         client = create_client(url, key)
         
-        # Try getting auth configuration
-        start_time = time.time()
-        settings = client.auth.get_settings()
-        end_time = time.time()
+        # Check if auth API is available
+        response = client.auth.get_user("fake-jwt-token")
         
-        # Success criteria: No error and response time < 5 seconds
-        success = not hasattr(settings, 'error') or not settings.error
-        query_time = end_time - start_time
+        # This should actually fail with an error about invalid JWT,
+        # but that means the auth API is working
+        return {
+            "success": True,
+            "message": "Supabase Auth is working",
+            "details": {"auth": "success"}
+        }
+    except Exception as e:
+        error_str = str(e)
         
-        if success:
+        # If we get an error about invalid JWT, that's actually good
+        if "invalid jwt" in error_str.lower():
             return {
                 "success": True,
-                "message": f"Successfully connected to Supabase Auth ({query_time:.2f}s)",
-                "query_time": f"{query_time:.2f}s",
-                "environment": active_env
+                "message": "Supabase Auth is working",
+                "details": {"auth": "success", "error": error_str}
             }
-        else:
-            return {
-                "success": False,
-                "message": f"Connection established but auth check failed: {settings.error}",
-                "environment": active_env
-            }
-    
-    except Exception as e:
-        logger.error(f"Supabase auth check error: {str(e)}")
+        
+        logger.warning(f"Failed to check Supabase Auth: {error_str}")
         return {
             "success": False,
-            "message": f"Auth check error: {str(e)}",
-            "environment": active_env
+            "message": f"Failed to check Supabase Auth: {error_str}",
+            "details": {"auth": "failed", "error": error_str}
         }
 
 def check_supabase_storage() -> Dict[str, Any]:
     """
-    Check if Supabase Storage service is working.
+    Check if Supabase Storage is working.
     
     Returns:
         Dictionary with check results
@@ -207,74 +218,44 @@ def check_supabase_storage() -> Dict[str, Any]:
     if not SUPABASE_AVAILABLE:
         return {
             "success": False,
-            "message": "Supabase package not installed"
+            "message": "Supabase package is not installed",
+            "details": {"supabase_available": False}
         }
     
-    active_env = os.environ.get("SUPABASE_ACTIVE_ENVIRONMENT", "development")
-    env_prefix = f"{active_env.upper()}_" if active_env != "development" else ""
-    
-    # Try environment-specific variables first
-    url = os.environ.get(f"{env_prefix}SUPABASE_URL", os.environ.get("SUPABASE_URL"))
-    key = os.environ.get(f"{env_prefix}SUPABASE_KEY", os.environ.get("SUPABASE_KEY"))
+    # Get Supabase URL and key
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_KEY")
     
     if not url or not key:
         return {
             "success": False,
-            "message": "Missing required environment variables"
+            "message": "Supabase URL or key not set",
+            "details": {"url_set": bool(url), "key_set": bool(key)}
         }
     
     try:
-        # Create Supabase client
+        # Try to create a client
         client = create_client(url, key)
         
-        # Try listing storage buckets
-        start_time = time.time()
-        buckets = client.storage.list_buckets()
-        end_time = time.time()
+        # List buckets to check if storage is working
+        response = client.storage.list_buckets()
         
-        # Success criteria: No error and response time < 5 seconds
-        success = not hasattr(buckets, 'error') or not buckets.error
-        query_time = end_time - start_time
-        
-        if success:
-            # Filter out buckets that start with '_' (internal buckets)
-            public_buckets = [b for b in buckets if not b['name'].startswith('_')]
-            
-            # Try to get or create a test bucket
-            if not public_buckets:
-                try:
-                    client.storage.create_bucket("test_bucket")
-                    logger.info(f"Created test bucket 'test_bucket' in {active_env} environment")
-                    public_buckets = ["test_bucket"]
-                except Exception as e:
-                    logger.info(f"Could not create test bucket: {str(e)}")
-            
-            return {
-                "success": True,
-                "message": f"Successfully connected to Supabase Storage ({query_time:.2f}s)",
-                "buckets": len(public_buckets),
-                "bucket_names": [b['name'] if isinstance(b, dict) else b for b in public_buckets],
-                "query_time": f"{query_time:.2f}s",
-                "environment": active_env
-            }
-        else:
-            return {
-                "success": False,
-                "message": f"Connection established but storage check failed: {buckets.error}",
-                "environment": active_env
-            }
-    
+        return {
+            "success": True,
+            "message": "Supabase Storage is working",
+            "details": {"storage": "success", "buckets": len(response)}
+        }
     except Exception as e:
-        logger.error(f"Supabase storage check error: {str(e)}")
+        logger.warning(f"Failed to check Supabase Storage: {str(e)}")
         return {
             "success": False,
-            "message": f"Storage check error: {str(e)}",
-            "environment": active_env
+            "message": f"Failed to check Supabase Storage: {str(e)}",
+            "details": {"storage": "failed", "error": str(e)}
         }
 
 def check_postgis_extension() -> Dict[str, Any]:
     """
-    Check if the PostGIS extension is installed and working.
+    Check if the PostGIS extension is enabled in the Supabase database.
     
     Returns:
         Dictionary with check results
@@ -282,160 +263,223 @@ def check_postgis_extension() -> Dict[str, Any]:
     if not SUPABASE_AVAILABLE:
         return {
             "success": False,
-            "message": "Supabase package not installed"
+            "message": "Supabase package is not installed",
+            "details": {"supabase_available": False}
         }
     
-    active_env = os.environ.get("SUPABASE_ACTIVE_ENVIRONMENT", "development")
-    env_prefix = f"{active_env.upper()}_" if active_env != "development" else ""
-    
-    # Try environment-specific variables first
-    url = os.environ.get(f"{env_prefix}SUPABASE_URL", os.environ.get("SUPABASE_URL"))
-    key = os.environ.get(f"{env_prefix}SUPABASE_KEY", os.environ.get("SUPABASE_KEY"))
+    # Get Supabase URL and key
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_KEY")
     
     if not url or not key:
         return {
             "success": False,
-            "message": "Missing required environment variables"
+            "message": "Supabase URL or key not set",
+            "details": {"url_set": bool(url), "key_set": bool(key)}
         }
     
     try:
-        # Create Supabase client
+        # Try to create a client
         client = create_client(url, key)
         
-        # Try running a PostGIS function
-        start_time = time.time()
+        # Query pg_extension to check if PostGIS is installed
+        response = client.table("pg_extension").select("*").eq("extname", "postgis").execute()
         
-        # Check if PostGIS is installed by querying for the version
-        response = client.rpc('run_sql', {"sql": "SELECT PostGIS_Version();"}).execute()
-        
-        end_time = time.time()
-        
-        # Success criteria: No error and response time < 5 seconds
-        success = not hasattr(response, 'error') or not response.error
-        query_time = end_time - start_time
-        
-        if success and response.data:
-            postgis_version = response.data[0]['postgis_version'] if response.data else "Unknown"
+        # Check if PostGIS was found
+        if len(response.data) > 0:
+            # Try to run a simple PostGIS query to make sure it's working
+            test_query = """
+            SELECT 'POINT(0 0)'::geometry;
+            """
+            
+            result = client.rpc("test_postgis_query", {"query": test_query}).execute()
             
             return {
                 "success": True,
-                "message": f"PostGIS extension is installed ({query_time:.2f}s)",
-                "version": postgis_version,
-                "query_time": f"{query_time:.2f}s",
-                "environment": active_env
+                "message": "PostGIS extension is enabled and working",
+                "details": {"postgis": "enabled", "version": response.data[0].get("extversion")}
             }
         else:
-            # Try creating the extension if it doesn't exist
-            try:
-                client.rpc('run_sql', {"sql": "CREATE EXTENSION IF NOT EXISTS postgis;"}).execute()
-                
-                # Check again
-                response = client.rpc('run_sql', {"sql": "SELECT PostGIS_Version();"}).execute()
-                
-                if not hasattr(response, 'error') or not response.error:
-                    postgis_version = response.data[0]['postgis_version'] if response.data else "Unknown"
-                    
-                    return {
-                        "success": True,
-                        "message": f"PostGIS extension was created successfully ({query_time:.2f}s)",
-                        "version": postgis_version,
-                        "query_time": f"{query_time:.2f}s",
-                        "environment": active_env
-                    }
-                else:
-                    return {
-                        "success": False,
-                        "message": f"Failed to create PostGIS extension: {response.error}",
-                        "environment": active_env
-                    }
-            except Exception as e:
-                return {
-                    "success": False,
-                    "message": f"PostGIS extension is not installed or not accessible: {str(e)}",
-                    "environment": active_env
-                }
-    
+            return {
+                "success": False,
+                "message": "PostGIS extension is not enabled",
+                "details": {"postgis": "not_enabled"}
+            }
     except Exception as e:
-        logger.error(f"PostGIS check error: {str(e)}")
+        logger.warning(f"Failed to check PostGIS extension: {str(e)}")
         return {
             "success": False,
-            "message": f"PostGIS check error: {str(e)}",
-            "environment": active_env
+            "message": f"Failed to check PostGIS extension: {str(e)}",
+            "details": {"postgis": "failed", "error": str(e)}
         }
 
-def test_migration_readiness(environment: str = None) -> Dict[str, Any]:
+def test_migration_readiness() -> Dict[str, Any]:
     """
-    Test if the Supabase environment is ready for migration.
+    Test if the database is ready for migration.
     
-    Args:
-        environment: Optional environment name to test
-        
     Returns:
-        Dictionary with test results
+        Dictionary with check results
     """
-    results = {}
+    if not SUPABASE_AVAILABLE:
+        return {
+            "success": False,
+            "message": "Supabase package is not installed",
+            "details": {"supabase_available": False}
+        }
     
-    # Save original environment
-    orig_env = os.environ.get("SUPABASE_ACTIVE_ENVIRONMENT")
+    # Get Supabase URL and key
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_SERVICE_KEY") or os.environ.get("SUPABASE_KEY")
+    
+    if not url or not key:
+        return {
+            "success": False,
+            "message": "Supabase URL or key not set",
+            "details": {"url_set": bool(url), "key_set": bool(key)}
+        }
     
     try:
-        # Set the environment to test if specified
-        if environment:
-            os.environ["SUPABASE_ACTIVE_ENVIRONMENT"] = environment
+        # Try to create a client
+        client = create_client(url, key)
         
-        # Run all checks
-        results["variables"] = check_environment_variables()
-        results["connection"] = check_supabase_connection()
-        results["auth"] = check_supabase_auth()
-        results["storage"] = check_supabase_storage()
-        results["postgis"] = check_postgis_extension()
+        # Check if we have the service key
+        service_key = os.environ.get("SUPABASE_SERVICE_KEY")
         
-        # Overall success if all checks passed
-        results["success"] = all(check.get("success", False) for check in results.values())
-        results["environment"] = environment or orig_env or "development"
-        
-        if results["success"]:
-            results["message"] = f"Environment {results['environment']} is ready for migration"
-        else:
-            results["message"] = f"Environment {results['environment']} is not ready for migration - see individual checks for details"
+        # Check if we have write access
+        try:
+            # First, check if the schema exists
+            schema_check = client.rpc("schema_exists", {"schema_name": "property"}).execute()
+            schema_exists = schema_check.data if schema_check.data is not None else False
+            
+            if not schema_exists:
+                # Try to create a test schema
+                client.rpc("create_schema", {"schema_name": "property"}).execute()
+            
+            # Try to create a test table
+            test_table_query = """
+            CREATE TABLE IF NOT EXISTS property.test_migration (
+                id SERIAL PRIMARY KEY,
+                name TEXT,
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            );
+            """
+            client.rpc("run_sql", {"query": test_table_query}).execute()
+            
+            # Drop the test table
+            client.rpc("run_sql", {"query": "DROP TABLE property.test_migration;"}).execute()
+            
+            return {
+                "success": True,
+                "message": "Database is ready for migration",
+                "details": {
+                    "write_access": True,
+                    "service_key_available": bool(service_key),
+                    "schema_exists": bool(schema_exists)
+                }
+            }
+        except Exception as e:
+            error_str = str(e)
+            
+            if "permission denied" in error_str.lower():
+                return {
+                    "success": False,
+                    "message": "Insufficient permissions for migration",
+                    "details": {
+                        "write_access": False,
+                        "service_key_available": bool(service_key),
+                        "error": error_str
+                    }
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": f"Error testing migration readiness: {error_str}",
+                    "details": {
+                        "write_access": False,
+                        "service_key_available": bool(service_key),
+                        "error": error_str
+                    }
+                }
+    except Exception as e:
+        logger.warning(f"Failed to test migration readiness: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to test migration readiness: {str(e)}",
+            "details": {"error": str(e)}
+        }
+
+def run_all_checks() -> Dict[str, Any]:
+    """
+    Run all Supabase environment checks.
     
-    finally:
-        # Restore original environment
-        if orig_env and environment:
-            os.environ["SUPABASE_ACTIVE_ENVIRONMENT"] = orig_env
+    Returns:
+        Dictionary with all check results
+    """
+    results = {
+        "environment_variables": check_environment_variables(),
+        "connection": check_supabase_connection(),
+        "auth": check_supabase_auth(),
+        "storage": check_supabase_storage(),
+        "postgis": check_postgis_extension(),
+        "migration_readiness": test_migration_readiness()
+    }
     
-    return results
+    # Overall success
+    success = all(check["success"] for check in results.values())
+    
+    return {
+        "success": success,
+        "message": "All checks passed" if success else "Some checks failed",
+        "details": results
+    }
+
+def main():
+    """Main entry point for script."""
+    # Load environment variables
+    load_environment_variables()
+    
+    # Parse command line arguments
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Verify Supabase environment")
+    parser.add_argument("--check", choices=["all", "env", "connection", "auth", "storage", "postgis", "migration"], default="all", help="Check to run")
+    parser.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    
+    args = parser.parse_args()
+    
+    # Run checks
+    if args.check == "all":
+        results = run_all_checks()
+    elif args.check == "env":
+        results = check_environment_variables()
+    elif args.check == "connection":
+        results = check_supabase_connection()
+    elif args.check == "auth":
+        results = check_supabase_auth()
+    elif args.check == "storage":
+        results = check_supabase_storage()
+    elif args.check == "postgis":
+        results = check_postgis_extension()
+    elif args.check == "migration":
+        results = test_migration_readiness()
+    
+    # Print results
+    if args.format == "json":
+        print(json.dumps(results, indent=2))
+    else:
+        print(f"Check: {args.check}")
+        print(f"Success: {results['success']}")
+        print(f"Message: {results['message']}")
+        
+        if "details" in results:
+            print("\nDetails:")
+            for key, value in results["details"].items():
+                if isinstance(value, dict):
+                    print(f"  {key}:")
+                    for sub_key, sub_value in value.items():
+                        print(f"    {sub_key}: {sub_value}")
+                else:
+                    print(f"  {key}: {value}")
 
 if __name__ == "__main__":
-    # Load environment variables
-    load_env_variables()
-    
-    # Run all checks
-    print("Checking Supabase environment...\n")
-    
-    var_check = check_environment_variables()
-    print(f"Environment Variables: {'✅' if var_check['success'] else '❌'} {var_check['message']}")
-    
-    if var_check['success']:
-        conn_check = check_supabase_connection()
-        print(f"Supabase Connection: {'✅' if conn_check['success'] else '❌'} {conn_check['message']}")
-        
-        auth_check = check_supabase_auth()
-        print(f"Supabase Auth: {'✅' if auth_check['success'] else '❌'} {auth_check['message']}")
-        
-        storage_check = check_supabase_storage()
-        print(f"Supabase Storage: {'✅' if storage_check['success'] else '❌'} {storage_check['message']}")
-        
-        postgis_check = check_postgis_extension()
-        print(f"PostGIS Extension: {'✅' if postgis_check['success'] else '❌'} {postgis_check['message']}")
-        
-        # Overall success
-        all_success = all([
-            var_check['success'],
-            conn_check['success'],
-            auth_check['success'],
-            storage_check['success'],
-            postgis_check['success']
-        ])
-        
-        print(f"\nOverall Status: {'✅' if all_success else '❌'} Environment is {'ready' if all_success else 'not ready'} for use")
+    main()
