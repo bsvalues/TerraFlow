@@ -336,12 +336,16 @@ def get_property(property_id: str) -> Optional[Property]:
     Returns:
         Property object or None if not found
     """
+    supabase = None
     try:
         if not is_authenticated():
             logger.warning("User not authenticated to get property")
             return None
         
         supabase = get_supabase_client()
+        if not supabase:
+            logger.error("Could not get Supabase client")
+            return None
         
         # Try to find in property schema first (newer system)
         response = supabase.table("property.properties").select("*").eq("id", property_id).execute()
@@ -361,6 +365,11 @@ def get_property(property_id: str) -> Optional[Property]:
     except Exception as e:
         logger.error(f"Error retrieving property: {str(e)}")
         return None
+    finally:
+        # Release the client
+        if supabase:
+            from supabase_connection_pool import release_connection
+            release_connection(supabase)
 
 
 def get_properties(filters: Dict[str, Any] = None, page: int = 1, per_page: int = 20) -> Dict[str, Any]:
@@ -375,12 +384,17 @@ def get_properties(filters: Dict[str, Any] = None, page: int = 1, per_page: int 
     Returns:
         Dictionary with properties list, pagination info, and success status
     """
+    supabase = None
     try:
         if not is_authenticated():
             logger.warning("User not authenticated to list properties")
             return {"success": False, "error": "Not authenticated", "data": [], "total": 0, "page": page, "per_page": per_page}
         
         supabase = get_supabase_client()
+        if not supabase:
+            logger.error("Could not get Supabase client")
+            return {"success": False, "error": "Database connection error", "data": [], "total": 0, "page": page, "per_page": per_page}
+            
         query = supabase.table("property.properties").select("*", count="exact")
         
         # Apply filters if provided
@@ -418,6 +432,11 @@ def get_properties(filters: Dict[str, Any] = None, page: int = 1, per_page: int 
     except Exception as e:
         logger.error(f"Error listing properties: {str(e)}")
         return {"success": False, "error": str(e), "data": [], "total": 0, "page": page, "per_page": per_page}
+    finally:
+        # Release the client
+        if supabase:
+            from supabase_connection_pool import release_connection
+            release_connection(supabase)
 
 
 def create_property(property_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -430,6 +449,7 @@ def create_property(property_data: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dictionary with created property and success status
     """
+    supabase = None
     try:
         if not is_authenticated():
             logger.warning("User not authenticated to create property")
@@ -456,6 +476,10 @@ def create_property(property_data: Dict[str, Any]) -> Dict[str, Any]:
         data = {k: v for k, v in data.items() if v is not None and k != "id"}
         
         supabase = get_supabase_client()
+        if not supabase:
+            logger.error("Could not get Supabase client")
+            return {"success": False, "error": "Database connection error"}
+            
         response = supabase.table("property.properties").insert(data).execute()
         
         if response.data and len(response.data) > 0:
@@ -466,6 +490,11 @@ def create_property(property_data: Dict[str, Any]) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Error creating property: {str(e)}")
         return {"success": False, "error": str(e)}
+    finally:
+        # Release the client
+        if supabase:
+            from supabase_connection_pool import release_connection
+            release_connection(supabase)
 
 
 def update_property(property_id: str, property_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -479,6 +508,7 @@ def update_property(property_id: str, property_data: Dict[str, Any]) -> Dict[str
     Returns:
         Dictionary with updated property and success status
     """
+    supabase = None
     try:
         if not is_authenticated():
             logger.warning("User not authenticated to update property")
@@ -512,6 +542,10 @@ def update_property(property_id: str, property_data: Dict[str, Any]) -> Dict[str
         data["updated_at"] = datetime.now().isoformat()
         
         supabase = get_supabase_client()
+        if not supabase:
+            logger.error("Could not get Supabase client")
+            return {"success": False, "error": "Database connection error"}
+            
         response = supabase.table("property.properties").update(data).eq("id", property_id).execute()
         
         if response.data and len(response.data) > 0:
@@ -522,6 +556,11 @@ def update_property(property_id: str, property_data: Dict[str, Any]) -> Dict[str
     except Exception as e:
         logger.error(f"Error updating property: {str(e)}")
         return {"success": False, "error": str(e)}
+    finally:
+        # Release the client
+        if supabase:
+            from supabase_connection_pool import release_connection
+            release_connection(supabase)
 
 
 def delete_property(property_id: str) -> Dict[str, bool]:
@@ -534,6 +573,7 @@ def delete_property(property_id: str) -> Dict[str, bool]:
     Returns:
         Dictionary with success status
     """
+    supabase = None
     try:
         if not is_authenticated():
             logger.warning("User not authenticated to delete property")
@@ -549,6 +589,9 @@ def delete_property(property_id: str) -> Dict[str, bool]:
             return {"success": False, "error": "Property not found"}
         
         supabase = get_supabase_client()
+        if not supabase:
+            logger.error("Could not get Supabase client")
+            return {"success": False, "error": "Database connection error"}
         
         # Delete property
         response = supabase.table("property.properties").delete().eq("id", property_id).execute()
@@ -561,6 +604,11 @@ def delete_property(property_id: str) -> Dict[str, bool]:
     except Exception as e:
         logger.error(f"Error deleting property: {str(e)}")
         return {"success": False, "error": str(e)}
+    finally:
+        # Release the client
+        if supabase:
+            from supabase_connection_pool import release_connection
+            release_connection(supabase)
 
 
 # Database Operations for Assessments
@@ -575,13 +623,17 @@ def get_property_assessments(property_id: str) -> List[PropertyAssessment]:
     Returns:
         List of PropertyAssessment objects
     """
+    supabase = None
     try:
         if not is_authenticated():
             logger.warning("User not authenticated to get assessments")
             return []
         
         supabase = get_supabase_client()
-        
+        if not supabase:
+            logger.error("Could not get Supabase client")
+            return []
+            
         response = supabase.table("property.property_assessments") \
             .select("*") \
             .eq("property_id", property_id) \
@@ -596,6 +648,11 @@ def get_property_assessments(property_id: str) -> List[PropertyAssessment]:
     except Exception as e:
         logger.error(f"Error retrieving property assessments: {str(e)}")
         return []
+    finally:
+        # Release the client
+        if supabase:
+            from supabase_connection_pool import release_connection
+            release_connection(supabase)
 
 
 def get_assessment(assessment_id: str) -> Optional[PropertyAssessment]:
@@ -608,13 +665,17 @@ def get_assessment(assessment_id: str) -> Optional[PropertyAssessment]:
     Returns:
         PropertyAssessment object or None if not found
     """
+    supabase = None
     try:
         if not is_authenticated():
             logger.warning("User not authenticated to get assessment")
             return None
         
         supabase = get_supabase_client()
-        
+        if not supabase:
+            logger.error("Could not get Supabase client")
+            return None
+            
         response = supabase.table("property.property_assessments") \
             .select("*") \
             .eq("id", assessment_id) \
@@ -629,6 +690,11 @@ def get_assessment(assessment_id: str) -> Optional[PropertyAssessment]:
     except Exception as e:
         logger.error(f"Error retrieving assessment: {str(e)}")
         return None
+    finally:
+        # Release the client
+        if supabase:
+            from supabase_connection_pool import release_connection
+            release_connection(supabase)
 
 
 def create_assessment(assessment_data: Dict[str, Any]) -> Dict[str, Any]:
