@@ -1,0 +1,407 @@
+{% extends "base.html" %}
+
+{% block title %}Property Files{% endblock %}
+
+{% block styles %}
+<style>
+    .file-card {
+        transition: transform 0.2s;
+    }
+    
+    .file-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    }
+    
+    .file-icon {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .document-icon { color: #dc3545; }
+    .image-icon { color: #198754; }
+    .spreadsheet-icon { color: #0d6efd; }
+    .pdf-icon { color: #fd7e14; }
+    .archive-icon { color: #6c757d; }
+    .geo-icon { color: #6f42c1; }
+    
+    .dropzone {
+        border: 2px dashed #ddd;
+        border-radius: 10px;
+        padding: 2rem;
+        text-align: center;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+    
+    .dropzone:hover {
+        background-color: #f8f9fa;
+    }
+    
+    .dropzone.dragover {
+        background-color: #e9ecef;
+        border-color: #0d6efd;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="mb-1">Property Files</h1>
+            <p class="text-muted mb-0">{{ property.address or 'Property' }} | Parcel ID: {{ property.parcel_id }}</p>
+        </div>
+        
+        <a href="{{ url_for('property.property_detail', property_id=property.id) }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Property
+        </a>
+    </div>
+    
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Document Library</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <select class="form-select" id="fileFilter">
+                            <option value="all">All Files</option>
+                            <option value="Deed">Deeds</option>
+                            <option value="Tax">Tax Documents</option>
+                            <option value="Photo">Photos</option>
+                            <option value="Survey">Surveys</option>
+                            <option value="Inspection">Inspection Reports</option>
+                            <option value="Appeal">Appeal Documents</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    
+                    {% if files %}
+                        <div class="row row-cols-1 row-cols-md-3 g-4" id="fileGrid">
+                            {% for file in files %}
+                                <div class="col file-item" data-category="{{ file.file_category }}">
+                                    <div class="card h-100 file-card">
+                                        <div class="card-body text-center">
+                                            <div class="file-icon">
+                                                {% set file_extension = file.file_name.split('.')[-1]|lower %}
+                                                
+                                                {% if file_extension in ['jpg', 'jpeg', 'png', 'gif', 'bmp'] or file.file_type and 'image/' in file.file_type %}
+                                                    <i class="bi bi-file-image file-icon image-icon"></i>
+                                                {% elif file_extension == 'pdf' or file.file_type == 'application/pdf' %}
+                                                    <i class="bi bi-file-pdf file-icon pdf-icon"></i>
+                                                {% elif file_extension in ['xls', 'xlsx', 'csv'] %}
+                                                    <i class="bi bi-file-spreadsheet file-icon spreadsheet-icon"></i>
+                                                {% elif file_extension in ['doc', 'docx', 'txt', 'rtf'] %}
+                                                    <i class="bi bi-file-text file-icon document-icon"></i>
+                                                {% elif file_extension in ['zip', 'rar', 'tar', 'gz', '7z'] %}
+                                                    <i class="bi bi-file-zip file-icon archive-icon"></i>
+                                                {% elif file_extension in ['shp', 'geojson', 'kml', 'gml'] %}
+                                                    <i class="bi bi-geo-alt file-icon geo-icon"></i>
+                                                {% else %}
+                                                    <i class="bi bi-file-earmark file-icon"></i>
+                                                {% endif %}
+                                            </div>
+                                            
+                                            <h5 class="card-title text-truncate">{{ file.file_name }}</h5>
+                                            <p class="card-text">
+                                                <span class="badge bg-primary">{{ file.file_category or 'Other' }}</span>
+                                            </p>
+                                            
+                                            <div class="btn-group w-100">
+                                                <a href="{{ file.public_url }}" class="btn btn-outline-primary" target="_blank">
+                                                    <i class="bi bi-eye"></i> View
+                                                </a>
+                                                
+                                                {% if has_role('admin') or has_role('editor') %}
+                                                <button type="button" class="btn btn-outline-danger delete-file" data-file-id="{{ file.id }}" data-file-name="{{ file.file_name }}">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        <div class="card-footer text-muted">
+                                            <small>Uploaded: {{ file.created_at|datetimeformat }}</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info">
+                            No files have been uploaded for this property yet.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            {% if has_role('admin') or has_role('editor') %}
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Upload Files</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('property.property_file_upload', property_id=property.id) }}" enctype="multipart/form-data" id="uploadForm">
+                        <div class="mb-3">
+                            <label for="fileCategory" class="form-label">File Category</label>
+                            <select class="form-select" id="fileCategory" name="file_category" required>
+                                <option value="" selected disabled>Select a category</option>
+                                <option value="Deed">Deed</option>
+                                <option value="Tax">Tax Document</option>
+                                <option value="Photo">Photo</option>
+                                <option value="Survey">Survey</option>
+                                <option value="Inspection">Inspection Report</option>
+                                <option value="Appeal">Appeal Document</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="file" class="form-label">Select File</label>
+                            <input type="file" class="form-control" id="file" name="file" required>
+                            
+                            <!-- Dropzone for drag-and-drop file upload -->
+                            <div class="dropzone mt-3" id="dropzone">
+                                <i class="bi bi-cloud-upload" style="font-size: 2rem;"></i>
+                                <p class="mb-0">Drag and drop files here or click to select</p>
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-success" id="uploadButton">
+                                <i class="bi bi-upload"></i> Upload File
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+            
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">File Statistics</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-3">
+                        <div>Total Files:</div>
+                        <div><strong>{{ files|length }}</strong></div>
+                    </div>
+                    
+                    <!-- File type statistics -->
+                    <h6 class="mt-4 mb-3">File Categories</h6>
+                    
+                    {% set categories = {} %}
+                    {% for file in files %}
+                        {% set category = file.file_category or 'Other' %}
+                        {% if category in categories %}
+                            {% set _ = categories.update({category: categories[category] + 1}) %}
+                        {% else %}
+                            {% set _ = categories.update({category: 1}) %}
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% for category, count in categories.items() %}
+                        <div class="d-flex justify-content-between mb-2">
+                            <div>{{ category }}:</div>
+                            <div><strong>{{ count }}</strong></div>
+                        </div>
+                    {% endfor %}
+                    
+                    <!-- File type chart -->
+                    {% if files %}
+                        <div class="mt-4">
+                            <canvas id="fileTypesChart"></canvas>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete File Modal -->
+{% if has_role('admin') or has_role('editor') %}
+<div class="modal fade" id="deleteFileModal" tabindex="-1" aria-labelledby="deleteFileModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteFileModalLabel">Confirm Delete</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete this file? This action cannot be undone.</p>
+                <p><strong>File:</strong> <span id="deleteFileName"></span></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form id="deleteFileForm" method="POST" action="">
+                    <button type="submit" class="btn btn-danger">Delete File</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // File filtering
+        const fileFilter = document.getElementById('fileFilter');
+        const fileGrid = document.getElementById('fileGrid');
+        
+        if (fileFilter && fileGrid) {
+            fileFilter.addEventListener('change', function() {
+                const category = this.value;
+                const fileItems = document.querySelectorAll('.file-item');
+                
+                fileItems.forEach(function(item) {
+                    if (category === 'all' || item.dataset.category === category) {
+                        item.style.display = 'block';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+            });
+        }
+        
+        // File deletion
+        const deleteButtons = document.querySelectorAll('.delete-file');
+        const deleteModal = document.getElementById('deleteFileModal');
+        
+        if (deleteButtons.length > 0 && deleteModal) {
+            deleteButtons.forEach(function(button) {
+                button.addEventListener('click', function() {
+                    const fileId = this.dataset.fileId;
+                    const fileName = this.dataset.fileName;
+                    
+                    document.getElementById('deleteFileName').textContent = fileName;
+                    document.getElementById('deleteFileForm').action = `/property/files/${fileId}/delete`;
+                    
+                    const modal = new bootstrap.Modal(deleteModal);
+                    modal.show();
+                });
+            });
+        }
+        
+        // Drag and drop file upload
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('file');
+        
+        if (dropzone && fileInput) {
+            dropzone.addEventListener('click', function() {
+                fileInput.click();
+            });
+            
+            fileInput.addEventListener('change', function() {
+                if (this.files.length > 0) {
+                    dropzone.innerHTML = `
+                        <i class="bi bi-check-circle-fill" style="font-size: 2rem; color: #198754;"></i>
+                        <p class="mb-0">${this.files[0].name} selected</p>
+                    `;
+                } else {
+                    dropzone.innerHTML = `
+                        <i class="bi bi-cloud-upload" style="font-size: 2rem;"></i>
+                        <p class="mb-0">Drag and drop files here or click to select</p>
+                    `;
+                }
+            });
+            
+            // Prevent default behavior to allow drop
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropzone.addEventListener(eventName, preventDefaults, false);
+            });
+            
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            
+            // Add/remove the dragover class
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropzone.addEventListener(eventName, function() {
+                    dropzone.classList.add('dragover');
+                }, false);
+            });
+            
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropzone.addEventListener(eventName, function() {
+                    dropzone.classList.remove('dragover');
+                }, false);
+            });
+            
+            // Handle drop event
+            dropzone.addEventListener('drop', function(e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                
+                if (files.length > 0) {
+                    fileInput.files = files;
+                    dropzone.innerHTML = `
+                        <i class="bi bi-check-circle-fill" style="font-size: 2rem; color: #198754;"></i>
+                        <p class="mb-0">${files[0].name} selected</p>
+                    `;
+                }
+            }, false);
+        }
+        
+        // Chart for file types
+        {% if files %}
+        const categories = {{ categories|tojson }};
+        const categoryLabels = Object.keys(categories);
+        const categoryCounts = Object.values(categories);
+        
+        // Generate colors for the chart
+        const categoryColors = [
+            'rgba(255, 99, 132, 0.7)',
+            'rgba(54, 162, 235, 0.7)',
+            'rgba(255, 206, 86, 0.7)',
+            'rgba(75, 192, 192, 0.7)',
+            'rgba(153, 102, 255, 0.7)',
+            'rgba(255, 159, 64, 0.7)',
+            'rgba(199, 199, 199, 0.7)'
+        ];
+        
+        // Create the chart
+        const ctx = document.getElementById('fileTypesChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: categoryLabels,
+                datasets: [{
+                    data: categoryCounts,
+                    backgroundColor: categoryColors.slice(0, categoryLabels.length),
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+        {% endif %}
+    });
+</script>
+{% endblock %}

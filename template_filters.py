@@ -25,6 +25,11 @@ def register_template_filters(app: Flask) -> None:
     app.jinja_env.filters['format_filesize'] = format_filesize
     app.jinja_env.filters['timestamp_to_date'] = timestamp_to_date
     app.jinja_env.filters['relative_time'] = relative_time
+    app.jinja_env.filters['dateformat'] = dateformat
+    app.jinja_env.filters['datetimeformat'] = datetimeformat
+    app.jinja_env.filters['commaformat'] = commaformat
+    app.jinja_env.filters['tojson'] = to_json
+    app.jinja_env.globals['now'] = now
 
 
 def format_date(value: Union[datetime.date, datetime.datetime, str, None], format_string: str = '%Y-%m-%d') -> str:

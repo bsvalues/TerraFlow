@@ -1,0 +1,368 @@
+{% extends "base.html" %}
+
+{% block title %}Property List{% endblock %}
+
+{% block styles %}
+<style>
+    .property-card {
+        transition: transform 0.2s;
+    }
+    
+    .property-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    }
+    
+    .search-box {
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .map-container {
+        height: 500px;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="mb-0">Property Database</h1>
+        
+        {% if has_role('admin') or has_role('editor') %}
+        <a href="{{ url_for('property.property_create') }}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Add Property
+        </a>
+        {% endif %}
+    </div>
+    
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    
+    <div class="search-box">
+        <h5><i class="bi bi-search"></i> Search Properties</h5>
+        <form id="searchForm" action="javascript:void(0);">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label for="parcelId" class="form-label">Parcel ID</label>
+                    <input type="text" class="form-control" id="parcelId" name="parcel_id">
+                </div>
+                <div class="col-md-8">
+                    <label for="address" class="form-label">Address</label>
+                    <input type="text" class="form-control" id="address" name="address_like">
+                </div>
+                <div class="col-md-4">
+                    <label for="propertyClass" class="form-label">Property Class</label>
+                    <select class="form-select" id="propertyClass" name="property_class">
+                        <option value="">Any</option>
+                        <option value="Residential">Residential</option>
+                        <option value="Commercial">Commercial</option>
+                        <option value="Agricultural">Agricultural</option>
+                        <option value="Industrial">Industrial</option>
+                        <option value="Mixed Use">Mixed Use</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="minValue" class="form-label">Min Value</label>
+                    <input type="number" class="form-control" id="minValue" name="total_value_gte">
+                </div>
+                <div class="col-md-4">
+                    <label for="maxValue" class="form-label">Max Value</label>
+                    <input type="number" class="form-control" id="maxValue" name="total_value_lte">
+                </div>
+                <div class="col-12 d-flex justify-content-end">
+                    <button type="reset" class="btn btn-secondary me-2">Reset</button>
+                    <button type="submit" class="btn btn-primary">Search</button>
+                </div>
+            </div>
+        </form>
+    </div>
+    
+    <div class="row mb-4">
+        <div class="col-md-5">
+            <div id="propertyList" class="list-group property-list overflow-auto" style="max-height: 500px;">
+                <!-- Properties will be loaded here via JavaScript -->
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Loading properties...</p>
+                </div>
+            </div>
+            
+            <div class="mt-3">
+                <nav aria-label="Property navigation">
+                    <ul class="pagination justify-content-center" id="pagination">
+                        <!-- Pagination will be loaded here via JavaScript -->
+                    </ul>
+                </nav>
+            </div>
+        </div>
+        
+        <div class="col-md-7">
+            <div class="map-container" id="propertyMap">
+                <!-- Map will be loaded here via JavaScript -->
+                <div class="d-flex align-items-center justify-content-center h-100">
+                    <div class="text-center">
+                        <i class="bi bi-map" style="font-size: 3rem; color: #ccc;"></i>
+                        <p class="mt-2">Select a property to view on map</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Current page for pagination
+        let currentPage = 1;
+        let perPage = 10;
+        
+        // Initialize the map
+        const map = L.map('propertyMap').setView([46.0646, -118.3430], 13); // Centered on Benton County area
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+        
+        // Property markers
+        let markers = {};
+        
+        // Load properties
+        function loadProperties(page = 1, filters = {}) {
+            const propertyList = document.getElementById('propertyList');
+            propertyList.innerHTML = `
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Loading properties...</p>
+                </div>
+            `;
+            
+            // Build query string from filters
+            let queryParams = new URLSearchParams({
+                page: page,
+                per_page: perPage
+            });
+            
+            // Add filters to query params
+            for (const [key, value] of Object.entries(filters)) {
+                if (value) {
+                    queryParams.append(key, value);
+                }
+            }
+            
+            // Fetch properties
+            fetch(`/property/api/properties?${queryParams.toString()}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        renderProperties(data.data, data.page);
+                        updatePagination(data.page, data.data.length === perPage);
+                    } else {
+                        propertyList.innerHTML = `
+                            <div class="alert alert-danger">
+                                Failed to load properties: ${data.error || 'Unknown error'}
+                            </div>
+                        `;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    propertyList.innerHTML = `
+                        <div class="alert alert-danger">
+                            An error occurred while loading properties. Please try again.
+                        </div>
+                    `;
+                });
+        }
+        
+        // Render properties in the list
+        function renderProperties(properties, page) {
+            const propertyList = document.getElementById('propertyList');
+            currentPage = page;
+            
+            if (properties.length === 0) {
+                propertyList.innerHTML = `
+                    <div class="alert alert-info">
+                        No properties found matching your criteria.
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '';
+            properties.forEach(property => {
+                html += `
+                    <a href="${window.location.pathname}/${property.id}" class="list-group-item list-group-item-action property-item" data-id="${property.id}">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h5 class="mb-1">${property.address || 'No Address'}</h5>
+                            <small>${property.property_class || 'Unknown'}</small>
+                        </div>
+                        <p class="mb-1">Parcel ID: ${property.parcel_id || 'N/A'}</p>
+                        <div class="d-flex justify-content-between">
+                            <small>Value: $${property.total_value ? property.total_value.toLocaleString() : 'N/A'}</small>
+                            <small>${property.city || ''} ${property.state || ''} ${property.zip_code || ''}</small>
+                        </div>
+                    </a>
+                `;
+                
+                // Add marker to map if coordinates are available
+                if (property.latitude && property.longitude) {
+                    if (markers[property.id]) {
+                        // Update existing marker
+                        markers[property.id].setLatLng([property.latitude, property.longitude]);
+                    } else {
+                        // Create new marker
+                        const marker = L.marker([property.latitude, property.longitude])
+                            .addTo(map)
+                            .bindPopup(`
+                                <strong>${property.address || 'No Address'}</strong><br>
+                                Parcel ID: ${property.parcel_id || 'N/A'}<br>
+                                Value: $${property.total_value ? property.total_value.toLocaleString() : 'N/A'}<br>
+                                <a href="${window.location.pathname}/${property.id}" class="btn btn-sm btn-primary mt-2">View Details</a>
+                            `);
+                        
+                        markers[property.id] = marker;
+                    }
+                }
+            });
+            
+            propertyList.innerHTML = html;
+            
+            // Add click event for property items
+            document.querySelectorAll('.property-item').forEach(item => {
+                item.addEventListener('click', function(event) {
+                    event.preventDefault();
+                    
+                    // Highlight the selected property
+                    document.querySelectorAll('.property-item').forEach(i => {
+                        i.classList.remove('active');
+                    });
+                    this.classList.add('active');
+                    
+                    const propertyId = this.dataset.id;
+                    
+                    // Center map on the selected property marker
+                    if (markers[propertyId]) {
+                        map.setView(markers[propertyId].getLatLng(), 15);
+                        markers[propertyId].openPopup();
+                    }
+                });
+            });
+        }
+        
+        // Update pagination controls
+        function updatePagination(page, hasMore) {
+            const pagination = document.getElementById('pagination');
+            
+            let html = '';
+            
+            // Previous button
+            html += `
+                <li class="page-item ${page <= 1 ? 'disabled' : ''}">
+                    <a class="page-link" href="#" data-page="${page - 1}" aria-label="Previous">
+                        <span aria-hidden="true">&laquo;</span>
+                    </a>
+                </li>
+            `;
+            
+            // Page numbers
+            if (page > 1) {
+                html += `<li class="page-item"><a class="page-link" href="#" data-page="1">1</a></li>`;
+                
+                if (page > 2) {
+                    html += page > 3 ? `<li class="page-item disabled"><span class="page-link">...</span></li>` : '';
+                    html += `<li class="page-item"><a class="page-link" href="#" data-page="${page - 1}">${page - 1}</a></li>`;
+                }
+            }
+            
+            // Current page
+            html += `<li class="page-item active"><span class="page-link">${page}</span></li>`;
+            
+            // Next pages
+            if (hasMore) {
+                html += `<li class="page-item"><a class="page-link" href="#" data-page="${page + 1}">${page + 1}</a></li>`;
+                html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+            }
+            
+            // Next button
+            html += `
+                <li class="page-item ${!hasMore ? 'disabled' : ''}">
+                    <a class="page-link" href="#" data-page="${page + 1}" aria-label="Next">
+                        <span aria-hidden="true">&raquo;</span>
+                    </a>
+                </li>
+            `;
+            
+            pagination.innerHTML = html;
+            
+            // Add event listeners to pagination links
+            document.querySelectorAll('.page-link[data-page]').forEach(link => {
+                link.addEventListener('click', function(event) {
+                    event.preventDefault();
+                    
+                    const page = parseInt(this.dataset.page);
+                    const filters = getFormFilters();
+                    
+                    loadProperties(page, filters);
+                });
+            });
+        }
+        
+        // Get filters from form
+        function getFormFilters() {
+            const form = document.getElementById('searchForm');
+            const formData = new FormData(form);
+            const filters = {};
+            
+            for (const [key, value] of formData.entries()) {
+                if (value) {
+                    filters[key] = value;
+                }
+            }
+            
+            return filters;
+        }
+        
+        // Initial load
+        loadProperties();
+        
+        // Search form submission
+        document.getElementById('searchForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            
+            const filters = getFormFilters();
+            loadProperties(1, filters);
+        });
+        
+        // Reset form
+        document.getElementById('searchForm').addEventListener('reset', function(event) {
+            // Wait for form to reset, then load all properties
+            setTimeout(() => {
+                loadProperties();
+            }, 0);
+        });
+    });
+</script>
+{% endblock %}
