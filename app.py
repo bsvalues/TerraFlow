@@ -834,6 +834,14 @@ try:
 except Exception as e:
     app.logger.error(f"Error registering Supabase config routes: {str(e)}")
 
+# Register Property Management routes
+try:
+    from property_routes import register_property_routes
+    register_property_routes(app)
+    app.logger.info("Property management routes registered successfully")
+except Exception as e:
+    app.logger.error(f"Error registering property routes: {str(e)}")
+
 # Initialize API for third-party and microservice integration
 try:
     # Add test API key for development
