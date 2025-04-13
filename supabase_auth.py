@@ -11,6 +11,15 @@ import json
 import time
 from typing import Dict, Any, Optional, Tuple, Union, List, cast
 from functools import wraps
+from datetime import datetime, timedelta
+
+try:
+    from flask import session, current_app
+    from flask_login import login_user as flask_login_user
+    from flask_login import logout_user as flask_logout_user
+    FLASK_AVAILABLE = True
+except ImportError:
+    FLASK_AVAILABLE = False
 
 # Local modules
 from supabase_connection_pool import get_connection, release_connection
@@ -481,3 +490,112 @@ class SupabaseAuth:
 
 # Create a singleton instance
 supabase_auth = SupabaseAuth()
+
+def login_user(email: str, password: str, remember: bool = False) -> Tuple[bool, Dict[str, Any]]:
+    """
+    Login a user with Flask-Login.
+    
+    Args:
+        email: User email
+        password: User password
+        remember: Whether to remember the user
+        
+    Returns:
+        Tuple of (success, data)
+    """
+    if not FLASK_AVAILABLE:
+        return False, {"error": "Flask is not available"}
+    
+    # Authenticate with Supabase
+    success, data = supabase_auth.sign_in(email, password)
+    
+    if not success:
+        return False, data
+    
+    # Create user object for Flask-Login
+    user_data = data.get("user", {})
+    if not user_data:
+        return False, {"error": "User data not returned from Supabase"}
+    
+    # Create user object
+    user = SupabaseUser(user_data)
+    
+    try:
+        # Login with Flask-Login
+        flask_login_user(user, remember=remember)
+        
+        # Store session info in Flask session
+        session["supabase_session"] = {
+            "access_token": data.get("session", {}).get("access_token"),
+            "refresh_token": data.get("session", {}).get("refresh_token"),
+            "expires_at": data.get("session", {}).get("expires_at")
+        }
+        
+        return True, {"user": user_data}
+    except Exception as e:
+        logger.error(f"Error logging in user with Flask-Login: {str(e)}")
+        return False, {"error": str(e)}
+
+def logout_user() -> bool:
+    """
+    Logout a user with Flask-Login.
+    
+    Returns:
+        True if successful, False otherwise
+    """
+    if not FLASK_AVAILABLE:
+        return False
+    
+    try:
+        # Sign out from Supabase
+        supabase_auth.sign_out()
+        
+        # Logout with Flask-Login
+        flask_logout_user()
+        
+        # Clear session
+        if "supabase_session" in session:
+            del session["supabase_session"]
+        
+        return True
+    except Exception as e:
+        logger.error(f"Error logging out user: {str(e)}")
+        return False
+        
+def get_current_user() -> Optional[SupabaseUser]:
+    """
+    Get the current user from Flask-Login.
+    
+    Returns:
+        User object if logged in, None otherwise
+    """
+    if not FLASK_AVAILABLE:
+        return None
+    
+    try:
+        from flask_login import current_user
+        
+        if current_user and current_user.is_authenticated:
+            # Check if we need to refresh the session
+            if "supabase_session" in session:
+                expires_at = session["supabase_session"].get("expires_at")
+                
+                if expires_at:
+                    # Convert to datetime
+                    try:
+                        expires_at = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+                        
+                        # Refresh if expires in less than 5 minutes
+                        if expires_at - timedelta(minutes=5) < datetime.now(expires_at.tzinfo):
+                            logger.debug("Refreshing Supabase session")
+                            supabase_auth.refresh_session()
+                    except Exception as e:
+                        logger.warning(f"Error checking session expiry: {str(e)}")
+            
+            # Return current user
+            return current_user
+        
+        return None
+    except Exception as e:
+        logger.error(f"Error getting current user: {str(e)}")
+        return None
