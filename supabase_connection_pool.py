@@ -1,14 +1,16 @@
 """
 Supabase Connection Pool
 
-This module provides a connection pool for Supabase clients to optimize
-resource usage and prevent opening too many connections.
+This module provides a connection pool for Supabase clients to improve
+performance and resource usage.
 """
 
+import os
+import time
 import logging
 import threading
-import time
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Optional, Any, List, Tuple
+from collections import defaultdict
 
 try:
     from supabase import create_client, Client
@@ -20,161 +22,194 @@ except ImportError:
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-class SupabaseConnectionPool:
-    """Connection pool for Supabase clients."""
-    
-    def __init__(self, max_size: int = 5, idle_timeout: int = 300, check_interval: int = 60):
-        """
-        Initialize the connection pool.
-        
-        Args:
-            max_size: Maximum number of connections to keep in the pool
-            idle_timeout: Seconds after which an idle connection is closed
-            check_interval: Seconds between checking for idle connections
-        """
-        self._pool: Dict[str, Tuple[Client, float]] = {}  # Maps connection_id to (client, last_used_time)
-        self._max_size = max_size
-        self._idle_timeout = idle_timeout
-        self._check_interval = check_interval
-        self._lock = threading.RLock()
-        self._cleanup_thread = None
-        self._running = False
-        
-        # Start cleanup thread
-        self._start_cleanup_thread()
-    
-    def _start_cleanup_thread(self):
-        """Start the cleanup thread to remove idle connections."""
-        if self._cleanup_thread is None or not self._cleanup_thread.is_alive():
-            self._running = True
-            self._cleanup_thread = threading.Thread(target=self._cleanup_worker, daemon=True)
-            self._cleanup_thread.start()
-    
-    def _cleanup_worker(self):
-        """Worker function to clean up idle connections."""
-        while self._running:
-            time.sleep(self._check_interval)
-            self._remove_idle_connections()
-    
-    def _remove_idle_connections(self):
-        """Remove idle connections from the pool."""
-        current_time = time.time()
-        with self._lock:
-            to_remove = []
-            for connection_id, (_, last_used) in self._pool.items():
-                if current_time - last_used > self._idle_timeout:
-                    to_remove.append(connection_id)
-            
-            for connection_id in to_remove:
-                logger.info(f"Removing idle connection: {connection_id}")
-                del self._pool[connection_id]
-    
-    def get_connection(self, url: str, key: str, service_role: bool = False) -> Optional[Client]:
-        """
-        Get a Supabase client from the pool or create a new one.
-        
-        Args:
-            url: Supabase URL
-            key: Supabase API key or service role key
-            service_role: Whether to use the service role key
-            
-        Returns:
-            Supabase client or None if not available
-        """
-        if not SUPABASE_AVAILABLE:
-            logger.warning("Supabase package is not installed")
-            return None
-        
-        # Create a connection ID from the URL and key (service role)
-        connection_id = f"{url}:{key}:{service_role}"
-        
-        # Check if we already have a connection in the pool
-        with self._lock:
-            if connection_id in self._pool:
-                client, _ = self._pool[connection_id]
-                # Update last used time
-                self._pool[connection_id] = (client, time.time())
-                return client
-            
-            # Check if we need to remove the oldest connection when at max capacity
-            if len(self._pool) >= self._max_size:
-                oldest_id = None
-                oldest_time = float('inf')
-                for conn_id, (_, last_used) in self._pool.items():
-                    if last_used < oldest_time:
-                        oldest_time = last_used
-                        oldest_id = conn_id
-                
-                if oldest_id:
-                    logger.info(f"Removing oldest connection to make room: {oldest_id}")
-                    del self._pool[oldest_id]
-            
-            # Create a new connection
-            try:
-                logger.info(f"Creating new Supabase connection: {url}")
-                client = create_client(url, key)
-                self._pool[connection_id] = (client, time.time())
-                return client
-            except Exception as e:
-                logger.error(f"Error creating Supabase client: {str(e)}")
-                return None
-    
-    def release_connection(self, url: str, key: str, service_role: bool = False):
-        """
-        Release a connection back to the pool.
-        
-        Args:
-            url: Supabase URL
-            key: Supabase API key or service role key
-            service_role: Whether to use the service role key
-        """
-        # In this implementation, we don't actually need to do anything
-        # as the connection is already in the pool with its last used time
-        # Just update the last used time
-        connection_id = f"{url}:{key}:{service_role}"
-        with self._lock:
-            if connection_id in self._pool:
-                client, _ = self._pool[connection_id]
-                self._pool[connection_id] = (client, time.time())
-    
-    def close_all(self):
-        """Close all connections in the pool."""
-        with self._lock:
-            self._running = False
-            self._pool.clear()
-    
-    def __del__(self):
-        """Clean up when the pool is garbage collected."""
-        self.close_all()
+# Thread-local storage for connections
+thread_local = threading.local()
 
-# Create a global connection pool
-connection_pool = SupabaseConnectionPool()
+# Global connection pools for each environment
+# Format: {(url, key): {"client": client, "last_used": timestamp, "in_use": count}}
+connection_pools = {}
+connection_pools_lock = threading.RLock()
 
-def get_client(url: str, key: str, service_role: bool = False) -> Optional[Client]:
+# Configuration
+MAX_POOL_SIZE = 10  # Maximum number of clients per pool
+MAX_IDLE_TIME = 300  # Maximum idle time in seconds before a client is removed
+CHECK_INTERVAL = 60  # Interval in seconds to check for expired clients
+
+def get_client(url: str, key: str) -> Optional[Client]:
     """
-    Get a Supabase client from the connection pool.
+    Get a Supabase client from the connection pool or create a new one.
     
     Args:
         url: Supabase URL
-        key: Supabase API key or service role key
-        service_role: Whether to use the service role key
+        key: Supabase API key or service key
         
     Returns:
         Supabase client or None if not available
     """
-    return connection_pool.get_connection(url, key, service_role)
+    if not SUPABASE_AVAILABLE:
+        logger.warning("Supabase package is not installed")
+        return None
+    
+    if not url or not key:
+        logger.error("Supabase URL and key are required")
+        return None
+    
+    # Create a pool key based on URL and key
+    pool_key = (url, key)
+    
+    # Check if we already have a client for this thread
+    if hasattr(thread_local, 'client_cache') and pool_key in thread_local.client_cache:
+        logger.debug(f"Using thread-local client for {url}")
+        
+        # Update last used time in the global pool
+        with connection_pools_lock:
+            if pool_key in connection_pools:
+                connection_pools[pool_key]["last_used"] = time.time()
+                connection_pools[pool_key]["in_use"] += 1
+        
+        return thread_local.client_cache[pool_key]
+    
+    # Check if we have a client in the global pool
+    with connection_pools_lock:
+        if pool_key in connection_pools:
+            client_info = connection_pools[pool_key]
+            client_info["last_used"] = time.time()
+            client_info["in_use"] += 1
+            logger.debug(f"Using pooled client for {url}")
+            
+            # Store in thread-local storage
+            if not hasattr(thread_local, 'client_cache'):
+                thread_local.client_cache = {}
+            thread_local.client_cache[pool_key] = client_info["client"]
+            
+            return client_info["client"]
+        
+        # Create a new client
+        try:
+            logger.info(f"Creating new Supabase client for {url}")
+            client = create_client(url, key)
+            
+            # Store in thread-local storage
+            if not hasattr(thread_local, 'client_cache'):
+                thread_local.client_cache = {}
+            thread_local.client_cache[pool_key] = client
+            
+            # Store in global pool
+            connection_pools[pool_key] = {
+                "client": client,
+                "last_used": time.time(),
+                "in_use": 1
+            }
+            
+            # Check if we need to clean up the pool
+            if len(connection_pools) > MAX_POOL_SIZE:
+                _cleanup_pool()
+            
+            return client
+        except Exception as e:
+            logger.error(f"Error creating Supabase client: {str(e)}")
+            return None
 
-def release_client(url: str, key: str, service_role: bool = False):
+def release_client(url: str, key: str) -> bool:
     """
-    Release a Supabase client back to the connection pool.
+    Release a Supabase client back to the pool.
     
     Args:
         url: Supabase URL
-        key: Supabase API key or service role key
-        service_role: Whether to use the service role key
+        key: Supabase API key or service key
+        
+    Returns:
+        True if successful, False otherwise
     """
-    connection_pool.release_connection(url, key, service_role)
+    pool_key = (url, key)
+    
+    with connection_pools_lock:
+        if pool_key in connection_pools:
+            connection_pools[pool_key]["in_use"] -= 1
+            logger.debug(f"Released client for {url}")
+            return True
+    
+    return False
 
-def close_all_connections():
-    """Close all connections in the pool."""
-    connection_pool.close_all()
+def _cleanup_pool():
+    """
+    Clean up the connection pool by removing expired clients.
+    """
+    now = time.time()
+    
+    with connection_pools_lock:
+        # Find expired clients
+        expired_keys = []
+        for key, info in connection_pools.items():
+            if info["in_use"] <= 0 and now - info["last_used"] > MAX_IDLE_TIME:
+                expired_keys.append(key)
+        
+        # Remove expired clients
+        for key in expired_keys:
+            url, api_key = key
+            logger.info(f"Removing expired client for {url}")
+            del connection_pools[key]
+            
+            # Remove from thread-local storage
+            for thread_id, thread_cache in _get_all_thread_caches().items():
+                if key in thread_cache:
+                    del thread_cache[key]
+
+def _get_all_thread_caches() -> Dict[int, Dict[Tuple[str, str], Client]]:
+    """
+    Get all thread-local client caches.
+    
+    Returns:
+        Dictionary mapping thread IDs to their client caches
+    """
+    # This is a bit of a hack, but it's the only way to access thread-local storage of other threads
+    thread_caches = {}
+    
+    for thread in threading.enumerate():
+        if hasattr(thread, '_Thread__target') and thread._Thread__target is not None:
+            thread_id = thread.ident
+            if hasattr(thread_local, 'client_cache'):
+                thread_caches[thread_id] = thread_local.client_cache
+    
+    return thread_caches
+
+def get_pool_stats() -> Dict[str, Any]:
+    """
+    Get statistics about the connection pool.
+    
+    Returns:
+        Dictionary with pool statistics
+    """
+    with connection_pools_lock:
+        stats = {
+            "total_pools": len(connection_pools),
+            "total_clients": sum(1 for info in connection_pools.values() if info["client"] is not None),
+            "active_clients": sum(info["in_use"] for info in connection_pools.values() if info["client"] is not None),
+            "idle_clients": sum(1 for info in connection_pools.values() if info["client"] is not None and info["in_use"] <= 0),
+            "pools": []
+        }
+        
+        for (url, key), info in connection_pools.items():
+            stats["pools"].append({
+                "url": url,
+                "in_use": info["in_use"],
+                "idle_time": time.time() - info["last_used"]
+            })
+        
+        return stats
+
+# Start a background thread to clean up the pool periodically
+def _cleanup_thread():
+    """
+    Background thread to clean up the connection pool periodically.
+    """
+    while True:
+        time.sleep(CHECK_INTERVAL)
+        try:
+            _cleanup_pool()
+        except Exception as e:
+            logger.error(f"Error cleaning up connection pool: {str(e)}")
+
+# Start the cleanup thread when the module is imported
+cleanup_thread = threading.Thread(target=_cleanup_thread, daemon=True)
+cleanup_thread.start()

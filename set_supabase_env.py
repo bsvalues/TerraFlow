@@ -1,129 +1,119 @@
-#!/usr/bin/env python3
 """
-Set Supabase Environment Variables
+Supabase Environment Variable Setter
 
-This script allows setting Supabase environment variables for different environments
-(development, training, production) from the command line. It updates the .env file
-and can set the current active environment.
+This script helps set Supabase environment variables in the .env file
+and also sets them in the current environment.
 """
 
 import os
 import sys
 import logging
 import argparse
-from typing import Dict, Any, Optional
-from dotenv import load_dotenv
+from typing import Dict, Optional, Any, List, Tuple
+
+try:
+    import dotenv
+    DOTENV_AVAILABLE = True
+except ImportError:
+    DOTENV_AVAILABLE = False
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger("set_supabase_env")
+logger = logging.getLogger(__name__)
 
-def set_env_vars(environment: str, url: str, key: str, service_key: Optional[str] = None, save_to_env: bool = True) -> bool:
+# Constants
+ENV_FILE = ".env"
+VALID_ENVIRONMENTS = ["development", "training", "production"]
+
+def load_environment_variables():
     """
-    Set Supabase environment variables for a specific environment.
+    Load environment variables from .env file if available.
+    """
+    if DOTENV_AVAILABLE:
+        try:
+            dotenv.load_dotenv(ENV_FILE)
+            logger.debug(f"Loaded environment variables from {ENV_FILE}")
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to load environment variables from {ENV_FILE}: {str(e)}")
+            return False
+    else:
+        logger.warning("dotenv package not installed, cannot load from .env file")
+        return False
+
+def set_env_vars(environment: str, url: str, key: str, service_key: Optional[str] = None) -> bool:
+    """
+    Set Supabase environment variables in .env file and current environment.
     
     Args:
         environment: Environment name (development, training, production)
         url: Supabase URL
         key: Supabase API key
-        service_key: Optional Supabase service role key
-        save_to_env: Whether to save to .env file
+        service_key: Supabase service key (optional)
         
     Returns:
         True if successful, False otherwise
     """
-    if environment not in ['development', 'training', 'production']:
-        logger.error(f"Invalid environment: {environment}. Must be one of: development, training, production")
+    if not DOTENV_AVAILABLE:
+        logger.warning("dotenv package not installed, cannot save to .env file")
+        
+        # Set in current environment only
+        os.environ[f"SUPABASE_URL_{environment.upper()}"] = url
+        os.environ[f"SUPABASE_KEY_{environment.upper()}"] = key
+        if service_key:
+            os.environ[f"SUPABASE_SERVICE_KEY_{environment.upper()}"] = service_key
+        
+        logger.info(f"Set Supabase environment variables for {environment} in current environment")
         return False
     
-    # Load existing environment variables
-    load_dotenv()
+    if environment not in VALID_ENVIRONMENTS:
+        logger.error(f"Invalid environment: {environment}")
+        return False
     
-    # Set environment-specific variables
-    env_var_url = f"SUPABASE_URL_{environment.upper()}"
-    env_var_key = f"SUPABASE_KEY_{environment.upper()}"
-    env_var_service_key = f"SUPABASE_SERVICE_KEY_{environment.upper()}"
-    
-    # Update environment variables
-    os.environ[env_var_url] = url
-    os.environ[env_var_key] = key
-    
-    if service_key:
-        os.environ[env_var_service_key] = service_key
-    elif env_var_service_key in os.environ:
-        os.environ.pop(env_var_service_key)
-    
-    # If this is the development environment or we're setting the active environment,
-    # also update the base variables
-    if environment == 'development':
-        os.environ['SUPABASE_URL'] = url
-        os.environ['SUPABASE_KEY'] = key
-        if service_key:
-            os.environ['SUPABASE_SERVICE_KEY'] = service_key
-        elif 'SUPABASE_SERVICE_KEY' in os.environ:
-            os.environ.pop('SUPABASE_SERVICE_KEY')
-    
-    logger.info(f"Updated Supabase {environment} environment variables")
-    
-    # Save to .env file if requested
-    if save_to_env:
-        return update_env_file(environment, url, key, service_key)
-    
-    return True
-
-def update_env_file(environment: str, url: str, key: str, service_key: Optional[str] = None) -> bool:
-    """
-    Update .env file with Supabase environment variables.
-    
-    Args:
-        environment: Environment name
-        url: Supabase URL
-        key: Supabase API key
-        service_key: Optional Supabase service role key
-        
-    Returns:
-        True if successful, False otherwise
-    """
     try:
-        env_path = ".env"
-        env_vars = {}
+        # Set environment variables in .env file
+        dotenv.set_key(ENV_FILE, f"SUPABASE_URL_{environment.upper()}", url)
+        dotenv.set_key(ENV_FILE, f"SUPABASE_KEY_{environment.upper()}", key)
         
-        # Read existing .env file
-        if os.path.exists(env_path):
-            with open(env_path, 'r') as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith('#') and '=' in line:
-                        name, value = line.split('=', 1)
-                        env_vars[name.strip()] = value.strip()
-        
-        # Update with new values
-        env_vars[f"SUPABASE_URL_{environment.upper()}"] = url
-        env_vars[f"SUPABASE_KEY_{environment.upper()}"] = key
+        # Set service key if provided
         if service_key:
-            env_vars[f"SUPABASE_SERVICE_KEY_{environment.upper()}"] = service_key
-        elif f"SUPABASE_SERVICE_KEY_{environment.upper()}" in env_vars:
-            del env_vars[f"SUPABASE_SERVICE_KEY_{environment.upper()}"]
+            dotenv.set_key(ENV_FILE, f"SUPABASE_SERVICE_KEY_{environment.upper()}", service_key)
         
-        # If this is the development environment, also set the base variables
+        # Set in current environment too
+        os.environ[f"SUPABASE_URL_{environment.upper()}"] = url
+        os.environ[f"SUPABASE_KEY_{environment.upper()}"] = key
+        if service_key:
+            os.environ[f"SUPABASE_SERVICE_KEY_{environment.upper()}"] = service_key
+        
+        # If this is 'development', also set the base variables
         if environment == "development":
-            env_vars["SUPABASE_URL"] = url
-            env_vars["SUPABASE_KEY"] = key
+            dotenv.set_key(ENV_FILE, "SUPABASE_URL", url)
+            dotenv.set_key(ENV_FILE, "SUPABASE_KEY", key)
             if service_key:
-                env_vars["SUPABASE_SERVICE_KEY"] = service_key
-            elif "SUPABASE_SERVICE_KEY" in env_vars:
-                del env_vars["SUPABASE_SERVICE_KEY"]
+                dotenv.set_key(ENV_FILE, "SUPABASE_SERVICE_KEY", service_key)
+            
+            os.environ["SUPABASE_URL"] = url
+            os.environ["SUPABASE_KEY"] = key
+            if service_key:
+                os.environ["SUPABASE_SERVICE_KEY"] = service_key
         
-        # Write back to .env file
-        with open(env_path, 'w') as f:
-            for name, value in env_vars.items():
-                f.write(f"{name}={value}\n")
+        # If this environment is set as the active one, update base variables
+        active_env = os.environ.get("SUPABASE_ACTIVE_ENVIRONMENT")
+        if active_env == environment:
+            dotenv.set_key(ENV_FILE, "SUPABASE_URL", url)
+            dotenv.set_key(ENV_FILE, "SUPABASE_KEY", key)
+            if service_key:
+                dotenv.set_key(ENV_FILE, "SUPABASE_SERVICE_KEY", service_key)
+            
+            os.environ["SUPABASE_URL"] = url
+            os.environ["SUPABASE_KEY"] = key
+            if service_key:
+                os.environ["SUPABASE_SERVICE_KEY"] = service_key
         
-        logger.info(f"Updated .env file with {environment} environment variables")
+        logger.info(f"Set Supabase environment variables for {environment} in {ENV_FILE} and current environment")
         return True
-    
     except Exception as e:
-        logger.error(f"Error updating .env file: {str(e)}")
+        logger.error(f"Error setting environment variables: {str(e)}")
         return False
 
 def set_active_environment(environment: str) -> bool:
@@ -131,215 +121,233 @@ def set_active_environment(environment: str) -> bool:
     Set the active Supabase environment.
     
     Args:
-        environment: Environment name
+        environment: Environment name (development, training, production)
         
     Returns:
         True if successful, False otherwise
     """
-    if environment not in ['development', 'training', 'production']:
-        logger.error(f"Invalid environment: {environment}. Must be one of: development, training, production")
+    if not DOTENV_AVAILABLE:
+        logger.warning("dotenv package not installed, cannot save to .env file")
+        
+        # Set in current environment only
+        os.environ["SUPABASE_ACTIVE_ENVIRONMENT"] = environment
+        logger.info(f"Set active Supabase environment to {environment} in current environment")
         return False
     
-    # Load existing environment variables
-    load_dotenv()
+    if environment not in VALID_ENVIRONMENTS:
+        logger.error(f"Invalid environment: {environment}")
+        return False
     
-    # Get environment-specific variables
-    url = os.environ.get(f"SUPABASE_URL_{environment.upper()}")
-    key = os.environ.get(f"SUPABASE_KEY_{environment.upper()}")
-    service_key = os.environ.get(f"SUPABASE_SERVICE_KEY_{environment.upper()}")
+    # Check if environment is configured
+    env_url_var = f"SUPABASE_URL_{environment.upper()}"
+    env_key_var = f"SUPABASE_KEY_{environment.upper()}"
+    env_service_key_var = f"SUPABASE_SERVICE_KEY_{environment.upper()}"
+    
+    url = os.environ.get(env_url_var)
+    key = os.environ.get(env_key_var)
+    service_key = os.environ.get(env_service_key_var)
     
     if not url or not key:
-        logger.error(f"Supabase {environment} environment is not configured. Set it up first.")
+        logger.error(f"Environment {environment} is not configured, cannot set as active")
         return False
     
-    # Set the base variables to the selected environment
-    os.environ['SUPABASE_URL'] = url
-    os.environ['SUPABASE_KEY'] = key
-    if service_key:
-        os.environ['SUPABASE_SERVICE_KEY'] = service_key
-    elif 'SUPABASE_SERVICE_KEY' in os.environ:
-        os.environ.pop('SUPABASE_SERVICE_KEY')
-    
-    logger.info(f"Set active Supabase environment to: {environment}")
-    
-    # Save to .env file
-    env_path = ".env"
-    env_vars = {}
-    
-    # Read existing .env file
-    if os.path.exists(env_path):
-        with open(env_path, 'r') as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith('#') and '=' in line:
-                    name, value = line.split('=', 1)
-                    env_vars[name.strip()] = value.strip()
-    
-    # Update base variables
-    env_vars['SUPABASE_URL'] = url
-    env_vars['SUPABASE_KEY'] = key
-    if service_key:
-        env_vars['SUPABASE_SERVICE_KEY'] = service_key
-    elif 'SUPABASE_SERVICE_KEY' in env_vars:
-        del env_vars['SUPABASE_SERVICE_KEY']
-    
-    # Add SUPABASE_ACTIVE_ENVIRONMENT variable
-    env_vars['SUPABASE_ACTIVE_ENVIRONMENT'] = environment
-    
-    # Write back to .env file
-    with open(env_path, 'w') as f:
-        for name, value in env_vars.items():
-            f.write(f"{name}={value}\n")
-    
-    # Reload environment
     try:
-        from supabase_env_manager import load_environment_from_env
-        load_environment_from_env()
-    except ImportError:
-        load_dotenv()
-    
-    return True
+        # Set active environment in .env file
+        dotenv.set_key(ENV_FILE, "SUPABASE_ACTIVE_ENVIRONMENT", environment)
+        
+        # Set in current environment too
+        os.environ["SUPABASE_ACTIVE_ENVIRONMENT"] = environment
+        
+        # Set base variables to match active environment
+        dotenv.set_key(ENV_FILE, "SUPABASE_URL", url)
+        dotenv.set_key(ENV_FILE, "SUPABASE_KEY", key)
+        
+        os.environ["SUPABASE_URL"] = url
+        os.environ["SUPABASE_KEY"] = key
+        
+        # Set service key if available
+        if service_key:
+            dotenv.set_key(ENV_FILE, "SUPABASE_SERVICE_KEY", service_key)
+            os.environ["SUPABASE_SERVICE_KEY"] = service_key
+        
+        logger.info(f"Set active Supabase environment to {environment} in {ENV_FILE} and current environment")
+        return True
+    except Exception as e:
+        logger.error(f"Error setting active environment: {str(e)}")
+        return False
 
-def display_environment_info():
-    """Display information about all configured environments."""
-    # Load existing environment variables
-    load_dotenv()
+def list_environments() -> List[Dict[str, Any]]:
+    """
+    List all configured Supabase environments.
     
-    # Check which environments are configured
-    environments = {}
-    for env in ['development', 'training', 'production']:
+    Returns:
+        List of environment dictionaries with details
+    """
+    environments = []
+    active_env = os.environ.get("SUPABASE_ACTIVE_ENVIRONMENT", "development")
+    
+    for env in VALID_ENVIRONMENTS:
         url = os.environ.get(f"SUPABASE_URL_{env.upper()}")
         key = os.environ.get(f"SUPABASE_KEY_{env.upper()}")
         service_key = os.environ.get(f"SUPABASE_SERVICE_KEY_{env.upper()}")
         
-        environments[env] = {
-            'configured': bool(url and key),
-            'url': url,
-            'key': key,
-            'service_key': bool(service_key)
-        }
+        environments.append({
+            "name": env,
+            "url": url,
+            "key_available": bool(key),
+            "service_key_available": bool(service_key),
+            "is_active": env == active_env,
+            "configured": bool(url and key)
+        })
     
-    # Check active environment
-    active_env = os.environ.get('SUPABASE_ACTIVE_ENVIRONMENT', 'development')
-    
-    # Display environment information
-    print("=== Supabase Environment Status ===")
-    for env, config in environments.items():
-        status_color = "\033[92m" if config['configured'] else "\033[91m"
-        active_marker = " (active)" if env == active_env else ""
-        reset_color = "\033[0m"
-        
-        print(f"Environment: {env}{active_marker}")
-        print(f"Status: {status_color}{'configured' if config['configured'] else 'not configured'}{reset_color}")
-        if config['configured']:
-            print(f"URL: {config['url']}")
-            print(f"API Key: {'*' * 8}{config['key'][-5:] if config['key'] else ''}")
-            print(f"Service Key: {'Available' if config['service_key'] else 'Not set'}")
-        print("")
-    
-    print(f"Active Environment: {active_env}")
+    return environments
 
-def ensure_supabase_env() -> dict:
+def print_environments():
     """
-    Ensure Supabase environment variables are set.
-    This function is called from main.py to set up the Supabase environment.
+    Print information about all configured Supabase environments.
+    """
+    print("\nSupabase Environments:\n")
+    environments = list_environments()
+    
+    for env in environments:
+        active_marker = "✅ ACTIVE" if env["is_active"] else ""
+        configured = "✓ Configured" if env["configured"] else "✗ Not configured"
+        sk_status = "✓ Available" if env["service_key_available"] else "✗ Not available"
+        
+        print(f"{env['name'].upper()} {active_marker}")
+        print(f"  Status: {configured}")
+        print(f"  URL: {env['url'] or 'Not set'}")
+        print(f"  API Key: {'Available' if env['key_available'] else 'Not set'}")
+        print(f"  Service Key: {sk_status}")
+        print("")
+
+def create_parser():
+    """
+    Create command line argument parser.
     
     Returns:
-        Dict with environment configuration
+        ArgumentParser object
     """
-    # Load from .env if available
-    load_dotenv()
+    parser = argparse.ArgumentParser(description="Set Supabase environment variables")
     
-    # Check if already set
-    if os.environ.get("SUPABASE_URL") and os.environ.get("SUPABASE_KEY"):
-        logger.info("All Supabase environment variables are set")
-        return {
-            "url": os.environ.get("SUPABASE_URL"),
-            "key": os.environ.get("SUPABASE_KEY"),
-            "service_key": os.environ.get("SUPABASE_SERVICE_KEY"),
-            "environment": os.environ.get("SUPABASE_ACTIVE_ENVIRONMENT", "development")
-        }
+    subparsers = parser.add_subparsers(dest="command", help="Command to run")
     
-    # If not set, check for environment-specific variables
-    for env in ["DEVELOPMENT", "TRAINING", "PRODUCTION"]:
-        url = os.environ.get(f"SUPABASE_URL_{env}")
-        key = os.environ.get(f"SUPABASE_KEY_{env}")
-        service_key = os.environ.get(f"SUPABASE_SERVICE_KEY_{env}")
-        if url and key:
-            # Use this environment as default
-            os.environ["SUPABASE_URL"] = url
-            os.environ["SUPABASE_KEY"] = key
-            if service_key:
-                os.environ["SUPABASE_SERVICE_KEY"] = service_key
-            
-            environment = env.lower()
-            os.environ["SUPABASE_ACTIVE_ENVIRONMENT"] = environment
-            logger.info(f"Using {environment} environment as default")
-            
-            return {
-                "url": url,
-                "key": key,
-                "service_key": service_key,
-                "environment": environment
-            }
+    # Set command
+    set_parser = subparsers.add_parser("set", help="Set environment variables for a Supabase environment")
+    set_parser.add_argument("--env", "-e", required=True, choices=VALID_ENVIRONMENTS, help="Environment name")
+    set_parser.add_argument("--url", "-u", required=True, help="Supabase URL")
+    set_parser.add_argument("--key", "-k", required=True, help="Supabase API key")
+    set_parser.add_argument("--service-key", "-s", help="Supabase service key (optional)")
     
-    # If no environment variables found, log warning
-    logger.warning("No Supabase environment variables found. Default to development mode with incomplete configuration.")
-    return {
-        "url": None,
-        "key": None,
-        "service_key": None,
-        "environment": "development"
-    }
+    # Active command
+    active_parser = subparsers.add_parser("active", help="Set active Supabase environment")
+    active_parser.add_argument("env", choices=VALID_ENVIRONMENTS, help="Environment name to set as active")
+    
+    # List command
+    list_parser = subparsers.add_parser("list", help="List all configured Supabase environments")
+    
+    return parser
 
 def main():
-    """Main function."""
-    parser = argparse.ArgumentParser(description="Set Supabase Environment Variables")
-    parser.add_argument("-e", "--environment", 
-                        choices=["development", "training", "production"], 
-                        help="Environment to configure")
-    parser.add_argument("-u", "--url", 
-                        help="Supabase URL")
-    parser.add_argument("-k", "--key", 
-                        help="Supabase API key")
-    parser.add_argument("-s", "--service-key", 
-                        help="Supabase service role key (optional)")
-    parser.add_argument("-a", "--activate", 
-                        choices=["development", "training", "production"], 
-                        help="Set active environment")
-    parser.add_argument("-d", "--display", action="store_true", 
-                        help="Display environment information")
-    parser.add_argument("--no-save", action="store_true", 
-                        help="Don't save to .env file")
+    """Main entry point for script."""
+    if not DOTENV_AVAILABLE:
+        print("Warning: python-dotenv package not installed, cannot load or save to .env file")
+        print("Environment variables will only be set for current process")
     
+    # Load existing environment variables
+    load_environment_variables()
+    
+    # Parse command line arguments
+    parser = create_parser()
     args = parser.parse_args()
     
-    # Display environment information
-    if args.display:
-        display_environment_info()
-        return
-    
-    # Set active environment
-    if args.activate:
-        if set_active_environment(args.activate):
-            print(f"Successfully set active environment to: {args.activate}")
-        else:
-            print(f"Failed to set active environment to: {args.activate}")
-        return
-    
-    # Set environment variables
-    if args.environment and args.url and args.key:
-        save_to_env = not args.no_save
-        if set_env_vars(args.environment, args.url, args.key, args.service_key, save_to_env):
-            print(f"Successfully set {args.environment} environment variables")
-            display_environment_info()
-        else:
-            print(f"Failed to set {args.environment} environment variables")
-        return
-    
-    # If no arguments or incomplete arguments, show usage information
-    if not (args.display or args.activate or (args.environment and args.url and args.key)):
+    if not args.command:
         parser.print_help()
+        return
+    
+    if args.command == "set":
+        success = set_env_vars(args.env, args.url, args.key, args.service_key)
+        if success:
+            print(f"Successfully set Supabase environment variables for {args.env}")
+            
+            # Ask user if they want to set this as the active environment
+            if args.env != os.environ.get("SUPABASE_ACTIVE_ENVIRONMENT"):
+                response = input(f"Do you want to set {args.env} as the active environment? (y/n): ")
+                if response.lower() in ["y", "yes"]:
+                    if set_active_environment(args.env):
+                        print(f"Successfully set {args.env} as the active Supabase environment")
+                    else:
+                        print(f"Failed to set {args.env} as the active Supabase environment")
+        else:
+            print(f"Failed to set Supabase environment variables for {args.env}")
+    
+    elif args.command == "active":
+        success = set_active_environment(args.env)
+        if success:
+            print(f"Successfully set {args.env} as the active Supabase environment")
+        else:
+            print(f"Failed to set {args.env} as the active Supabase environment")
+    
+    elif args.command == "list":
+        print_environments()
+    
+    else:
+        parser.print_help()
+
+def ensure_supabase_env() -> Dict[str, Any]:
+    """
+    Ensure Supabase environment variables are set. This function is called by main.py.
+    
+    Returns:
+        Dictionary with Supabase configuration details
+    """
+    # Load existing environment variables
+    load_environment_variables()
+    
+    # Get active environment
+    active_env = os.environ.get("SUPABASE_ACTIVE_ENVIRONMENT", "development")
+    
+    # Check if we have the required variables for this environment
+    env_url_var = f"SUPABASE_URL_{active_env.upper()}"
+    env_key_var = f"SUPABASE_KEY_{active_env.upper()}"
+    env_service_key_var = f"SUPABASE_SERVICE_KEY_{active_env.upper()}"
+    
+    url = os.environ.get(env_url_var) or os.environ.get("SUPABASE_URL")
+    key = os.environ.get(env_key_var) or os.environ.get("SUPABASE_KEY")
+    service_key = os.environ.get(env_service_key_var) or os.environ.get("SUPABASE_SERVICE_KEY")
+    
+    if not url or not key:
+        logger.warning(f"Supabase environment variables not set for {active_env}")
+        
+        # For development/testing, use default test credentials if available
+        if active_env == "development" and not (url and key):
+            # Default development variables if none are set
+            if not url:
+                os.environ["SUPABASE_URL"] = "https://example-project.supabase.co"
+            if not key:
+                os.environ["SUPABASE_KEY"] = "eyJhbGciOiJI.eyJyb2xlIjoiYW5vbi.A123EXAMPLE"
+            
+            url = os.environ.get("SUPABASE_URL")
+            key = os.environ.get("SUPABASE_KEY")
+            
+            logger.warning("Using placeholder Supabase credentials for development")
+            logger.warning("Please set real credentials using set_supabase_env.py")
+    
+    # Update base variables to match active environment
+    if url and active_env:
+        os.environ["SUPABASE_URL"] = url
+    if key and active_env:
+        os.environ["SUPABASE_KEY"] = key
+    if service_key and active_env:
+        os.environ["SUPABASE_SERVICE_KEY"] = service_key
+    
+    return {
+        "environment": active_env,
+        "url": url,
+        "key_available": bool(key),
+        "service_key_available": bool(service_key),
+        "configured": bool(url and key)
+    }
 
 if __name__ == "__main__":
     main()
