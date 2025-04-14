@@ -72,6 +72,9 @@ class StatusReporter:
                 logger.warning("Status reporter already running")
                 return
                 
+            # Subscribe to the broker first
+            self.message_broker.subscribe("status_reporter")
+            
             # Subscribe to status update messages
             self.message_broker.subscribe_with_pattern(
                 agent_id="status_reporter",
