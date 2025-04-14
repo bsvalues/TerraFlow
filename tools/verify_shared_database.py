@@ -154,9 +154,9 @@ def print_result(message: str, status: str) -> None:
     else:
         print(f"  {message.ljust(65)} {status_str}")
 
-def get_supabase_client(url: str = None, key: str = None, environment: str = "development") -> Optional[Client]:
+def _get_supabase_client(url: str = None, key: str = None, environment: str = "development") -> Optional[Client]:
     """
-    Get a Supabase client.
+    Get a Supabase client (local implementation).
     
     Args:
         url: Supabase URL (optional if using centralized client management)
@@ -461,7 +461,7 @@ def check_service_connections() -> Tuple[int, int]:
             # Clean up connection
             if client and service_client_release_available:
                 try:
-                    release_service_supabase_client(client)
+                    release_service_supabase_client(service_name, client)
                 except Exception as release_error:
                     logger.error(f"Error releasing service client for {service_name}: {str(release_error)}")
     
@@ -677,7 +677,7 @@ def main():
                 return 1
             
             logger.info("Using direct client creation")
-            client = get_supabase_client(url, key)
+            client = _get_supabase_client(url, key)
         
         if not client:
             logger.error("Failed to create Supabase client")

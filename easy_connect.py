@@ -210,10 +210,18 @@ def test_connection(service_name: str) -> Optional[Client]:
     try:
         # Get client using centralized management if available
         print_info(f"Connecting to Supabase as '{service_name}'...")
-        if CENTRAL_CLIENT_AVAILABLE:
-            client = get_supabase_client('development')
-        else:
-            # Fallback to direct creation
+        try:
+            if CENTRAL_CLIENT_AVAILABLE:
+                from supabase_client import get_supabase_client as central_get_client
+                client = central_get_client('development')
+            else:
+                # Fallback to direct creation
+                from supabase import create_client
+                client = create_client(url, key)
+        except ImportError as import_error:
+            print_warning(f"Import error: {str(import_error)}")
+            # Last resort fallback if imports fail
+            from supabase import create_client
             client = create_client(url, key)
         
         if not client:
@@ -242,12 +250,13 @@ def test_connection(service_name: str) -> Optional[Client]:
         return None
     finally:
         # Only release the client if we're using centralized management and the client was created
-        if CENTRAL_CLIENT_AVAILABLE and client and 'release_supabase_client' in globals():
+        if CENTRAL_CLIENT_AVAILABLE and client:
             try:
-                release_supabase_client(client)
+                from supabase_client import release_supabase_client as central_release_client
+                central_release_client(client)
                 print_info("Released Supabase client back to connection pool.")
-            except Exception as e:
-                print_warning(f"Failed to release Supabase client: {str(e)}")
+            except Exception as e_release:
+                print_warning(f"Failed to release Supabase client: {str(e_release)}")
 
 def create_service_files(service_name: str) -> bool:
     """
