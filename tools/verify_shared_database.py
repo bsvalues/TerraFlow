@@ -50,11 +50,23 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 # Try to import supabase
 try:
-    from supabase import create_client, Client
+    from supabase import Client
     SUPABASE_AVAILABLE = True
 except ImportError:
     SUPABASE_AVAILABLE = False
     logger.error("❌ Supabase package not installed. Install with: pip install supabase")
+
+# Try to import centralized client management
+try:
+    from supabase_client import get_supabase_client, release_supabase_client
+    CENTRAL_CLIENT_AVAILABLE = True
+except ImportError:
+    CENTRAL_CLIENT_AVAILABLE = False
+    logger.warning("⚠️ Centralized Supabase client management not available. Falling back to direct client creation.")
+    try:
+        from supabase import create_client
+    except ImportError:
+        logger.error("❌ Failed to import create_client from supabase package.")
 
 # Import service tools
 try:
@@ -142,11 +154,44 @@ def print_result(message: str, status: str) -> None:
     else:
         print(f"  {message.ljust(65)} {status_str}")
 
-def get_supabase_client(url: str, key: str) -> Optional[Client]:
-    """Get a Supabase client."""
+def get_supabase_client(url: str = None, key: str = None, environment: str = "development") -> Optional[Client]:
+    """
+    Get a Supabase client.
+    
+    Args:
+        url: Supabase URL (optional if using centralized client management)
+        key: Supabase key (optional if using centralized client management)
+        environment: Environment to use (development, staging, production)
+    
+    Returns:
+        Supabase client or None if initialization failed
+    """
     if not SUPABASE_AVAILABLE:
         logger.error("Supabase package is not available")
         return None
+    
+    # Try to use centralized client management if available
+    if CENTRAL_CLIENT_AVAILABLE:
+        try:
+            logger.info(f"Using centralized client management for environment: {environment}")
+            # Use the imported get_supabase_client from supabase_client module, not our local function
+            from supabase_client import get_supabase_client as central_get_client
+            client = central_get_client(environment)
+            if client:
+                return client
+            logger.warning("Centralized client failed, falling back to direct client creation")
+        except Exception as e:
+            logger.warning(f"Error getting client from pool: {str(e)}")
+            logger.warning("Falling back to direct client creation")
+    
+    # Fall back to direct client creation
+    if not url or not key:
+        url = os.environ.get("SUPABASE_URL")
+        key = os.environ.get("SUPABASE_SERVICE_KEY") or os.environ.get("SUPABASE_KEY")
+        
+        if not url or not key:
+            logger.error("Supabase URL and key are required for direct client creation")
+            return None
     
     try:
         return create_client(url, key)
