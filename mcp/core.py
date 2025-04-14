@@ -26,6 +26,7 @@ from mcp.message_broker import MessageBroker, MessageFilter
 from mcp.experience_buffer import ExperienceBuffer, Experience
 from mcp.master_prompt import MasterPromptManager, MasterPrompt
 from mcp.status_reporter import StatusReporter
+from mcp.progress_report import ProgressReporter
 from mcp.knowledge_sharing import KnowledgeSharingSystem
 
 # Setup logging
@@ -61,6 +62,9 @@ class MCP:
         
         # Initialize status reporter
         self.status_reporter = StatusReporter(self.message_broker)
+        
+        # Initialize progress reporter (integrated with status reporter)
+        self.progress_reporter = ProgressReporter(self.status_reporter)
         
         # Agent-to-Agent communication protocol
         self.protocol = AgentCommunicationProtocol(self)

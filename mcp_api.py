@@ -2,16 +2,18 @@
 MCP API Module
 
 This module provides API endpoints for interacting with the MCP system.
-It allows users to submit tasks to agents, check task status, and get results.
+It allows users to submit tasks to agents, check task status, get results,
+and generate MVP progress reports.
 """
 
-from flask import Blueprint, request, jsonify, current_app, session
+from flask import Blueprint, request, jsonify, current_app, session, render_template, send_from_directory
 import logging
 import time
+import os
 from functools import wraps
 from typing import Dict, Any, List
 
-from auth import login_required, is_authenticated
+from auth import login_required, is_authenticated, permission_required
 from mcp.core import mcp_instance
 
 # Create blueprint
@@ -186,3 +188,210 @@ def get_system_report():
         "status": "success",
         "report": report
     })
+
+@mcp_api.route('/progress/report', methods=['GET'])
+@api_login_required
+def get_progress_report():
+    """Get MVP progress report data as JSON"""
+    try:
+        report = mcp_instance.progress_reporter.generate_progress_report()
+        
+        return jsonify({
+            "status": "success",
+            "report": report
+        })
+    except Exception as e:
+        logger.error(f"Error generating progress report: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": f"Error generating progress report: {str(e)}"
+        }), 500
+
+@mcp_api.route('/progress/view', methods=['GET'])
+@login_required
+def view_progress_report():
+    """View the MVP progress report page"""
+    try:
+        # Get report data
+        report = mcp_instance.progress_reporter.generate_progress_report()
+        
+        # Generate HTML report
+        html_content = mcp_instance.progress_reporter.generate_html_report(report)
+        
+        # Return the HTML directly
+        return html_content
+    except Exception as e:
+        logger.error(f"Error displaying progress report: {str(e)}")
+        return f"<h1>Error</h1><p>Error generating progress report: {str(e)}</p>", 500
+
+@mcp_api.route('/progress/html', methods=['GET'])
+@login_required
+def save_html_progress_report():
+    """Generate and save an HTML progress report, and return the file"""
+    try:
+        # Generate report and save as HTML
+        filepath = mcp_instance.progress_reporter.save_html_report()
+        
+        if not filepath:
+            return jsonify({
+                "status": "error",
+                "message": "Failed to save HTML report"
+            }), 500
+            
+        # Get filename
+        filename = os.path.basename(filepath)
+        directory = os.path.dirname(filepath)
+        
+        # Return the file
+        return send_from_directory(directory, filename, as_attachment=True)
+    except Exception as e:
+        logger.error(f"Error saving HTML progress report: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": f"Error saving HTML progress report: {str(e)}"
+        }), 500
+
+@mcp_api.route('/progress/update/component', methods=['POST'])
+@api_login_required
+@permission_required('admin')
+def update_component_progress():
+    """Update progress for a component"""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({
+                "status": "error",
+                "message": "Missing request body"
+            }), 400
+            
+        component_id = data.get('component_id')
+        completion = data.get('completion')
+        
+        if not component_id or completion is None:
+            return jsonify({
+                "status": "error",
+                "message": "Missing required fields: component_id, completion"
+            }), 400
+            
+        # Validate completion percentage
+        try:
+            completion = int(completion)
+            if not 0 <= completion <= 100:
+                return jsonify({
+                    "status": "error",
+                    "message": "Completion must be between 0 and 100"
+                }), 400
+        except ValueError:
+            return jsonify({
+                "status": "error",
+                "message": "Completion must be a number"
+            }), 400
+            
+        # Update component progress
+        mcp_instance.progress_reporter.update_component_progress(component_id, completion)
+        
+        return jsonify({
+            "status": "success",
+            "message": f"Updated progress for component {component_id} to {completion}%"
+        })
+    except Exception as e:
+        logger.error(f"Error updating component progress: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": f"Error updating component progress: {str(e)}"
+        }), 500
+
+@mcp_api.route('/progress/update/subcomponent', methods=['POST'])
+@api_login_required
+@permission_required('admin')
+def update_subcomponent_progress():
+    """Update progress for a subcomponent"""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({
+                "status": "error",
+                "message": "Missing request body"
+            }), 400
+            
+        component_id = data.get('component_id')
+        subcomponent_id = data.get('subcomponent_id')
+        completion = data.get('completion')
+        
+        if not component_id or not subcomponent_id or completion is None:
+            return jsonify({
+                "status": "error",
+                "message": "Missing required fields: component_id, subcomponent_id, completion"
+            }), 400
+            
+        # Validate completion percentage
+        try:
+            completion = int(completion)
+            if not 0 <= completion <= 100:
+                return jsonify({
+                    "status": "error",
+                    "message": "Completion must be between 0 and 100"
+                }), 400
+        except ValueError:
+            return jsonify({
+                "status": "error",
+                "message": "Completion must be a number"
+            }), 400
+            
+        # Update subcomponent progress
+        mcp_instance.progress_reporter.update_subcomponent_progress(component_id, subcomponent_id, completion)
+        
+        return jsonify({
+            "status": "success",
+            "message": f"Updated progress for subcomponent {component_id}.{subcomponent_id} to {completion}%"
+        })
+    except Exception as e:
+        logger.error(f"Error updating subcomponent progress: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": f"Error updating subcomponent progress: {str(e)}"
+        }), 500
+
+@mcp_api.route('/progress/update/criterion', methods=['POST'])
+@api_login_required
+@permission_required('admin')
+def update_completion_criterion():
+    """Update completion status for a criterion"""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({
+                "status": "error",
+                "message": "Missing request body"
+            }), 400
+            
+        category = data.get('category')
+        criterion_name = data.get('criterion_name')
+        complete = data.get('complete')
+        
+        if not category or not criterion_name or complete is None:
+            return jsonify({
+                "status": "error",
+                "message": "Missing required fields: category, criterion_name, complete"
+            }), 400
+            
+        # Convert complete to boolean
+        if isinstance(complete, str):
+            complete = complete.lower() in ('true', 'yes', '1', 't', 'y')
+            
+        # Update criterion status
+        mcp_instance.progress_reporter.update_completion_criterion(category, criterion_name, complete)
+        
+        return jsonify({
+            "status": "success",
+            "message": f"Updated status for criterion {category}.{criterion_name} to {complete}"
+        })
+    except Exception as e:
+        logger.error(f"Error updating completion criterion: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": f"Error updating completion criterion: {str(e)}"
+        }), 500
