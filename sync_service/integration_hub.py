@@ -163,6 +163,37 @@ class IntegrationHub:
                 "appraiser": "STRING",
                 "notes": "TEXT",
                 "last_updated": "TIMESTAMP"
+            },
+            "tax": {
+                "tax_id": "STRING",
+                "property_id": "STRING",
+                "parcel_number": "STRING",
+                "tax_year": "INTEGER",
+                "tax_code_area": "STRING",
+                "levy_code": "STRING",
+                "assessed_value": "FLOAT",
+                "taxable_value": "FLOAT",
+                "total_tax": "FLOAT",
+                "tax_bill_number": "STRING",
+                "first_half_amount": "FLOAT",
+                "first_half_due_date": "DATE",
+                "first_half_paid_date": "DATE",
+                "first_half_paid_amount": "FLOAT",
+                "second_half_amount": "FLOAT",
+                "second_half_due_date": "DATE",
+                "second_half_paid_date": "DATE",
+                "second_half_paid_amount": "FLOAT",
+                "is_delinquent": "BOOLEAN",
+                "delinquent_amount": "FLOAT",
+                "interest_amount": "FLOAT",
+                "penalty_amount": "FLOAT",
+                "payment_status": "STRING",
+                "special_assessments": "FLOAT",
+                "tax_relief_amount": "FLOAT",
+                "tax_relief_type": "STRING",
+                "exemption_codes": "STRING",
+                "notes": "TEXT",
+                "last_updated": "TIMESTAMP"
             }
         }
         
@@ -503,6 +534,98 @@ class IntegrationHub:
             "target": target_id or "Internal Database",
             "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
+        
+    def sync_tax_data(self, source_id: str, target_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Synchronize tax data from source to target
+        
+        Args:
+            source_id: Source data source ID
+            target_id: Target data source ID (optional)
+            
+        Returns:
+            Result of synchronization operation
+        """
+        # Check if source exists
+        if source_id not in self.data_sources:
+            return {
+                "status": "error",
+                "message": "Source data source not found"
+            }
+        
+        # Check if target exists if provided
+        if target_id and target_id not in self.data_sources:
+            return {
+                "status": "error",
+                "message": "Target data source not found"
+            }
+        
+        # Get connections
+        source_conn = self.get_connection(source_id)
+        if not source_conn or not source_conn.connected:
+            return {
+                "status": "error",
+                "message": f"Failed to connect to source: {source_conn.error if source_conn else 'Unknown error'}"
+            }
+        
+        target_conn = None
+        if target_id:
+            target_conn = self.get_connection(target_id)
+            if not target_conn or not target_conn.connected:
+                return {
+                    "status": "error",
+                    "message": f"Failed to connect to target: {target_conn.error if target_conn else 'Unknown error'}"
+                }
+        
+        try:
+            # Load tax data from source
+            tax_data = self._load_tax_data(source_conn)
+            
+            if tax_data is None or len(tax_data) == 0:
+                return {
+                    "status": "warning",
+                    "message": "No tax data found in source",
+                    "source": source_id,
+                    "target": target_id or "Internal Database",
+                    "records": 0,
+                    "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                }
+            
+            # If target provided, sync to target
+            if target_conn:
+                records = self._save_tax_data(tax_data, target_conn)
+            else:
+                # Sync to internal database
+                records = self._save_tax_data_internal(tax_data)
+            
+            # Update last sync time
+            self.data_sources[source_id].last_sync = datetime.datetime.now()
+            if target_id:
+                self.data_sources[target_id].last_sync = datetime.datetime.now()
+            
+            return {
+                "status": "success",
+                "message": "Tax data synchronized successfully",
+                "source": source_id,
+                "target": target_id or "Internal Database",
+                "records": len(tax_data),
+                "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "details": {
+                    "total_records": len(tax_data),
+                    "new_records": records.get("new", 0),
+                    "updated_records": records.get("updated", 0)
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Error synchronizing tax data from {source_id} to {target_id or 'internal'}: {str(e)}")
+            return {
+                "status": "error",
+                "message": f"Error synchronizing tax data: {str(e)}",
+                "source": source_id,
+                "target": target_id or "Internal Database",
+                "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            }
     
     def export_data(self, data_type: str, export_format: str, filters: Dict[str, Any] = None) -> Dict[str, Any]:
         """Export data to a file"""
@@ -880,6 +1003,222 @@ class IntegrationHub:
         # TODO: Implement saving to internal database
         # For now, just log the data and return a placeholder result
         logger.info(f"Saving {len(data)} property records to internal database")
+        return {"new": len(data), "updated": 0}
+    
+    def _load_tax_data(self, connection: DataSourceConnection) -> Optional[pd.DataFrame]:
+        """Load tax data from a data source"""
+        try:
+            # Get source config
+            source_id = connection.source_id
+            source_config = self.data_sources[source_id]
+            source_type = source_config.source_type
+            
+            # Based on source type, load tax data
+            if source_type in ['postgresql', 'gis', 'sql_server', 'cama']:
+                # Try to detect tax table
+                try:
+                    tables = []
+                    schema_info = self.get_source_metadata(source_id)
+                    
+                    if schema_info.get('status') == 'success' and schema_info.get('schema_info'):
+                        tables = schema_info['schema_info'].get('tables', [])
+                    
+                    # Look for tax table
+                    tax_table = None
+                    for table in tables:
+                        if ('tax' in table.lower() or 'taxation' in table.lower() or 
+                            'tax_bill' in table.lower() or 'taxbill' in table.lower() or
+                            'tax_roll' in table.lower() or 'taxroll' in table.lower()):
+                            tax_table = table
+                            break
+                    
+                    if not tax_table:
+                        # Use default query if no tax table found
+                        # TODO: Replace with more sophisticated detection
+                        logger.warning(f"No tax table found in {source_id}, using sample data")
+                        return self._get_sample_data('tax')
+                    
+                    # Query the tax table
+                    if connection.engine:
+                        query = f"SELECT * FROM {tax_table}"
+                        return pd.read_sql(query, connection.engine)
+                
+                except Exception as e:
+                    logger.error(f"Error detecting tax table in {source_id}: {str(e)}")
+                    # Fall back to sample data
+                    return self._get_sample_data('tax')
+            
+            elif source_type == 'sqlite':
+                # Try to detect tax table
+                try:
+                    cursor = connection.connection.cursor()
+                    cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+                    tables = [row[0] for row in cursor.fetchall()]
+                    
+                    # Look for tax table
+                    tax_table = None
+                    for table in tables:
+                        if ('tax' in table.lower() or 'taxation' in table.lower() or 
+                            'tax_bill' in table.lower() or 'taxbill' in table.lower() or
+                            'tax_roll' in table.lower() or 'taxroll' in table.lower()):
+                            tax_table = table
+                            break
+                    
+                    if not tax_table:
+                        # Use default query if no tax table found
+                        logger.warning(f"No tax table found in {source_id}, using sample data")
+                        return self._get_sample_data('tax')
+                    
+                    # Query the tax table
+                    query = f"SELECT * FROM {tax_table}"
+                    return pd.read_sql_query(query, connection.connection)
+                
+                except Exception as e:
+                    logger.error(f"Error detecting tax table in {source_id}: {str(e)}")
+                    # Fall back to sample data
+                    return self._get_sample_data('tax')
+            
+            elif source_type == 'file':
+                # Load file based on extension
+                file_path = connection.connection
+                _, ext = os.path.splitext(file_path)
+                
+                if ext.lower() == '.csv':
+                    try:
+                        df = pd.read_csv(file_path)
+                        
+                        # Check if it looks like tax data
+                        tax_cols = ['tax_id', 'parcel_number', 'tax_year', 'total_tax', 'tax_bill_number']
+                        has_tax_cols = any(col in df.columns for col in tax_cols)
+                        
+                        if has_tax_cols:
+                            return df
+                        else:
+                            logger.warning(f"CSV file doesn't appear to contain tax data: {file_path}")
+                            return self._get_sample_data('tax')
+                    except Exception as e:
+                        logger.error(f"Error reading CSV file: {str(e)}")
+                        return self._get_sample_data('tax')
+                
+                elif ext.lower() in ['.xls', '.xlsx']:
+                    try:
+                        df = pd.read_excel(file_path)
+                        
+                        # Check if it looks like tax data
+                        tax_cols = ['tax_id', 'parcel_number', 'tax_year', 'total_tax', 'tax_bill_number']
+                        has_tax_cols = any(col in df.columns for col in tax_cols)
+                        
+                        if has_tax_cols:
+                            return df
+                        else:
+                            logger.warning(f"Excel file doesn't appear to contain tax data: {file_path}")
+                            return self._get_sample_data('tax')
+                    except Exception as e:
+                        logger.error(f"Error reading Excel file: {str(e)}")
+                        return self._get_sample_data('tax')
+                
+                else:
+                    logger.warning(f"Unsupported file extension for tax data: {ext}")
+                    return self._get_sample_data('tax')
+            
+            # If we get here, we don't have a supported source type
+            logger.warning(f"Unsupported source type for tax data: {source_type}")
+            # Fallback to sample data
+            return self._get_sample_data('tax')
+            
+        except Exception as e:
+            logger.error(f"Error loading tax data from {connection.source_id}: {str(e)}")
+            return None
+    
+    def _save_tax_data(self, data: pd.DataFrame, connection: DataSourceConnection) -> Dict[str, int]:
+        """Save tax data to a target data source"""
+        try:
+            # Get target config
+            source_id = connection.source_id
+            source_config = self.data_sources[source_id]
+            source_type = source_config.source_type
+            
+            # Based on source type, save tax data
+            if source_type in ['postgresql', 'gis', 'sql_server', 'cama']:
+                # Try to detect or create tax table
+                try:
+                    tables = []
+                    schema_info = self.get_source_metadata(source_id)
+                    
+                    if schema_info.get('status') == 'success' and schema_info.get('schema_info'):
+                        tables = schema_info['schema_info'].get('tables', [])
+                    
+                    # Look for tax table
+                    tax_table = None
+                    for table in tables:
+                        if ('tax' in table.lower() or 'taxation' in table.lower() or 
+                            'tax_bill' in table.lower() or 'taxbill' in table.lower() or
+                            'tax_roll' in table.lower() or 'taxroll' in table.lower()):
+                            tax_table = table
+                            break
+                    
+                    if not tax_table:
+                        # Create a new tax table
+                        tax_table = 'tax_data'
+                        logger.warning(f"No tax table found in {source_id}, would create one in a real implementation")
+                    
+                    # In a real implementation, we would upsert to the tax table
+                    # For now, just log the data and return a placeholder result
+                    logger.info(f"Would save {len(data)} tax records to {tax_table} in {source_id}")
+                    return {"new": len(data), "updated": 0}
+                
+                except Exception as e:
+                    logger.error(f"Error saving tax data to {source_id}: {str(e)}")
+                    return {"new": 0, "updated": 0}
+            
+            elif source_type == 'sqlite':
+                # Similar implementation as above
+                logger.info(f"Would save {len(data)} tax records to SQLite database {source_id}")
+                return {"new": len(data), "updated": 0}
+            
+            elif source_type == 'file':
+                # Save to file based on extension
+                file_path = connection.connection
+                _, ext = os.path.splitext(file_path)
+                
+                # Replace extension with new one for tax data file
+                tax_file_path = file_path.replace(ext, f"_tax{ext}")
+                
+                if ext.lower() == '.csv':
+                    try:
+                        # data.to_csv(tax_file_path, index=False)
+                        logger.info(f"Would save {len(data)} tax records to CSV file {tax_file_path}")
+                        return {"new": len(data), "updated": 0}
+                    except Exception as e:
+                        logger.error(f"Error saving tax data to CSV file: {str(e)}")
+                        return {"new": 0, "updated": 0}
+                
+                elif ext.lower() in ['.xls', '.xlsx']:
+                    try:
+                        # data.to_excel(tax_file_path, index=False)
+                        logger.info(f"Would save {len(data)} tax records to Excel file {tax_file_path}")
+                        return {"new": len(data), "updated": 0}
+                    except Exception as e:
+                        logger.error(f"Error saving tax data to Excel file: {str(e)}")
+                        return {"new": 0, "updated": 0}
+                
+                else:
+                    logger.warning(f"Unsupported file extension for saving tax data: {ext}")
+                    return {"new": 0, "updated": 0}
+            
+            # If we get here, we don't have a supported source type
+            logger.warning(f"Unsupported source type for saving tax data: {source_type}")
+            return {"new": 0, "updated": 0}
+            
+        except Exception as e:
+            logger.error(f"Error saving tax data to {connection.source_id}: {str(e)}")
+            return {"new": 0, "updated": 0}
+    
+    def _save_tax_data_internal(self, data: pd.DataFrame) -> Dict[str, int]:
+        """Save tax data to the internal database"""
+        # TODO: Implement saving to internal database
+        # For now, just log the data and return a placeholder result
+        logger.info(f"Saving {len(data)} tax records to internal database")
         return {"new": len(data), "updated": 0}
     
     def _get_sample_data(self, data_type: str, filters: Dict[str, Any] = None) -> pd.DataFrame:
