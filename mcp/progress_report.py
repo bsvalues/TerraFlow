@@ -262,10 +262,13 @@ class ProgressReporter:
         
         return result
         
-    def generate_progress_report(self) -> Dict[str, Any]:
+    def generate_progress_report(self, force_refresh: bool = False) -> Dict[str, Any]:
         """
         Generate a comprehensive progress report
         
+        Args:
+            force_refresh: If True, forces a refresh of all data instead of using cached values
+            
         Returns:
             Dictionary with the full progress report
         """
@@ -273,7 +276,7 @@ class ProgressReporter:
         agent_statuses = {}
         blockers = []
         if self.status_reporter:
-            system_status = self.status_reporter.get_system_status()
+            system_status = self.status_reporter.get_system_status(force_refresh=force_refresh)
             agent_statuses = system_status.get("agents", {})
             
             # Extract blockers

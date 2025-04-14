@@ -178,16 +178,23 @@ class StatusReporter:
                 else:
                     logger.info(f"Agent {agent_id} status changed to {status}: {message}")
     
-    def get_system_status(self) -> Dict[str, Any]:
+    def get_system_status(self, force_refresh: bool = False) -> Dict[str, Any]:
         """
         Get the current system status
         
+        Args:
+            force_refresh: If True, forces a complete refresh of all agent statuses
+            
         Returns:
             Dictionary with system status information
         """
         with self.lock:
             # Check for missing heartbeats
             self._check_agent_heartbeats()
+            
+            # If force_refresh, poll all agents for a status update
+            if force_refresh:
+                self._request_status_updates()
             
             # Calculate overall system status
             highest_status_level = 0
@@ -323,6 +330,30 @@ class StatusReporter:
                 time.sleep(5.0)
         
         logger.info("Status reporter worker thread stopped")
+    
+    def _request_status_updates(self):
+        """Request status updates from all registered agents"""
+        try:
+            # Create status request message
+            request_msg = Message(
+                source_agent_id="status_reporter",
+                target_agent_id="broadcast",
+                message_type=MessageType.STATUS_REQUEST.value,
+                payload={
+                    'timestamp': time.time(),
+                    'request_type': 'status_update'
+                }
+            )
+            
+            # Publish the message
+            self.message_broker.publish(request_msg)
+            logger.info(f"Requested status updates from all agents ({len(self.agent_statuses)} registered)")
+            
+            # Give agents a small amount of time to respond
+            time.sleep(0.5)
+            
+        except Exception as e:
+            logger.error(f"Error requesting status updates: {str(e)}")
     
     def _publish_status_report(self):
         """Publish a system-wide status report"""

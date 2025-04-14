@@ -420,9 +420,30 @@
             $('#' + targetId).toggle();
         });
         
-        // Refresh report
+        // Refresh report using AJAX
         $('#refresh-report').click(function() {
-            location.reload();
+            var $btn = $(this);
+            $btn.html('<i class="fas fa-sync-alt fa-spin"></i> Refreshing...').prop('disabled', true);
+            
+            $.ajax({
+                url: '/mcp/progress/refresh',
+                method: 'GET',
+                success: function(response) {
+                    if (response.status === 'success') {
+                        showToast('Report refreshed successfully');
+                        setTimeout(function() {
+                            location.reload();
+                        }, 1000);
+                    } else {
+                        alert('Error: ' + response.message);
+                        $btn.html('<i class="fas fa-sync-alt"></i> Refresh').prop('disabled', false);
+                    }
+                },
+                error: function(xhr) {
+                    alert('Error refreshing report: ' + xhr.statusText);
+                    $btn.html('<i class="fas fa-sync-alt"></i> Refresh').prop('disabled', false);
+                }
+            });
         });
         
         // Update component progress
