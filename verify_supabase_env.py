@@ -468,14 +468,16 @@ def check_supabase_functions() -> Dict[str, Any]:
         # Edge functions are hard to check without knowing their names
         # So we'll just check if we can call a built-in RPC function
         
-        client = create_client(url, key)
+        client = get_supabase_client(url, key)
         response = client.rpc("check_connection").execute()
         
         # If we get here, functions are probably working
-        return {
+        result = {
             "success": True,
             "message": "Supabase functions seem to be working (RPC check)"
         }
+        release_supabase_client(client)
+        return result
     except Exception as e:
         logger.warning(f"Failed to check Supabase functions: {str(e)}")
         return {
