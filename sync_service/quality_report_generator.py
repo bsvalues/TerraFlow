@@ -525,6 +525,411 @@ class QualityReportGenerator:
         """
         pdf = HTML(string=html_content).write_pdf()
         return pdf
+        
+    def generate_excel_report(self, report_id: Optional[int] = None, 
+                             start_date: Optional[datetime.datetime] = None,
+                             end_date: Optional[datetime.datetime] = None,
+                             save_to_db: bool = True,
+                             options: Optional[Dict[str, Any]] = None) -> Tuple[bytes, str, Optional[int]]:
+        """
+        Generate an Excel report for the specified time period or report ID.
+        
+        Args:
+            report_id: Optional ID of a specific report to use as the base
+            start_date: Optional start date for the report period
+            end_date: Optional end date for the report period
+            save_to_db: Whether to save the report metadata to the database
+            options: Optional dictionary of report generation options like include_anomalies,
+                    include_issues, include_recommendations
+            
+        Returns:
+            Tuple of (Excel bytes, filename, report_id)
+        """
+        # Set default options if none provided
+        if options is None:
+            options = {
+                'include_anomalies': True,
+                'include_issues': True,
+                'include_recommendations': True
+            }
+            
+        # Get report data
+        summary, anomaly_summary, recent_anomalies, table_metrics, recommendations = self._get_report_data(
+            report_id, start_date, end_date, options
+        )
+        
+        # Generate report ID and date
+        report_date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        report_uuid = str(uuid.uuid4())[:8]
+        
+        # Create Excel workbook
+        excel_bytes = self._generate_excel_workbook(
+            report_date=report_date,
+            report_id=report_uuid,
+            version=self.version,
+            summary=summary,
+            anomaly_summary=anomaly_summary,
+            recent_anomalies=recent_anomalies,
+            table_metrics=table_metrics,
+            recommendations=recommendations,
+            options=options
+        )
+        
+        # Generate filename with date and ID
+        filename = f"quality_report_{datetime.datetime.now().strftime('%Y%m%d')}_{report_uuid}.xlsx"
+        
+        # Save report to filesystem
+        reports_dir = os.path.join('uploads', 'reports')
+        if not os.path.exists(reports_dir):
+            os.makedirs(reports_dir, exist_ok=True)
+            
+        file_path = os.path.join(reports_dir, filename)
+        with open(file_path, 'wb') as f:
+            f.write(excel_bytes)
+            
+        # Save report metadata to database
+        db_report_id = None
+        if save_to_db:
+            try:
+                # Create report record
+                report = DataQualityReport(
+                    report_name=f"Quality Report {datetime.datetime.now().strftime('%Y-%m-%d')}",
+                    report_type='excel',
+                    tables_checked=summary.get('tables_checked', []),
+                    overall_score=summary.get('overall_score', 0),
+                    report_data={
+                        'summary': summary,
+                        'anomaly_summary': anomaly_summary,
+                        'recent_anomalies': recent_anomalies,
+                        'table_metrics': table_metrics,
+                        'recommendations': recommendations
+                    },
+                    critical_issues=summary.get('critical_issues', 0),
+                    high_issues=summary.get('high_issues', 0),
+                    medium_issues=summary.get('medium_issues', 0),
+                    low_issues=summary.get('low_issues', 0),
+                    report_file_path=file_path,
+                    report_format='excel',
+                    start_date=start_date,
+                    end_date=end_date,
+                    created_at=datetime.datetime.now()
+                )
+                
+                db.session.add(report)
+                db.session.commit()
+                db_report_id = report.id
+                
+                logger.info(f"Excel report saved to database with ID: {db_report_id}")
+            except Exception as e:
+                logger.error(f"Error saving Excel report to database: {str(e)}")
+                db.session.rollback()
+        
+        return excel_bytes, filename, db_report_id
+    
+    def _generate_excel_workbook(self, **kwargs) -> bytes:
+        """
+        Generate an Excel workbook with the provided data.
+        
+        Args:
+            **kwargs: Template variables including report data
+            
+        Returns:
+            Excel file as bytes
+        """
+        # Create a new workbook
+        wb = openpyxl.Workbook()
+        
+        # Remove the default sheet
+        default_sheet = wb.active
+        wb.remove(default_sheet)
+        
+        # Add Summary sheet
+        self._add_summary_sheet(wb, **kwargs)
+        
+        # Add Anomalies sheet if included
+        if kwargs.get('options', {}).get('include_anomalies', True) and kwargs.get('recent_anomalies'):
+            self._add_anomalies_sheet(wb, **kwargs)
+            
+            # Add Anomaly Summary sheet if there's data
+            if kwargs.get('anomaly_summary'):
+                self._add_anomaly_summary_sheet(wb, **kwargs)
+        
+        # Add Table Metrics sheet if there's data
+        if kwargs.get('table_metrics'):
+            self._add_table_metrics_sheet(wb, **kwargs)
+        
+        # Add Recommendations sheet if included and there's data
+        if kwargs.get('options', {}).get('include_recommendations', True) and kwargs.get('recommendations'):
+            self._add_recommendations_sheet(wb, **kwargs)
+        
+        # Save the workbook to a BytesIO object
+        excel_file = io.BytesIO()
+        wb.save(excel_file)
+        
+        # Get Excel bytes
+        excel_file.seek(0)
+        excel_bytes = excel_file.getvalue()
+        excel_file.close()
+        
+        return excel_bytes
+    
+    def _add_summary_sheet(self, wb, **kwargs):
+        """Add a summary sheet to the workbook."""
+        summary = kwargs.get('summary', {})
+        report_date = kwargs.get('report_date', datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        report_id = kwargs.get('report_id', '')
+        version = kwargs.get('version', '1.0')
+        
+        # Create sheet
+        ws = wb.create_sheet("Summary")
+        
+        # Define styles
+        title_font = Font(name='Arial', size=14, bold=True)
+        header_font = Font(name='Arial', size=12, bold=True)
+        normal_font = Font(name='Arial', size=11)
+        
+        header_fill = PatternFill(start_color="DDEBF7", end_color="DDEBF7", fill_type="solid")
+        good_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
+        warning_fill = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")
+        error_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+        
+        # Add report title and metadata
+        ws['A1'] = "Data Quality Report"
+        ws['A1'].font = title_font
+        ws.merge_cells('A1:E1')
+        
+        ws['A2'] = f"Report Date: {report_date}"
+        ws['A3'] = f"Report ID: {report_id}"
+        ws['A4'] = f"Version: {version}"
+        
+        # Set column widths
+        ws.column_dimensions['A'].width = 25
+        ws.column_dimensions['B'].width = 15
+        ws.column_dimensions['C'].width = 15
+        ws.column_dimensions['D'].width = 15
+        ws.column_dimensions['E'].width = 15
+        
+        # Add overall quality score
+        ws['A6'] = "Overall Quality Score"
+        ws['A6'].font = header_font
+        ws.merge_cells('A6:E6')
+        
+        ws['A7'] = "Score:"
+        ws['B7'] = summary.get('overall_score', 0)
+        
+        # Color score based on value
+        score_cell = ws['B7']
+        if summary.get('overall_score', 0) >= 90:
+            score_cell.fill = good_fill
+        elif summary.get('overall_score', 0) >= 70:
+            score_cell.fill = warning_fill
+        else:
+            score_cell.fill = error_fill
+            
+        # Add issue summary
+        ws['A9'] = "Issue Summary"
+        ws['A9'].font = header_font
+        ws.merge_cells('A9:E9')
+        
+        # Add headers
+        headers = ["Severity", "Count", "Trend"]
+        for i, header in enumerate(headers):
+            cell = ws.cell(row=10, column=i+1)
+            cell.value = header
+            cell.font = header_font
+            cell.fill = header_fill
+        
+        # Add issue data
+        issue_rows = [
+            ("Critical", summary.get('critical_issues', 0), summary.get('critical_trend', 0)),
+            ("High", summary.get('high_issues', 0), summary.get('high_trend', 0)),
+            ("Medium", summary.get('medium_issues', 0), summary.get('medium_trend', 0)),
+            ("Low", summary.get('low_issues', 0), summary.get('low_trend', 0))
+        ]
+        
+        for i, (severity, count, trend) in enumerate(issue_rows):
+            row = 11 + i
+            
+            # Severity
+            ws.cell(row=row, column=1).value = severity
+            
+            # Count
+            count_cell = ws.cell(row=row, column=2)
+            count_cell.value = count
+            
+            # Apply fill color based on severity
+            if severity == "Critical" and count > 0:
+                count_cell.fill = error_fill
+            elif severity == "High" and count > 0:
+                count_cell.fill = warning_fill
+            
+            # Trend
+            trend_cell = ws.cell(row=row, column=3)
+            if trend != 0:
+                trend_prefix = "+" if trend > 0 else ""
+                trend_cell.value = f"{trend_prefix}{trend}"
+                
+                # Color code trends
+                if trend > 0:
+                    trend_cell.fill = error_fill
+                else:
+                    trend_cell.fill = good_fill
+    
+    def _add_anomalies_sheet(self, wb, **kwargs):
+        """Add the recent anomalies sheet to the workbook."""
+        recent_anomalies = kwargs.get('recent_anomalies', [])
+        
+        # Create sheet
+        ws = wb.create_sheet("Recent Anomalies")
+        
+        # Define styles
+        header_font = Font(name='Arial', size=12, bold=True)
+        header_fill = PatternFill(start_color="DDEBF7", end_color="DDEBF7", fill_type="solid")
+        
+        # Set column widths
+        ws.column_dimensions['A'].width = 10
+        ws.column_dimensions['B'].width = 25
+        ws.column_dimensions['C'].width = 20
+        ws.column_dimensions['D'].width = 25
+        ws.column_dimensions['E'].width = 15
+        ws.column_dimensions['F'].width = 20
+        
+        # Add headers
+        headers = ["ID", "Table", "Field", "Anomaly Type", "Severity", "Detected At"]
+        for i, header in enumerate(headers):
+            cell = ws.cell(row=1, column=i+1)
+            cell.value = header
+            cell.font = header_font
+            cell.fill = header_fill
+        
+        # Add anomaly data
+        for i, anomaly in enumerate(recent_anomalies):
+            row = i + 2
+            
+            ws.cell(row=row, column=1).value = anomaly.get('id', '')
+            ws.cell(row=row, column=2).value = anomaly.get('table_name', '')
+            ws.cell(row=row, column=3).value = anomaly.get('field_name', '')
+            ws.cell(row=row, column=4).value = anomaly.get('anomaly_type', '')
+            ws.cell(row=row, column=5).value = anomaly.get('severity', '')
+            ws.cell(row=row, column=6).value = anomaly.get('detected_at', '')
+            
+            # Apply fill color based on severity
+            severity_cell = ws.cell(row=row, column=5)
+            if anomaly.get('severity') == 'critical':
+                severity_cell.fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+            elif anomaly.get('severity') in ['high', 'error']:
+                severity_cell.fill = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")
+    
+    def _add_anomaly_summary_sheet(self, wb, **kwargs):
+        """Add the anomaly summary sheet to the workbook."""
+        anomaly_summary = kwargs.get('anomaly_summary', [])
+        
+        # Create sheet
+        ws = wb.create_sheet("Anomaly Summary")
+        
+        # Define styles
+        header_font = Font(name='Arial', size=12, bold=True)
+        header_fill = PatternFill(start_color="DDEBF7", end_color="DDEBF7", fill_type="solid")
+        
+        # Set column widths
+        ws.column_dimensions['A'].width = 25
+        ws.column_dimensions['B'].width = 15
+        ws.column_dimensions['C'].width = 25
+        ws.column_dimensions['D'].width = 25
+        
+        # Add headers
+        headers = ["Table", "Anomaly Count", "Most Common Type", "Status"]
+        for i, header in enumerate(headers):
+            cell = ws.cell(row=1, column=i+1)
+            cell.value = header
+            cell.font = header_font
+            cell.fill = header_fill
+        
+        # Add summary data
+        for i, summary_item in enumerate(anomaly_summary):
+            row = i + 2
+            
+            ws.cell(row=row, column=1).value = summary_item.get('table_name', '')
+            ws.cell(row=row, column=2).value = summary_item.get('count', 0)
+            ws.cell(row=row, column=3).value = summary_item.get('most_common_type', '')
+            ws.cell(row=row, column=4).value = summary_item.get('status', '')
+    
+    def _add_table_metrics_sheet(self, wb, **kwargs):
+        """Add the table metrics sheet to the workbook."""
+        table_metrics = kwargs.get('table_metrics', [])
+        
+        # Create sheet
+        ws = wb.create_sheet("Table Metrics")
+        
+        # Define styles
+        header_font = Font(name='Arial', size=12, bold=True)
+        header_fill = PatternFill(start_color="DDEBF7", end_color="DDEBF7", fill_type="solid")
+        
+        # Set column widths
+        ws.column_dimensions['A'].width = 25
+        ws.column_dimensions['B'].width = 15
+        ws.column_dimensions['C'].width = 15
+        ws.column_dimensions['D'].width = 15
+        ws.column_dimensions['E'].width = 15
+        
+        # Add headers
+        headers = ["Table", "Completeness %", "Accuracy %", "Consistency %", "Overall %"]
+        for i, header in enumerate(headers):
+            cell = ws.cell(row=1, column=i+1)
+            cell.value = header
+            cell.font = header_font
+            cell.fill = header_fill
+        
+        # Add metric data
+        for i, metric in enumerate(table_metrics):
+            row = i + 2
+            
+            ws.cell(row=row, column=1).value = metric.get('name', '')
+            ws.cell(row=row, column=2).value = metric.get('completeness', 0)
+            ws.cell(row=row, column=3).value = metric.get('accuracy', 0)
+            ws.cell(row=row, column=4).value = metric.get('consistency', 0)
+            ws.cell(row=row, column=5).value = metric.get('overall', 0)
+            
+            # Apply conditional formatting to metric values
+            for col in range(2, 6):
+                cell = ws.cell(row=row, column=col)
+                value = cell.value
+                
+                if value >= 90:
+                    cell.fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
+                elif value >= 70:
+                    cell.fill = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")
+                else:
+                    cell.fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+    
+    def _add_recommendations_sheet(self, wb, **kwargs):
+        """Add the recommendations sheet to the workbook."""
+        recommendations = kwargs.get('recommendations', [])
+        
+        # Create sheet
+        ws = wb.create_sheet("Recommendations")
+        
+        # Define styles
+        header_font = Font(name='Arial', size=12, bold=True)
+        
+        # Set column widths
+        ws.column_dimensions['A'].width = 15
+        ws.column_dimensions['B'].width = 65
+        
+        # Add title
+        ws['A1'] = "Data Quality Recommendations"
+        ws['A1'].font = header_font
+        ws.merge_cells('A1:B1')
+        
+        # Add recommendations
+        for i, recommendation in enumerate(recommendations):
+            row = i + 3
+            
+            ws.cell(row=row, column=1).value = f"Recommendation {i+1}:"
+            ws.cell(row=row, column=2).value = recommendation
+            
+            # Apply wrap text to long recommendations
+            ws.cell(row=row, column=2).alignment = Alignment(wrap_text=True)
 
 
 # Initialize the report generator

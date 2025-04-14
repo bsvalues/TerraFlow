@@ -108,11 +108,25 @@ def generate_report():
                 return render_template('data_quality/generate_report.html', 
                                       error=f"Error generating report: {str(e)}")
         
-        # Future: support for Excel reports
+        # Support for Excel reports
         elif report_format == 'excel':
-            # Not implemented yet
-            return render_template('data_quality/generate_report.html', 
-                                  error="Excel format is not implemented yet.")
+            try:
+                excel_bytes, filename, new_report_id = report_generator.generate_excel_report(
+                    report_id=report_id,
+                    start_date=start_date,
+                    end_date=end_date,
+                    options=report_options
+                )
+                
+                # Return Excel as downloadable attachment
+                response = make_response(excel_bytes)
+                response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+                return response
+            except Exception as e:
+                logger.exception(f"Error generating Excel report: {str(e)}")
+                return render_template('data_quality/generate_report.html', 
+                                    error=f"Error generating Excel report: {str(e)}")
             
         else:
             return render_template('data_quality/generate_report.html', 
@@ -189,10 +203,30 @@ def api_generate_report():
                 'format': 'pdf'
             })
             
-        # Future: support for Excel reports
+        # Support for Excel reports
         elif report_format == 'excel':
-            # Not implemented yet
-            return jsonify({'error': 'Excel format not implemented yet'}), 501
+            try:
+                excel_bytes, filename, new_report_id = report_generator.generate_excel_report(
+                    report_id=report_id,
+                    start_date=start_date,
+                    end_date=end_date,
+                    options=report_options
+                )
+                
+                # Return base64 encoded Excel
+                import base64
+                excel_base64 = base64.b64encode(excel_bytes).decode('utf-8')
+                
+                return jsonify({
+                    'success': True,
+                    'filename': filename,
+                    'report_id': new_report_id,
+                    'data': excel_base64,
+                    'format': 'excel'
+                })
+            except Exception as e:
+                logger.exception(f"Error generating Excel report via API: {str(e)}")
+                return jsonify({'error': f'Error generating Excel report: {str(e)}'}), 500
             
         else:
             return jsonify({'error': 'Unsupported format'}), 400
@@ -268,10 +302,15 @@ def download_report(report_id):
                 
             # Check if the report has a stored file
             if report.report_file_path and os.path.exists(report.report_file_path):
+                # Determine the correct mimetype based on report format
+                mimetype = 'application/pdf'
+                if report.report_format == 'excel':
+                    mimetype = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                
                 # Return the stored file
                 return send_file(
                     report.report_file_path,
-                    mimetype='application/pdf',
+                    mimetype=mimetype,
                     as_attachment=True,
                     download_name=os.path.basename(report.report_file_path)
                 )
@@ -287,20 +326,37 @@ def download_report(report_id):
                     'include_recommendations': True
                 }
                 
-                # Generate new PDF
-                pdf_bytes, filename, _ = report_generator.generate_pdf_report(
-                    report_id=report_id,
-                    start_date=start_date,
-                    end_date=end_date,
-                    options=report_options,
-                    save_to_db=False  # Don't save duplicate entry
-                )
-                
-                # Return PDF as downloadable attachment
-                response = make_response(pdf_bytes)
-                response.headers['Content-Type'] = 'application/pdf'
-                response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
-                return response
+                # Generate new report based on the original format
+                if report.report_format == 'excel':
+                    # Generate Excel
+                    excel_bytes, filename, _ = report_generator.generate_excel_report(
+                        report_id=report_id,
+                        start_date=start_date,
+                        end_date=end_date,
+                        options=report_options,
+                        save_to_db=False  # Don't save duplicate entry
+                    )
+                    
+                    # Return Excel as downloadable attachment
+                    response = make_response(excel_bytes)
+                    response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                    response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+                    return response
+                else:
+                    # Default to PDF
+                    pdf_bytes, filename, _ = report_generator.generate_pdf_report(
+                        report_id=report_id,
+                        start_date=start_date,
+                        end_date=end_date,
+                        options=report_options,
+                        save_to_db=False  # Don't save duplicate entry
+                    )
+                    
+                    # Return PDF as downloadable attachment
+                    response = make_response(pdf_bytes)
+                    response.headers['Content-Type'] = 'application/pdf'
+                    response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+                    return response
     except Exception as e:
         logger.exception(f"Error downloading report: {str(e)}")
         return jsonify({'error': f'Error downloading report: {str(e)}'}), 500
