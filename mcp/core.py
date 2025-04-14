@@ -699,6 +699,9 @@ class MCP:
         enabling them to use the Agent-to-Agent communication functionality.
         """
         for agent_id, agent in self.agents.items():
+            # Subscribe agent to the "broadcast" topic
+            self.message_broker.subscribe_to_topic(agent_id, "broadcast")
+            
             # Add protocol to agent if it has the proper interface
             if hasattr(agent, 'send_query') and hasattr(agent, 'send_inform') and hasattr(agent, 'send_request'):
                 # Inject the protocol into the agent's methods
