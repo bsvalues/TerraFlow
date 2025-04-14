@@ -29,6 +29,7 @@ class MessageType(Enum):
     RESPONSE = "response"         # Reply to a query or command
     ERROR = "error"               # Error notification
     STATUS_UPDATE = "status_update"  # Agent status update
+    STATUS_REQUEST = "status_request"  # Request for status update
     POLICY_UPDATE = "policy_update"  # Update to agent policy/rules
     TASK_REQUEST = "task_request"    # Request for task execution
     DATA_EXCHANGE = "data_exchange"  # Exchange of data
