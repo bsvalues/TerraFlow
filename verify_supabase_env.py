@@ -26,6 +26,7 @@ except ImportError:
 
 # Local modules
 from set_supabase_env import ensure_supabase_env, get_current_environment
+from supabase_client import get_supabase_client, release_supabase_client
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -122,20 +123,22 @@ def check_supabase_connection() -> Dict[str, Any]:
     
     # Try to create a client
     try:
-        client = create_client(url, key)
+        client = get_supabase_client(url, key)
         response = client.rpc("check_connection").execute()
         
         if response.data:
-            return {
+            result = {
                 "success": True,
                 "message": "Supabase connection is working",
                 "data": response.data
             }
         else:
-            return {
+            result = {
                 "success": True,
                 "message": "Supabase connection established, but no data returned from check_connection RPC"
             }
+        release_supabase_client(client)
+        return result
     except Exception as e:
         logger.warning(f"Failed to connect to Supabase: {str(e)}")
         
@@ -190,19 +193,21 @@ def check_supabase_auth() -> Dict[str, Any]:
     
     # Try to create a client
     try:
-        client = create_client(url, key)
+        client = get_supabase_client(url, key)
         response = client.auth.get_session()
         
         if response:
-            return {
+            result = {
                 "success": True,
                 "message": "Supabase authentication is working"
             }
         else:
-            return {
+            result = {
                 "success": False,
                 "message": "Failed to initialize Supabase authentication"
             }
+        release_supabase_client(client)
+        return result
     except Exception as e:
         logger.warning(f"Failed to initialize Supabase authentication: {str(e)}")
         return {
@@ -244,17 +249,19 @@ def check_supabase_storage() -> Dict[str, Any]:
     
     # Try to create a client
     try:
-        client = create_client(url, key)
+        client = get_supabase_client(url, key)
         
         # Get list of buckets
         response = client.storage.list_buckets()
         
         # If we get here, storage is working
-        return {
+        result = {
             "success": True,
             "message": f"Supabase storage is working. {len(response)} buckets found.",
             "buckets": [bucket["name"] for bucket in response]
         }
+        release_supabase_client(client)
+        return result
     except Exception as e:
         logger.warning(f"Failed to initialize Supabase storage: {str(e)}")
         return {
@@ -296,19 +303,22 @@ def check_supabase_service_role() -> Dict[str, Any]:
     
     # Try to create a client
     try:
-        client = create_client(url, service_key)
+        client = get_supabase_client(url, service_key)
         
         # Get list of users (only available with service role)
         try:
             response = client.auth.admin.list_users()
             
             # If we get here, service role is working
-            return {
+            result = {
                 "success": True,
                 "message": f"Supabase service role is working. {len(response.users) if response.users else 0} users found."
             }
+            release_supabase_client(client)
+            return result
         except Exception as e:
             logger.warning(f"Failed to list users with service role: {str(e)}")
+            release_supabase_client(client)
             return {
                 "success": False,
                 "message": f"Failed to list users with service role: {str(e)}",
@@ -355,16 +365,18 @@ def check_supabase_database() -> Dict[str, Any]:
     
     # Try to create a client
     try:
-        client = create_client(url, key)
+        client = get_supabase_client(url, key)
         
         # Perform a simple query
         response = client.table("test_connection").select("*").limit(1).execute()
         
         # If we get here, database is working
-        return {
+        result = {
             "success": True,
             "message": "Supabase database is working"
         }
+        release_supabase_client(client)
+        return result
     except Exception as e:
         # Check if table doesn't exist
         if "relation" in str(e) and "does not exist" in str(e):
@@ -378,27 +390,33 @@ def check_supabase_database() -> Dict[str, Any]:
                         "message": "Missing required environment variable: SUPABASE_SERVICE_KEY"
                     }
                 
-                service_client = create_client(url, service_key)
+                service_client = get_supabase_client(url, service_key)
                 
-                # Create test_connection table
-                response = service_client.rpc(
-                    "create_test_connection_table",
-                    {
-                        "table_name": "test_connection"
+                try:
+                    # Create test_connection table
+                    response = service_client.rpc(
+                        "create_test_connection_table",
+                        {
+                            "table_name": "test_connection"
+                        }
+                    ).execute()
+                    
+                    # Try to insert a row
+                    response = service_client.table("test_connection").insert({
+                        "created_at": datetime.now().isoformat(),
+                        "test_value": "Connection test"
+                    }).execute()
+                    
+                    # If we get here, database is working
+                    result = {
+                        "success": True,
+                        "message": "Supabase database is working (created test table)"
                     }
-                ).execute()
-                
-                # Try to insert a row
-                response = service_client.table("test_connection").insert({
-                    "created_at": datetime.now().isoformat(),
-                    "test_value": "Connection test"
-                }).execute()
-                
-                # If we get here, database is working
-                return {
-                    "success": True,
-                    "message": "Supabase database is working (created test table)"
-                }
+                    release_supabase_client(service_client)
+                    return result
+                except Exception as e:
+                    release_supabase_client(service_client)
+                    raise e
             except Exception as inner_e:
                 logger.warning(f"Failed to create test table: {str(inner_e)}")
                 return {
