@@ -27,6 +27,21 @@ try:
     CONNECTION_POOL_AVAILABLE = True
 except ImportError:
     CONNECTION_POOL_AVAILABLE = False
+    
+def release_supabase_client(client):
+    """
+    Release a Supabase client back to the connection pool if available.
+    
+    Args:
+        client: Supabase client instance to release
+    """
+    if CONNECTION_POOL_AVAILABLE:
+        try:
+            release_client(client)
+            logger.debug("Released Supabase client back to connection pool")
+        except Exception as e:
+            logger.error(f"Error releasing Supabase client: {str(e)}")
+    # If connection pool isn't available, there's nothing to release
 
 def get_supabase_client(environment: Optional[str] = None) -> Optional[Client]:
     """
