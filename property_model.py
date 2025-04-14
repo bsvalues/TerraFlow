@@ -10,7 +10,7 @@ import uuid
 from datetime import datetime
 from typing import Dict, List, Optional, Any, Union
 
-from supabase_client import get_supabase_client
+from supabase_client import get_supabase_client, release_supabase_client
 from auth import is_authenticated, has_permission
 from flask import session
 from flask_login import current_user
@@ -368,8 +368,8 @@ def get_property(property_id: str) -> Optional[Property]:
     finally:
         # Release the client
         if supabase:
-            from supabase_connection_pool import release_connection
-            release_connection(supabase)
+            # Using our centralized release function
+            release_supabase_client(supabase)
 
 
 def get_properties(filters: Dict[str, Any] = None, page: int = 1, per_page: int = 20) -> Dict[str, Any]:
@@ -435,8 +435,8 @@ def get_properties(filters: Dict[str, Any] = None, page: int = 1, per_page: int 
     finally:
         # Release the client
         if supabase:
-            from supabase_connection_pool import release_connection
-            release_connection(supabase)
+            # Using our centralized release function
+            release_supabase_client(supabase)
 
 
 def create_property(property_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -493,8 +493,8 @@ def create_property(property_data: Dict[str, Any]) -> Dict[str, Any]:
     finally:
         # Release the client
         if supabase:
-            from supabase_connection_pool import release_connection
-            release_connection(supabase)
+            # Using our centralized release function
+            release_supabase_client(supabase)
 
 
 def update_property(property_id: str, property_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -559,8 +559,8 @@ def update_property(property_id: str, property_data: Dict[str, Any]) -> Dict[str
     finally:
         # Release the client
         if supabase:
-            from supabase_connection_pool import release_connection
-            release_connection(supabase)
+            # Using our centralized release function
+            release_supabase_client(supabase)
 
 
 def delete_property(property_id: str) -> Dict[str, bool]:
@@ -607,8 +607,8 @@ def delete_property(property_id: str) -> Dict[str, bool]:
     finally:
         # Release the client
         if supabase:
-            from supabase_connection_pool import release_connection
-            release_connection(supabase)
+            # Using our centralized release function
+            release_supabase_client(supabase)
 
 
 # Database Operations for Assessments
@@ -651,8 +651,8 @@ def get_property_assessments(property_id: str) -> List[PropertyAssessment]:
     finally:
         # Release the client
         if supabase:
-            from supabase_connection_pool import release_connection
-            release_connection(supabase)
+            # Using our centralized release function
+            release_supabase_client(supabase)
 
 
 def get_assessment(assessment_id: str) -> Optional[PropertyAssessment]:
@@ -693,8 +693,8 @@ def get_assessment(assessment_id: str) -> Optional[PropertyAssessment]:
     finally:
         # Release the client
         if supabase:
-            from supabase_connection_pool import release_connection
-            release_connection(supabase)
+            # Using our centralized release function
+            release_supabase_client(supabase)
 
 
 def create_assessment(assessment_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -758,8 +758,8 @@ def create_assessment(assessment_data: Dict[str, Any]) -> Dict[str, Any]:
     finally:
         # Release the client
         if supabase:
-            from supabase_connection_pool import release_connection
-            release_connection(supabase)
+            # Using our centralized release function
+            release_supabase_client(supabase)
 
 
 def update_assessment(assessment_id: str, assessment_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -831,8 +831,8 @@ def update_assessment(assessment_id: str, assessment_data: Dict[str, Any]) -> Di
     finally:
         # Release the client
         if supabase:
-            from supabase_connection_pool import release_connection
-            release_connection(supabase)
+            # Using our centralized release function
+            release_supabase_client(supabase)
 
 
 def delete_assessment(assessment_id: str) -> Dict[str, bool]:
@@ -879,8 +879,8 @@ def delete_assessment(assessment_id: str) -> Dict[str, bool]:
     finally:
         # Release the client
         if supabase:
-            from supabase_connection_pool import release_connection
-            release_connection(supabase)
+            # Using our centralized release function
+            release_supabase_client(supabase)
 
 
 # Database Operations for Property Files
@@ -923,8 +923,8 @@ def get_property_files(property_id: str) -> List[PropertyFile]:
     finally:
         # Release the client
         if supabase:
-            from supabase_connection_pool import release_connection
-            release_connection(supabase)
+            # Using our centralized release function
+            release_supabase_client(supabase)
 
 
 def get_file(file_id: str) -> Optional[PropertyFile]:
@@ -965,8 +965,8 @@ def get_file(file_id: str) -> Optional[PropertyFile]:
     finally:
         # Release the client
         if supabase:
-            from supabase_connection_pool import release_connection
-            release_connection(supabase)
+            # Using our centralized release function
+            release_supabase_client(supabase)
 
 
 def create_property_file(file_data: Dict[str, Any], file_content: Any) -> Dict[str, Any]:
@@ -1051,8 +1051,8 @@ def create_property_file(file_data: Dict[str, Any], file_content: Any) -> Dict[s
     finally:
         # Release the client
         if supabase:
-            from supabase_connection_pool import release_connection
-            release_connection(supabase)
+            # Using our centralized release function
+            release_supabase_client(supabase)
 
 
 def delete_property_file(file_id: str) -> Dict[str, bool]:
@@ -1109,5 +1109,5 @@ def delete_property_file(file_id: str) -> Dict[str, bool]:
     finally:
         # Release the client
         if supabase:
-            from supabase_connection_pool import release_connection
-            release_connection(supabase)
+            # Using our centralized release function
+            release_supabase_client(supabase)
