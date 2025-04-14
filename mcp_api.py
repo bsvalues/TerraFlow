@@ -206,6 +206,26 @@ def get_progress_report():
             "status": "error",
             "message": f"Error generating progress report: {str(e)}"
         }), 500
+        
+@mcp_api.route('/progress/refresh', methods=['GET'])
+@api_login_required
+def refresh_progress_report():
+    """Refresh and return the latest MVP progress report data as JSON"""
+    try:
+        # Force a fresh report generation
+        report = mcp_instance.progress_reporter.generate_progress_report()
+        
+        return jsonify({
+            "status": "success",
+            "report": report,
+            "message": "Progress report refreshed successfully"
+        })
+    except Exception as e:
+        logger.error(f"Error refreshing progress report: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": f"Error refreshing progress report: {str(e)}"
+        }), 500
 
 @mcp_api.route('/progress/view', methods=['GET'])
 @login_required
