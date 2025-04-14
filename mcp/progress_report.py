@@ -434,16 +434,7 @@ class ProgressReporter:
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-            <style>
-                .progress-bar { 
-                    -webkit-transition: width 0.5s ease-in-out;
-                    -moz-transition: width 0.5s ease-in-out;
-                    -o-transition: width 0.5s ease-in-out;
-                    transition: width 0.5s ease-in-out; 
-                }
-                .card { margin-bottom: 1.5rem; }
-                .completion-badge { font-size: 0.8rem; }
-            </style>
+            <!-- Styles removed to fix template rendering issues -->
         </head>
         <body>
             <div class="container my-5">
