@@ -43,6 +43,55 @@ def get_service_client(service_name: str) -> Any:
     
     return _service_clients[service_name]
 
+def get_service_supabase_client(service_name: str) -> Optional[Any]:
+    """
+    Get a Supabase client for a specific service.
+    
+    This function is used by tools and services that need to access
+    the database with service-specific permissions.
+    
+    Args:
+        service_name: Name of the service (e.g., "property", "valuation", etc.)
+        
+    Returns:
+        Supabase client or None if it couldn't be created
+    """
+    logger.info(f"Getting Supabase client for service: {service_name}")
+    
+    # Get environment variables
+    url = os.environ.get("SUPABASE_URL")
+    service_key = os.environ.get("SUPABASE_SERVICE_KEY")
+    
+    if not url or not service_key:
+        logger.error(f"Missing required environment variables for {service_name} service client")
+        return None
+    
+    # Get a client from the centralized client manager for this service
+    try:
+        client = get_supabase_client(service_name)
+        if client:
+            return client
+        
+        # Fall back to using the service key directly
+        logger.warning(f"Centralized client for service {service_name} not available, creating direct client")
+        return get_supabase_client()
+    except Exception as e:
+        logger.error(f"Error getting Supabase client for service {service_name}: {str(e)}")
+        return None
+
+def release_service_supabase_client(client: Any) -> None:
+    """
+    Release a service-specific Supabase client back to the pool.
+    
+    Args:
+        client: Supabase client to release
+    """
+    try:
+        release_supabase_client(client)
+    except Exception as e:
+        logger.error(f"Error releasing Supabase client: {str(e)}")
+        # Even if we can't release it, don't crash
+
 class ServiceClient:
     """
     A Supabase client for a specific service.
@@ -82,19 +131,29 @@ class ServiceClient:
             Decorated function
         """
         def wrapper(*args, **kwargs):
-            if not self.url or not self.key:
-                logger.error(f"Missing required environment variables for {self.service_name} service client")
-                raise ValueError("Missing required environment variables (URL or key)")
-            
-            # Get a client from the centralized client manager
-            client = get_supabase_client(self.url, self.key)
-            
+            client = None
             try:
+                # Get a client from the centralized client manager
+                client = get_supabase_client(environment="development")
+                
+                if not client:
+                    # Fall back to direct client creation using environment variables
+                    if not self.url or not self.key:
+                        logger.error(f"Missing required environment variables for {self.service_name} service client")
+                        raise ValueError("Missing required environment variables (URL or key)")
+                    
+                    client = get_supabase_client(url=self.url, key=self.key)
+                    
+                    if not client:
+                        logger.error(f"Failed to create client for {self.service_name} service")
+                        raise ConnectionError(f"Failed to create client for {self.service_name} service")
+                
                 # Call the function with the client
                 return func(client, *args, **kwargs)
             finally:
                 # Release the client back through the centralized client manager
-                release_supabase_client(client)
+                if client:
+                    release_supabase_client(client)
         
         return wrapper
     
@@ -109,19 +168,29 @@ class ServiceClient:
             Decorated function
         """
         def wrapper(*args, **kwargs):
-            if not self.url or not self.service_key:
-                logger.error(f"Missing required environment variables for {self.service_name} service client (service role)")
-                raise ValueError("Missing required environment variables (URL or service key)")
-            
-            # Get a client from the centralized client manager
-            client = get_supabase_client(self.url, self.service_key)
-            
+            client = None
             try:
+                # Try to get a service-specific client first
+                client = get_service_supabase_client(self.service_name)
+                
+                if not client:
+                    # Fall back to direct client creation using environment variables
+                    if not self.url or not self.service_key:
+                        logger.error(f"Missing required environment variables for {self.service_name} service client (service role)")
+                        raise ValueError("Missing required environment variables (URL or service key)")
+                    
+                    client = get_supabase_client(url=self.url, key=self.service_key)
+                    
+                    if not client:
+                        logger.error(f"Failed to create service client for {self.service_name}")
+                        raise ConnectionError(f"Failed to create service client for {self.service_name}")
+                
                 # Call the function with the client
                 return func(client, *args, **kwargs)
             finally:
                 # Release the client back through the centralized client manager
-                release_supabase_client(client)
+                if client:
+                    release_service_supabase_client(client)
         
         return wrapper
     

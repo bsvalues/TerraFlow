@@ -628,35 +628,55 @@ def main():
     parser.add_argument("--url", "-u", help="Supabase URL")
     parser.add_argument("--key", "-k", help="Supabase service key")
     parser.add_argument("--use-pool", "-p", action="store_true", help="Use connection pool instead of direct client")
+    parser.add_argument("--environment", "-e", default="development", help="Environment to use (development, staging, production)")
     args = parser.parse_args()
     
-    # Get Supabase credentials
-    url = args.url or os.environ.get("SUPABASE_URL")
-    key = args.key or os.environ.get("SUPABASE_SERVICE_KEY") or os.environ.get("SUPABASE_KEY")
-    
-    if not url or not key:
-        logger.error(
-            "Supabase URL and key are required. "
-            "Provide them as arguments or set SUPABASE_URL and SUPABASE_SERVICE_KEY environment variables."
-        )
-        return 1
-    
     client = None
+    release_func = None
+    
     try:
-        # Try to use connection pool if available and requested
-        if args.use_pool:
+        # Determine if we can/should use the centralized client management
+        use_central = args.use_pool or CENTRAL_CLIENT_AVAILABLE
+        
+        if use_central:
             try:
-                # Import from parent directory
-                from supabase_client import get_supabase_client, release_supabase_client
-                client = get_supabase_client()
+                # Import centralized client management to avoid name collision
+                from supabase_client import get_supabase_client as central_get_client
+                from supabase_client import release_supabase_client as central_release_client
+                
+                logger.info(f"Using centralized client management for environment: {args.environment}")
+                client = central_get_client(args.environment)
+                release_func = central_release_client
+                
                 if not client:
-                    logger.error("Failed to get Supabase client from connection pool")
+                    if args.use_pool:  # Only error if pool was explicitly requested
+                        logger.error("Failed to get Supabase client from connection pool")
+                        return 1
+                    else:
+                        logger.warning("Failed to get client from centralized management, falling back to direct client")
+                        use_central = False
+            except ImportError as e:
+                if args.use_pool:  # Only error if pool was explicitly requested
+                    logger.error(f"Connection pool was explicitly requested but not available: {str(e)}")
                     return 1
-            except ImportError:
-                logger.warning("Connection pool not available, falling back to direct client")
-                client = get_supabase_client(url, key)
-        else:
-            # Get Supabase client directly
+                else:
+                    logger.warning(f"Centralized client management not available: {str(e)}")
+                    use_central = False
+        
+        # Fall back to direct client creation if needed
+        if not client:
+            # Get Supabase credentials for direct client
+            url = args.url or os.environ.get("SUPABASE_URL")
+            key = args.key or os.environ.get("SUPABASE_SERVICE_KEY") or os.environ.get("SUPABASE_KEY")
+            
+            if not url or not key:
+                logger.error(
+                    "Supabase URL and key are required for direct client creation. "
+                    "Provide them as arguments or set SUPABASE_URL and SUPABASE_SERVICE_KEY environment variables."
+                )
+                return 1
+            
+            logger.info("Using direct client creation")
             client = get_supabase_client(url, key)
         
         if not client:
@@ -668,14 +688,14 @@ def main():
         return 0
     
     finally:
-        # Release client if we're using the connection pool
-        if client and args.use_pool:
+        # Release client if we're using the centralized client management
+        if client and release_func:
             try:
-                release_supabase_client(client)
+                release_func(client)
                 logger.info("Released Supabase client back to connection pool")
-            except (ImportError, NameError):
-                # If release_supabase_client isn't available, we didn't use the pool
-                pass
+            except Exception as e:
+                logger.error(f"Error releasing client: {str(e)}")
+                logger.warning("Connection may not have been properly released")
 
 if __name__ == "__main__":
     sys.exit(main())
