@@ -377,30 +377,53 @@ def release_client(client: Optional[Client]) -> None:
             logger.warning(f"Failed to release Supabase client: {{str(e)}}")
             # Continue even if release fails
 
-# Example usage
-def run_example_query():
-    \"\"\"Run an example query to demonstrate usage.\"\"\"
+def execute_with_client(operation, *args, **kwargs):
+    \"\"\"
+    Execute an operation with a properly managed Supabase client.
+    
+    Args:
+        operation: Function that takes client as first arg
+        *args: Additional args for operation
+        **kwargs: Additional kwargs for operation
+        
+    Returns:
+        Result of the operation
+    \"\"\"
     client = None
     try:
         client = get_client()
         if not client:
-            logger.error("Could not create client")
-            return
-        
+            logger.error("Failed to get Supabase client")
+            return None
+            
+        return operation(client, *args, **kwargs)
+    except Exception as e:
+        logger.error(f"Error executing operation: {{str(e)}}")
+        return None
+    finally:
+        if client:
+            try:
+                release_client(client)
+            except Exception as e:
+                logger.error(f"Error releasing client: {{str(e)}}")
+
+# Example usage
+def run_example_query():
+    \"\"\"Run an example query to demonstrate usage.\"\"\"
+    def _query_operation(client):
         # Run a simple query
         response = client.table("core.properties").select("*").limit(5).execute()
         
         if hasattr(response, 'data'):
             logger.info(f"Query returned {{len(response.data)}} results")
             logger.info(f"Sample data: {{json.dumps(response.data[0], indent=2) if response.data else 'No data'}}")
+            return response.data
         else:
             logger.error("Query returned invalid response")
-    except Exception as e:
-        logger.error(f"Error running example query: {{str(e)}}")
-    finally:
-        # Always release the client
-        if client:
-            release_client(client)
+            return None
+    
+    # Execute with proper client lifecycle management
+    return execute_with_client(_query_operation)
 
 if __name__ == "__main__":
     # Run the example when the script is executed directly
@@ -441,17 +464,13 @@ class {service_name.replace('_', ' ').title().replace(' ', '')}App:
     
     def __init__(self):
         \"\"\"Initialize the application.\"\"\"
-        self.client = None
         self.running = False
+        self.channel = None
     
     def start(self):
         \"\"\"Start the application.\"\"\"
-        # Acquire a client when starting
-        self.client = get_client()
-        if not self.client:
-            logger.error("Cannot start: Failed to connect to Supabase")
-            return
-        
+        # Application can start without needing to acquire a persistent client
+        # We'll use execute_with_client for each individual operation
         self.running = True
         logger.info("Application started")
         
@@ -466,28 +485,41 @@ class {service_name.replace('_', ' ').title().replace(' ', '')}App:
         self.running = False
         logger.info("Application stopped")
         
-        # Always release the client when stopping
-        if self.client:
+        # No need to release client as we're using execute_with_client pattern
+        # which handles client lifecycle for each operation
+        
+        # Clean up any persistent resources
+        if hasattr(self, 'channel') and self.channel:
             try:
-                release_client(self.client)
-                self.client = None
-                logger.info("Supabase client released")
+                # Unsubscribe from realtime channel if exists
+                self.channel.unsubscribe()
+                logger.info("Unsubscribed from realtime channel")
             except Exception as e:
-                logger.error(f"Error releasing Supabase client: {str(e)}")
+                logger.error(f"Error unsubscribing from channel: {str(e)}")
     
     def _setup_realtime_subscription(self):
         \"\"\"Set up realtime subscription for database changes.\"\"\"
-        try:
-            channel = self.client.channel("db-changes")
-            channel.on(
-                'postgres_changes',
-                {{'event': '*', 'schema': 'core', 'table': 'properties'}},
-                lambda payload: self._handle_property_change(payload)
-            ).subscribe()
-            
-            logger.info("Subscribed to property changes")
-        except Exception as e:
-            logger.error(f"Error setting up realtime subscription: {{str(e)}}")
+        from {service_name}_client import execute_with_client
+        
+        def _subscription_operation(client):
+            try:
+                channel = client.channel("db-changes")
+                channel.on(
+                    'postgres_changes',
+                    {{'event': '*', 'schema': 'core', 'table': 'properties'}},
+                    lambda payload: self._handle_property_change(payload)
+                ).subscribe()
+                
+                logger.info("Subscribed to property changes")
+                # Save the channel to the instance
+                self.channel = channel
+                return channel
+            except Exception as e:
+                logger.error(f"Error setting up realtime subscription: {{str(e)}}")
+                return None
+                
+        # Execute with proper client lifecycle management
+        return execute_with_client(_subscription_operation)
     
     def _handle_property_change(self, payload):
         \"\"\"Handle property change notification.\"\"\"
@@ -496,23 +528,33 @@ class {service_name.replace('_', ' ').title().replace(' ', '')}App:
     
     def _run_sample_query(self):
         \"\"\"Run a sample query to demonstrate database access.\"\"\"
-        try:
-            # Query properties
-            response = self.client.table("core.properties").select("*").limit(5).execute()
-            
-            if hasattr(response, 'data') and response.data:
-                logger.info(f"Found {{len(response.data)}} properties")
+        from {service_name}_client import execute_with_client
+        
+        # Define operation function for client use
+        def _query_operation(client):
+            try:
+                # Query properties
+                response = client.table("core.properties").select("*").limit(5).execute()
                 
-                # Example: Cross-schema query using a function
-                if response.data:
-                    property_id = response.data[0]['id']
-                    property_detail = self.client.rpc('core.get_property_with_valuation', {{'property_id': property_id}}).execute()
+                if hasattr(response, 'data') and response.data:
+                    logger.info(f"Found {{len(response.data)}} properties")
                     
-                    logger.info(f"Retrieved detailed property information: {{property_detail.data}}")
-            else:
-                logger.warning("No properties found or query failed")
-        except Exception as e:
-            logger.error(f"Error running sample query: {{str(e)}}")
+                    # Example: Cross-schema query using a function
+                    if response.data:
+                        property_id = response.data[0]['id']
+                        property_detail = client.rpc('core.get_property_with_valuation', {{'property_id': property_id}}).execute()
+                        
+                        logger.info(f"Retrieved detailed property information: {{property_detail.data}}")
+                    return response.data
+                else:
+                    logger.warning("No properties found or query failed")
+                    return None
+            except Exception as e:
+                logger.error(f"Error running sample query: {{str(e)}}")
+                return None
+        
+        # Use the client from execute_with_client for proper connection lifecycle
+        return execute_with_client(_query_operation)
 
 def execute_with_client(operation, *args, **kwargs):
     \"\"\"
