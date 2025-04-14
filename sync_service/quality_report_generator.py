@@ -13,6 +13,9 @@ import datetime
 from typing import Dict, List, Any, Optional, Tuple
 from sqlalchemy import func, desc, and_
 from weasyprint import HTML
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
 
 from app import app, db
 from sync_service.models.data_quality import (
