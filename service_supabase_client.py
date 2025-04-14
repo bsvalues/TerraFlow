@@ -68,12 +68,18 @@ def get_service_supabase_client(service_name: str) -> Optional[Any]:
     
     # Get a client from the centralized client manager for this service
     try:
-        client = get_supabase_client(service_name)
+        # Try with service name for specific role/permissions
+        client = get_supabase_client(environment=service_name)
         if client:
+            # Set app name for monitoring
+            try:
+                client.sql(f"SET app.service_name TO '{service_name}';").execute()
+            except Exception as app_err:
+                logger.warning(f"Could not set app.service_name (not critical): {str(app_err)}")
             return client
         
-        # Fall back to using the service key directly
-        logger.warning(f"Centralized client for service {service_name} not available, creating direct client")
+        # Fall back to using the default client
+        logger.warning(f"Centralized client for service {service_name} not available, using default client")
         return get_supabase_client()
     except Exception as e:
         logger.error(f"Error getting Supabase client for service {service_name}: {str(e)}")
@@ -87,11 +93,15 @@ def release_service_supabase_client(service_name: str, client: Any) -> None:
         service_name: Name of the service
         client: Supabase client to release
     """
+    if client is None:
+        logger.debug(f"No client to release for service: {service_name}")
+        return
+        
     logger.debug(f"Releasing Supabase client for service: {service_name}")
     try:
         release_supabase_client(client)
-    except Exception as e:
-        logger.error(f"Error releasing Supabase client for service {service_name}: {str(e)}")
+    except Exception as release_err:
+        logger.error(f"Error releasing Supabase client for service {service_name}: {str(release_err)}")
         # Even if we can't release it, don't crash
 
 class ServiceClient:
