@@ -79,17 +79,19 @@ def get_service_supabase_client(service_name: str) -> Optional[Any]:
         logger.error(f"Error getting Supabase client for service {service_name}: {str(e)}")
         return None
 
-def release_service_supabase_client(client: Any) -> None:
+def release_service_supabase_client(service_name: str, client: Any) -> None:
     """
     Release a service-specific Supabase client back to the pool.
     
     Args:
+        service_name: Name of the service
         client: Supabase client to release
     """
+    logger.debug(f"Releasing Supabase client for service: {service_name}")
     try:
         release_supabase_client(client)
     except Exception as e:
-        logger.error(f"Error releasing Supabase client: {str(e)}")
+        logger.error(f"Error releasing Supabase client for service {service_name}: {str(e)}")
         # Even if we can't release it, don't crash
 
 class ServiceClient:
@@ -142,7 +144,8 @@ class ServiceClient:
                         logger.error(f"Missing required environment variables for {self.service_name} service client")
                         raise ValueError("Missing required environment variables (URL or key)")
                     
-                    client = get_supabase_client(url=self.url, key=self.key)
+                    # Note: Using environment variables directly is a fallback only
+                    client = get_supabase_client()
                     
                     if not client:
                         logger.error(f"Failed to create client for {self.service_name} service")
@@ -179,7 +182,8 @@ class ServiceClient:
                         logger.error(f"Missing required environment variables for {self.service_name} service client (service role)")
                         raise ValueError("Missing required environment variables (URL or service key)")
                     
-                    client = get_supabase_client(url=self.url, key=self.service_key)
+                    # Note: Using environment variables directly is a fallback only
+                    client = get_supabase_client()
                     
                     if not client:
                         logger.error(f"Failed to create service client for {self.service_name}")
@@ -190,7 +194,7 @@ class ServiceClient:
             finally:
                 # Release the client back through the centralized client manager
                 if client:
-                    release_service_supabase_client(client)
+                    release_service_supabase_client(self.service_name, client)
         
         return wrapper
     
