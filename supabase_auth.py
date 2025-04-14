@@ -22,7 +22,7 @@ except ImportError:
     FLASK_AVAILABLE = False
 
 # Local modules
-from supabase_connection_pool import get_connection, release_connection
+from supabase_client import get_supabase_client, release_supabase_client
 from set_supabase_env import ensure_supabase_env
 
 # Set up logging
@@ -163,17 +163,17 @@ class SupabaseAuth:
                 # Use client
                 result = client.from_('table').select('*').execute()
             finally:
-                # Release client
-                release_connection(client)
+                # Release client back to the centralized client manager
+                release_supabase_client(client)
                 
         Returns:
-            Supabase client
+            Supabase client from the centralized client manager
         """
         if not self.url or not self.key:
             logger.error('Missing required environment variables: SUPABASE_URL, SUPABASE_KEY')
             return None
         
-        return get_connection(self.url, self.key)
+        return get_supabase_client(self.url, self.key)
     
     def sign_up(self, email: str, password: str, user_metadata: Optional[Dict[str, Any]] = None) -> Tuple[bool, Dict[str, Any]]:
         """
@@ -191,7 +191,7 @@ class SupabaseAuth:
             return False, {'error': 'Missing required environment variables: SUPABASE_URL, SUPABASE_KEY'}
         
         # Get a client
-        client = get_connection(self.url, self.key)
+        client = get_supabase_client(self.url, self.key)
         
         try:
             # Sign up
@@ -227,7 +227,7 @@ class SupabaseAuth:
             return False, {'error': str(e)}
         finally:
             # Release the client
-            release_connection(client)
+            release_supabase_client(client)
     
     def sign_in(self, email: str, password: str) -> Tuple[bool, Dict[str, Any]]:
         """
@@ -244,7 +244,7 @@ class SupabaseAuth:
             return False, {'error': 'Missing required environment variables: SUPABASE_URL, SUPABASE_KEY'}
         
         # Get a client
-        client = get_connection(self.url, self.key)
+        client = get_supabase_client(self.url, self.key)
         
         try:
             # Sign in
@@ -277,7 +277,7 @@ class SupabaseAuth:
             return False, {'error': str(e)}
         finally:
             # Release the client
-            release_connection(client)
+            release_supabase_client(client)
     
     def sign_out(self) -> bool:
         """
@@ -290,7 +290,7 @@ class SupabaseAuth:
             return False
         
         # Get a client
-        client = get_connection(self.url, self.key)
+        client = get_supabase_client(self.url, self.key)
         
         try:
             # Sign out
@@ -308,7 +308,7 @@ class SupabaseAuth:
             return False
         finally:
             # Release the client
-            release_connection(client)
+            release_supabase_client(client)
     
     def get_user(self) -> Optional[SupabaseUser]:
         """
@@ -321,7 +321,7 @@ class SupabaseAuth:
             return None
         
         # Get a client
-        client = get_connection(self.url, self.key)
+        client = get_supabase_client(self.url, self.key)
         
         try:
             # Get user
@@ -339,7 +339,7 @@ class SupabaseAuth:
             return None
         finally:
             # Release the client
-            release_connection(client)
+            release_supabase_client(client)
     
     def get_session(self) -> Optional[Dict[str, Any]]:
         """
@@ -352,7 +352,7 @@ class SupabaseAuth:
             return None
         
         # Get a client
-        client = get_connection(self.url, self.key)
+        client = get_supabase_client(self.url, self.key)
         
         try:
             # Get session
@@ -374,7 +374,7 @@ class SupabaseAuth:
             return None
         finally:
             # Release the client
-            release_connection(client)
+            release_supabase_client(client)
     
     def refresh_session(self) -> bool:
         """
@@ -387,7 +387,7 @@ class SupabaseAuth:
             return False
         
         # Get a client
-        client = get_connection(self.url, self.key)
+        client = get_supabase_client(self.url, self.key)
         
         try:
             # Refresh session
@@ -409,7 +409,7 @@ class SupabaseAuth:
             return False
         finally:
             # Release the client
-            release_connection(client)
+            release_supabase_client(client)
     
     def reset_password(self, email: str) -> bool:
         """
@@ -425,7 +425,7 @@ class SupabaseAuth:
             return False
         
         # Get a client
-        client = get_connection(self.url, self.key)
+        client = get_supabase_client(self.url, self.key)
         
         try:
             # Reset password
@@ -438,7 +438,7 @@ class SupabaseAuth:
             return False
         finally:
             # Release the client
-            release_connection(client)
+            release_supabase_client(client)
     
     def update_user(self, user_metadata: Dict[str, Any]) -> Tuple[bool, Dict[str, Any]]:
         """
@@ -454,7 +454,7 @@ class SupabaseAuth:
             return False, {'error': 'Missing required environment variables: SUPABASE_URL, SUPABASE_KEY'}
         
         # Get a client
-        client = get_connection(self.url, self.key)
+        client = get_supabase_client(self.url, self.key)
         
         try:
             # Update user
@@ -474,7 +474,7 @@ class SupabaseAuth:
             return False, {'error': str(e)}
         finally:
             # Release the client
-            release_connection(client)
+            release_supabase_client(client)
     
     def get_user_by_id(self, user_id: str) -> Optional[SupabaseUser]:
         """
@@ -490,7 +490,7 @@ class SupabaseAuth:
             return None
         
         # Get a client
-        client = get_connection(self.url, self.key)
+        client = get_supabase_client(self.url, self.key)
         
         try:
             # Get user
@@ -508,7 +508,7 @@ class SupabaseAuth:
             return None
         finally:
             # Release the client
-            release_connection(client)
+            release_supabase_client(client)
 
 # Create a singleton instance
 supabase_auth = SupabaseAuth()
