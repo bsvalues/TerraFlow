@@ -66,7 +66,7 @@ def get_supabase_client(environment: Optional[str] = None) -> Optional[Client]:
         # Try to use the environment manager for better multi-environment support
         try:
             # Import here to avoid circular imports
-            from supabase_env_manager import get_environment_url, get_environment_key, get_current_environment
+            from supabase_env_manager import get_environment_variables, get_current_environment
             
             # If no environment specified, use current environment context
             if environment is None:
@@ -74,9 +74,12 @@ def get_supabase_client(environment: Optional[str] = None) -> Optional[Client]:
                 
             logger.info(f"Getting Supabase client for environment: {environment}")
             
+            # Get environment-specific variables
+            env_vars = get_environment_variables(environment)
+            
             # Get environment-specific URL and key
-            url = get_environment_url(environment)
-            key = get_environment_key(environment)
+            url = env_vars.get("url")
+            key = env_vars.get("key")
             
         except ImportError:
             # Fall back to legacy configuration if environment manager not available

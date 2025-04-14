@@ -146,15 +146,16 @@ def test_connection(environment: str) -> bool:
     """
     try:
         # Import here to avoid circular imports
-        from supabase_env_manager import set_current_environment, get_environment_url, get_environment_key
+        from supabase_env_manager import get_current_environment, get_environment_variables, set_environment_variables
         from supabase_client import get_supabase_client
         
         # Set the environment context
-        set_current_environment(environment)
+        set_environment_variables(environment)
         
         # Get the credentials
-        url = get_environment_url(environment)
-        key = get_environment_key(environment)
+        env_vars = get_environment_variables(environment)
+        url = env_vars.get('url')
+        key = env_vars.get('key')
         
         if not url or not key:
             logger.error(f"Missing URL or API key for {environment} environment.")

@@ -220,6 +220,19 @@ def set_environment_variables(environment: str,
     
     return True
 
+def is_configured(environment: Optional[str] = None) -> bool:
+    """
+    Check if the Supabase environment is configured.
+    
+    Args:
+        environment: Environment name (development, training, production)
+        
+    Returns:
+        True if configured, False otherwise
+    """
+    env_vars = get_environment_variables(environment)
+    return env_vars.get("configured", False)
+
 def list_environments() -> Dict[str, Dict[str, Any]]:
     """
     List all Supabase environments and their configuration status.
