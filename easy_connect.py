@@ -312,45 +312,81 @@ def get_client() -> Optional[Client]:
         logger.error("Supabase package is not available")
         return None
     
-    # Check for service-specific environment variables first
-    env_prefix = "{service_name.upper().replace('_SERVICE', '')}"
-    url = os.environ.get("SUPABASE_URL")
-    key = os.environ.get(f"{{env_prefix}}_SUPABASE_KEY") or os.environ.get("SUPABASE_SERVICE_KEY")
-    
-    if not url or not key:
-        logger.error("Missing Supabase URL or key")
-        return None
-    
+    client = None
     try:
-        # Create the client
-        client = create_client(url, key)
+        # Try to use centralized client management if available
+        if CENTRAL_CLIENT_AVAILABLE:
+            # Get the environment from env vars or default to development
+            environment = os.environ.get("SUPABASE_ENVIRONMENT", "development")
+            logger.info(f"Using centralized client management for environment: {{environment}}")
+            client = get_supabase_client(environment)
+            
+            if client:
+                logger.info("Successfully connected to Supabase using centralized client management")
+            else:
+                logger.warning("Failed to get client from centralized management, falling back to direct creation")
+        
+        # Fall back to direct client creation if needed
+        if not client:
+            # Check for service-specific environment variables first
+            env_prefix = "{service_name.upper().replace('_SERVICE', '')}"
+            url = os.environ.get("SUPABASE_URL")
+            key = os.environ.get(f"{{env_prefix}}_SUPABASE_KEY") or os.environ.get("SUPABASE_SERVICE_KEY")
+            
+            if not url or not key:
+                logger.error("Missing Supabase URL or key")
+                return None
+            
+            try:
+                # Create the client directly
+                client = create_client(url, key)
+            except Exception as e:
+                logger.error(f"Error creating Supabase client directly: {{str(e)}}")
+                return None
         
         # Set the application name to identify the service in audit logs
-        client.postgrest.request_builder.session.headers.update({{
-            "X-Application-Name": "{service_name}"
-        }})
-        
-        # Execute setup query to set the application name in the connection
-        try:
-            client.sql(f"SET app.service_name TO '{service_name}';").execute()
-        except Exception as e:
-            logger.warning(f"Could not set app.service_name (not critical): {{str(e)}}")
+        if client:
+            try:
+                client.postgrest.request_builder.session.headers.update({{
+                    "X-Application-Name": "{service_name}"
+                }})
+                
+                # Execute setup query to set the application name in the connection
+                client.sql(f"SET app.service_name TO '{service_name}';").execute()
+            except Exception as e:
+                logger.warning(f"Could not set app.service_name (not critical): {{str(e)}}")
         
         logger.info("Successfully connected to Supabase")
         return client
     except Exception as e:
         logger.error(f"Error creating Supabase client: {{str(e)}}")
         return None
+        
+def release_client(client: Optional[Client]) -> None:
+    \"\"\"
+    Release a Supabase client back to the connection pool.
+    
+    Args:
+        client: The client to release
+    \"\"\"
+    if client and CENTRAL_CLIENT_AVAILABLE:
+        try:
+            release_supabase_client(client)
+            logger.info("Released Supabase client back to connection pool")
+        except Exception as e:
+            logger.warning(f"Failed to release Supabase client: {{str(e)}}")
+            # Continue even if release fails
 
 # Example usage
 def run_example_query():
     \"\"\"Run an example query to demonstrate usage.\"\"\"
-    client = get_client()
-    if not client:
-        logger.error("Could not create client")
-        return
-    
+    client = None
     try:
+        client = get_client()
+        if not client:
+            logger.error("Could not create client")
+            return
+        
         # Run a simple query
         response = client.table("core.properties").select("*").limit(5).execute()
         
@@ -361,6 +397,10 @@ def run_example_query():
             logger.error("Query returned invalid response")
     except Exception as e:
         logger.error(f"Error running example query: {{str(e)}}")
+    finally:
+        # Always release the client
+        if client:
+            release_client(client)
 
 if __name__ == "__main__":
     # Run the example when the script is executed directly
@@ -387,7 +427,7 @@ import threading
 from typing import Dict, Any, List, Optional
 
 # Import the client
-from {service_name}_client import get_client
+from {service_name}_client import get_client, release_client
 
 # Set up logging
 logging.basicConfig(
