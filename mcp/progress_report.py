@@ -46,12 +46,13 @@ MVP_COMPONENTS = {
     },
     "prototype_agents": {
         "name": "Prototype Agents",
-        "completion": 75,
+        "completion": 85,
         "subcomponents": {
             "data_quality_agent": {"name": "Data Quality Agent", "completion": 85},
             "compliance_agent": {"name": "Compliance Agent", "completion": 70},
             "monitoring_agent": {"name": "Monitoring Agent", "completion": 90},
-            "power_query_agent": {"name": "Power Query Agent", "completion": 65}
+            "power_query_agent": {"name": "Power Query Agent", "completion": 65},
+            "sales_verification_agent": {"name": "Sales Verification Agent", "completion": 90}
         }
     },
     "testing_framework": {
@@ -93,7 +94,7 @@ MVP_COMPLETION_CRITERIA = {
         {"name": "Property data integration", "complete": True},
         {"name": "GIS data visualization", "complete": True},
         {"name": "User authentication & permissions", "complete": True},
-        {"name": "Sales verification workflow", "complete": False},
+        {"name": "Sales verification workflow", "complete": True},
         {"name": "Advanced reporting capabilities", "complete": False},
         {"name": "Multi-agent communications", "complete": True},
         {"name": "Knowledge sharing system", "complete": True},
