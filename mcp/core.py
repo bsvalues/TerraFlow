@@ -102,8 +102,29 @@ class MCP:
         # Register agent with knowledge sharing system
         self.knowledge_sharing.register_agent(agent_id)
         
-        # Subscribe agent to the broadcast topic for status updates and general messages
-        self.message_broker.subscribe(agent_id, 'broadcast')
+        # First subscribe agent to the message broker
+        self.message_broker.subscribe(agent_id)
+        
+        # Then subscribe to the broadcast topic for status updates and general messages
+        self.message_broker.subscribe_to_topic(agent_id, 'broadcast')
+        
+        # Set up agent's protocol attributes if they don't exist
+        if not hasattr(agent_instance, 'protocol'):
+            # We access protocol directly instead of through agent_protocol (which doesn't exist)
+            agent_instance.protocol = self.protocol
+            
+        # Register the agent's message handlers
+        if hasattr(agent_instance, 'message_handlers'):
+            for msg_type, handler in agent_instance.message_handlers.items():
+                self.register_message_handler(agent_id, msg_type, handler)
+                
+        # Register status handler
+        if hasattr(agent_instance, '_handle_status_request'):
+            self.register_message_handler(
+                agent_id, 
+                'STATUS_REQUEST',  # Use string instead of enum to avoid TypeScript errors
+                agent_instance._handle_status_request
+            )
         
         # Set initial agent status - using 'normal' as the default valid status level
         # Status options are typically: 'normal', 'warning', 'error', 'critical', 'blocked'
@@ -153,6 +174,16 @@ class MCP:
             self.knowledge_sharing.unregister_agent(agent_id)
         except Exception as e:
             logger.warning(f"Error unregistering agent {agent_id} from knowledge sharing: {str(e)}")
+            
+        # Unsubscribe from broadcast topic and message broker
+        try:
+            # First unsubscribe from all topics including 'broadcast'
+            self.message_broker.unsubscribe_from_topic(agent_id, 'broadcast')
+            
+            # Then unsubscribe from the message broker entirely
+            self.message_broker.unsubscribe(agent_id)
+        except Exception as e:
+            logger.warning(f"Error unsubscribing agent {agent_id} from message broker: {str(e)}")
         
         logger.info(f"Agent {agent_id} deregistered")
         return True
@@ -698,29 +729,16 @@ class MCP:
         """
         Initialize the protocol for a specific agent
         
+        This method is now deprecated as the functionality has been moved to register_agent
+        for clearer integration with agent subscription and initialization.
+        
         Args:
             agent_id: ID of the agent
             agent_instance: Agent instance
         """
-        # Set up agent's protocol attributes if they don't exist
-        if not hasattr(agent_instance, 'protocol'):
-            agent_instance.protocol = self.agent_protocol
-            
-        # Subscribe agent to broadcast topic
-        self.message_broker.subscribe(agent_id, 'broadcast')
-        
-        # Register the agent's message handlers
-        if hasattr(agent_instance, 'message_handlers'):
-            for msg_type, handler in agent_instance.message_handlers.items():
-                self.register_message_handler(agent_id, msg_type, handler)
-                
-        # Register status handler
-        if hasattr(agent_instance, '_handle_status_request'):
-            self.register_message_handler(
-                agent_id, 
-                MessageType.STATUS_REQUEST, 
-                agent_instance._handle_status_request
-            )
+        # This method is no longer used and kept only for backward compatibility
+        # The implementation has been moved to register_agent to fix TypeScript errors
+        logger.warning("_initialize_agent_protocol is deprecated - functionality moved to register_agent")
             
     def inject_protocol(self) -> None:
         """
