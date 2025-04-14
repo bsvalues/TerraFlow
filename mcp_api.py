@@ -215,14 +215,11 @@ def view_progress_report():
         # Get report data
         report = mcp_instance.progress_reporter.generate_progress_report()
         
-        # Generate HTML report
-        html_content = mcp_instance.progress_reporter.generate_html_report(report)
-        
-        # Return the HTML directly
-        return html_content
+        # Render the dashboard template with the report data
+        return render_template('reports/progress_dashboard.html', report=report)
     except Exception as e:
         logger.error(f"Error displaying progress report: {str(e)}")
-        return f"<h1>Error</h1><p>Error generating progress report: {str(e)}</p>", 500
+        return render_template('error.html', error=f"Error generating progress report: {str(e)}"), 500
 
 @mcp_api.route('/progress/html', methods=['GET'])
 @login_required
