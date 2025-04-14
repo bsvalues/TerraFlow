@@ -113,15 +113,15 @@ class ServiceClient:
                 logger.error(f"Missing required environment variables for {self.service_name} service client (service role)")
                 raise ValueError("Missing required environment variables (URL or service key)")
             
-            # Get a client from the pool
-            client = get_connection(self.url, self.service_key)
+            # Get a client from the centralized client manager
+            client = get_supabase_client(self.url, self.service_key)
             
             try:
                 # Call the function with the client
                 return func(client, *args, **kwargs)
             finally:
-                # Release the client back to the pool
-                release_connection(client)
+                # Release the client back through the centralized client manager
+                release_supabase_client(client)
         
         return wrapper
     
