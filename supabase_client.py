@@ -68,12 +68,12 @@ def get_supabase_client(environment: Optional[str] = None) -> Optional[Client]:
             logger.warning("supabase_env_manager not available, falling back to config and environment variables")
             
             # Get configuration
-            db_config = get_config("database")
-            env_mode = environment or get_config("env_mode", "development")
+            db_config = get_config("database") or {}
+            env_mode = environment or get_config("env_mode") or "development"
             
             # Try getting URL and key from config first
-            url = db_config.get("supabase_url")
-            key = db_config.get("supabase_service_key", db_config.get("supabase_key"))
+            url = db_config.get("supabase_url") if isinstance(db_config, dict) else None
+            key = db_config.get("supabase_service_key", db_config.get("supabase_key")) if isinstance(db_config, dict) else None
             
             # If we're using environment-specific credentials and they're available, use them
             if environment and environment != "development":
