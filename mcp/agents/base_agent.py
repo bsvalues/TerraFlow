@@ -80,6 +80,40 @@ class BaseAgent:
         self.status = status
         self.last_activity = time.time()
         self.logger.info(f"Agent status changed to: {status}")
+        
+    def _handle_status_request(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Handle a status request message
+        
+        Args:
+            message: The status request message
+            
+        Returns:
+            Status update message with agent's current status
+        """
+        self.logger.info(f"Received status request from {message.get('sender_id', 'unknown')}")
+        
+        # Create detailed status information
+        status_details = {
+            "status": self.status,
+            "capabilities": self.capabilities,
+            "last_activity": self.last_activity,
+            "active_tasks": len(self.active_tasks),
+            "agent_type": self.__class__.__name__
+        }
+        
+        # Return a status update message
+        return {
+            "message_type": "status_update",
+            "content": {
+                "status": self.status,
+                "details": status_details
+            },
+            "sender_id": self.agent_id,
+            "receiver_id": message.get("sender_id", "status_reporter"),  # Default to status_reporter if no sender
+            "conversation_id": message.get("conversation_id"),
+            "reply_to": message.get("id")
+        }
     
     def get_capabilities(self) -> List[str]:
         """Get the list of agent capabilities"""
@@ -203,6 +237,8 @@ class BaseAgent:
             return self._handle_inform(message)
         elif message_type == "request":
             return self._handle_request(message)
+        elif message_type == "status_request":
+            return self._handle_status_request(message)
         
         # Unknown message type
         self.logger.warning(f"No handler for message type: {message_type}")
