@@ -17,6 +17,7 @@ from flask_login import current_user, login_required
 from supabase_auth import (
     login_user, logout_user, get_current_user, SupabaseUser, SupabaseAuth
 )
+from supabase_client import get_supabase_client, release_supabase_client
 from auth import is_authenticated, has_role
 
 # Get singleton instance
@@ -60,8 +61,8 @@ def list_users(page=1, per_page=10):
     finally:
         # Release the client
         if client:
-            from supabase_connection_pool import release_connection
-            release_connection(client)
+            # Using centralized client release function
+            release_supabase_client(client)
 
 def update_user_roles(user_id, roles):
     """
@@ -104,8 +105,8 @@ def update_user_roles(user_id, roles):
     finally:
         # Release the client
         if client:
-            from supabase_connection_pool import release_connection
-            release_connection(client)
+            # Using centralized client release function
+            release_supabase_client(client)
 
 def initialize_roles():
     """
@@ -162,8 +163,8 @@ def initialize_roles():
     finally:
         # Release the client
         if client:
-            from supabase_connection_pool import release_connection
-            release_connection(client)
+            # Using centralized client release function
+            release_supabase_client(client)
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -373,8 +374,8 @@ def user_list():
     finally:
         # Release the client
         if client:
-            from supabase_connection_pool import release_connection
-            release_connection(client)
+            # Using centralized client release function
+            release_supabase_client(client)
     
     total_pages = (total_count + per_page - 1) // per_page if total_count > 0 else 1
     
@@ -429,8 +430,8 @@ def update_roles_api(user_id):
     finally:
         # Release the client
         if client:
-            from supabase_connection_pool import release_connection
-            release_connection(client)
+            # Using centralized client release function
+            release_supabase_client(client)
 
 @auth_bp.route('/initialize-roles')
 def initialize_roles_route():
@@ -491,8 +492,8 @@ def initialize_roles_route():
     finally:
         # Release the client
         if client:
-            from supabase_connection_pool import release_connection
-            release_connection(client)
+            # Using centralized client release function
+            release_supabase_client(client)
     
     return redirect(url_for('auth.user_list'))
 

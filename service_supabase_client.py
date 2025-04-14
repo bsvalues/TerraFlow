@@ -16,7 +16,7 @@ try:
 except ImportError:
     SUPABASE_AVAILABLE = False
 
-from supabase_connection_pool import get_connection, release_connection
+from supabase_client import get_supabase_client, release_supabase_client
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -86,15 +86,15 @@ class ServiceClient:
                 logger.error(f"Missing required environment variables for {self.service_name} service client")
                 raise ValueError("Missing required environment variables (URL or key)")
             
-            # Get a client from the pool
-            client = get_connection(self.url, self.key)
+            # Get a client from the centralized client manager
+            client = get_supabase_client(self.url, self.key)
             
             try:
                 # Call the function with the client
                 return func(client, *args, **kwargs)
             finally:
-                # Release the client back to the pool
-                release_connection(client)
+                # Release the client back through the centralized client manager
+                release_supabase_client(client)
         
         return wrapper
     
