@@ -49,7 +49,7 @@ except ImportError:
 
 # Try to import supabase
 try:
-    from supabase import create_client, Client
+    from supabase import Client
     SUPABASE_AVAILABLE = True
 except ImportError:
     SUPABASE_AVAILABLE = False
@@ -59,6 +59,19 @@ except ImportError:
     subprocess.call([sys.executable, "-m", "pip", "install", "supabase"])
     print("Please restart this script after installation.")
     sys.exit(1)
+
+# Try to import our centralized client management
+try:
+    from supabase_client import get_supabase_client, release_supabase_client
+    CENTRAL_CLIENT_AVAILABLE = True
+except ImportError:
+    CENTRAL_CLIENT_AVAILABLE = False
+    logger.warning("❗ Centralized Supabase client management not available. Falling back to direct client creation.")
+    try:
+        from supabase import create_client
+    except ImportError:
+        logger.error("❌ Failed to import create_client from Supabase package.")
+        sys.exit(1)
 
 # Valid service types
 VALID_SERVICES = [
@@ -193,11 +206,20 @@ def test_connection(service_name: str) -> Optional[Client]:
         print_error("SUPABASE_URL and SUPABASE_SERVICE_KEY environment variables must be set.")
         return None
     
+    client = None
     try:
-        # Create client
+        # Get client using centralized management if available
         print_info(f"Connecting to Supabase as '{service_name}'...")
-        client = create_client(url, key)
+        if CENTRAL_CLIENT_AVAILABLE:
+            client = get_supabase_client('development')
+        else:
+            # Fallback to direct creation
+            client = create_client(url, key)
         
+        if not client:
+            print_error("Failed to create Supabase client.")
+            return None
+            
         # Set app name for audit logging
         try:
             client.sql(f"SET app.service_name TO '{service_name}';").execute()
@@ -218,6 +240,14 @@ def test_connection(service_name: str) -> Optional[Client]:
     except Exception as e:
         print_error(f"Connection test failed: {str(e)}")
         return None
+    finally:
+        # Only release the client if we're using centralized management and the client was created
+        if CENTRAL_CLIENT_AVAILABLE and client and 'release_supabase_client' in globals():
+            try:
+                release_supabase_client(client)
+                print_info("Released Supabase client back to connection pool.")
+            except Exception as e:
+                print_warning(f"Failed to release Supabase client: {str(e)}")
 
 def create_service_files(service_name: str) -> bool:
     """
@@ -253,11 +283,23 @@ logger = logging.getLogger("{service_name}")
 
 # Try to import supabase
 try:
-    from supabase import create_client, Client
+    from supabase import Client
     SUPABASE_AVAILABLE = True
 except ImportError:
     SUPABASE_AVAILABLE = False
     logger.error("Supabase package not installed. Install with: pip install supabase")
+
+# Try to import centralized client management
+try:
+    from supabase_client import get_supabase_client, release_supabase_client
+    CENTRAL_CLIENT_AVAILABLE = True
+except ImportError:
+    CENTRAL_CLIENT_AVAILABLE = False
+    logger.warning("Centralized client management not available. Using direct connection.")
+    try:
+        from supabase import create_client
+    except ImportError:
+        logger.error("Failed to import create_client from supabase")
 
 def get_client() -> Optional[Client]:
     \"\"\"
