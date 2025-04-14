@@ -441,16 +441,15 @@ class {service_name.replace('_', ' ').title().replace(' ', '')}App:
     
     def __init__(self):
         \"\"\"Initialize the application.\"\"\"
-        self.client = get_client()
+        self.client = None
         self.running = False
-        
-        if not self.client:
-            logger.error("Failed to initialize Supabase client")
     
     def start(self):
         \"\"\"Start the application.\"\"\"
+        # Acquire a client when starting
+        self.client = get_client()
         if not self.client:
-            logger.error("Cannot start: Client not initialized")
+            logger.error("Cannot start: Failed to connect to Supabase")
             return
         
         self.running = True
@@ -466,6 +465,15 @@ class {service_name.replace('_', ' ').title().replace(' ', '')}App:
         \"\"\"Stop the application.\"\"\"
         self.running = False
         logger.info("Application stopped")
+        
+        # Always release the client when stopping
+        if self.client:
+            try:
+                release_client(self.client)
+                self.client = None
+                logger.info("Supabase client released")
+            except Exception as e:
+                logger.error(f"Error releasing Supabase client: {str(e)}")
     
     def _setup_realtime_subscription(self):
         \"\"\"Set up realtime subscription for database changes.\"\"\"
@@ -505,6 +513,36 @@ class {service_name.replace('_', ' ').title().replace(' ', '')}App:
                 logger.warning("No properties found or query failed")
         except Exception as e:
             logger.error(f"Error running sample query: {{str(e)}}")
+
+def execute_with_client(operation, *args, **kwargs):
+    \"\"\"
+    Execute an operation with a properly managed Supabase client.
+    
+    Args:
+        operation: Function that takes client as first arg
+        *args: Additional args for operation
+        **kwargs: Additional kwargs for operation
+        
+    Returns:
+        Result of the operation
+    \"\"\"
+    client = None
+    try:
+        client = get_client()
+        if not client:
+            logger.error("Failed to get Supabase client")
+            return None
+            
+        return operation(client, *args, **kwargs)
+    except Exception as e:
+        logger.error(f"Error executing operation: {str(e)}")
+        return None
+    finally:
+        if client:
+            try:
+                release_client(client)
+            except Exception as e:
+                logger.error(f"Error releasing client: {str(e)}")
 
 def main():
     \"\"\"Main application entry point.\"\"\"
