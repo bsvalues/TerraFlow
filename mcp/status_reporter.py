@@ -311,9 +311,24 @@ class StatusReporter:
         last_status_report = time.time()
         last_health_check = time.time()
         
+        # Get the message queue from the broker
+        message_queue = self.message_broker.subscribe("status_reporter")
+        
         while self.running:
             try:
                 now = time.time()
+                
+                # Check for incoming status messages
+                try:
+                    # Non-blocking queue check
+                    message = message_queue.get(block=False)
+                    if message and isinstance(message, Message):
+                        if message.message_type == MessageType.STATUS_UPDATE.value:
+                            self.process_status_message(message)
+                        elif message.message_type == MessageType.STATUS_REQUEST.value:
+                            logger.debug(f"Status reporter received a status request (forwarding)")
+                except queue.Empty:
+                    pass  # No messages in queue
                 
                 # Perform periodic health check
                 if now - last_health_check >= self.health_check_interval:
@@ -326,7 +341,7 @@ class StatusReporter:
                     last_status_report = now
                 
                 # Sleep for a short interval
-                time.sleep(1.0)
+                time.sleep(0.1)
                 
             except Exception as e:
                 logger.error(f"Error in status reporter worker: {str(e)}")
