@@ -463,7 +463,8 @@ def check_service_connections() -> Tuple[int, int]:
                 try:
                     release_service_supabase_client(service_name, client)
                 except Exception as release_error:
-                    logger.error(f"Error releasing service client for {service_name}: {str(release_error)}")
+                    logger.warning(f"Error releasing service client for {service_name}: {str(release_error)}")
+
     
     return success_count, len(SERVICE_ROLES)
 
@@ -696,6 +697,8 @@ def main():
             except Exception as e:
                 logger.error(f"Error releasing client: {str(e)}")
                 logger.warning("Connection may not have been properly released")
+        elif client:
+            logger.warning("No release function available for client, connection may not be properly released")
 
 if __name__ == "__main__":
     sys.exit(main())

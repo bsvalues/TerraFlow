@@ -161,12 +161,24 @@ class ServiceClient:
                         logger.error(f"Failed to create client for {self.service_name} service")
                         raise ConnectionError(f"Failed to create client for {self.service_name} service")
                 
+                # Set app name for monitoring/auditing
+                try:
+                    client.sql(f"SET app.service_name TO '{self.service_name}';").execute()
+                except Exception as app_err:
+                    logger.warning(f"Could not set app.service_name (not critical): {str(app_err)}")
+                
                 # Call the function with the client
                 return func(client, *args, **kwargs)
+            except Exception as operation_err:
+                logger.error(f"Error executing operation in {self.service_name} service: {str(operation_err)}")
+                raise
             finally:
                 # Release the client back through the centralized client manager
                 if client:
-                    release_supabase_client(client)
+                    try:
+                        release_supabase_client(client)
+                    except Exception as release_err:
+                        logger.error(f"Error releasing client for {self.service_name}: {str(release_err)}")
         
         return wrapper
     
@@ -199,12 +211,24 @@ class ServiceClient:
                         logger.error(f"Failed to create service client for {self.service_name}")
                         raise ConnectionError(f"Failed to create service client for {self.service_name}")
                 
+                # Set app name for monitoring/auditing
+                try:
+                    client.sql(f"SET app.service_name TO '{self.service_name}_service';").execute()
+                except Exception as app_err:
+                    logger.warning(f"Could not set app.service_name (not critical): {str(app_err)}")
+                
                 # Call the function with the client
                 return func(client, *args, **kwargs)
+            except Exception as operation_err:
+                logger.error(f"Error executing service operation in {self.service_name}: {str(operation_err)}")
+                raise
             finally:
                 # Release the client back through the centralized client manager
                 if client:
-                    release_service_supabase_client(self.service_name, client)
+                    try:
+                        release_service_supabase_client(self.service_name, client)
+                    except Exception as release_err:
+                        logger.error(f"Error releasing service client for {self.service_name}: {str(release_err)}")
         
         return wrapper
     
