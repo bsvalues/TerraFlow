@@ -66,11 +66,11 @@ MVP_COMPONENTS = {
     },
     "data_integration": {
         "name": "Data Integration",
-        "completion": 65,
+        "completion": 70,
         "subcomponents": {
             "gis_integration": {"name": "GIS Integration", "completion": 75},
             "property_data": {"name": "Property Data", "completion": 80},
-            "tax_data": {"name": "Tax Data", "completion": 60},
+            "tax_data": {"name": "Tax Data", "completion": 80},
             "valuation_data": {"name": "Valuation Data", "completion": 55}
         }
     },
