@@ -361,6 +361,66 @@ def download_report(report_id):
         logger.exception(f"Error downloading report: {str(e)}")
         return jsonify({'error': f'Error downloading report: {str(e)}'}), 500
 
+@quality_report_bp.route('/test-report/<format>', methods=['GET'])
+def test_report(format='excel'):
+    """
+    Test endpoint to generate a report without authentication (for development only).
+    
+    Args:
+        format: 'excel' or 'pdf'
+    """
+    try:
+        # Generate dates for the last 30 days
+        end_date = datetime.datetime.now()
+        start_date = end_date - datetime.timedelta(days=30)
+        
+        # Set report options
+        report_options = {
+            'include_anomalies': True,
+            'include_issues': True,
+            'include_recommendations': True
+        }
+        
+        # Generate report based on requested format
+        if format.lower() == 'excel':
+            # Generate Excel report
+            report_bytes, filename, report_id = report_generator.generate_excel_report(
+                start_date=start_date,
+                end_date=end_date,
+                options=report_options
+            )
+            
+            # Return Excel as downloadable attachment
+            response = make_response(report_bytes)
+            response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+            return response
+        elif format.lower() == 'pdf':
+            # Generate PDF report
+            report_bytes, filename, report_id = report_generator.generate_pdf_report(
+                start_date=start_date,
+                end_date=end_date,
+                options=report_options
+            )
+            
+            # Return PDF as downloadable attachment
+            response = make_response(report_bytes)
+            response.headers['Content-Type'] = 'application/pdf'
+            response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+            return response
+        else:
+            return jsonify({'error': 'Invalid format. Use "excel" or "pdf"'}), 400
+            
+    except Exception as e:
+        logger.exception(f"Error generating test report: {str(e)}")
+        return jsonify({'error': f'Error generating test report: {str(e)}'}), 500
+        
+# Add backward compatibility route
+@quality_report_bp.route('/test-excel-report', methods=['GET'])
+def test_excel_report():
+    """Redirect to test-report/excel for backward compatibility."""
+    return test_report('excel')
+
 def register_blueprint(app):
     """Register the blueprint with the app."""
     app.register_blueprint(quality_report_bp)
