@@ -120,9 +120,10 @@ class MCP:
                 
         # Register status handler
         if hasattr(agent_instance, '_handle_status_request'):
+            from mcp.agent_protocol import MessageType
             self.register_message_handler(
                 agent_id, 
-                'STATUS_REQUEST',  # Use string instead of enum to avoid TypeScript errors
+                MessageType.STATUS_REQUEST,  # Use the actual enum value
                 agent_instance._handle_status_request
             )
         
