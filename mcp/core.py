@@ -102,6 +102,9 @@ class MCP:
         # Register agent with knowledge sharing system
         self.knowledge_sharing.register_agent(agent_id)
         
+        # Subscribe agent to the broadcast topic for status updates and general messages
+        self.message_broker.subscribe(agent_id, 'broadcast')
+        
         # Set initial agent status - using 'normal' as the default valid status level
         # Status options are typically: 'normal', 'warning', 'error', 'critical', 'blocked'
         agent_status = getattr(agent_instance, 'status', 'normal')
@@ -691,6 +694,34 @@ class MCP:
         
         return report
 
+    def _initialize_agent_protocol(self, agent_id: str, agent_instance) -> None:
+        """
+        Initialize the protocol for a specific agent
+        
+        Args:
+            agent_id: ID of the agent
+            agent_instance: Agent instance
+        """
+        # Set up agent's protocol attributes if they don't exist
+        if not hasattr(agent_instance, 'protocol'):
+            agent_instance.protocol = self.agent_protocol
+            
+        # Subscribe agent to broadcast topic
+        self.message_broker.subscribe(agent_id, 'broadcast')
+        
+        # Register the agent's message handlers
+        if hasattr(agent_instance, 'message_handlers'):
+            for msg_type, handler in agent_instance.message_handlers.items():
+                self.register_message_handler(agent_id, msg_type, handler)
+                
+        # Register status handler
+        if hasattr(agent_instance, '_handle_status_request'):
+            self.register_message_handler(
+                agent_id, 
+                MessageType.STATUS_REQUEST, 
+                agent_instance._handle_status_request
+            )
+            
     def inject_protocol(self) -> None:
         """
         Inject the protocol into all registered agents
