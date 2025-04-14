@@ -212,13 +212,14 @@ def get_progress_report():
 def refresh_progress_report():
     """Refresh and return the latest MVP progress report data as JSON"""
     try:
-        # Force a fresh report generation
-        report = mcp_instance.progress_reporter.generate_progress_report()
+        # Force a fresh report generation with force_refresh=True to update agent statuses
+        report = mcp_instance.progress_reporter.generate_progress_report(force_refresh=True)
         
         return jsonify({
             "status": "success",
             "report": report,
-            "message": "Progress report refreshed successfully"
+            "message": "Progress report refreshed successfully",
+            "timestamp": time.time()
         })
     except Exception as e:
         logger.error(f"Error refreshing progress report: {str(e)}")
@@ -232,8 +233,11 @@ def refresh_progress_report():
 def view_progress_report():
     """View the MVP progress report page"""
     try:
-        # Get report data
-        report = mcp_instance.progress_reporter.generate_progress_report()
+        # Check if force_refresh parameter is provided in the URL query string
+        force_refresh = request.args.get('force_refresh', '').lower() in ('true', 'yes', '1', 't')
+        
+        # Get report data, with optional force_refresh
+        report = mcp_instance.progress_reporter.generate_progress_report(force_refresh=force_refresh)
         
         # Render the dashboard template with the report data
         return render_template('reports/progress_dashboard.html', report=report)
@@ -246,8 +250,16 @@ def view_progress_report():
 def save_html_progress_report():
     """Generate and save an HTML progress report, and return the file"""
     try:
-        # Generate report and save as HTML
-        filepath = mcp_instance.progress_reporter.save_html_report()
+        # Check if force_refresh parameter is provided in the URL query string
+        force_refresh = request.args.get('force_refresh', '').lower() in ('true', 'yes', '1', 't')
+        
+        # Generate report with the latest data if force_refresh=True
+        if force_refresh:
+            report = mcp_instance.progress_reporter.generate_progress_report(force_refresh=True)
+            filepath = mcp_instance.progress_reporter.save_html_report(report)
+        else:
+            # Use default behavior
+            filepath = mcp_instance.progress_reporter.save_html_report()
         
         if not filepath:
             return jsonify({
