@@ -659,7 +659,7 @@ class DataQualityAlertManager:
                 alert_data = [alert.to_dict() for alert in self.alerts.values()]
                 
                 # Try to use the table name that matches our SQLAlchemy model
-                table_name = 'quality_alert'
+                table_name = 'data_quality_alert'
                 
                 # Check if the table exists
                 try:

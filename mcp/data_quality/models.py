@@ -19,65 +19,64 @@ except:
 class QualityAlertModel(db.Model):
     """
     Database model for data quality alerts
+    
+    Maps to the existing data_quality_alert table structure
     """
     __tablename__ = 'data_quality_alert'
 
-    id = db.Column(db.String(36), primary_key=True)
+    id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(128), nullable=False)
     description = db.Column(db.Text, nullable=True)
-    check_type = db.Column(db.String(64), nullable=False)
-    parameters = db.Column(JsonType, nullable=False, default={})
-    threshold = db.Column(db.Float, nullable=False, default=0.95)
-    severity = db.Column(db.String(32), nullable=False, default='medium')
-    notification_channels = db.Column(JsonType, nullable=False, default=["log"])
-    enabled = db.Column(db.Boolean, nullable=False, default=True)
-    last_checked = db.Column(DateTime, nullable=True)
-    last_status = db.Column(db.String(32), nullable=True)
-    last_value = db.Column(db.String(128), nullable=True)
-    last_error = db.Column(db.Text, nullable=True)
-    triggered_count = db.Column(db.Integer, nullable=False, default=0)
-    created_date = db.Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+    alert_type = db.Column(db.String(64), nullable=False)  # This maps to our check_type
+    table_name = db.Column(db.String(128), nullable=True)
+    field_name = db.Column(db.String(128), nullable=True)
+    severity_threshold = db.Column(db.String(32), nullable=True)  # This maps to our severity
+    conditions = db.Column(JsonType, nullable=False)  # This maps to our parameters
+    channels = db.Column(JsonType, nullable=False)  # This maps to our notification_channels
+    recipients = db.Column(JsonType, nullable=False)  # Additional recipients information
+    is_active = db.Column(db.Boolean, nullable=True, default=True)  # This maps to our enabled
+    created_by = db.Column(db.Integer, nullable=True)
+    created_at = db.Column(DateTime, nullable=True)  # This maps to our created_date
+    updated_at = db.Column(DateTime, nullable=True)
     
-    # Create indices
-    __table_args__ = (
-        Index('ix_quality_alert_check_type', 'check_type'),
-        Index('ix_quality_alert_severity', 'severity')
-    )
+    # SQLAlchemy will handle with the existing table - no need for indices
+    __table_args__ = {'extend_existing': True}
     
     def to_dict(self):
         """
-        Convert model to dictionary
+        Convert model to dictionary - maps database fields to Alert object fields
         """
-        nc = self.notification_channels
-        if isinstance(nc, str):
-            nc = json.loads(nc)
+        channels = self.channels
+        if isinstance(channels, str):
+            channels = json.loads(channels)
             
-        params = self.parameters
-        if isinstance(params, str):
-            params = json.loads(params)
+        conditions = self.conditions
+        if isinstance(conditions, str):
+            conditions = json.loads(conditions)
             
+        # Map the database model to our Alert format
         return {
-            "id": self.id,
+            "id": str(self.id),  # Convert to string for compatibility
             "name": self.name,
             "description": self.description,
-            "check_type": self.check_type,
-            "parameters": params,
-            "threshold": self.threshold,
-            "severity": self.severity,
-            "notification_channels": nc,
-            "enabled": self.enabled,
-            "last_checked": self.last_checked.isoformat() if self.last_checked else None,
-            "last_status": self.last_status,
-            "last_value": self.last_value,
-            "last_error": self.last_error,
-            "triggered_count": self.triggered_count,
-            "created_date": self.created_date.isoformat() if self.created_date else None
+            "check_type": self.alert_type,  # Map from alert_type to check_type
+            "parameters": conditions,        # Map from conditions to parameters
+            "threshold": 0.95,               # Default, not directly mapped
+            "severity": self.severity_threshold or "medium",  # Map from severity_threshold
+            "notification_channels": channels,  # Map from channels
+            "enabled": self.is_active,          # Map from is_active
+            "last_checked": None,              # Not directly mapped
+            "last_status": None,               # Not directly mapped
+            "last_value": None,                # Not directly mapped
+            "last_error": None,                # Not directly mapped
+            "triggered_count": 0,              # Not directly mapped
+            "created_date": self.created_at.isoformat() if self.created_at else None
         }
         
     @classmethod
     def from_dict(cls, data):
         """
-        Create model from dictionary
+        Create model from dictionary - maps Alert object fields to database fields
         """
         nc = data.get('notification_channels', ['log'])
         if not isinstance(nc, str):
@@ -87,22 +86,19 @@ class QualityAlertModel(db.Model):
         if not isinstance(params, str):
             params = json.dumps(params)
             
+        # Create a database model from our Alert format
         model = cls(
-            id=data.get('id'),
+            # If id is a string, convert to int if possible, otherwise None
+            id=int(data.get('id')) if data.get('id') and data.get('id').isdigit() else None,
             name=data.get('name', ''),
             description=data.get('description'),
-            check_type=data.get('check_type', ''),
-            parameters=params,
-            threshold=data.get('threshold', 0.95),
-            severity=data.get('severity', 'medium'),
-            notification_channels=nc,
-            enabled=data.get('enabled', True),
-            last_checked=data.get('last_checked'),
-            last_status=data.get('last_status'),
-            last_value=data.get('last_value'),
-            last_error=data.get('last_error'),
-            triggered_count=data.get('triggered_count', 0),
-            created_date=data.get('created_date')
+            alert_type=data.get('check_type', ''),  # Map from check_type to alert_type
+            conditions=params,                      # Map from parameters to conditions
+            channels=nc,                           # Map from notification_channels to channels
+            recipients=json.dumps([]),             # Default empty recipients
+            is_active=data.get('enabled', True),   # Map from enabled to is_active
+            severity_threshold=data.get('severity', 'medium'),  # Map from severity
+            created_at=datetime.datetime.utcnow()  # Current timestamp
         )
         
         return model
