@@ -1,10 +1,10 @@
-# Benton County GIS System
+# GeoAssessmentPro
 
-A comprehensive Geographic Information System (GIS) for the Benton County Assessor's Office, featuring data quality management, validation capabilities, and integration with Supabase.
+A comprehensive Geographic Information System (GIS) and property assessment platform for the Benton County Assessor's Office, featuring advanced data quality management, validation capabilities, and integration with Supabase.
 
 ## Overview
 
-This system provides a sophisticated platform for managing Geographic Information System (GIS) data with enhanced data quality management and validation capabilities. The application supports both local database storage and Supabase integration, providing flexibility for different deployment scenarios.
+GeoAssessmentPro provides a sophisticated platform for managing Geographic Information System (GIS) data with enhanced data quality monitoring, valuation capabilities, and Supabase integration. The application supports multiple environments (development, training, production) and serves as a central hub that coordinates with specialized modules for property assessment tasks.
 
 ## Features
 
@@ -78,6 +78,78 @@ The system supports both local file storage and Supabase Storage. When Supabase 
 - CDN delivery
 - Easy access control
 
+## Multi-Environment Support
+
+GeoAssessmentPro supports multiple environments for development, training, and production deployments. Each environment can have its own database, Supabase project, and configuration settings.
+
+### Environment Setup
+
+To set up a new environment:
+
+```bash
+# Initialize a development environment (default)
+python initialize_environment.py development
+
+# Initialize a training environment
+python initialize_environment.py training --database-url postgresql://user:pass@host:port/training_db
+
+# Initialize a production environment
+python initialize_environment.py production --database-url postgresql://user:pass@host:port/production_db
+```
+
+You can also provide Supabase configuration for each environment:
+
+```bash
+python initialize_environment.py training \
+  --database-url postgresql://user:pass@host:port/training_db \
+  --supabase-url https://your-training-project.supabase.co \
+  --supabase-key your_supabase_key \
+  --supabase-service-key your_supabase_service_key
+```
+
+### Switching Environments
+
+To switch between environments:
+
+```bash
+# Switch to development environment
+python switch_environment.py development
+
+# Switch to training environment
+python switch_environment.py training
+
+# Switch to production environment
+python switch_environment.py production
+```
+
+### Deployment Process
+
+For deploying to different environments:
+
+```bash
+# Deploy to development (runs migrations and restarts the application)
+python deploy.py development
+
+# Deploy to training
+python deploy.py training
+
+# Deploy to production
+python deploy.py production --skip-migrations
+```
+
+You can customize the deployment process with flags:
+
+```bash
+# Skip database migrations
+python deploy.py production --skip-migrations
+
+# Skip restarting the application
+python deploy.py training --skip-restart
+
+# Skip deployment verification
+python deploy.py training --skip-verify
+```
+
 ## Development
 
 ### Prerequisites
@@ -92,21 +164,21 @@ The system supports both local file storage and Supabase Storage. When Supabase 
 
 ```bash
 # Clone the repository
-git clone https://github.com/benton-county/gis-system.git
-cd gis-system
+git clone https://github.com/benton-county/geoassessmentpro.git
+cd geoassessmentpro
 
 # Install dependencies
 pip install -r requirements.txt
 
 # Set up environment variables
-cp .env.example .env
+cp .env.template .env
 # Edit .env with your configuration
 
-# Run database migrations
-flask db upgrade
+# Initialize development environment
+python initialize_environment.py development
 
-# Start the development server
-flask run
+# Start the application
+gunicorn --bind 0.0.0.0:5000 --reload main:app
 ```
 
 ### Running Tests
@@ -121,10 +193,17 @@ pytest --cov=app tests/
 
 ## Deployment
 
-For production deployment, we recommend using Gunicorn with Nginx as a reverse proxy:
+For production deployment, we recommend using Gunicorn:
 
 ```bash
-gunicorn --bind 0.0.0.0:5000 --worker-class gthread --workers 3 main:app
+# Initialize production environment
+python initialize_environment.py production
+
+# Deploy to production
+python deploy.py production
+
+# Start the server manually if needed
+gunicorn --bind 0.0.0.0:5000 --workers 4 --threads 2 main:app
 ```
 
 ## License

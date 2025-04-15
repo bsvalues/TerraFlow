@@ -1,15 +1,18 @@
 #!/usr/bin/env python
 """
-Switch Environment Script
+Switch Environment Script for GeoAssessmentPro
 
-This script allows you to easily switch between development, training, and
-production environments for the GeoAssessmentPro application.
+This script switches the application to a different environment
+(development, training, production).
 """
 
 import os
 import sys
-import argparse
 import logging
+import argparse
+import configparser
+import dotenv
+from typing import Dict, Any, Optional
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, 
@@ -20,40 +23,60 @@ logger = logging.getLogger(__name__)
 VALID_ENVIRONMENTS = ["development", "training", "production"]
 ENV_FILE = ".env"
 
-def save_environment_variables(variables):
+def load_env_file() -> Dict[str, str]:
     """
-    Save environment variables to .env file.
+    Load environment variables from .env file
     
-    Args:
-        variables: Dict of variables to save
+    Returns:
+        Dictionary of environment variables
     """
-    # Read existing .env file if it exists
-    existing_vars = {}
+    # Load environment variables from .env file
+    dotenv.load_dotenv(ENV_FILE)
+    
+    # Get all environment variables as a dictionary
+    env_vars = {}
     if os.path.exists(ENV_FILE):
         with open(ENV_FILE, "r") as f:
             for line in f:
                 line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
+                if not line or line.startswith("#"):
+                    continue
+                try:
                     key, value = line.split("=", 1)
-                    existing_vars[key] = value
-
-    # Update with new variables
-    existing_vars.update(variables)
+                    env_vars[key] = value
+                except ValueError:
+                    # Skip lines that don't have a key-value pair
+                    pass
     
-    # Write back to .env file
-    with open(ENV_FILE, "w") as f:
-        for key, value in existing_vars.items():
-            f.write(f"{key}={value}\n")
-    
-    logger.info(f"Updated environment variables in {ENV_FILE}")
+    return env_vars
 
-def switch_environment(environment):
+def save_env_file(env_vars: Dict[str, str]) -> bool:
     """
-    Switch to the specified environment.
+    Save environment variables to .env file
+    
+    Args:
+        env_vars: Dictionary of environment variables
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        with open(ENV_FILE, "w") as f:
+            for key, value in env_vars.items():
+                f.write(f"{key}={value}\n")
+        logger.info(f"Updated environment variables in {ENV_FILE}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to update environment variables in {ENV_FILE}: {str(e)}")
+        return False
+
+def switch_to_environment(environment: str) -> bool:
+    """
+    Switch to the specified environment
     
     Args:
         environment: The environment to switch to (development, training, production)
-    
+        
     Returns:
         True if successful, False otherwise
     """
@@ -62,97 +85,85 @@ def switch_environment(environment):
         logger.error(f"Valid environments are: {', '.join(VALID_ENVIRONMENTS)}")
         return False
     
-    logger.info(f"Switching to {environment} environment")
+    # Load environment variables from .env file
+    env_vars = load_env_file()
     
-    # Set the environment in the .env file
-    save_environment_variables({
-        "ENV_MODE": environment
-    })
+    # Update ENV_MODE
+    env_vars["ENV_MODE"] = environment
     
-    # Set environment-specific variables
-    if environment == "training":
-        # Check if training URL is set
-        if not os.environ.get("DATABASE_URL_TRAINING"):
-            logger.warning("DATABASE_URL_TRAINING is not set")
-            logger.warning("Please set it in the .env file or as an environment variable")
-    elif environment == "production":
-        # Check if production URL is set
-        if not os.environ.get("DATABASE_URL_PRODUCTION"):
-            logger.warning("DATABASE_URL_PRODUCTION is not set")
-            logger.warning("Please set it in the .env file or as an environment variable")
+    # Update database URL if environment-specific URL exists
+    if environment != "development":
+        # Check if there's an environment-specific URL
+        db_url_key = f"DATABASE_URL_{environment.upper()}"
+        if db_url_key in env_vars:
+            db_url = env_vars[db_url_key]
+            logger.info(f"Using {environment}-specific database URL: {db_url}")
+            env_vars["DATABASE_URL"] = db_url
+        else:
+            logger.warning(f"No {environment}-specific database URL found in {ENV_FILE}")
+    
+    # Update Supabase URL if environment-specific URL exists
+    if environment != "development":
+        # Check if there's an environment-specific URL
+        supabase_url_key = f"SUPABASE_URL_{environment.upper()}"
+        if supabase_url_key in env_vars:
+            supabase_url = env_vars[supabase_url_key]
+            logger.info(f"Using {environment}-specific Supabase URL: {supabase_url}")
+            env_vars["SUPABASE_URL"] = supabase_url
+        else:
+            logger.warning(f"No {environment}-specific Supabase URL found in {ENV_FILE}")
+    
+    # Update Supabase key if environment-specific key exists
+    if environment != "development":
+        # Check if there's an environment-specific key
+        supabase_key_key = f"SUPABASE_KEY_{environment.upper()}"
+        if supabase_key_key in env_vars:
+            supabase_key = env_vars[supabase_key_key]
+            logger.info(f"Using {environment}-specific Supabase key")
+            env_vars["SUPABASE_KEY"] = supabase_key
+        else:
+            logger.warning(f"No {environment}-specific Supabase key found in {ENV_FILE}")
+    
+    # Update Supabase service key if environment-specific key exists
+    if environment != "development":
+        # Check if there's an environment-specific key
+        supabase_service_key_key = f"SUPABASE_SERVICE_KEY_{environment.upper()}"
+        if supabase_service_key_key in env_vars:
+            supabase_service_key = env_vars[supabase_service_key_key]
+            logger.info(f"Using {environment}-specific Supabase service key")
+            env_vars["SUPABASE_SERVICE_KEY"] = supabase_service_key
+        else:
+            logger.warning(f"No {environment}-specific Supabase service key found in {ENV_FILE}")
+    
+    # Save updated environment variables to .env file
+    if not save_env_file(env_vars):
+        return False
+    
+    # Check if the Supabase client is available and attempt to refresh the connection
+    try:
+        import set_supabase_env
+        result = set_supabase_env.set_supabase_environment(environment)
+        if result:
+            logger.info(f"Set Supabase environment to {environment}")
+        else:
+            logger.warning(f"Failed to set Supabase environment to {environment}")
+    except ImportError as e:
+        logger.warning(f"Could not import set_supabase_env module: {str(e)}")
+        # This is not a critical error, so we continue
     
     logger.info(f"Successfully switched to {environment} environment")
     return True
 
-def get_current_environment():
-    """
-    Get the current environment from the .env file or environment variable.
-    
-    Returns:
-        The current environment (development, training, production)
-    """
-    env_mode = os.environ.get("ENV_MODE")
-    if not env_mode and os.path.exists(ENV_FILE):
-        with open(ENV_FILE, "r") as f:
-            for line in f:
-                line = line.strip()
-                if line.startswith("ENV_MODE="):
-                    env_mode = line.split("=", 1)[1]
-                    break
-    
-    return env_mode.lower() if env_mode else "development"
-
 def main():
     """Main function"""
-    parser = argparse.ArgumentParser(description="Switch between environments")
-    parser.add_argument("environment", nargs="?", choices=VALID_ENVIRONMENTS,
-                       help="The environment to switch to (development, training, production)")
-    parser.add_argument("--status", action="store_true", 
-                       help="Show the current environment status")
+    parser = argparse.ArgumentParser(description="Switch to a different environment")
+    parser.add_argument("environment", choices=VALID_ENVIRONMENTS,
+                      help="The environment to switch to")
     
     args = parser.parse_args()
     
-    if args.status or not args.environment:
-        current_env = get_current_environment()
-        print(f"Current environment: {current_env}")
-        
-        # Show database URLs
-        dev_url = os.environ.get("DATABASE_URL", "Not set")
-        train_url = os.environ.get("DATABASE_URL_TRAINING", "Not set")
-        prod_url = os.environ.get("DATABASE_URL_PRODUCTION", "Not set")
-        
-        if len(dev_url) > 30:
-            dev_url = f"{dev_url[:27]}..."
-        if len(train_url) > 30:
-            train_url = f"{train_url[:27]}..."
-        if len(prod_url) > 30:
-            prod_url = f"{prod_url[:27]}..."
-        
-        print("\nDatabase URLs:")
-        print(f"  Development: {dev_url}")
-        print(f"  Training:    {train_url}")
-        print(f"  Production:  {prod_url}")
-        
-        # Show Supabase URLs
-        supabase_url = os.environ.get("SUPABASE_URL", "Not set")
-        supabase_train_url = os.environ.get("SUPABASE_URL_TRAINING", "Not set")
-        supabase_prod_url = os.environ.get("SUPABASE_URL_PRODUCTION", "Not set")
-        
-        if len(supabase_url) > 30:
-            supabase_url = f"{supabase_url[:27]}..."
-        if len(supabase_train_url) > 30:
-            supabase_train_url = f"{supabase_train_url[:27]}..."
-        if len(supabase_prod_url) > 30:
-            supabase_prod_url = f"{supabase_prod_url[:27]}..."
-        
-        print("\nSupabase URLs:")
-        print(f"  Development: {supabase_url}")
-        print(f"  Training:    {supabase_train_url}")
-        print(f"  Production:  {supabase_prod_url}")
-        
-        return 0
-        
-    result = switch_environment(args.environment)
+    result = switch_to_environment(args.environment)
+    
     return 0 if result else 1
 
 if __name__ == "__main__":
