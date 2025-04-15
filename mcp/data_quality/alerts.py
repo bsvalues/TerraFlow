@@ -487,7 +487,31 @@ class DataQualityAlertManager:
         """Load alerts from database"""
         client = None
         try:
-            # Get a Supabase client from the connection pool
+            # First, try to load from SQLAlchemy
+            try:
+                from mcp.data_quality.models import QualityAlertModel
+                from app import db, app
+                
+                # Use the app context to ensure we're in an application context
+                with app.app_context():
+                    # Query all alerts from the database
+                    alert_models = QualityAlertModel.query.all()
+                    
+                    if alert_models:
+                        # Convert models to alert objects
+                        for model in alert_models:
+                            alert_dict = model.to_dict()
+                            alert = QualityAlert.from_dict(alert_dict)
+                            self.alerts[alert.id] = alert
+                        
+                        logger.info(f"Loaded {len(self.alerts)} quality alerts from SQLAlchemy")
+                        return
+                    else:
+                        logger.info("No alerts found in SQLAlchemy database, trying Supabase")
+            except Exception as sa_error:
+                logger.warning(f"Error loading alerts from SQLAlchemy: {str(sa_error)}")
+            
+            # If SQLAlchemy fails, try Supabase as a fallback
             from supabase_client import get_supabase_client
             client = get_supabase_client()
             
@@ -497,41 +521,37 @@ class DataQualityAlertManager:
                 self._load_sample_alerts()
                 return
             
-            # Keep track of which table name works
-            table_name = None
-            
-            # Try loading alerts from the table
+            # Try loading alerts from the Supabase table
             try:
-                # First try the new table name format
-                table_name = 'data_quality_alerts'
+                # Try the table name that matches our SQLAlchemy model
+                table_name = 'data_quality_alert'
                 response = client.table(table_name).select('*').execute()
                 logger.info(f"Successfully queried {table_name} table")
             except Exception as primary_error:
                 logger.warning(f"Error querying primary table: {str(primary_error)}")
                 
                 try:
-                    # If that fails, try the old format with dot notation
-                    table_name = 'data_quality.alerts'
+                    # If that fails, try the old format
+                    table_name = 'data_quality_alerts'
                     response = client.table(table_name).select('*').execute()
                     logger.info(f"Successfully queried {table_name} table")
                 except Exception as secondary_error:
-                    # Both tables failed to be accessed
+                    # Tables failed to be accessed
                     logger.error(f"Error accessing alerts tables: {str(secondary_error)}")
                     
-                    # For simplicity and resilience, let's use sample alerts 
-                    # rather than trying to create tables that might not be allowed
+                    # Use sample alerts instead
                     logger.warning("Using fallback sample alerts in memory")
                     self._load_sample_alerts()
                     return
             
-            # At this point we have a response from one of the tables
+            # Process response from Supabase if available
             if response and hasattr(response, 'data') and response.data:
                 # Convert data to alert objects
                 for alert_data in response.data:
                     alert = QualityAlert.from_dict(alert_data)
                     self.alerts[alert.id] = alert
                 
-                logger.info(f"Loaded {len(self.alerts)} quality alerts from database")
+                logger.info(f"Loaded {len(self.alerts)} quality alerts from Supabase")
             else:
                 # If no alerts exist, load sample alerts and save them to the database
                 logger.info("No alerts found in database, loading samples")
@@ -549,8 +569,11 @@ class DataQualityAlertManager:
         finally:
             # Release the Supabase client back to the connection pool
             if client:
-                from supabase_client import release_supabase_client
-                release_supabase_client(client)
+                try:
+                    from supabase_client import release_supabase_client
+                    release_supabase_client(client)
+                except Exception as release_error:
+                    logger.error(f"Error releasing Supabase client: {str(release_error)}")
     
     def _load_sample_alerts(self):
         """Load sample alerts for testing"""
@@ -595,67 +618,96 @@ class DataQualityAlertManager:
     
     def _save_alerts(self):
         """Save alerts to database"""
-        client = None
         try:
-            # Get a Supabase client from the connection pool
-            from supabase_client import get_supabase_client
-            client = get_supabase_client()
+            # First try to save using SQLAlchemy
+            try:
+                from mcp.data_quality.models import QualityAlertModel
+                from app import db, app
+                
+                # Use the app context to ensure we're in an application context
+                with app.app_context():
+                    # Start a session 
+                    db.session.query(QualityAlertModel).delete()
+                    
+                    # Create new alert models
+                    for alert in self.alerts.values():
+                        alert_dict = alert.to_dict()
+                        model = QualityAlertModel.from_dict(alert_dict)
+                        db.session.add(model)
+                    
+                    # Commit changes
+                    db.session.commit()
+                    
+                logger.info(f"Saved {len(self.alerts)} quality alerts to database using SQLAlchemy")
+                return True
+            except Exception as sa_error:
+                logger.warning(f"Error saving alerts using SQLAlchemy: {str(sa_error)}")
+                logger.info("Falling back to Supabase storage")
             
-            if not client:
-                logger.error("Failed to get Supabase client")
+            # If SQLAlchemy fails, try Supabase as a fallback
+            client = None
+            try:
+                # Get a Supabase client from the connection pool
+                from supabase_client import get_supabase_client
+                client = get_supabase_client()
+                
+                if not client:
+                    logger.error("Failed to get Supabase client")
+                    return False
+                
+                # Prepare data for database
+                alert_data = [alert.to_dict() for alert in self.alerts.values()]
+                
+                # Try to use the table name that matches our SQLAlchemy model
+                table_name = 'quality_alert'
+                
+                # Check if the table exists
+                try:
+                    # Try to query the table to check if it exists
+                    response = client.table(table_name).select('*').limit(1).execute()
+                    logger.info(f"Found {table_name} table in Supabase")
+                except Exception as table_error:
+                    logger.warning(f"Table {table_name} not found: {str(table_error)}")
+                    
+                    # Try with the old table name
+                    try:
+                        table_name = 'data_quality_alerts'
+                        response = client.table(table_name).select('*').limit(1).execute()
+                        logger.info(f"Found {table_name} table in Supabase")
+                    except Exception as old_table_error:
+                        logger.warning(f"Table {table_name} not found: {str(old_table_error)}")
+                        logger.info("Using memory-only storage for quality alerts for now")
+                        return True
+                
+                # Save to Supabase
+                try:
+                    # First delete all existing alerts
+                    client.table(table_name).delete().neq('id', 'dummy_id').execute()
+                    
+                    # Then insert all current alerts if there are any
+                    if alert_data:
+                        client.table(table_name).insert(alert_data).execute()
+                    
+                    logger.info(f"Saved {len(self.alerts)} quality alerts to database using Supabase")
+                    return True
+                    
+                except Exception as save_error:
+                    logger.error(f"Error saving to {table_name}: {str(save_error)}")
+                    return False
+            
+            except Exception as e:
+                logger.error(f"Error saving quality alerts: {str(e)}")
                 return False
             
-            # Prepare data for database
-            alert_data = [alert.to_dict() for alert in self.alerts.values()]
-            
-            # Determine which table name to use - try new format first
-            table_name = 'data_quality_alerts'
-            
-            # Check if table exists and create it if needed
-            try:
-                # Try to query the table to check if it exists
-                response = client.table(table_name).select('*').limit(1).execute()
-                logger.info(f"Found {table_name} table in Supabase")
-            except Exception as table_error:
-                logger.warning(f"Table {table_name} not found: {str(table_error)}")
-                
-                # Supabase doesn't allow direct table creation through the REST API
-                # Our approach here is to use a "try to insert, catch the error" strategy
-                # that will make the code more robust against table structure changes
-                
-                # We'll just use memory-based alerts and log the situation
-                logger.warning(f"Table {table_name} doesn't exist in Supabase")
-                logger.info("Using memory-only storage for quality alerts for now")
-                
-                # We'll still return True here so the application can continue
-                # with memory-based alerts which work fine for our needs
-                return True
-            
-            try:
-                # Save to Supabase - first delete all existing alerts
-                client.table(table_name).delete().neq('id', 'dummy_id').execute()
-                
-                # Then insert all current alerts if there are any
-                if alert_data:
-                    client.table(table_name).insert(alert_data).execute()
-                
-                logger.info(f"Saved {len(self.alerts)} quality alerts to database")
-                return True
-                
-            except Exception as save_error:
-                logger.error(f"Error saving to {table_name}: {str(save_error)}")
-                # We've attempted both table formats, so we'll just log the error
-                return False
+            finally:
+                # Release the Supabase client back to the connection pool
+                if client:
+                    from supabase_client import release_supabase_client
+                    release_supabase_client(client)
         
         except Exception as e:
-            logger.error(f"Error saving quality alerts: {str(e)}")
+            logger.error(f"Error in _save_alerts: {str(e)}")
             return False
-        
-        finally:
-            # Release the Supabase client back to the connection pool
-            if client:
-                from supabase_client import release_supabase_client
-                release_supabase_client(client)
 
 # Singleton instance
 alert_manager = DataQualityAlertManager()
