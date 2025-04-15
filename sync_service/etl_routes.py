@@ -1,7 +1,8 @@
 """
 ETL Routes Module
 
-This module provides Flask routes for ETL operations with enhanced functionality.
+This module provides Flask routes for ETL operations with enhanced functionality,
+including data import/export and field mapping management.
 """
 
 import os

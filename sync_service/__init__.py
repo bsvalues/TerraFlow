@@ -178,6 +178,15 @@ def register_blueprints(app):
         except ImportError as e:
             logger.warning(f"Could not load Enhanced ETL module: {e}")
             has_enhanced_etl = False
+            
+        # Try to import field mapping routes
+        try:
+            from sync_service.mapping_routes import register_mapping_routes
+            has_field_mapping = True
+            logger.info("Field Mapping module loaded successfully")
+        except ImportError as e:
+            logger.warning(f"Could not load Field Mapping module: {e}")
+            has_field_mapping = False
         
         # Register the blueprints
         app.register_blueprint(sync_bp)
@@ -201,6 +210,11 @@ def register_blueprints(app):
         if has_enhanced_etl:
             register_etl_routes(app)
             logger.info("Enhanced ETL routes registered successfully")
+            
+        # Register field mapping blueprint if available
+        if has_field_mapping:
+            register_mapping_routes(app)
+            logger.info("Field Mapping routes registered successfully")
         
         # Initialize models
         with app.app_context():

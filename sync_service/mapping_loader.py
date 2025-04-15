@@ -1,263 +1,353 @@
 """
 Field Mapping Loader
 
-This module loads field mapping configurations from JSON files
-and provides them to the ETL system.
+This module provides a mapping loader for ETL operations that handles
+loading, creating, updating, and deleting field mappings.
 """
 
 import os
 import json
 import logging
-from datetime import datetime
-from typing import Dict, Any, List, Optional
+import datetime
+from typing import Dict, List, Any, Optional, Union
 
+# Setup logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Mapping loader instance
+_mapping_loader = None
+
 class MappingLoader:
-    """Loads and manages field mappings for ETL operations"""
+    """
+    Field mapping loader class
     
-    def __init__(self, mappings_directory: str = None):
+    This class provides functionality for loading, creating, updating, and
+    deleting field mappings used in ETL operations.
+    """
+    
+    def __init__(self, mappings_dir: Optional[str] = None):
         """
         Initialize the mapping loader
         
         Args:
-            mappings_directory: Directory where mapping JSON files are stored
+            mappings_dir: Directory where mapping files are stored (optional)
         """
-        if mappings_directory is None:
-            # Default to the mappings directory within sync_service
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            self.mappings_directory = os.path.join(base_dir, 'mappings')
-        else:
-            self.mappings_directory = mappings_directory
+        if mappings_dir is None:
+            mappings_dir = os.path.join(os.getcwd(), 'sync_service', 'mappings')
             
-        # Ensure the directory exists
-        os.makedirs(self.mappings_directory, exist_ok=True)
+        self.mappings_dir = mappings_dir
+        os.makedirs(self.mappings_dir, exist_ok=True)
         
         # Cache for loaded mappings
-        self.mappings_cache = {}
+        self._mappings_cache = {}
+        self._mapping_list_cache = {}
         
-        # Initialize the loader
-        self._load_all_mappings()
-        
-    def _load_all_mappings(self) -> None:
-        """Load all mapping files into the cache"""
-        if not os.path.exists(self.mappings_directory):
-            logger.warning(f"Mappings directory not found: {self.mappings_directory}")
-            return
-            
-        # Load each JSON file in the directory
-        for filename in os.listdir(self.mappings_directory):
-            if filename.endswith('.json'):
-                try:
-                    file_path = os.path.join(self.mappings_directory, filename)
-                    with open(file_path, 'r') as f:
-                        mapping_data = json.load(f)
-                        
-                    # Extract mapping info
-                    data_type = mapping_data.get('data_type')
-                    name = mapping_data.get('name')
-                    
-                    if data_type and name:
-                        # Cache the mapping by data_type and name
-                        if data_type not in self.mappings_cache:
-                            self.mappings_cache[data_type] = {}
-                            
-                        self.mappings_cache[data_type][name] = mapping_data
-                        logger.info(f"Loaded mapping: {data_type}/{name} from {filename}")
-                except Exception as e:
-                    logger.error(f"Error loading mapping file {filename}: {str(e)}")
-    
-    def get_mapping(self, data_type: str, name: str = 'default') -> Optional[Dict[str, str]]:
-        """
-        Get a specific field mapping
-        
-        Args:
-            data_type: Type of data ('property', 'sales', 'valuation', 'tax')
-            name: Name of the mapping ('default' or custom name)
-            
-        Returns:
-            Dictionary with field mappings or None if not found
-        """
-        # Refresh cache if needed
-        if not self.mappings_cache:
-            self._load_all_mappings()
-            
-        # Get mapping from cache
-        type_mappings = self.mappings_cache.get(data_type, {})
-        mapping_data = type_mappings.get(name)
-        
-        if mapping_data:
-            return mapping_data.get('mapping', {})
-        else:
-            logger.warning(f"Mapping not found: {data_type}/{name}")
-            
-            # Check if there's a default mapping for this data type
-            if name != 'default':
-                logger.info(f"Falling back to default mapping for {data_type}")
-                return self.get_mapping(data_type, 'default')
-                
-            return None
+        logger.info(f"Mapping loader initialized with directory: {self.mappings_dir}")
     
     def list_mappings(self, data_type: Optional[str] = None) -> Dict[str, List[str]]:
         """
-        List available mappings
+        List available mappings by data type
         
         Args:
-            data_type: Optional filter by data type
+            data_type: Optional data type to filter mappings (property, sales, valuation, tax)
             
         Returns:
             Dictionary with data types as keys and lists of mapping names as values
         """
-        result = {}
+        # Clear cache to get fresh list
+        self._mapping_list_cache = {}
         
+        # Get list of mapping files
+        result = {}
+        try:
+            for filename in os.listdir(self.mappings_dir):
+                if filename.endswith('.json'):
+                    try:
+                        with open(os.path.join(self.mappings_dir, filename), 'r') as f:
+                            mapping_data = json.load(f)
+                            
+                            if 'data_type' in mapping_data and 'name' in mapping_data:
+                                mapping_type = mapping_data['data_type']
+                                mapping_name = mapping_data['name']
+                                
+                                if mapping_type not in result:
+                                    result[mapping_type] = []
+                                    
+                                result[mapping_type].append(mapping_name)
+                    except Exception as e:
+                        logger.error(f"Error loading mapping file {filename}: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error listing mappings in directory {self.mappings_dir}: {str(e)}")
+        
+        # Update cache
+        self._mapping_list_cache = result
+        
+        # Filter by data type if provided
         if data_type:
-            # List mappings for a specific data type
-            type_mappings = self.mappings_cache.get(data_type, {})
-            result[data_type] = list(type_mappings.keys())
-        else:
-            # List all mappings
-            for dt, mappings in self.mappings_cache.items():
-                result[dt] = list(mappings.keys())
-                
+            return {data_type: result.get(data_type, [])}
+        
         return result
     
-    def create_mapping(self, data_type: str, name: str, mapping: Dict[str, str]) -> bool:
+    def get_mapping(self, data_type: str, mapping_name: str) -> Optional[Dict[str, str]]:
         """
-        Create a new field mapping
+        Get a specific mapping
         
         Args:
-            data_type: Type of data ('property', 'sales', 'valuation', 'tax')
-            name: Name of the mapping
-            mapping: Dictionary with field mappings (target_field: source_field)
+            data_type: Data type (property, sales, valuation, tax)
+            mapping_name: Name of the mapping
+            
+        Returns:
+            Dictionary with field mappings or None if not found
+        """
+        # Check cache first
+        cache_key = f"{data_type}_{mapping_name}"
+        if cache_key in self._mappings_cache:
+            return self._mappings_cache[cache_key]
+        
+        # Find mapping file
+        filename = f"{data_type}_{mapping_name}.json"
+        filepath = os.path.join(self.mappings_dir, filename)
+        
+        if os.path.exists(filepath):
+            try:
+                with open(filepath, 'r') as f:
+                    mapping_data = json.load(f)
+                    
+                    if 'mapping' in mapping_data:
+                        # Update cache
+                        self._mappings_cache[cache_key] = mapping_data['mapping']
+                        return mapping_data['mapping']
+            except Exception as e:
+                logger.error(f"Error loading mapping file {filename}: {str(e)}")
+        
+        # Try alternative filename format
+        for filename in os.listdir(self.mappings_dir):
+            if filename.endswith('.json'):
+                try:
+                    with open(os.path.join(self.mappings_dir, filename), 'r') as f:
+                        mapping_data = json.load(f)
+                        
+                        if mapping_data.get('data_type') == data_type and mapping_data.get('name') == mapping_name:
+                            if 'mapping' in mapping_data:
+                                # Update cache
+                                self._mappings_cache[cache_key] = mapping_data['mapping']
+                                return mapping_data['mapping']
+                except Exception:
+                    pass
+        
+        return None
+    
+    def create_mapping(self, data_type: str, mapping_name: str, mapping: Dict[str, str]) -> bool:
+        """
+        Create a new mapping
+        
+        Args:
+            data_type: Data type (property, sales, valuation, tax)
+            mapping_name: Name of the mapping
+            mapping: Dictionary with field mappings
             
         Returns:
             True if successful, False otherwise
         """
+        # Validate inputs
+        if not data_type or not mapping_name or not mapping:
+            logger.error("Invalid mapping parameters: data_type, mapping_name, and mapping are required")
+            return False
+        
+        # Create mapping file
+        filename = f"{data_type}_{mapping_name}.json"
+        filepath = os.path.join(self.mappings_dir, filename)
+        
+        # Check if file already exists
+        if os.path.exists(filepath):
+            logger.error(f"Mapping file already exists: {filename}")
+            return False
+        
+        # Create mapping data
+        mapping_data = {
+            'data_type': data_type,
+            'name': mapping_name,
+            'mapping': mapping,
+            'created': datetime.datetime.now().isoformat()
+        }
+        
+        # Write to file
         try:
-            # Prepare mapping data
-            mapping_data = {
-                'data_type': data_type,
-                'name': name,
-                'mapping': mapping,
-                'created': datetime.now().isoformat()
-            }
-            
-            # Save to file
-            filename = f"{data_type}_{name}.json"
-            file_path = os.path.join(self.mappings_directory, filename)
-            
-            with open(file_path, 'w') as f:
+            with open(filepath, 'w') as f:
                 json.dump(mapping_data, f, indent=2)
-                
-            # Update cache
-            if data_type not in self.mappings_cache:
-                self.mappings_cache[data_type] = {}
-                
-            self.mappings_cache[data_type][name] = mapping_data
             
-            logger.info(f"Created mapping: {data_type}/{name}")
+            # Update cache
+            cache_key = f"{data_type}_{mapping_name}"
+            self._mappings_cache[cache_key] = mapping
+            
+            # Clear list cache to force refresh
+            self._mapping_list_cache = {}
+            
+            logger.info(f"Created new mapping: {data_type}/{mapping_name}")
             return True
         except Exception as e:
-            logger.error(f"Error creating mapping {data_type}/{name}: {str(e)}")
+            logger.error(f"Error creating mapping file {filename}: {str(e)}")
             return False
     
-    def update_mapping(self, data_type: str, name: str, mapping: Dict[str, str]) -> bool:
+    def update_mapping(self, data_type: str, mapping_name: str, mapping: Dict[str, str]) -> bool:
         """
-        Update an existing field mapping
+        Update an existing mapping
         
         Args:
-            data_type: Type of data ('property', 'sales', 'valuation', 'tax')
-            name: Name of the mapping
-            mapping: Dictionary with field mappings (target_field: source_field)
+            data_type: Data type (property, sales, valuation, tax)
+            mapping_name: Name of the mapping
+            mapping: Dictionary with field mappings
             
         Returns:
             True if successful, False otherwise
         """
-        try:
-            # Check if mapping exists
-            if data_type in self.mappings_cache and name in self.mappings_cache[data_type]:
-                # Get existing mapping
-                existing = self.mappings_cache[data_type][name]
+        # Validate inputs
+        if not data_type or not mapping_name or not mapping:
+            logger.error("Invalid mapping parameters: data_type, mapping_name, and mapping are required")
+            return False
+        
+        # Find mapping file
+        filename = f"{data_type}_{mapping_name}.json"
+        filepath = os.path.join(self.mappings_dir, filename)
+        
+        # Check if standard file exists
+        if os.path.exists(filepath):
+            try:
+                # Load existing data to preserve metadata
+                with open(filepath, 'r') as f:
+                    mapping_data = json.load(f)
                 
-                # Update mapping data
-                mapping_data = {
-                    'data_type': data_type,
-                    'name': name,
-                    'mapping': mapping,
-                    'created': existing.get('created'),
-                    'updated': datetime.now().isoformat()
-                }
+                # Update mapping
+                mapping_data['mapping'] = mapping
+                mapping_data['updated'] = datetime.datetime.now().isoformat()
                 
-                # Save to file
-                filename = f"{data_type}_{name}.json"
-                file_path = os.path.join(self.mappings_directory, filename)
-                
-                with open(file_path, 'w') as f:
+                # Write back to file
+                with open(filepath, 'w') as f:
                     json.dump(mapping_data, f, indent=2)
-                    
-                # Update cache
-                self.mappings_cache[data_type][name] = mapping_data
                 
-                logger.info(f"Updated mapping: {data_type}/{name}")
+                # Update cache
+                cache_key = f"{data_type}_{mapping_name}"
+                self._mappings_cache[cache_key] = mapping
+                
+                logger.info(f"Updated mapping: {data_type}/{mapping_name}")
                 return True
-            else:
-                logger.warning(f"Cannot update non-existent mapping: {data_type}/{name}")
+            except Exception as e:
+                logger.error(f"Error updating mapping file {filename}: {str(e)}")
                 return False
-        except Exception as e:
-            logger.error(f"Error updating mapping {data_type}/{name}: {str(e)}")
-            return False
+        
+        # Try to find alternative filename format
+        for filename in os.listdir(self.mappings_dir):
+            if filename.endswith('.json'):
+                try:
+                    filepath = os.path.join(self.mappings_dir, filename)
+                    with open(filepath, 'r') as f:
+                        mapping_data = json.load(f)
+                        
+                        if mapping_data.get('data_type') == data_type and mapping_data.get('name') == mapping_name:
+                            # Update mapping
+                            mapping_data['mapping'] = mapping
+                            mapping_data['updated'] = datetime.datetime.now().isoformat()
+                            
+                            # Write back to file
+                            with open(filepath, 'w') as f:
+                                json.dump(mapping_data, f, indent=2)
+                            
+                            # Update cache
+                            cache_key = f"{data_type}_{mapping_name}"
+                            self._mappings_cache[cache_key] = mapping
+                            
+                            logger.info(f"Updated mapping: {data_type}/{mapping_name}")
+                            return True
+                except Exception:
+                    pass
+        
+        logger.error(f"Mapping not found: {data_type}/{mapping_name}")
+        return False
     
-    def delete_mapping(self, data_type: str, name: str) -> bool:
+    def delete_mapping(self, data_type: str, mapping_name: str) -> bool:
         """
-        Delete a field mapping
+        Delete a mapping
         
         Args:
-            data_type: Type of data ('property', 'sales', 'valuation', 'tax')
-            name: Name of the mapping
+            data_type: Data type (property, sales, valuation, tax)
+            mapping_name: Name of the mapping
             
         Returns:
             True if successful, False otherwise
         """
-        try:
-            # Don't allow deletion of default mappings
-            if name == 'default':
-                logger.warning("Cannot delete default mapping")
-                return False
-                
-            # Check if mapping exists
-            if data_type in self.mappings_cache and name in self.mappings_cache[data_type]:
-                # Remove from cache
-                del self.mappings_cache[data_type][name]
-                
-                # Remove file
-                filename = f"{data_type}_{name}.json"
-                file_path = os.path.join(self.mappings_directory, filename)
-                
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-                    
-                logger.info(f"Deleted mapping: {data_type}/{name}")
-                return True
-            else:
-                logger.warning(f"Cannot delete non-existent mapping: {data_type}/{name}")
-                return False
-        except Exception as e:
-            logger.error(f"Error deleting mapping {data_type}/{name}: {str(e)}")
+        # Validate inputs
+        if not data_type or not mapping_name:
+            logger.error("Invalid mapping parameters: data_type and mapping_name are required")
             return False
-
-# Singleton instance
-_mapping_loader = None
-
-def get_mapping_loader() -> MappingLoader:
-    """
-    Get the singleton mapping loader instance
+        
+        # Find mapping file
+        filename = f"{data_type}_{mapping_name}.json"
+        filepath = os.path.join(self.mappings_dir, filename)
+        
+        # Check if standard file exists
+        if os.path.exists(filepath):
+            try:
+                os.remove(filepath)
+                
+                # Clear caches
+                cache_key = f"{data_type}_{mapping_name}"
+                if cache_key in self._mappings_cache:
+                    del self._mappings_cache[cache_key]
+                
+                self._mapping_list_cache = {}
+                
+                logger.info(f"Deleted mapping: {data_type}/{mapping_name}")
+                return True
+            except Exception as e:
+                logger.error(f"Error deleting mapping file {filename}: {str(e)}")
+                return False
+        
+        # Try to find alternative filename format
+        for filename in os.listdir(self.mappings_dir):
+            if filename.endswith('.json'):
+                try:
+                    filepath = os.path.join(self.mappings_dir, filename)
+                    with open(filepath, 'r') as f:
+                        mapping_data = json.load(f)
+                        
+                        if mapping_data.get('data_type') == data_type and mapping_data.get('name') == mapping_name:
+                            os.remove(filepath)
+                            
+                            # Clear caches
+                            cache_key = f"{data_type}_{mapping_name}"
+                            if cache_key in self._mappings_cache:
+                                del self._mappings_cache[cache_key]
+                            
+                            self._mapping_list_cache = {}
+                            
+                            logger.info(f"Deleted mapping: {data_type}/{mapping_name}")
+                            return True
+                except Exception:
+                    pass
+        
+        logger.error(f"Mapping not found: {data_type}/{mapping_name}")
+        return False
     
+    def clear_cache(self):
+        """Clear the mapping cache"""
+        self._mappings_cache = {}
+        self._mapping_list_cache = {}
+        logger.info("Mapping cache cleared")
+
+def get_mapping_loader(mappings_dir: Optional[str] = None) -> MappingLoader:
+    """
+    Get a mapping loader instance
+    
+    Args:
+        mappings_dir: Directory where mapping files are stored (optional)
+        
     Returns:
         MappingLoader instance
     """
     global _mapping_loader
     
     if _mapping_loader is None:
-        _mapping_loader = MappingLoader()
-        
+        _mapping_loader = MappingLoader(mappings_dir)
+    
     return _mapping_loader
