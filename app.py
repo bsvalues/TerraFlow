@@ -859,8 +859,8 @@ def submit_feedback():
         
         # If we have Supabase enabled, save to the feedback table
         if is_supabase_enabled():
-            from supabase_client import get_client
-            supabase = get_client()
+            from supabase_client import get_supabase_client
+            supabase = get_supabase_client()
             if supabase:
                 result = supabase.table('user_feedback').insert(feedback).execute()
                 app.logger.info(f"Feedback saved to Supabase: {result}")
