@@ -38,6 +38,41 @@ target_metadata = db.metadata
 # ... etc.
 
 
+def get_database_url() -> str:
+    """Get the appropriate database URL based on the environment"""
+    # Check for environment mode
+    env_mode = os.environ.get("ENV_MODE", "development").lower()
+    
+    # Try environment-specific URLs first
+    if env_mode == "training":
+        url = os.environ.get("DATABASE_URL_TRAINING")
+        if url:
+            print(f"Using DATABASE_URL_TRAINING for {env_mode} environment")
+            return url
+    elif env_mode == "production":
+        url = os.environ.get("DATABASE_URL_PRODUCTION")
+        if url:
+            print(f"Using DATABASE_URL_PRODUCTION for {env_mode} environment")
+            return url
+    
+    # Try environment-specific suffix next
+    env_suffix = "_" + env_mode.upper() if env_mode != "development" else ""
+    url = os.environ.get(f"DATABASE_URL{env_suffix}")
+    if url:
+        print(f"Using DATABASE_URL{env_suffix} for {env_mode} environment")
+        return url
+    
+    # Fall back to generic DATABASE_URL
+    url = os.environ.get("DATABASE_URL")
+    if url:
+        print(f"Using DATABASE_URL for {env_mode} environment")
+        return url
+    
+    # Last resort - use the URL from alembic.ini
+    url = config.get_main_option("sqlalchemy.url")
+    print(f"Using sqlalchemy.url from alembic.ini for {env_mode} environment")
+    return url
+
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
 
@@ -50,9 +85,7 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = os.environ.get('DATABASE_URL')
-    if not url:
-        url = config.get_main_option("sqlalchemy.url")
+    url = get_database_url()
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -71,11 +104,10 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    # Override sqlalchemy.url with DATABASE_URL environment variable if it exists
+    # Override sqlalchemy.url with the appropriate database URL
     configuration = config.get_section(config.config_ini_section, {})
-    if os.environ.get('DATABASE_URL'):
-        configuration['sqlalchemy.url'] = os.environ.get('DATABASE_URL')
-        
+    configuration['sqlalchemy.url'] = get_database_url()
+    
     connectable = engine_from_config(
         configuration,
         prefix="sqlalchemy.",

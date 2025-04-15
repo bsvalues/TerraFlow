@@ -13,10 +13,40 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Get the database URL from environment variable
-db_url = os.environ.get("DATABASE_URL")
+# Determine environment and get the correct database URL
+env_mode = os.environ.get("ENV_MODE", "development").lower()
+logger.info(f"Using environment: {env_mode}")
+
+# Initialize db_url to None
+db_url = None
+
+# Get environment-specific database URL
+if env_mode == "training":
+    db_url = os.environ.get("DATABASE_URL_TRAINING")
+    if db_url:
+        logger.info("Using DATABASE_URL_TRAINING")
+elif env_mode == "production":
+    db_url = os.environ.get("DATABASE_URL_PRODUCTION")
+    if db_url:
+        logger.info("Using DATABASE_URL_PRODUCTION")
+
+# Fallback to environment suffix
 if not db_url:
-    logger.error("DATABASE_URL environment variable not set")
+    env_suffix = "_" + env_mode.upper() if env_mode != "development" else ""
+    db_url = os.environ.get(f"DATABASE_URL{env_suffix}")
+    if db_url:
+        logger.info(f"Using DATABASE_URL{env_suffix}")
+
+# Final fallback to default DATABASE_URL
+if not db_url:
+    db_url = os.environ.get("DATABASE_URL")
+    if db_url:
+        logger.info("Using default DATABASE_URL")
+
+# Exit if no database URL is found
+if not db_url:
+    logger.error("No database URL found for the current environment")
+    logger.error(f"Please set DATABASE_URL_TRAINING, DATABASE_URL_PRODUCTION, DATABASE_URL_{env_mode.upper()} or DATABASE_URL")
     sys.exit(1)
 
 def create_tables():

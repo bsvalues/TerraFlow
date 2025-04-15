@@ -93,10 +93,15 @@ def load_config() -> Dict[str, Any]:
         os.environ.get("SUPABASE_SERVICE_KEY", "")
     )
     
-    database_url = (
-        os.environ.get(f"DATABASE_URL{env_suffix}") or 
-        os.environ.get("DATABASE_URL", "")
-    )
+    # Environment-specific database URLs with dedicated variables for training and production
+    if env_mode == "training":
+        database_url = os.environ.get("DATABASE_URL_TRAINING") or os.environ.get(f"DATABASE_URL{env_suffix}") or os.environ.get("DATABASE_URL", "")
+    elif env_mode == "production":
+        database_url = os.environ.get("DATABASE_URL_PRODUCTION") or os.environ.get(f"DATABASE_URL{env_suffix}") or os.environ.get("DATABASE_URL", "")
+    else:
+        database_url = os.environ.get(f"DATABASE_URL{env_suffix}") or os.environ.get("DATABASE_URL", "")
+        
+    logger.info(f"Using database URL for {env_mode} environment")
     
     # Override with environment variables
     if supabase_url and supabase_key:
@@ -129,23 +134,26 @@ def load_config() -> Dict[str, Any]:
         logger.info(f"Production database configured: {config['production_db']['engine']}")
     
     # Configure sync settings
-    if os.environ.get("SYNC_INTERVAL"):
+    sync_interval = os.environ.get("SYNC_INTERVAL")
+    if sync_interval:
         try:
-            config["sync"]["interval"] = int(os.environ.get("SYNC_INTERVAL"))
+            config["sync"]["interval"] = int(sync_interval)
         except ValueError:
-            logger.warning(f"Invalid SYNC_INTERVAL value: {os.environ.get('SYNC_INTERVAL')}")
+            logger.warning(f"Invalid SYNC_INTERVAL value: {sync_interval}")
     
     if os.environ.get("SYNC_AUTO", "").lower() in ("true", "1", "yes"):
         config["sync"]["auto_sync"] = True
     
-    if os.environ.get("SYNC_BATCH_SIZE"):
+    batch_size = os.environ.get("SYNC_BATCH_SIZE")
+    if batch_size:
         try:
-            config["sync"]["batch_size"] = int(os.environ.get("SYNC_BATCH_SIZE"))
+            config["sync"]["batch_size"] = int(batch_size)
         except ValueError:
-            logger.warning(f"Invalid SYNC_BATCH_SIZE value: {os.environ.get('SYNC_BATCH_SIZE')}")
+            logger.warning(f"Invalid SYNC_BATCH_SIZE value: {batch_size}")
     
-    if os.environ.get("SYNC_LOG_LEVEL"):
-        config["sync"]["log_level"] = os.environ.get("SYNC_LOG_LEVEL").upper()
+    log_level = os.environ.get("SYNC_LOG_LEVEL")
+    if log_level:
+        config["sync"]["log_level"] = log_level.upper()
     
     if os.environ.get("SYNC_ENABLE_CHANGE_TRACKING", "").lower() in ("false", "0", "no"):
         config["sync"]["enable_change_tracking"] = False
@@ -153,11 +161,12 @@ def load_config() -> Dict[str, Any]:
     if os.environ.get("SYNC_ENABLE_ROLLBACK", "").lower() in ("false", "0", "no"):
         config["sync"]["enable_rollback"] = False
     
-    if os.environ.get("SYNC_ROLLBACK_RETENTION_DAYS"):
+    rollback_days = os.environ.get("SYNC_ROLLBACK_RETENTION_DAYS")
+    if rollback_days:
         try:
-            config["sync"]["rollback_retention_days"] = int(os.environ.get("SYNC_ROLLBACK_RETENTION_DAYS"))
+            config["sync"]["rollback_retention_days"] = int(rollback_days)
         except ValueError:
-            logger.warning(f"Invalid SYNC_ROLLBACK_RETENTION_DAYS value: {os.environ.get('SYNC_ROLLBACK_RETENTION_DAYS')}")
+            logger.warning(f"Invalid SYNC_ROLLBACK_RETENTION_DAYS value: {rollback_days}")
     
     # Allow bypassing authentication for development
     if os.environ.get("BYPASS_LDAP", "").lower() == "true":
