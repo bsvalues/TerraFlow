@@ -497,10 +497,21 @@ class DataQualityAlertManager:
                 self._load_sample_alerts()
                 return
                 
-            # Query the data_quality.alerts table to load saved alerts
-            response = client.table('data_quality.alerts').select('*').execute()
+            try:
+                # Query the data_quality_alerts table to load saved alerts
+                # First try the new table name format
+                response = client.table('data_quality_alerts').select('*').execute()
+            except Exception as table_error:
+                try:
+                    # If that fails, try the old format with dot notation
+                    response = client.table('data_quality.alerts').select('*').execute()
+                except Exception:
+                    # If both fail, log the original error and fallback to sample alerts
+                    logger.error(f"Error accessing alerts table: {str(table_error)}")
+                    self._load_sample_alerts()
+                    return
             
-            if response.data:
+            if response and hasattr(response, 'data') and response.data:
                 # Convert data to alert objects
                 for alert_data in response.data:
                     alert = QualityAlert.from_dict(alert_data)
@@ -578,15 +589,39 @@ class DataQualityAlertManager:
             # Prepare data for database
             alert_data = [alert.to_dict() for alert in self.alerts.values()]
             
-            # Save to Supabase - first delete all existing alerts
-            client.table('data_quality.alerts').delete().neq('id', 'dummy_id').execute()
+            # Determine which table name to use - try new format first
+            table_name = 'data_quality_alerts'
+            try:
+                # Try to get schema from the new table format first
+                response = client.table(table_name).select('*').limit(1).execute()
+            except Exception:
+                # If it fails, fallback to old dot notation format
+                table_name = 'data_quality.alerts'
+                
+                # Try to create the table if it doesn't exist
+                try:
+                    # For the purpose of this project, we won't try to create tables directly,
+                    # as that should be managed through migrations
+                    pass
+                except Exception:
+                    # Just continue with the table name that we have
+                    pass
             
-            # Then insert all current alerts if there are any
-            if alert_data:
-                client.table('data_quality.alerts').insert(alert_data).execute()
-            
-            logger.info(f"Saved {len(self.alerts)} quality alerts to database")
-            return True
+            try:
+                # Save to Supabase - first delete all existing alerts
+                client.table(table_name).delete().neq('id', 'dummy_id').execute()
+                
+                # Then insert all current alerts if there are any
+                if alert_data:
+                    client.table(table_name).insert(alert_data).execute()
+                
+                logger.info(f"Saved {len(self.alerts)} quality alerts to database")
+                return True
+                
+            except Exception as save_error:
+                logger.error(f"Error saving to {table_name}: {str(save_error)}")
+                # We've attempted both table formats, so we'll just log the error
+                return False
         
         except Exception as e:
             logger.error(f"Error saving quality alerts: {str(e)}")
