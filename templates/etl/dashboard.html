@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}ETL Dashboard{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <h1 class="mb-4">ETL Dashboard</h1>
+  
+  <div class="row">
+    <div class="col-md-6 mb-4">
+      <div class="card h-100">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0">Data Import</h5>
+        </div>
+        <div class="card-body">
+          <p>Import data from various sources into the system.</p>
+          <ul>
+            <li>Import from CSV, Excel, or JSON files</li>
+            <li>Import from database connections</li>
+            <li>Apply field mappings and transformations</li>
+          </ul>
+          <a href="{{ url_for('etl.import_data') }}" class="btn btn-primary mt-3">Go to Import</a>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-md-6 mb-4">
+      <div class="card h-100">
+        <div class="card-header bg-success text-white">
+          <h5 class="mb-0">Data Export</h5>
+        </div>
+        <div class="card-body">
+          <p>Export data from the system to various formats.</p>
+          <ul>
+            <li>Export to CSV, Excel, JSON, or Parquet</li>
+            <li>Apply filters and transformations</li>
+            <li>Schedule automated exports</li>
+          </ul>
+          <a href="{{ url_for('etl.export_data') }}" class="btn btn-success mt-3">Go to Export</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="row">
+    <div class="col-md-6 mb-4">
+      <div class="card h-100">
+        <div class="card-header bg-info text-white">
+          <h5 class="mb-0">Field Mappings</h5>
+        </div>
+        <div class="card-body">
+          <p>Manage field mappings for ETL operations.</p>
+          <ul>
+            <li>Create mappings between source and target schemas</li>
+            <li>Define field transformations</li>
+            <li>Save and reuse mappings</li>
+          </ul>
+          <a href="{{ url_for('etl.manage_mappings') }}" class="btn btn-info mt-3">Manage Mappings</a>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-md-6 mb-4">
+      <div class="card h-100">
+        <div class="card-header bg-secondary text-white">
+          <h5 class="mb-0">Data Validation</h5>
+        </div>
+        <div class="card-body">
+          <p>Validate data against schema and constraints.</p>
+          <ul>
+            <li>Check data quality and integrity</li>
+            <li>Identify missing or invalid values</li>
+            <li>Generate validation reports</li>
+          </ul>
+          <a href="{{ url_for('etl.api_validate') }}" class="btn btn-secondary mt-3">Validate Data</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="row">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header bg-dark text-white">
+          <h5 class="mb-0">Recent ETL Operations</h5>
+        </div>
+        <div class="card-body">
+          <p>No recent ETL operations found.</p>
+          <!-- This would be populated dynamically with recent ETL operations -->
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

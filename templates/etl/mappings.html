@@ -1,0 +1,322 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Field Mappings{% endblock %}
+
+{% block head %}
+{{ super() }}
+<style>
+  .mapping-row {
+    margin-bottom: 10px;
+  }
+  .remove-mapping {
+    cursor: pointer;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <h1 class="mb-4">Manage Field Mappings</h1>
+  
+  <div class="row">
+    <div class="col-md-6">
+      <div class="card mb-4">
+        <div class="card-header bg-info text-white">
+          <h5 class="mb-0">Create New Mapping</h5>
+        </div>
+        <div class="card-body">
+          <form id="mappingForm" action="{{ url_for('etl.manage_mappings') }}" method="post">
+            <div class="mb-3">
+              <label for="data_type" class="form-label">Data Type</label>
+              <select class="form-select" id="data_type" name="data_type" required>
+                {% for data_type in schemas.keys() %}
+                <option value="{{ data_type }}">{{ data_type|title }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            
+            <div class="mb-3">
+              <label for="mapping_name" class="form-label">Mapping Name</label>
+              <input type="text" class="form-control" id="mapping_name" name="mapping_name" required>
+              <div class="form-text">A descriptive name for this field mapping.</div>
+            </div>
+            
+            <div class="mb-3">
+              <label class="form-label">Field Mappings</label>
+              <div id="mappings-container">
+                <div class="mapping-row row">
+                  <div class="col-5">
+                    <select class="form-select target-field" name="target_field">
+                      <option value="">Select Target Field</option>
+                      <!-- Target fields will be populated by JavaScript -->
+                    </select>
+                  </div>
+                  <div class="col-5">
+                    <input type="text" class="form-control source-field" name="source_field" placeholder="Source Field">
+                  </div>
+                  <div class="col-2">
+                    <span class="btn btn-sm btn-danger remove-mapping">
+                      <i class="bi bi-trash"></i>
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              <button type="button" id="add-mapping" class="btn btn-sm btn-secondary mt-2">
+                <i class="bi bi-plus"></i> Add Field
+              </button>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">Save Mapping</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header bg-secondary text-white">
+          <h5 class="mb-0">Existing Mappings</h5>
+        </div>
+        <div class="card-body">
+          {% if mappings %}
+            <div class="list-group">
+              {% for mapping in mappings %}
+                <div class="list-group-item">
+                  <div class="d-flex w-100 justify-content-between">
+                    <h5 class="mb-1">{{ mapping.name }}</h5>
+                    <small class="text-muted">{{ mapping.data_type|title }}</small>
+                  </div>
+                  <p class="mb-1">Created: {{ mapping.created }}</p>
+                  <small class="text-muted">Fields mapped: {{ mapping.mapping|length }}</small>
+                  
+                  <div class="mt-2">
+                    <button type="button" class="btn btn-sm btn-info view-mapping" data-mapping="{{ mapping|tojson }}">
+                      <i class="bi bi-eye"></i> View
+                    </button>
+                    <button type="button" class="btn btn-sm btn-warning edit-mapping" data-mapping="{{ mapping|tojson }}">
+                      <i class="bi bi-pencil"></i> Edit
+                    </button>
+                    <button type="button" class="btn btn-sm btn-danger delete-mapping" data-name="{{ mapping.name }}" data-type="{{ mapping.data_type }}">
+                      <i class="bi bi-trash"></i> Delete
+                    </button>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="card-text">No mappings found. Create your first mapping using the form.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="mt-4">
+    <a href="{{ url_for('etl.etl_dashboard') }}" class="btn btn-secondary">Back to ETL Dashboard</a>
+  </div>
+  
+  <!-- View Mapping Modal -->
+  <div class="modal fade" id="viewMappingModal" tabindex="-1" aria-labelledby="viewMappingModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="viewMappingModalLabel">View Mapping</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div id="mappingDetails">
+            <p><strong>Name:</strong> <span id="modal-mapping-name"></span></p>
+            <p><strong>Data Type:</strong> <span id="modal-mapping-type"></span></p>
+            <p><strong>Created:</strong> <span id="modal-mapping-created"></span></p>
+            
+            <h6 class="mt-3">Field Mappings:</h6>
+            <table class="table table-sm">
+              <thead>
+                <tr>
+                  <th>Target Field</th>
+                  <th>Source Field</th>
+                </tr>
+              </thead>
+              <tbody id="modal-mapping-fields">
+                <!-- Will be populated by JavaScript -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Schemas object for JavaScript
+    const schemas = {{ schemas|tojson|safe }};
+    
+    // Populate target fields based on selected data type
+    const dataTypeSelect = document.getElementById('data_type');
+    const populateTargetFields = function() {
+      const dataType = dataTypeSelect.value;
+      const targetFields = schemas[dataType] || {};
+      const targetSelects = document.querySelectorAll('.target-field');
+      
+      targetSelects.forEach(select => {
+        // Save current selection
+        const currentValue = select.value;
+        
+        // Clear options
+        select.innerHTML = '<option value="">Select Target Field</option>';
+        
+        // Add options for each field
+        Object.keys(targetFields).forEach(field => {
+          const option = document.createElement('option');
+          option.value = field;
+          option.textContent = field;
+          select.appendChild(option);
+        });
+        
+        // Restore selection if it exists in new options
+        if (currentValue) {
+          select.value = currentValue;
+        }
+      });
+    };
+    
+    dataTypeSelect.addEventListener('change', populateTargetFields);
+    
+    // Initial population
+    populateTargetFields();
+    
+    // Add new mapping row
+    const addMappingBtn = document.getElementById('add-mapping');
+    const mappingsContainer = document.getElementById('mappings-container');
+    
+    addMappingBtn.addEventListener('click', function() {
+      const newRow = document.createElement('div');
+      newRow.className = 'mapping-row row';
+      newRow.innerHTML = `
+        <div class="col-5">
+          <select class="form-select target-field" name="target_field">
+            <option value="">Select Target Field</option>
+          </select>
+        </div>
+        <div class="col-5">
+          <input type="text" class="form-control source-field" name="source_field" placeholder="Source Field">
+        </div>
+        <div class="col-2">
+          <span class="btn btn-sm btn-danger remove-mapping">
+            <i class="bi bi-trash"></i>
+          </span>
+        </div>
+      `;
+      
+      mappingsContainer.appendChild(newRow);
+      
+      // Re-populate target fields for this new row
+      populateTargetFields();
+      
+      // Add event listener for remove button
+      newRow.querySelector('.remove-mapping').addEventListener('click', function() {
+        newRow.remove();
+      });
+    });
+    
+    // Remove mapping row
+    document.addEventListener('click', function(e) {
+      if (e.target.classList.contains('remove-mapping') || e.target.closest('.remove-mapping')) {
+        const row = e.target.closest('.mapping-row');
+        if (row && mappingsContainer.querySelectorAll('.mapping-row').length > 1) {
+          row.remove();
+        }
+      }
+    });
+    
+    // View mapping modal
+    const viewMappingModal = new bootstrap.Modal(document.getElementById('viewMappingModal'));
+    
+    document.addEventListener('click', function(e) {
+      if (e.target.classList.contains('view-mapping') || e.target.closest('.view-mapping')) {
+        const button = e.target.closest('.view-mapping');
+        const mapping = JSON.parse(button.dataset.mapping);
+        
+        // Populate modal
+        document.getElementById('modal-mapping-name').textContent = mapping.name;
+        document.getElementById('modal-mapping-type').textContent = mapping.data_type;
+        document.getElementById('modal-mapping-created').textContent = mapping.created;
+        
+        const tbody = document.getElementById('modal-mapping-fields');
+        tbody.innerHTML = '';
+        
+        Object.entries(mapping.mapping).forEach(([target, source]) => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${target}</td>
+            <td>${source}</td>
+          `;
+          tbody.appendChild(row);
+        });
+        
+        viewMappingModal.show();
+      }
+    });
+    
+    // Edit mapping
+    document.addEventListener('click', function(e) {
+      if (e.target.classList.contains('edit-mapping') || e.target.closest('.edit-mapping')) {
+        const button = e.target.closest('.edit-mapping');
+        const mapping = JSON.parse(button.dataset.mapping);
+        
+        // Set form values
+        document.getElementById('data_type').value = mapping.data_type;
+        document.getElementById('mapping_name').value = mapping.name;
+        
+        // Clear existing mappings
+        mappingsContainer.innerHTML = '';
+        
+        // Add mapping rows
+        Object.entries(mapping.mapping).forEach(([target, source]) => {
+          const newRow = document.createElement('div');
+          newRow.className = 'mapping-row row';
+          newRow.innerHTML = `
+            <div class="col-5">
+              <select class="form-select target-field" name="target_field">
+                <option value="">Select Target Field</option>
+              </select>
+            </div>
+            <div class="col-5">
+              <input type="text" class="form-control source-field" name="source_field" value="${source}" placeholder="Source Field">
+            </div>
+            <div class="col-2">
+              <span class="btn btn-sm btn-danger remove-mapping">
+                <i class="bi bi-trash"></i>
+              </span>
+            </div>
+          `;
+          
+          mappingsContainer.appendChild(newRow);
+        });
+        
+        // Populate target fields and set values
+        populateTargetFields();
+        
+        // Set target field values after population
+        const targetSelects = document.querySelectorAll('.target-field');
+        const targetFields = Object.keys(mapping.mapping);
+        
+        targetSelects.forEach((select, index) => {
+          if (index < targetFields.length) {
+            select.value = targetFields[index];
+          }
+        });
+        
+        // Scroll to the form
+        document.getElementById('mappingForm').scrollIntoView({ behavior: 'smooth' });
+      }
+    });
+  });
+</script>
+{% endblock %}

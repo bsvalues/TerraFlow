@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block title %}Import Data{% endblock %}
+
+{% block head %}
+{{ super() }}
+<style>
+  .tab-content {
+    padding: 20px;
+    border: 1px solid #dee2e6;
+    border-top: none;
+    border-radius: 0 0 5px 5px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <h1 class="mb-4">Import Data</h1>
+  
+  <ul class="nav nav-tabs" id="importTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="file-tab" data-bs-toggle="tab" data-bs-target="#file" type="button" role="tab" aria-controls="file" aria-selected="true">
+        File Import
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="database-tab" data-bs-toggle="tab" data-bs-target="#database" type="button" role="tab" aria-controls="database" aria-selected="false">
+        Database Import
+      </button>
+    </li>
+  </ul>
+  
+  <div class="tab-content" id="importTabsContent">
+    <!-- File Import Tab -->
+    <div class="tab-pane fade show active" id="file" role="tabpanel" aria-labelledby="file-tab">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Import from File</h5>
+          <p class="card-text">Upload a file to import data into the system.</p>
+          
+          <form action="{{ url_for('etl.import_data') }}" method="post" enctype="multipart/form-data">
+            <input type="hidden" name="import_type" value="file">
+            
+            <div class="mb-3">
+              <label for="data_type" class="form-label">Data Type</label>
+              <select class="form-select" id="data_type" name="data_type" required>
+                {% for data_type in data_types %}
+                <option value="{{ data_type }}">{{ data_type|title }}</option>
+                {% endfor %}
+              </select>
+              <div class="form-text">Select the type of data you want to import.</div>
+            </div>
+            
+            <div class="mb-3">
+              <label for="file" class="form-label">Select File</label>
+              <input type="file" class="form-control" id="file" name="file" required>
+              <div class="form-text">Supported file types: CSV, Excel (.xlsx, .xls), JSON, Parquet</div>
+            </div>
+            
+            <div class="mb-3">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="validate_only" name="validate_only">
+                <label class="form-check-label" for="validate_only">
+                  Validate only (do not import)
+                </label>
+              </div>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">Import File</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Database Import Tab -->
+    <div class="tab-pane fade" id="database" role="tabpanel" aria-labelledby="database-tab">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Import from Database</h5>
+          <p class="card-text">Connect to a database and import data.</p>
+          
+          <form action="{{ url_for('etl.import_data') }}" method="post">
+            <input type="hidden" name="import_type" value="database">
+            
+            <div class="mb-3">
+              <label for="data_type_db" class="form-label">Data Type</label>
+              <select class="form-select" id="data_type_db" name="data_type" required>
+                {% for data_type in data_types %}
+                <option value="{{ data_type }}">{{ data_type|title }}</option>
+                {% endfor %}
+              </select>
+              <div class="form-text">Select the type of data you want to import.</div>
+            </div>
+            
+            <div class="mb-3">
+              <label for="connection_string" class="form-label">Connection String</label>
+              <input type="text" class="form-control" id="connection_string" name="connection_string" required>
+              <div class="form-text">Database connection string (e.g., postgresql://user:pass@localhost/dbname)</div>
+            </div>
+            
+            <div class="mb-3">
+              <label for="query" class="form-label">SQL Query</label>
+              <textarea class="form-control" id="query" name="query" rows="5" required></textarea>
+              <div class="form-text">SQL query to execute for data import</div>
+            </div>
+            
+            <div class="mb-3">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="validate_only_db" name="validate_only">
+                <label class="form-check-label" for="validate_only_db">
+                  Validate only (do not import)
+                </label>
+              </div>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">Import from Database</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="mt-4">
+    <a href="{{ url_for('etl.etl_dashboard') }}" class="btn btn-secondary">Back to ETL Dashboard</a>
+  </div>
+</div>
+
+<script>
+  // Initialize Bootstrap tabs
+  document.addEventListener('DOMContentLoaded', function() {
+    const triggerTabList = document.querySelectorAll('#importTabs button');
+    triggerTabList.forEach(function(triggerEl) {
+      new bootstrap.Tab(triggerEl);
+    });
+  });
+</script>
+{% endblock %}
