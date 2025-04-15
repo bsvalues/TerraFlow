@@ -261,3 +261,26 @@ def clean_pool() -> int:
                     count += 1
     
     return count
+
+# Function aliases for compatibility with supabase_client.py
+def get_client(url: str, key: str) -> Any:
+    """
+    Alias for get_connection for compatibility.
+    
+    Args:
+        url: Supabase URL
+        key: Supabase API key or service key
+        
+    Returns:
+        Supabase client
+    """
+    return get_connection(url, key)
+
+def release_client(client: Any) -> None:
+    """
+    Alias for release_connection for compatibility.
+    
+    Args:
+        client: Supabase client to release
+    """
+    release_connection(client)
