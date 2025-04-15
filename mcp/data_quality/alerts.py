@@ -496,21 +496,47 @@ class DataQualityAlertManager:
                 # Fallback to sample alerts if we can't get a client
                 self._load_sample_alerts()
                 return
-                
+            
+            # Keep track of which table name works
+            table_name = None
+            
+            # Try loading alerts from the table
             try:
-                # Query the data_quality_alerts table to load saved alerts
                 # First try the new table name format
-                response = client.table('data_quality_alerts').select('*').execute()
-            except Exception as table_error:
+                table_name = 'data_quality_alerts'
+                response = client.table(table_name).select('*').execute()
+                logger.info(f"Successfully queried {table_name} table")
+            except Exception as primary_error:
+                logger.warning(f"Error querying primary table: {str(primary_error)}")
+                
                 try:
                     # If that fails, try the old format with dot notation
-                    response = client.table('data_quality.alerts').select('*').execute()
-                except Exception:
-                    # If both fail, log the original error and fallback to sample alerts
-                    logger.error(f"Error accessing alerts table: {str(table_error)}")
-                    self._load_sample_alerts()
-                    return
+                    table_name = 'data_quality.alerts'
+                    response = client.table(table_name).select('*').execute()
+                    logger.info(f"Successfully queried {table_name} table")
+                except Exception as secondary_error:
+                    # If both fail, attempt to create the table and initialize it
+                    logger.error(f"Error accessing alerts tables: {str(secondary_error)}")
+                    
+                    # Use _save_alerts to attempt to create the table
+                    logger.info("Attempting to create and save the alerts table")
+                    success = self._save_alerts()
+                    
+                    if not success:
+                        # If table creation also fails, fallback to sample alerts
+                        logger.warning("Using fallback sample alerts")
+                        self._load_sample_alerts()
+                        return
+                    
+                    # Try querying the newly created table
+                    try:
+                        response = client.table('data_quality_alerts').select('*').execute()
+                    except Exception:
+                        # If still not working, use sample alerts
+                        self._load_sample_alerts()
+                        return
             
+            # At this point we have a response from one of the tables
             if response and hasattr(response, 'data') and response.data:
                 # Convert data to alert objects
                 for alert_data in response.data:
@@ -519,8 +545,13 @@ class DataQualityAlertManager:
                 
                 logger.info(f"Loaded {len(self.alerts)} quality alerts from database")
             else:
-                # If no alerts exist, load sample alerts
+                # If no alerts exist, load sample alerts and save them to the database
+                logger.info("No alerts found in database, loading samples")
                 self._load_sample_alerts()
+                
+                # Try to save the sample alerts to the database
+                logger.info("Saving sample alerts to database")
+                self._save_alerts()
         
         except Exception as e:
             logger.error(f"Error loading quality alerts: {str(e)}")
@@ -591,21 +622,89 @@ class DataQualityAlertManager:
             
             # Determine which table name to use - try new format first
             table_name = 'data_quality_alerts'
+            
+            # Check if table exists and create it if needed
             try:
-                # Try to get schema from the new table format first
+                # Try to query the table to check if it exists
                 response = client.table(table_name).select('*').limit(1).execute()
-            except Exception:
-                # If it fails, fallback to old dot notation format
-                table_name = 'data_quality.alerts'
+                logger.info(f"Found {table_name} table in Supabase")
+            except Exception as table_error:
+                logger.warning(f"Table {table_name} not found: {str(table_error)}")
                 
-                # Try to create the table if it doesn't exist
                 try:
-                    # For the purpose of this project, we won't try to create tables directly,
-                    # as that should be managed through migrations
-                    pass
-                except Exception:
-                    # Just continue with the table name that we have
-                    pass
+                    # Try to create the table
+                    logger.info(f"Attempting to create {table_name} table in Supabase")
+                    
+                    # Use SQL query to create the table
+                    sql_query = f"""
+                    CREATE TABLE IF NOT EXISTS {table_name} (
+                        id VARCHAR(100) PRIMARY KEY,
+                        name VARCHAR(255) NOT NULL,
+                        description TEXT,
+                        check_type VARCHAR(50) NOT NULL,
+                        parameters JSONB DEFAULT '{{}}'::jsonb,
+                        threshold FLOAT DEFAULT 0.95,
+                        severity VARCHAR(20) DEFAULT 'medium',
+                        notification_channels JSONB DEFAULT '["log"]'::jsonb,
+                        enabled BOOLEAN DEFAULT TRUE,
+                        last_checked TIMESTAMP,
+                        last_status VARCHAR(50),
+                        last_value FLOAT,
+                        last_error TEXT,
+                        triggered_count INTEGER DEFAULT 0,
+                        created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+                    """
+                    
+                    # Execute the SQL
+                    client.rpc('exec_sql', {'query': sql_query}).execute()
+                    logger.info(f"Created {table_name} table in Supabase")
+                    
+                except Exception as create_error:
+                    # If table creation fails, try the alternative table name format
+                    logger.error(f"Error creating table {table_name}: {str(create_error)}")
+                    table_name = 'data_quality.alerts'
+                    
+                    try:
+                        # Try to create the alternative table
+                        logger.info(f"Attempting to create {table_name} table in Supabase")
+                        
+                        # Create schema first if using dot notation
+                        schema_sql = """
+                        CREATE SCHEMA IF NOT EXISTS data_quality;
+                        """
+                        client.rpc('exec_sql', {'query': schema_sql}).execute()
+                        
+                        # Create table SQL
+                        alt_sql_query = f"""
+                        CREATE TABLE IF NOT EXISTS {table_name} (
+                            id VARCHAR(100) PRIMARY KEY,
+                            name VARCHAR(255) NOT NULL,
+                            description TEXT,
+                            check_type VARCHAR(50) NOT NULL,
+                            parameters JSONB DEFAULT '{{}}'::jsonb,
+                            threshold FLOAT DEFAULT 0.95,
+                            severity VARCHAR(20) DEFAULT 'medium',
+                            notification_channels JSONB DEFAULT '["log"]'::jsonb,
+                            enabled BOOLEAN DEFAULT TRUE,
+                            last_checked TIMESTAMP,
+                            last_status VARCHAR(50),
+                            last_value FLOAT,
+                            last_error TEXT,
+                            triggered_count INTEGER DEFAULT 0,
+                            created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        );
+                        """
+                        
+                        # Execute the SQL
+                        client.rpc('exec_sql', {'query': alt_sql_query}).execute()
+                        logger.info(f"Created {table_name} table in Supabase")
+                        
+                    except Exception as alt_create_error:
+                        logger.error(f"Error creating alternative table {table_name}: {str(alt_create_error)}")
+                        # If both table creation attempts fail, fall back to using memory-only storage
+                        logger.warning("Using memory-only storage for quality alerts")
+                        return False
             
             try:
                 # Save to Supabase - first delete all existing alerts
