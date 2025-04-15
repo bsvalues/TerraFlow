@@ -16,6 +16,7 @@ import pandas as pd
 from typing import Dict, List, Any, Optional, Union
 
 from sync_service.enhanced_etl import get_enhanced_etl
+from sync_service.chunked_etl import get_chunked_etl_processor
 from auth import login_required, permission_required
 
 logger = logging.getLogger(__name__)
@@ -287,20 +288,76 @@ def api_import():
     source_connection = data.get('source_connection', '')
     source_query = data.get('source_query', '')
     data_type = data.get('data_type', 'property')
+    mapping_name = data.get('mapping_name', '')
+    target_table = data.get('target_table', '')
+    use_chunking = data.get('use_chunking', False)
+    chunk_size = data.get('chunk_size', 1000)
     
     if not source_connection:
         return jsonify({'status': 'error', 'message': 'Source connection is required'}), 400
         
     if source_type == 'database' and not source_query:
         return jsonify({'status': 'error', 'message': 'Query is required for database source'}), 400
+    
+    # Process import with chunking if requested
+    if use_chunking:
+        logger.info(f"Using chunked ETL processing with chunk_size={chunk_size}")
+        processor = get_chunked_etl_processor(chunk_size=chunk_size)
+        results = processor.execute_chunked_etl(
+            source_connection=source_connection,
+            source_query=source_query,
+            data_type=data_type,
+            source_type=source_type,
+            mapping_name=mapping_name if mapping_name else None,
+            target_table=target_table if target_table else None
+        )
+    else:
+        # Use standard ETL processing
+        logger.info("Using standard ETL processing")
+        etl = get_enhanced_etl()
+        results = etl.execute_etl_pipeline(
+            source_connection=source_connection,
+            source_query=source_query,
+            data_type=data_type,
+            source_type=source_type
+        )
+    
+    return jsonify(results)
+
+@etl_bp.route('/api/chunked-import', methods=['POST'])
+@login_required
+@permission_required('import_data')
+def api_chunked_import():
+    """API endpoint for importing large datasets with chunking"""
+    # Parse request
+    data = request.get_json()
+    
+    if not data:
+        return jsonify({'status': 'error', 'message': 'No data provided'}), 400
         
-    # Process import
-    etl = get_enhanced_etl()
-    results = etl.execute_etl_pipeline(
+    source_type = data.get('source_type', 'file')
+    source_connection = data.get('source_connection', '')
+    source_query = data.get('source_query', '')
+    data_type = data.get('data_type', 'property')
+    mapping_name = data.get('mapping_name', '')
+    target_table = data.get('target_table', '')
+    chunk_size = data.get('chunk_size', 1000)
+    
+    if not source_connection:
+        return jsonify({'status': 'error', 'message': 'Source connection is required'}), 400
+        
+    if source_type == 'database' and not source_query:
+        return jsonify({'status': 'error', 'message': 'Query is required for database source'}), 400
+    
+    # Use chunked ETL processor
+    processor = get_chunked_etl_processor(chunk_size=chunk_size)
+    results = processor.execute_chunked_etl(
         source_connection=source_connection,
         source_query=source_query,
         data_type=data_type,
-        source_type=source_type
+        source_type=source_type,
+        mapping_name=mapping_name if mapping_name else None,
+        target_table=target_table if target_table else None
     )
     
     return jsonify(results)

@@ -140,6 +140,22 @@
                             </label>
                         </div>
                         
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="useChunking" name="use_chunking">
+                            <label class="form-check-label" for="useChunking">
+                                Use chunked processing for large datasets
+                            </label>
+                        </div>
+                        
+                        <div class="mb-3" id="chunkSizeContainer" style="display: none;">
+                            <label for="chunkSize" class="form-label">Chunk Size</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="chunkSize" name="chunk_size" min="100" max="10000" value="1000">
+                                <span class="input-group-text">rows</span>
+                            </div>
+                            <div class="form-text">Number of records to process in each batch</div>
+                        </div>
+                        
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                             <button type="button" class="btn btn-secondary me-md-2" id="resetBtn">Reset</button>
                             <button type="submit" class="btn btn-primary" id="importBtn">Import Data</button>
@@ -187,6 +203,22 @@
                             <label class="form-check-label" for="dbValidateOnly">
                                 Validate only (don't import)
                             </label>
+                        </div>
+                        
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="dbUseChunking" name="use_chunking">
+                            <label class="form-check-label" for="dbUseChunking">
+                                Use chunked processing for large datasets
+                            </label>
+                        </div>
+                        
+                        <div class="mb-3" id="dbChunkSizeContainer" style="display: none;">
+                            <label for="dbChunkSize" class="form-label">Chunk Size</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="dbChunkSize" name="chunk_size" min="100" max="10000" value="1000">
+                                <span class="input-group-text">rows</span>
+                            </div>
+                            <div class="form-text">Number of records to process in each batch</div>
                         </div>
                         
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end">
@@ -250,6 +282,22 @@
                             <label class="form-check-label" for="apiValidateOnly">
                                 Validate only (don't import)
                             </label>
+                        </div>
+                        
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="apiUseChunking" name="use_chunking">
+                            <label class="form-check-label" for="apiUseChunking">
+                                Use chunked processing for large datasets
+                            </label>
+                        </div>
+                        
+                        <div class="mb-3" id="apiChunkSizeContainer" style="display: none;">
+                            <label for="apiChunkSize" class="form-label">Chunk Size</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="apiChunkSize" name="chunk_size" min="100" max="10000" value="1000">
+                                <span class="input-group-text">rows</span>
+                            </div>
+                            <div class="form-text">Number of records to process in each batch</div>
                         </div>
                         
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end">
@@ -363,6 +411,17 @@
         
         document.getElementById('apiDataType').addEventListener('change', function() {
             loadMappingsForDataType(this.value, 'apiMappingName');
+        });
+        
+        // Chunking option toggles
+        document.getElementById('useChunking').addEventListener('change', function() {
+            const chunkSizeContainer = document.getElementById('chunkSizeContainer');
+            chunkSizeContainer.style.display = this.checked ? 'block' : 'none';
+        });
+        
+        document.getElementById('dbUseChunking').addEventListener('change', function() {
+            const chunkSizeContainer = document.getElementById('dbChunkSizeContainer');
+            chunkSizeContainer.style.display = this.checked ? 'block' : 'none';
         });
     });
     
