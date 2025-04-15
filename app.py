@@ -278,6 +278,38 @@ with app.app_context():
     
     # Register the system agent
     mcp_instance.register_agent("system", SystemAgent())
+    
+    # Initialize health check system
+    try:
+        from health_checker import register_blueprint as register_health_checks
+        health_manager = register_health_checks(app)
+        logger.info("Health check system initialized successfully")
+    except ImportError as e:
+        logger.warning(f"Health check system not available: {str(e)}")
+    
+    # Initialize logging configuration
+    try:
+        from logging_config import register_logging_with_app
+        register_logging_with_app(app)
+        logger.info("Enhanced logging configuration initialized")
+    except ImportError as e:
+        logger.warning(f"Enhanced logging configuration not available: {str(e)}")
+    
+    # Initialize feature flag system
+    try:
+        from feature_manager import register_blueprint as register_feature_flags
+        feature_manager = register_feature_flags(app)
+        logger.info("Feature flag system initialized successfully")
+    except ImportError as e:
+        logger.warning(f"Feature flag system not available: {str(e)}")
+    
+    # Initialize secrets manager
+    try:
+        from secrets_manager import initialize_secrets
+        secrets = initialize_secrets()
+        logger.info("Secrets manager initialized successfully")
+    except ImportError as e:
+        logger.warning(f"Secrets manager not available: {str(e)}")
 
 # Define route handlers
 @app.route('/')
