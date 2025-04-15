@@ -452,8 +452,9 @@ class EnhancedETL:
             DataFrame with extracted data
         """
         try:
-            file_path = Path(file_path)
-            ext = file_path.suffix.lower()
+            from pathlib import Path
+            path_obj = Path(file_path)
+            ext = path_obj.suffix.lower()
             
             if ext == '.csv':
                 return pd.read_csv(file_path)
@@ -471,8 +472,8 @@ class EnhancedETL:
             logger.error(f"Error extracting data from {file_path}: {str(e)}")
             return pd.DataFrame()
     
-    def extract_from_api(self, api_url: str, params: Dict[str, Any] = None,
-                        headers: Dict[str, str] = None) -> pd.DataFrame:
+    def extract_from_api(self, api_url: str, params: Optional[Dict[str, Any]] = None,
+                        headers: Optional[Dict[str, str]] = None) -> pd.DataFrame:
         """
         Extract data from an API
         
@@ -770,7 +771,7 @@ class EnhancedETL:
             
         return results
 
-def get_enhanced_etl(db_connection_string: str = None) -> EnhancedETL:
+def get_enhanced_etl(db_connection_string: Optional[str] = None) -> EnhancedETL:
     """
     Factory function to create an EnhancedETL instance
     

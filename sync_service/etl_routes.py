@@ -70,7 +70,7 @@ def import_data():
                 etl = get_enhanced_etl()
                 results = etl.execute_etl_pipeline(
                     source_connection=filepath,
-                    source_query=None,
+                    source_query="",  # Empty query for file import
                     data_type=data_type,
                     source_type='file'
                 )

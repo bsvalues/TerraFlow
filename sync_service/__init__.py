@@ -169,6 +169,15 @@ def register_blueprints(app):
         except ImportError as e:
             logger.warning(f"Could not load Integration Hub module: {e}")
             has_integration_hub = False
+            
+        # Try to import enhanced ETL routes
+        try:
+            from sync_service.etl_routes import register_etl_routes
+            has_enhanced_etl = True
+            logger.info("Enhanced ETL module loaded successfully")
+        except ImportError as e:
+            logger.warning(f"Could not load Enhanced ETL module: {e}")
+            has_enhanced_etl = False
         
         # Register the blueprints
         app.register_blueprint(sync_bp)
@@ -187,6 +196,11 @@ def register_blueprints(app):
         # Register integration hub blueprint if available
         if has_integration_hub:
             register_integration_blueprint(app)
+            
+        # Register enhanced ETL blueprint if available
+        if has_enhanced_etl:
+            register_etl_routes(app)
+            logger.info("Enhanced ETL routes registered successfully")
         
         # Initialize models
         with app.app_context():
