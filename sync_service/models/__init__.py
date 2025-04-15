@@ -35,7 +35,9 @@ try:
         DataQualityIssue,
         DataQualityReport,
         AnomalyDetectionConfig,
-        DataAnomaly
+        DataAnomaly,
+        DataQualityAlert,
+        DataQualityNotification
     )
 except ImportError:
     # Data Quality models not available
