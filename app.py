@@ -1024,6 +1024,16 @@ try:
 except Exception as e:
     app.logger.error(f"Error registering Supabase config routes: {str(e)}")
 
+# Register legacy data conversion routes
+try:
+    from legacy_converter import register_blueprint as register_legacy_conversion
+    legacy_converter = register_legacy_conversion(app)
+    app.logger.info("Legacy data conversion system registered successfully")
+except ImportError as e:
+    app.logger.warning(f"Legacy data conversion system not available: {str(e)}")
+except Exception as e:
+    app.logger.error(f"Error registering legacy data conversion system: {str(e)}")
+
 # Register Property Management routes
 try:
     from property_routes import register_property_routes
