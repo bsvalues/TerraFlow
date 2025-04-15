@@ -22,6 +22,9 @@ from sqlalchemy.types import String, Float, Integer, Boolean, DateTime, Date, Te
 from sqlalchemy.orm import Session
 from contextlib import contextmanager
 
+# Import the mapping loader
+from sync_service.mapping_loader import get_mapping_loader
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -518,7 +521,9 @@ class EnhancedETL:
     def transform_data(self, source_data: pd.DataFrame, target_schema: Dict[str, str],
                       source_schema: Optional[Dict[str, str]] = None,
                       field_mapping: Optional[Dict[str, str]] = None,
-                      transformers: Optional[Dict[str, Callable]] = None) -> pd.DataFrame:
+                      transformers: Optional[Dict[str, Callable]] = None,
+                      mapping_name: str = 'default',
+                      data_type: Optional[str] = None) -> pd.DataFrame:
         """
         Transform data from source format to target schema
         
@@ -554,6 +559,23 @@ class EnhancedETL:
         
         # Create data mapper
         mapper = DataMapper(source_schema, target_schema)
+        
+        # If no field mapping provided, try to load from mapping loader
+        if not field_mapping and data_type:
+            try:
+                # Get mapping loader
+                mapping_loader = get_mapping_loader()
+                
+                # Try to get mapping for the specified data type and mapping name
+                loaded_mapping = mapping_loader.get_mapping(data_type, mapping_name)
+                
+                if loaded_mapping:
+                    logger.info(f"Using field mapping from {data_type}/{mapping_name}")
+                    field_mapping = loaded_mapping
+                else:
+                    logger.warning(f"No field mapping found for {data_type}/{mapping_name}")
+            except Exception as e:
+                logger.error(f"Error loading field mapping: {str(e)}")
         
         # Add field mappings
         if field_mapping:
@@ -637,7 +659,8 @@ class EnhancedETL:
     
     def execute_etl_pipeline(self, source_connection: str, source_query: str,
                            data_type: str, source_type: str = 'database',
-                           if_exists: str = 'replace', field_mapping: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+                           if_exists: str = 'replace', field_mapping: Optional[Dict[str, str]] = None,
+                           mapping_name: str = 'default') -> Dict[str, Any]:
         """
         Execute a complete ETL pipeline
         
@@ -728,7 +751,9 @@ class EnhancedETL:
             transformed_data = self.transform_data(
                 source_data=source_data, 
                 target_schema=target_schema,
-                field_mapping=field_mapping
+                field_mapping=field_mapping,
+                data_type=data_type,
+                mapping_name=mapping_name
             )
             
             # Update the results
