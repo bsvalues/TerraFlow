@@ -68,14 +68,35 @@ def import_data():
                 filepath = os.path.join(UPLOAD_FOLDER, filename)
                 file.save(filepath)
                 
-                # Process file
-                etl = get_enhanced_etl()
-                results = etl.execute_etl_pipeline(
-                    source_connection=filepath,
-                    source_query="",  # Empty query for file import
-                    data_type=data_type,
-                    source_type='file'
-                )
+                # Get mapping information
+                mapping_name = request.form.get('mapping_name', '')
+                target_table = request.form.get('target_table', '')
+                
+                # Check if chunked processing is requested
+                use_chunking = request.form.get('use_chunking') == 'on'
+                chunk_size = int(request.form.get('chunk_size', 1000))
+                
+                if use_chunking:
+                    logger.info(f"Using chunked ETL processing with chunk_size={chunk_size}")
+                    processor = get_chunked_etl_processor(chunk_size=chunk_size)
+                    results = processor.execute_chunked_etl(
+                        source_connection=filepath,
+                        source_query="",  # Empty query for file import
+                        data_type=data_type,
+                        source_type='file',
+                        mapping_name=mapping_name if mapping_name else None,
+                        target_table=target_table if target_table else None
+                    )
+                else:
+                    # Process file using standard ETL
+                    logger.info("Using standard ETL processing")
+                    etl = get_enhanced_etl()
+                    results = etl.execute_etl_pipeline(
+                        source_connection=filepath,
+                        source_query="",  # Empty query for file import
+                        data_type=data_type,
+                        source_type='file'
+                    )
                 
                 # Store results in session for display
                 session['etl_results'] = results
@@ -103,14 +124,35 @@ def import_data():
                 flash('Query is required', 'error')
                 return redirect(request.url)
                 
-            # Process database import
-            etl = get_enhanced_etl()
-            results = etl.execute_etl_pipeline(
-                source_connection=connection_string,
-                source_query=query,
-                data_type=data_type,
-                source_type='database'
-            )
+            # Get mapping information
+            mapping_name = request.form.get('mapping_name', '')
+            target_table = request.form.get('target_table', '')
+            
+            # Check if chunked processing is requested
+            use_chunking = request.form.get('dbUseChunking') == 'on'
+            chunk_size = int(request.form.get('chunk_size', 1000))
+            
+            if use_chunking:
+                logger.info(f"Using chunked ETL processing with chunk_size={chunk_size} for database import")
+                processor = get_chunked_etl_processor(chunk_size=chunk_size)
+                results = processor.execute_chunked_etl(
+                    source_connection=connection_string,
+                    source_query=query,
+                    data_type=data_type,
+                    source_type='database',
+                    mapping_name=mapping_name if mapping_name else None,
+                    target_table=target_table if target_table else None
+                )
+            else:
+                # Process database import with standard ETL
+                logger.info("Using standard ETL processing for database import")
+                etl = get_enhanced_etl()
+                results = etl.execute_etl_pipeline(
+                    source_connection=connection_string,
+                    source_query=query,
+                    data_type=data_type,
+                    source_type='database'
+                )
             
             # Store results in session for display
             session['etl_results'] = results
