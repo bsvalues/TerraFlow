@@ -110,8 +110,8 @@ with app.app_context():
     try:
         from api.gateway import api_gateway
         from api.auth import auth_api
-        from api.spatial import spatial_api
-        from api.data_query import data_query_api
+        from api.spatial import spatial_bp as spatial_api
+        from api.data_query import data_bp as data_query_api
         
         # Register API blueprints
         app.register_blueprint(api_gateway, url_prefix='/api')
@@ -196,6 +196,29 @@ with app.app_context():
             super().__init__()
             self.capabilities = ["system_info", "dashboard_support"]
             
+        def process_task(self, task_data):
+            """Process a system task"""
+            self.last_activity = time.time()
+            
+            if not task_data or "task_type" not in task_data:
+                return {"error": "Invalid task data, missing task_type"}
+                
+            task_type = task_data["task_type"]
+            
+            if task_type == "system_info":
+                return {
+                    "status": "success",
+                    "system_info": {
+                        "hostname": os.uname().nodename,
+                        "platform": os.uname().sysname,
+                        "python_version": sys.version,
+                        "flask_version": "unknown",
+                        "uptime": time.time()
+                    }
+                }
+            else:
+                return {"error": f"Unsupported task type: {task_type}"}
+            
     # Register the API Gateway
     try:
         from api.gateway import register_api_endpoint_modules
@@ -218,29 +241,6 @@ with app.app_context():
         logger.warning(f"Could not load agent integrators module: {e}")
     except Exception as e:
         logger.error(f"Error initializing agent integrators: {str(e)}")
-        
-    def process_task(self, task_data):
-        """Process a system task"""
-        self.last_activity = time.time()
-        
-        if not task_data or "task_type" not in task_data:
-            return {"error": "Invalid task data, missing task_type"}
-            
-        task_type = task_data["task_type"]
-        
-        if task_type == "system_info":
-            return {
-                "status": "success",
-                "system_info": {
-                    "hostname": os.uname().nodename,
-                    "platform": os.uname().sysname,
-                    "python_version": sys.version,
-                    "flask_version": "unknown",
-                    "uptime": time.time()
-                }
-            }
-        else:
-            return {"error": f"Unsupported task type: {task_type}"}
     
     # Register the system agent
     mcp_instance.register_agent("system", SystemAgent())
