@@ -431,11 +431,13 @@ class FormatHandler(ABC):
 
 
 class AISchemaMapper:
-    """AI-powered schema mapping helper"""
+    """AI-powered schema mapping helper for property assessment data"""
     
     def __init__(self):
-        """Initialize schema mapper"""
+        """Initialize schema mapper with domain knowledge for property assessment"""
         self.ai_available = False
+        self.domain_knowledge = self._load_domain_knowledge()
+        
         try:
             from openai import OpenAI
             self.ai_available = True
@@ -444,10 +446,88 @@ class AISchemaMapper:
         except ImportError:
             logger.warning("OpenAI not available, AI schema mapping disabled")
     
+    def _load_domain_knowledge(self) -> Dict[str, Any]:
+        """
+        Load domain knowledge for property assessment data
+        
+        Returns:
+            Dictionary containing domain knowledge
+        """
+        # Standard property assessment field categories and common synonyms
+        return {
+            "field_categories": {
+                "parcel_identifier": [
+                    "parcel_id", "pin", "property_id", "apn", "id", "identifier", 
+                    "parcel_number", "tax_id", "parcel_key", "assessment_id"
+                ],
+                "owner_information": [
+                    "owner_name", "owner", "taxpayer", "owner_address", "taxpayer_name",
+                    "first_name", "last_name", "company_name", "primary_owner", "ownership_type"
+                ],
+                "property_location": [
+                    "address", "street", "city", "state", "zip", "zipcode", "county",
+                    "street_number", "street_name", "unit", "location", "geo_location"
+                ],
+                "property_characteristics": [
+                    "land_area", "building_area", "acreage", "square_feet", "sqft",
+                    "year_built", "bedrooms", "bathrooms", "stories", "construction_type",
+                    "property_class", "property_type", "zoning", "use_code", "condition"
+                ],
+                "valuation": [
+                    "assessed_value", "market_value", "land_value", "improvement_value",
+                    "total_value", "appraised_value", "tax_value", "exemption_value",
+                    "assessment_year", "valuation_date", "previous_value"
+                ],
+                "taxation": [
+                    "tax_rate", "tax_amount", "tax_status", "tax_year", "exemptions",
+                    "special_assessment", "tax_district", "millage_rate", "tax_code"
+                ],
+                "geographic": [
+                    "latitude", "longitude", "gis_id", "shapefile_id", "gis_link",
+                    "coordinates", "geo_id", "shape", "boundary", "map_id", "tax_map"
+                ],
+                "legal": [
+                    "legal_description", "subdivision", "lot", "block", "section",
+                    "township", "range", "plat", "deed_reference", "recording_date"
+                ],
+                "dates": [
+                    "sale_date", "recording_date", "assessment_date", "effective_date",
+                    "inspection_date", "creation_date", "update_date", "verification_date"
+                ]
+            },
+            "data_types": {
+                "parcel_identifier": "string",
+                "owner_information": "string",
+                "property_location": "string",
+                "property_characteristics": "mixed",
+                "valuation": "float",
+                "taxation": "float",
+                "geographic": "mixed",
+                "legal": "string",
+                "dates": "date"
+            },
+            "field_validations": {
+                "parcel_identifier": [
+                    {"type": "required", "message": "Parcel ID is required"},
+                    {"type": "unique", "message": "Parcel ID must be unique"}
+                ],
+                "valuation": [
+                    {"type": "min", "value": 0, "message": "Value cannot be negative"}
+                ],
+                "dates": [
+                    {"type": "date_format", "format": "%Y-%m-%d", "message": "Invalid date format"}
+                ],
+                "geographic": [
+                    {"type": "lat_range", "min": -90, "max": 90, "message": "Latitude must be between -90 and 90"},
+                    {"type": "lon_range", "min": -180, "max": 180, "message": "Longitude must be between -180 and 180"}
+                ]
+            }
+        }
+    
     def suggest_mappings(self, source_schema: Dict[str, Any], 
                          target_schema: Dict[str, Any]) -> List[ColumnMapping]:
         """
-        Suggest column mappings using AI
+        Suggest column mappings using AI and domain knowledge
         
         Args:
             source_schema: Source schema information
@@ -456,64 +536,289 @@ class AISchemaMapper:
         Returns:
             List of suggested column mappings
         """
-        if not self.ai_available:
-            logger.warning("AI not available for schema mapping")
-            return self._basic_mapping(source_schema, target_schema)
+        # First try semantic matching using domain knowledge
+        knowledge_mappings = self._knowledge_based_mapping(source_schema, target_schema)
         
-        try:
-            # Extract column information
-            source_columns = source_schema.get("columns", {})
-            target_columns = target_schema.get("columns", {})
-            
-            # Prepare the prompt
-            prompt = self._build_mapping_prompt(source_columns, target_columns)
-            
-            # Get suggestions from AI
-            response = self.client.chat.completions.create(
-                model="gpt-4",
-                messages=[
-                    {"role": "system", "content": "You are an expert in data conversion and schema mapping, specializing in property assessment data."},
-                    {"role": "user", "content": prompt}
-                ],
-                response_format={"type": "json_object"}
-            )
-            
-            # Parse response
-            result = json.loads(response.choices[0].message.content)
-            mappings = []
-            
-            for mapping_data in result.get("mappings", []):
-                mapping = ColumnMapping(
-                    source_column=mapping_data["source_column"],
-                    target_column=mapping_data["target_column"],
-                    required=mapping_data.get("required", False),
-                    data_type=mapping_data.get("data_type", "string"),
-                    validation_rules=mapping_data.get("validation_rules", []),
-                    description=mapping_data.get("description", ""),
-                    confidence=mapping_data.get("confidence", 0.8),
-                    ai_suggested=True
+        # If AI is available, enhance with AI suggestions
+        if self.ai_available:
+            try:
+                # Extract column information
+                source_columns = source_schema.get("columns", {})
+                target_columns = target_schema.get("columns", {})
+                
+                # Prepare the prompt with domain knowledge and existing mappings
+                prompt = self._build_mapping_prompt(source_columns, target_columns, knowledge_mappings)
+                
+                # Get suggestions from AI
+                response = self.client.chat.completions.create(
+                    model="gpt-4",
+                    messages=[
+                        {"role": "system", "content": "You are an expert in property assessment data, specializing in schema mapping for real estate valuation and tax assessment databases."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    response_format={"type": "json_object"}
                 )
-                mappings.append(mapping)
+                
+                # Parse response
+                result = json.loads(response.choices[0].message.content)
+                ai_mappings = []
+                
+                for mapping_data in result.get("mappings", []):
+                    mapping = ColumnMapping(
+                        source_column=mapping_data["source_column"],
+                        target_column=mapping_data["target_column"],
+                        required=mapping_data.get("required", False),
+                        data_type=mapping_data.get("data_type", "string"),
+                        validation_rules=mapping_data.get("validation_rules", []),
+                        description=mapping_data.get("description", ""),
+                        confidence=mapping_data.get("confidence", 0.8),
+                        ai_suggested=True
+                    )
+                    ai_mappings.append(mapping)
+                
+                # Merge knowledge-based and AI mappings, prioritizing higher confidence
+                return self._merge_mappings(knowledge_mappings, ai_mappings)
+            except Exception as e:
+                logger.error(f"Error in AI schema mapping: {str(e)}")
+                return knowledge_mappings
+        else:
+            logger.warning("AI not available for schema mapping, using domain knowledge only")
+            return knowledge_mappings
+    
+    def _merge_mappings(self, primary_mappings: List[ColumnMapping], 
+                       secondary_mappings: List[ColumnMapping]) -> List[ColumnMapping]:
+        """
+        Merge two sets of mappings, prioritizing by confidence
+        
+        Args:
+            primary_mappings: Primary mapping list
+            secondary_mappings: Secondary mapping list
             
-            return mappings
-        except Exception as e:
-            logger.error(f"Error in AI schema mapping: {str(e)}")
-            return self._basic_mapping(source_schema, target_schema)
+        Returns:
+            Merged list of mappings
+        """
+        result = primary_mappings.copy()
+        primary_sources = {m.source_column for m in primary_mappings}
+        
+        # Add any mappings from secondary that don't overlap with primary
+        for mapping in secondary_mappings:
+            if mapping.source_column not in primary_sources:
+                result.append(mapping)
+                primary_sources.add(mapping.source_column)
+                continue
+            
+            # For overlapping mappings, keep the one with higher confidence
+            for i, existing in enumerate(result):
+                if existing.source_column == mapping.source_column:
+                    if mapping.confidence > existing.confidence:
+                        result[i] = mapping
+                    break
+        
+        return sorted(result, key=lambda m: (m.source_column, -m.confidence))
+    
+    def _knowledge_based_mapping(self, source_schema: Dict[str, Any], 
+                               target_schema: Dict[str, Any]) -> List[ColumnMapping]:
+        """
+        Perform schema mapping based on property assessment domain knowledge
+        
+        Args:
+            source_schema: Source schema information
+            target_schema: Target schema information
+            
+        Returns:
+            List of suggested column mappings
+        """
+        source_columns = source_schema.get("columns", {})
+        target_columns = target_schema.get("columns", {})
+        mappings = []
+        
+        # Categorize all source and target fields based on domain knowledge
+        source_categories = self._categorize_fields(source_columns)
+        target_categories = self._categorize_fields(target_columns)
+        
+        # Map fields across categories
+        for category, source_fields in source_categories.items():
+            target_fields = target_categories.get(category, [])
+            if not target_fields:
+                continue
+                
+            # Match fields within categories based on similarity
+            for source_field in source_fields:
+                best_match = None
+                best_score = 0.0
+                
+                for target_field in target_fields:
+                    score = self._calculate_field_similarity(
+                        source_field, 
+                        target_field,
+                        source_columns.get(source_field, {}),
+                        target_columns.get(target_field, {})
+                    )
+                    if score > best_score and score > 0.6:  # Threshold for matching
+                        best_score = score
+                        best_match = target_field
+                
+                if best_match:
+                    # Create mapping with appropriate data type and validation rules
+                    data_type = self.domain_knowledge["data_types"].get(category, "string")
+                    validation_rules = self.domain_knowledge["field_validations"].get(category, [])
+                    
+                    # Add the mapping
+                    mapping = ColumnMapping(
+                        source_column=source_field,
+                        target_column=best_match,
+                        required=category == "parcel_identifier",  # Parcel IDs are typically required
+                        data_type=data_type,
+                        validation_rules=validation_rules,
+                        description=f"Mapped based on {category} category",
+                        confidence=best_score,
+                        ai_suggested=False
+                    )
+                    mappings.append(mapping)
+        
+        # Add basic string matching for any remaining fields
+        basic_mappings = self._basic_mapping(source_schema, target_schema)
+        result = []
+        
+        # Add basic mappings that don't overlap with knowledge mappings
+        mapped_sources = {m.source_column for m in mappings}
+        for mapping in basic_mappings:
+            if mapping.source_column not in mapped_sources:
+                result.append(mapping)
+        
+        return mappings + result
+    
+    def _categorize_fields(self, columns: Dict[str, Any]) -> Dict[str, List[str]]:
+        """
+        Categorize fields based on domain knowledge
+        
+        Args:
+            columns: Column information
+            
+        Returns:
+            Dictionary mapping categories to column names
+        """
+        categories = {}
+        
+        for field_name in columns.keys():
+            field_lower = field_name.lower().replace('_', '')
+            
+            for category, patterns in self.domain_knowledge["field_categories"].items():
+                matched = False
+                for pattern in patterns:
+                    if pattern.lower().replace('_', '') in field_lower:
+                        if category not in categories:
+                            categories[category] = []
+                        categories[category].append(field_name)
+                        matched = True
+                        break
+                if matched:
+                    break
+        
+        return categories
+    
+    def _calculate_field_similarity(self, source_field: str, target_field: str,
+                                  source_info: Dict[str, Any], 
+                                  target_info: Dict[str, Any]) -> float:
+        """
+        Calculate similarity between two fields based on name and metadata
+        
+        Args:
+            source_field: Source field name
+            target_field: Target field name
+            source_info: Source field metadata
+            target_info: Target field metadata
+            
+        Returns:
+            Similarity score between 0 and 1
+        """
+        # Calculate string similarity
+        name_similarity = self._string_similarity(source_field, target_field)
+        
+        # Calculate type similarity
+        type_similarity = 0.0
+        if "type" in source_info and "type" in target_info:
+            if source_info["type"] == target_info["type"]:
+                type_similarity = 1.0
+            elif (source_info["type"] in ["integer", "float", "decimal", "number"] and 
+                  target_info["type"] in ["integer", "float", "decimal", "number"]):
+                type_similarity = 0.8
+            elif (source_info["type"] in ["string", "text", "varchar"] and 
+                  target_info["type"] in ["string", "text", "varchar"]):
+                type_similarity = 0.9
+            elif (source_info["type"] in ["date", "datetime", "timestamp"] and 
+                  target_info["type"] in ["date", "datetime", "timestamp"]):
+                type_similarity = 0.9
+        else:
+            type_similarity = 0.5  # Default if type information is not available
+        
+        # Calculate description similarity if available
+        desc_similarity = 0.0
+        if "description" in source_info and "description" in target_info:
+            desc_similarity = self._string_similarity(
+                source_info["description"], target_info["description"]
+            )
+        
+        # Weighted combination of similarity measures
+        if "description" in source_info and "description" in target_info:
+            return 0.6 * name_similarity + 0.2 * type_similarity + 0.2 * desc_similarity
+        else:
+            return 0.7 * name_similarity + 0.3 * type_similarity
+    
+    def _string_similarity(self, str1: str, str2: str) -> float:
+        """
+        Calculate string similarity score
+        
+        Args:
+            str1: First string
+            str2: Second string
+            
+        Returns:
+            Similarity score between 0 and 1
+        """
+        # Simple Jaccard similarity implementation
+        s1 = set(str1.lower().replace('_', ' ').split())
+        s2 = set(str2.lower().replace('_', ' ').split())
+        
+        if not s1 and not s2:
+            return 1.0
+        if not s1 or not s2:
+            return 0.0
+            
+        intersection = len(s1.intersection(s2))
+        union = len(s1.union(s2))
+        
+        return intersection / union
     
     def _build_mapping_prompt(self, source_columns: Dict[str, Any], 
-                            target_columns: Dict[str, Any]) -> str:
+                            target_columns: Dict[str, Any],
+                            existing_mappings: List[ColumnMapping] = None) -> str:
         """
         Build a prompt for AI schema mapping
         
         Args:
             source_columns: Source column information
             target_columns: Target column information
+            existing_mappings: Existing mappings to consider
             
         Returns:
             Prompt for AI
         """
         source_desc = json.dumps(source_columns, indent=2)
         target_desc = json.dumps(target_columns, indent=2)
+        
+        # Include existing mappings if available
+        existing_mappings_json = "[]"
+        if existing_mappings:
+            mapping_list = []
+            for mapping in existing_mappings:
+                mapping_dict = {
+                    "source_column": mapping.source_column,
+                    "target_column": mapping.target_column,
+                    "confidence": mapping.confidence
+                }
+                mapping_list.append(mapping_dict)
+            existing_mappings_json = json.dumps(mapping_list, indent=2)
         
         return f"""
         I need to map columns from a source schema to a target schema for a property assessment data conversion.
@@ -524,20 +829,29 @@ class AISchemaMapper:
         TARGET SCHEMA:
         {target_desc}
         
-        Please suggest mappings between the source and target columns. For each mapping, provide:
-        1. Source column name
-        2. Target column name
-        3. Whether the mapping is required
-        4. The data type (string, integer, float, date, boolean)
-        5. Any validation rules needed
-        6. A brief description of the mapping
-        7. A confidence score (0 to 1)
+        EXISTING MAPPINGS (PROPOSED):
+        {existing_mappings_json}
         
-        Consider semantic similarity, field types, and common property assessment terms.
-        Focus on property assessment specific fields like parcel IDs, owner information, property characteristics,
-        land values, improvement values, tax information, and geographic identifiers.
+        You're an expert in property assessment data. Please analyze and suggest complete mappings between source and target columns.
+        For each mapping, provide:
+        1. source_column: The column name from the source schema
+        2. target_column: The column name from the target schema
+        3. required: Boolean indicating if this mapping is required (true/false)
+        4. data_type: Expected data type (string, integer, float, date, boolean)
+        5. validation_rules: Array of validation rules applicable
+        6. description: A brief description of what this mapping represents
+        7. confidence: Confidence score between 0 and 1
         
-        Respond with a JSON object containing an array of mappings with these fields.
+        Consider:
+        - Property assessment domain terms (parcel IDs, tax info, property characteristics)
+        - Field name similarities and semantics
+        - Required fields for property assessment systems (parcel identifiers, property address)
+        - Field meanings rather than just exact name matches
+        - Appropriate data types for property assessment data
+        - Validation rules needed for property data integrity
+        
+        Respond with a JSON object containing an array of mappings with the fields listed above.
+        Make sure to provide the most complete and accurate mapping possible for property assessment data.
         """
     
     def _basic_mapping(self, source_schema: Dict[str, Any], 
