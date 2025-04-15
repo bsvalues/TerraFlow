@@ -637,7 +637,7 @@ class EnhancedETL:
     
     def execute_etl_pipeline(self, source_connection: str, source_query: str,
                            data_type: str, source_type: str = 'database',
-                           if_exists: str = 'replace') -> Dict[str, Any]:
+                           if_exists: str = 'replace', field_mapping: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         """
         Execute a complete ETL pipeline
         
@@ -724,15 +724,24 @@ class EnhancedETL:
             
         # Transform
         try:
-            transformed_data = self.transform_data(source_data, target_schema)
+            # Use field mapping if provided
+            transformed_data = self.transform_data(
+                source_data=source_data, 
+                target_schema=target_schema,
+                field_mapping=field_mapping
+            )
+            
+            # Update the results
             results["transform"]["success"] = not transformed_data.empty
             results["transform"]["records"] = len(transformed_data)
+            
             if transformed_data.empty:
                 results["transform"]["message"] = "Transformation resulted in empty dataset"
             else:
                 results["transform"]["message"] = f"Transformed {len(transformed_data)} records"
         except Exception as e:
             results["transform"]["message"] = f"Error during transformation: {str(e)}"
+            logger.error(f"Transform error: {str(e)}")
             return results
             
         if transformed_data.empty:
