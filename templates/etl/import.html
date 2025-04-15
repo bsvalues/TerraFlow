@@ -423,6 +423,11 @@
             const chunkSizeContainer = document.getElementById('dbChunkSizeContainer');
             chunkSizeContainer.style.display = this.checked ? 'block' : 'none';
         });
+        
+        document.getElementById('apiUseChunking').addEventListener('change', function() {
+            const chunkSizeContainer = document.getElementById('apiChunkSizeContainer');
+            chunkSizeContainer.style.display = this.checked ? 'block' : 'none';
+        });
     });
     
     // Handle file selection

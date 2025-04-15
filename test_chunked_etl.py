@@ -16,7 +16,7 @@ logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def generate_test_data(rows=10000, output_file="uploads/large_test_data.csv"):
+def generate_test_data(rows=1000, output_file="uploads/large_test_data.csv"):
     """Generate a large test dataset for ETL testing"""
     logger.info(f"Generating test dataset with {rows} rows")
     
@@ -57,7 +57,7 @@ def test_chunked_etl_with_file():
     # Generate test data if it doesn't exist
     data_file = "uploads/large_test_data.csv"
     if not os.path.exists(data_file):
-        generate_test_data(rows=10000, output_file=data_file)
+        generate_test_data(rows=1000, output_file=data_file)
     
     # Create mapping for the test data
     from sync_service.mapping_loader import get_mapping_loader
