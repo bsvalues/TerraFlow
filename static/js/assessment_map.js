@@ -607,9 +607,49 @@ function createPropertyPopup(property) {
     `;
 }
 
+// Add ripple effect to an element
+function addRippleEffect(element) {
+    // Create ripple element
+    const ripple = document.createElement('div');
+    ripple.className = 'marker-ripple';
+    
+    // Set styles
+    ripple.style.position = 'absolute';
+    ripple.style.top = '50%';
+    ripple.style.left = '50%';
+    ripple.style.transform = 'translate(-50%, -50%)';
+    ripple.style.width = '0';
+    ripple.style.height = '0';
+    ripple.style.backgroundColor = 'rgba(255, 255, 255, 0.6)';
+    ripple.style.borderRadius = '50%';
+    ripple.style.pointerEvents = 'none';
+    ripple.style.zIndex = '10';
+    ripple.style.animation = 'ripple-effect 0.6s ease-out';
+    
+    // Add ripple to element
+    element.parentNode.appendChild(ripple);
+    
+    // Remove after animation completes
+    setTimeout(() => {
+        if (ripple.parentNode) {
+            ripple.parentNode.removeChild(ripple);
+        }
+    }, 600);
+}
+
 // Update property details panel
-function updatePropertyDetails(property) {
+function updatePropertyDetails(property, animate = false) {
     const detailsContainer = document.getElementById('property-details');
+    
+    // Add animation class if requested
+    if (animate && detailsContainer) {
+        detailsContainer.classList.add('animating');
+        
+        // Create a staggered entrance animation for the details
+        setTimeout(() => {
+            detailsContainer.classList.remove('animating');
+        }, 500);
+    }
     
     // Format currency
     const formatter = new Intl.NumberFormat('en-US', {
