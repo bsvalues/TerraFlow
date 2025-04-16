@@ -14,6 +14,43 @@
     z-index: 1000 !important;
 }
 
+.property-marker-container {
+    background: none !important;
+    border: none !important;
+}
+
+.property-marker {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 1px solid #333;
+    box-shadow: 0 0 3px rgba(0,0,0,0.3);
+}
+
+.marker-residential {
+    background-color: #4285F4; /* Blue */
+}
+
+.marker-commercial {
+    background-color: #EA4335; /* Red */
+}
+
+.marker-industrial {
+    background-color: #FBBC05; /* Yellow */
+}
+
+.marker-agricultural {
+    background-color: #34A853; /* Green */
+}
+
+.marker-public {
+    background-color: #8F44AD; /* Purple */
+}
+
+.marker-vacant {
+    background-color: #95A5A6; /* Gray */
+}
+
 /* Value range color indicators */
 .value-low {
     background-color: #1a9641;

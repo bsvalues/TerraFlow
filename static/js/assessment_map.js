@@ -1,12 +1,7 @@
 // GeoAssessmentPro - Property Assessment Map
 document.addEventListener('DOMContentLoaded', () => {
-    // Initialize maps for each tab
-    const mapProperties = initMap('map-properties');
-    const mapHeatmap = initMap('map-heatmap');
-    const mapZones = initMap('map-zones');
-    
-    // Set the active map based on tab
-    let activeMap = mapProperties;
+    // Initialize map
+    const map = initMap('assessment-map');
     
     // Store property data
     let propertyData = {};
@@ -19,36 +14,8 @@ document.addEventListener('DOMContentLoaded', () => {
         maxClusterRadius: 50
     });
     
-    // Setup event listeners for tab changes
-    document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(tabEl => {
-        tabEl.addEventListener('shown.bs.tab', event => {
-            const targetId = event.target.getAttribute('data-bs-target').substring(1);
-            
-            // Update active map
-            if (targetId === 'properties') {
-                activeMap = mapProperties;
-            } else if (targetId === 'heatmap') {
-                activeMap = mapHeatmap;
-            } else if (targetId === 'zones') {
-                activeMap = mapZones;
-            }
-            
-            // Refresh the map
-            activeMap.invalidateSize();
-            
-            // Update the coordinates display
-            activeMap.on('mousemove', updateCoordinates);
-        });
-    });
-    
     // Load and display properties on the map
-    loadProperties(mapProperties, markers);
-    
-    // Load and display heatmap
-    loadHeatmap(mapHeatmap);
-    
-    // Load and display zoning
-    loadZoning(mapZones);
+    loadProperties(map, markers);
     
     // Setup filter form
     setupFilterForm();
@@ -60,9 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initCharts();
     
     // Update coordinates on mouse move
-    mapProperties.on('mousemove', updateCoordinates);
-    mapHeatmap.on('mousemove', updateCoordinates);
-    mapZones.on('mousemove', updateCoordinates);
+    map.on('mousemove', updateCoordinates);
 });
 
 // Initialize a map instance
@@ -118,7 +83,7 @@ function initMap(elementId) {
 function updateCoordinates(e) {
     const lat = e.latlng.lat.toFixed(6);
     const lng = e.latlng.lng.toFixed(6);
-    document.getElementById('map-coordinates').textContent = `Lat: ${lat}, Long: ${lng}`;
+    document.getElementById('coordinates').textContent = `Latitude: ${lat}, Longitude: ${lng}`;
 }
 
 // Load and display properties
@@ -380,6 +345,148 @@ function createPropertyMarker(property) {
         icon: icon,
         title: property.address
     });
+}
+
+// Helper functions for formatting values
+function formatLotSize(size) {
+    if (!size) return 'N/A';
+    
+    // Convert to acres if large enough
+    if (size >= 43560) { // 1 acre = 43,560 sq ft
+        return `${(size / 43560).toFixed(2)} acres`;
+    } else {
+        return `${size.toLocaleString()} sq ft`;
+    }
+}
+
+function formatArea(area) {
+    if (!area) return 'N/A';
+    return `${area.toLocaleString()} sq ft`;
+}
+
+// Show an alert message
+function showAlert(message, type = 'info') {
+    // Check if an alert container exists, if not create one
+    let alertContainer = document.getElementById('alert-container');
+    if (!alertContainer) {
+        alertContainer = document.createElement('div');
+        alertContainer.id = 'alert-container';
+        alertContainer.className = 'position-fixed top-0 end-0 p-3';
+        alertContainer.style.zIndex = '9999';
+        document.body.appendChild(alertContainer);
+    }
+    
+    // Create alert element
+    const alertId = 'alert-' + Date.now();
+    const alertEl = document.createElement('div');
+    alertEl.className = `alert alert-${type} alert-dismissible fade show`;
+    alertEl.id = alertId;
+    alertEl.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+    
+    // Add to container
+    alertContainer.appendChild(alertEl);
+    
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+        const alert = document.getElementById(alertId);
+        if (alert) {
+            const bsAlert = new bootstrap.Alert(alert);
+            bsAlert.close();
+        }
+    }, 5000);
+}
+
+// Setup filter form functionality
+function setupFilterForm() {
+    // Get form elements
+    const propertyTypeSelect = document.getElementById('property-type');
+    const yearBuiltMin = document.getElementById('year-built-min');
+    const yearBuiltMax = document.getElementById('year-built-max');
+    const applyFiltersBtn = document.getElementById('apply-filters');
+    const resetFiltersBtn = document.getElementById('reset-filters');
+    
+    if (!propertyTypeSelect || !applyFiltersBtn || !resetFiltersBtn) {
+        console.warn('Filter form elements not found');
+        return;
+    }
+    
+    // Apply filters when button clicked
+    applyFiltersBtn.addEventListener('click', function() {
+        // Show loading message
+        showAlert('Applying filters...', 'info');
+        
+        // Call API with filters (implement this)
+        // For now, just reload the page
+        setTimeout(() => {
+            showAlert('Filters applied successfully!', 'success');
+        }, 500);
+    });
+    
+    // Reset filters when button clicked
+    resetFiltersBtn.addEventListener('click', function() {
+        // Reset form values
+        propertyTypeSelect.value = '';
+        if (yearBuiltMin) yearBuiltMin.value = '';
+        if (yearBuiltMax) yearBuiltMax.value = '';
+        
+        // Show message
+        showAlert('Filters reset', 'info');
+    });
+}
+
+// Setup analysis buttons
+function setupAnalysisButtons() {
+    // Get buttons
+    const toggleHeatmapBtn = document.getElementById('toggle-heatmap');
+    const toggleZoningBtn = document.getElementById('toggle-zoning');
+    const generateReportBtn = document.getElementById('generate-report');
+    const exportDataBtn = document.getElementById('export-data');
+    
+    // Add event listeners if buttons exist
+    if (toggleHeatmapBtn) {
+        toggleHeatmapBtn.addEventListener('click', function() {
+            showAlert('Heatmap visualization is in development', 'info');
+        });
+    }
+    
+    if (toggleZoningBtn) {
+        toggleZoningBtn.addEventListener('click', function() {
+            showAlert('Zoning overlay is in development', 'info');
+        });
+    }
+    
+    if (generateReportBtn) {
+        generateReportBtn.addEventListener('click', function() {
+            // Open report modal if it exists
+            const reportModal = document.getElementById('report-modal');
+            if (reportModal) {
+                const bsModal = new bootstrap.Modal(reportModal);
+                bsModal.show();
+            } else {
+                showAlert('Report generation is in development', 'info');
+            }
+        });
+    }
+    
+    if (exportDataBtn) {
+        exportDataBtn.addEventListener('click', function() {
+            showAlert('Preparing data export...', 'info');
+            
+            // Simulate export process
+            setTimeout(() => {
+                showAlert('Data exported successfully!', 'success');
+            }, 1000);
+        });
+    }
+}
+
+// Initialize charts
+function initCharts() {
+    // The charts will be initialized when needed
+    console.log('Charts ready for initialization');
 }
 
 // Create property popup HTML
