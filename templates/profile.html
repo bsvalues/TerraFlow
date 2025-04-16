@@ -9,9 +9,42 @@
         <div class="col-md-4 mb-4">
             <div class="card">
                 <div class="card-body text-center">
-                    <div class="avatar-circle mb-3">
-                        <span class="avatar-initials">{{ user.full_name[0]|upper if user.full_name else user.email[0]|upper }}</span>
+                    <!-- User Avatar Section -->
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-center">
+                            <!-- Current Avatar Display -->
+                            <div class="position-relative avatar-display">
+                                <!-- Default Circle Avatar -->
+                                <div class="avatar-circle mb-3" id="defaultAvatar">
+                                    <span class="avatar-initials">{{ user.full_name[0]|upper if user.full_name else user.email[0]|upper }}</span>
+                                </div>
+                                
+                                <!-- Fun User Avatar (hidden by default) -->
+                                <div class="fun-avatar mb-3" id="funUserAvatar" style="display: none;">
+                                    <img src="{{ url_for('static', filename='images/avatars/user_avatar.svg') }}" alt="User Avatar" class="img-fluid" style="width: 100px; height: 100px;">
+                                </div>
+                                
+                                <!-- Fun Agent Avatar (hidden by default) -->
+                                <div class="fun-avatar mb-3" id="funAgentAvatar" style="display: none;">
+                                    <img src="{{ url_for('static', filename='images/avatars/agent_avatar.svg') }}" alt="Agent Avatar" class="img-fluid" style="width: 100px; height: 100px;">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Avatar Selection Buttons -->
+                        <div class="avatar-selector mb-3">
+                            <div class="btn-group" role="group" aria-label="Avatar Selection">
+                                <button type="button" class="btn btn-outline-primary btn-sm" id="defaultAvatarBtn" onclick="selectAvatar('default')">Default</button>
+                                <button type="button" class="btn btn-outline-primary btn-sm" id="userAvatarBtn" onclick="selectAvatar('user')">User</button>
+                                <button type="button" class="btn btn-outline-primary btn-sm" id="agentAvatarBtn" onclick="selectAvatar('agent')">Agent</button>
+                            </div>
+                        </div>
+                        
+                        <a href="{{ url_for('avatars') }}" class="text-decoration-none">
+                            <small><i class="bi bi-info-circle"></i> View all available avatars</small>
+                        </a>
                     </div>
+                    
                     <h4>{{ user.full_name }}</h4>
                     <p class="text-muted">{{ user.email }}</p>
                     
@@ -256,6 +289,43 @@
             cancelBtn.style.display = 'none';
             editProfileBtn.style.display = 'block';
         });
+        
+        // Avatar selection functionality
+        function selectAvatar(type) {
+            // Hide all avatars first
+            document.getElementById('defaultAvatar').style.display = 'none';
+            document.getElementById('funUserAvatar').style.display = 'none';
+            document.getElementById('funAgentAvatar').style.display = 'none';
+            
+            // Reset all button states
+            document.getElementById('defaultAvatarBtn').classList.remove('active');
+            document.getElementById('userAvatarBtn').classList.remove('active');
+            document.getElementById('agentAvatarBtn').classList.remove('active');
+            
+            // Show the selected avatar and mark the corresponding button as active
+            if (type === 'default') {
+                document.getElementById('defaultAvatar').style.display = 'flex';
+                document.getElementById('defaultAvatarBtn').classList.add('active');
+            } else if (type === 'user') {
+                document.getElementById('funUserAvatar').style.display = 'block';
+                document.getElementById('userAvatarBtn').classList.add('active');
+            } else if (type === 'agent') {
+                document.getElementById('funAgentAvatar').style.display = 'block';
+                document.getElementById('agentAvatarBtn').classList.add('active');
+            }
+            
+            // Save selection to localStorage for persistence
+            localStorage.setItem('selectedAvatar', type);
+        }
+        
+        // Load the saved avatar selection if available
+        const savedAvatarType = localStorage.getItem('selectedAvatar');
+        if (savedAvatarType) {
+            selectAvatar(savedAvatarType);
+        } else {
+            // Default to the regular avatar if no selection is saved
+            selectAvatar('default');
+        }
         
         // Change password validation
         const changePasswordForm = document.getElementById('changePasswordForm');
