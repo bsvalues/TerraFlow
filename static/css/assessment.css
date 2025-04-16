@@ -1,0 +1,259 @@
+/* GeoAssessmentPro Assessment Styling */
+
+/* Assessment Card Styles */
+.border-left-primary {
+    border-left: 0.25rem solid #4e73df !important;
+}
+
+.border-left-success {
+    border-left: 0.25rem solid #1cc88a !important;
+}
+
+.border-left-info {
+    border-left: 0.25rem solid #36b9cc !important;
+}
+
+.border-left-warning {
+    border-left: 0.25rem solid #f6c23e !important;
+}
+
+.border-left-danger {
+    border-left: 0.25rem solid #e74a3b !important;
+}
+
+.text-gray-300 {
+    color: #dddfeb !important;
+}
+
+.text-gray-800 {
+    color: #3a3b45 !important;
+}
+
+/* Map Containers */
+.map-container {
+    height: 600px;
+    width: 100%;
+    border-radius: 0;
+}
+
+/* Assessment Sidebar */
+.assessment-sidebar {
+    height: 100%;
+}
+
+.assessment-sidebar .card {
+    margin-bottom: 1.5rem;
+    box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+}
+
+/* Property Detail Styles */
+.property-detail-header {
+    background-color: #f8f9fc;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.property-info-table th {
+    width: 35%;
+    font-weight: 600;
+}
+
+.property-badge {
+    font-size: 0.85rem;
+    padding: 0.35em 0.65em;
+    margin-right: 0.5rem;
+}
+
+/* Chart Container Styles */
+.chart-area {
+    position: relative;
+    height: 25rem;
+    width: 100%;
+}
+
+.chart-pie {
+    position: relative;
+    height: 18rem;
+    width: 100%;
+}
+
+/* Property Value Color Scales */
+.value-scale-low {
+    background-color: #4e73df;
+}
+
+.value-scale-medium {
+    background-color: #1cc88a;
+}
+
+.value-scale-high {
+    background-color: #f6c23e;
+}
+
+.value-scale-very-high {
+    background-color: #e74a3b;
+}
+
+/* Legend Styles */
+.map-legend {
+    background-color: rgba(255, 255, 255, 0.9);
+    border-radius: 4px;
+    padding: 10px;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.2);
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+.legend-color {
+    width: 16px;
+    height: 16px;
+    margin-right: 8px;
+    border-radius: 2px;
+}
+
+/* Property Type Marker Styles */
+.marker-residential {
+    background-color: #4e73df;
+    border-color: #2e59d9;
+}
+
+.marker-commercial {
+    background-color: #1cc88a;
+    border-color: #13855c;
+}
+
+.marker-agricultural {
+    background-color: #f6c23e;
+    border-color: #dda20a;
+}
+
+.marker-industrial {
+    background-color: #e74a3b;
+    border-color: #be2617;
+}
+
+.marker-public {
+    background-color: #36b9cc;
+    border-color: #258391;
+}
+
+/* Popup Styling */
+.property-popup {
+    max-width: 350px;
+}
+
+.property-popup-header {
+    background-color: #f8f9fc;
+    padding: 10px;
+    border-radius: 5px 5px 0 0;
+    border-bottom: 1px solid #e3e6f0;
+    margin: -13px -13px 10px -13px;
+}
+
+.property-popup-header h5 {
+    margin-bottom: 5px;
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.property-popup-address {
+    font-size: 0.85rem;
+    margin-bottom: 0;
+}
+
+.property-popup-details {
+    font-size: 0.85rem;
+}
+
+.property-popup-footer {
+    text-align: center;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #e3e6f0;
+}
+
+/* Responsive fixes */
+@media (max-width: 768px) {
+    .map-container {
+        height: 400px;
+    }
+    
+    .chart-area, .chart-pie {
+        height: 15rem;
+    }
+}
+
+/* Zoning colors */
+.zone-residential {
+    fill: #a6cee3;
+    stroke: #6a9fb5;
+}
+
+.zone-commercial {
+    fill: #1f78b4;
+    stroke: #145b93;
+}
+
+.zone-agricultural {
+    fill: #b2df8a;
+    stroke: #7fad5a;
+}
+
+.zone-industrial {
+    fill: #e31a1c;
+    stroke: #b01516;
+}
+
+.zone-public {
+    fill: #fb9a99;
+    stroke: #cf7a79;
+}
+
+.zone-mixed {
+    fill: #fdbf6f;
+    stroke: #cc9959;
+}
+
+.zone-open-space {
+    fill: #33a02c;
+    stroke: #217a1c;
+}
+
+/* Value heatmap gradient */
+.value-heatmap-gradient {
+    background: linear-gradient(to right, 
+        #313695, #4575b4, #74add1, 
+        #abd9e9, #e0f3f8, #ffffbf, 
+        #fee090, #fdae61, #f46d43, 
+        #d73027, #a50026);
+    height: 10px;
+    border-radius: 2px;
+    margin-top: 5px;
+}
+
+.value-heatmap-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.7rem;
+    margin-top: 2px;
+}
+
+/* Custom info box */
+.info-box {
+    padding: 6px 8px;
+    font: 14px/16px Arial, Helvetica, sans-serif;
+    background: white;
+    background: rgba(255,255,255,0.8);
+    box-shadow: 0 0 15px rgba(0,0,0,0.2);
+    border-radius: 5px;
+}
+
+.info-box h4 {
+    margin: 0 0 5px;
+    color: #777;
+}
