@@ -1072,6 +1072,14 @@ try:
 except Exception as e:
     app.logger.error(f"Error registering property routes: {str(e)}")
 
+# Register Assessment API routes
+try:
+    from api.assessment import register_blueprint
+    register_blueprint(app)
+    app.logger.info("Assessment API routes registered successfully")
+except Exception as e:
+    app.logger.error(f"Error registering assessment API routes: {str(e)}")
+
 # Initialize API for third-party and microservice integration
 try:
     # Add test API key for development

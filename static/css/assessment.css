@@ -1,259 +1,307 @@
-/* GeoAssessmentPro Assessment Styling */
+/* 
+ * Assessment CSS
+ * Custom styles for the GeoAssessmentPro assessment interface
+ */
 
-/* Assessment Card Styles */
-.border-left-primary {
-    border-left: 0.25rem solid #4e73df !important;
+/* Property Marker Styles */
+.custom-marker {
+    border-radius: 50%;
+    transition: transform 0.2s;
 }
 
-.border-left-success {
-    border-left: 0.25rem solid #1cc88a !important;
+.custom-marker:hover {
+    transform: scale(1.2);
+    z-index: 1000 !important;
 }
 
-.border-left-info {
-    border-left: 0.25rem solid #36b9cc !important;
+/* Value range color indicators */
+.value-low {
+    background-color: #1a9641;
+    border: 1px solid #333;
 }
 
-.border-left-warning {
-    border-left: 0.25rem solid #f6c23e !important;
+.value-medium-low {
+    background-color: #a6d96a;
+    border: 1px solid #333;
 }
 
-.border-left-danger {
-    border-left: 0.25rem solid #e74a3b !important;
+.value-medium {
+    background-color: #ffffbf;
+    border: 1px solid #333;
 }
 
-.text-gray-300 {
-    color: #dddfeb !important;
+.value-medium-high {
+    background-color: #fdae61;
+    border: 1px solid #333;
 }
 
-.text-gray-800 {
-    color: #3a3b45 !important;
+.value-high {
+    background-color: #d7191c;
+    border: 1px solid #333;
 }
 
-/* Map Containers */
-.map-container {
-    height: 600px;
-    width: 100%;
-    border-radius: 0;
+/* Custom popup styles */
+.leaflet-popup-content-wrapper {
+    padding: 0;
+    overflow: hidden;
 }
 
-/* Assessment Sidebar */
-.assessment-sidebar {
-    height: 100%;
-}
-
-.assessment-sidebar .card {
-    margin-bottom: 1.5rem;
-    box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
-}
-
-/* Property Detail Styles */
-.property-detail-header {
-    background-color: #f8f9fc;
-    padding: 1rem;
-    border-radius: 0.5rem;
-    margin-bottom: 1rem;
-}
-
-.property-info-table th {
-    width: 35%;
-    font-weight: 600;
-}
-
-.property-badge {
-    font-size: 0.85rem;
-    padding: 0.35em 0.65em;
-    margin-right: 0.5rem;
-}
-
-/* Chart Container Styles */
-.chart-area {
-    position: relative;
-    height: 25rem;
-    width: 100%;
-}
-
-.chart-pie {
-    position: relative;
-    height: 18rem;
-    width: 100%;
-}
-
-/* Property Value Color Scales */
-.value-scale-low {
-    background-color: #4e73df;
-}
-
-.value-scale-medium {
-    background-color: #1cc88a;
-}
-
-.value-scale-high {
-    background-color: #f6c23e;
-}
-
-.value-scale-very-high {
-    background-color: #e74a3b;
-}
-
-/* Legend Styles */
-.map-legend {
-    background-color: rgba(255, 255, 255, 0.9);
-    border-radius: 4px;
-    padding: 10px;
-    box-shadow: 0 1px 5px rgba(0,0,0,0.2);
-}
-
-.legend-item {
-    display: flex;
-    align-items: center;
-    margin-bottom: 5px;
-}
-
-.legend-color {
-    width: 16px;
-    height: 16px;
-    margin-right: 8px;
-    border-radius: 2px;
-}
-
-/* Property Type Marker Styles */
-.marker-residential {
-    background-color: #4e73df;
-    border-color: #2e59d9;
-}
-
-.marker-commercial {
-    background-color: #1cc88a;
-    border-color: #13855c;
-}
-
-.marker-agricultural {
-    background-color: #f6c23e;
-    border-color: #dda20a;
-}
-
-.marker-industrial {
-    background-color: #e74a3b;
-    border-color: #be2617;
-}
-
-.marker-public {
-    background-color: #36b9cc;
-    border-color: #258391;
-}
-
-/* Popup Styling */
 .property-popup {
-    max-width: 350px;
+    padding: 15px;
 }
 
-.property-popup-header {
-    background-color: #f8f9fc;
-    padding: 10px;
-    border-radius: 5px 5px 0 0;
-    border-bottom: 1px solid #e3e6f0;
-    margin: -13px -13px 10px -13px;
-}
-
-.property-popup-header h5 {
-    margin-bottom: 5px;
+.property-popup h5 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: #1a5276;
     font-weight: 600;
-    font-size: 1rem;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 8px;
 }
 
-.property-popup-address {
-    font-size: 0.85rem;
-    margin-bottom: 0;
+.property-popup p {
+    margin-bottom: 5px;
+    font-size: 0.95rem;
 }
 
-.property-popup-details {
-    font-size: 0.85rem;
-}
-
-.property-popup-footer {
-    text-align: center;
+.property-popup .btn {
     margin-top: 10px;
-    padding-top: 10px;
-    border-top: 1px solid #e3e6f0;
 }
 
-/* Responsive fixes */
+/* Statistics card styles */
+.stat-card {
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s;
+    margin-bottom: 15px;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+}
+
+.stat-icon {
+    font-size: 2.5rem;
+    margin-bottom: 15px;
+    color: #3498db;
+}
+
+.stat-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+.stat-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin-bottom: 10px;
+}
+
+.stat-trend {
+    font-size: 0.9rem;
+}
+
+.trend-up {
+    color: #2ecc71;
+}
+
+.trend-down {
+    color: #e74c3c;
+}
+
+/* Filter panel styles */
+.filter-card {
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.filter-card .card-header {
+    background-color: #2c3e50;
+    color: white;
+    font-weight: 600;
+}
+
+/* Tools panel styles */
+.tools-card {
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.tools-card .card-header {
+    background-color: #34495e;
+    color: white;
+    font-weight: 600;
+}
+
+/* Property details modal styles */
+.modal-property-details .modal-header {
+    background-color: #3498db;
+    color: white;
+}
+
+.property-detail-section {
+    margin-bottom: 20px;
+}
+
+.property-detail-section h5 {
+    border-bottom: 2px solid #eee;
+    padding-bottom: 5px;
+    margin-bottom: 15px;
+    color: #2c3e50;
+}
+
+.property-feature-tag {
+    display: inline-block;
+    background-color: #ecf0f1;
+    padding: 5px 10px;
+    border-radius: 20px;
+    margin-right: 8px;
+    margin-bottom: 8px;
+    font-size: 0.85rem;
+    color: #34495e;
+}
+
+.property-feature-tag i {
+    margin-right: 5px;
+}
+
+/* Valuation chart styles */
+.chart-container {
+    position: relative;
+    height: 300px;
+}
+
+/* Comparable properties table styles */
+.comparable-table {
+    font-size: 0.9rem;
+}
+
+.comparable-table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+}
+
+.comparable-table .highlight {
+    background-color: #e8f4fc;
+}
+
+/* Assessment badge styles */
+.assessment-badge {
+    display: inline-block;
+    padding: 0.25em 0.6em;
+    font-size: 0.75em;
+    font-weight: 700;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: baseline;
+    border-radius: 10px;
+    margin-left: 5px;
+}
+
+.assessment-badge-low {
+    background-color: #dff0d8;
+    color: #3c763d;
+}
+
+.assessment-badge-medium {
+    background-color: #fcf8e3;
+    color: #8a6d3b;
+}
+
+.assessment-badge-high {
+    background-color: #f2dede;
+    color: #a94442;
+}
+
+/* Benton County branding colors */
+.benton-primary {
+    color: #003366;
+}
+
+.benton-secondary {
+    color: #669933;
+}
+
+.benton-accent {
+    color: #cc9900;
+}
+
+.bg-benton-primary {
+    background-color: #003366;
+    color: white;
+}
+
+.bg-benton-secondary {
+    background-color: #669933;
+    color: white;
+}
+
+.bg-benton-accent {
+    background-color: #cc9900;
+    color: white;
+}
+
+/* Report generation styles */
+.report-section {
+    margin-bottom: 20px;
+}
+
+.report-section-title {
+    font-weight: 600;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 5px;
+    margin-bottom: 15px;
+}
+
+/* Media queries for responsive design */
 @media (max-width: 768px) {
     .map-container {
-        height: 400px;
+        height: 500px;
     }
     
-    .chart-area, .chart-pie {
-        height: 15rem;
+    .coordinates-display {
+        font-size: 10px;
+        padding: 3px 6px;
+    }
+    
+    .map-tools .btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+    }
+    
+    .legend {
+        font-size: 0.75rem;
+    }
+    
+    .legend-color {
+        width: 15px;
+        height: 15px;
     }
 }
 
-/* Zoning colors */
-.zone-residential {
-    fill: #a6cee3;
-    stroke: #6a9fb5;
-}
-
-.zone-commercial {
-    fill: #1f78b4;
-    stroke: #145b93;
-}
-
-.zone-agricultural {
-    fill: #b2df8a;
-    stroke: #7fad5a;
-}
-
-.zone-industrial {
-    fill: #e31a1c;
-    stroke: #b01516;
-}
-
-.zone-public {
-    fill: #fb9a99;
-    stroke: #cf7a79;
-}
-
-.zone-mixed {
-    fill: #fdbf6f;
-    stroke: #cc9959;
-}
-
-.zone-open-space {
-    fill: #33a02c;
-    stroke: #217a1c;
-}
-
-/* Value heatmap gradient */
-.value-heatmap-gradient {
-    background: linear-gradient(to right, 
-        #313695, #4575b4, #74add1, 
-        #abd9e9, #e0f3f8, #ffffbf, 
-        #fee090, #fdae61, #f46d43, 
-        #d73027, #a50026);
-    height: 10px;
-    border-radius: 2px;
-    margin-top: 5px;
-}
-
-.value-heatmap-labels {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.7rem;
-    margin-top: 2px;
-}
-
-/* Custom info box */
-.info-box {
-    padding: 6px 8px;
-    font: 14px/16px Arial, Helvetica, sans-serif;
-    background: white;
-    background: rgba(255,255,255,0.8);
-    box-shadow: 0 0 15px rgba(0,0,0,0.2);
-    border-radius: 5px;
-}
-
-.info-box h4 {
-    margin: 0 0 5px;
-    color: #777;
+/* Print styles for maps and reports */
+@media print {
+    .filter-card, .tools-card, .map-tools, .coordinates-display {
+        display: none !important;
+    }
+    
+    .map-container {
+        height: 500px !important;
+        page-break-after: always;
+    }
+    
+    .property-detail-section {
+        page-break-inside: avoid;
+    }
+    
+    .modal {
+        position: static;
+        display: block;
+    }
+    
+    .modal-backdrop {
+        display: none;
+    }
 }
