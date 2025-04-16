@@ -44,15 +44,12 @@ def insert_test_properties():
                 "year_built": 1995,
                 "bedrooms": 3,
                 "bathrooms": 2,
-                "total_area": 2100,
                 "owner_name": "John Smith",
                 "owner_address": "789 Oak Ave",
                 "purchase_date": "2015-06-15",
                 "purchase_price": 285000,
                 "assessed_value": 320000,
                 "features": {
-                    "bedrooms": 3,
-                    "bathrooms": 2,
                     "garage": "2 car attached",
                     "amenities": ["Fireplace", "Deck"]
                 },
@@ -78,15 +75,12 @@ def insert_test_properties():
                 "year_built": 2005,
                 "bedrooms": 4,
                 "bathrooms": 2.5,
-                "total_area": 2800,
                 "owner_name": "Sarah Johnson",
                 "owner_address": "123 Pine St",
                 "purchase_date": "2018-04-22",
                 "purchase_price": 375000,
                 "assessed_value": 425000,
                 "features": {
-                    "bedrooms": 4,
-                    "bathrooms": 2.5,
                     "garage": "3 car attached",
                     "amenities": ["Fireplace", "Deck", "Pool"]
                 },
@@ -110,7 +104,6 @@ def insert_test_properties():
                 "property_type": "commercial",
                 "lot_size": 25000,
                 "year_built": 2000,
-                "total_area": 15000,
                 "owner_name": "Tri-Cities Properties LLC",
                 "owner_address": "100 Business Plaza",
                 "purchase_date": "2010-08-10",
@@ -139,23 +132,26 @@ def insert_test_properties():
             prop_id = prop["id"]
             now = datetime.datetime.now().isoformat()
             
+            # Extract lat/lng from location JSON for map display
+            lat = prop["location"]["coordinates"][1]
+            lng = prop["location"]["coordinates"][0]
+            
             # Convert JSON fields
             features_json = json.dumps(prop["features"])
             location_json = json.dumps(prop["location"])
             metadata_json = json.dumps(prop["property_metadata"])
             
-            # SQL insert statement - note that we don't include assessed_value in the properties table
-            # It will be set in the assessment records
+            # SQL insert statement - using actual database schema
             cursor.execute("""
                 INSERT INTO properties (
                     id, parcel_id, address, city, state, zip_code, property_type,
-                    lot_size, year_built, bedrooms, bathrooms, total_area,
+                    lot_size, year_built, bedrooms, bathrooms,
                     owner_name, owner_address, purchase_date, purchase_price,
                     features, location, property_metadata,
                     created_at, updated_at
                 ) VALUES (
                     %s, %s, %s, %s, %s, %s, %s, 
-                    %s, %s, %s, %s, %s, 
+                    %s, %s, %s, %s, 
                     %s, %s, %s, %s, 
                     %s, %s, %s,
                     %s, %s
@@ -163,7 +159,7 @@ def insert_test_properties():
             """, (
                 prop_id, prop["parcel_id"], prop["address"], prop["city"], 
                 prop["state"], prop["zip_code"], prop["property_type"],
-                prop["lot_size"], prop["year_built"], prop["bedrooms"], prop["bathrooms"], prop["total_area"],
+                prop["lot_size"], prop["year_built"], prop["bedrooms"], prop["bathrooms"],
                 prop["owner_name"], prop["owner_address"], prop["purchase_date"], prop["purchase_price"],
                 features_json, location_json, metadata_json,
                 now, now
