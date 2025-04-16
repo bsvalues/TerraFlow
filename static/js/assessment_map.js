@@ -118,7 +118,23 @@ function loadProperties(map, markerCluster) {
                 
                 // Handle click event
                 marker.on('click', function() {
-                    updatePropertyDetails(property);
+                    // Add active animation class to marker
+                    const markerElement = this.getElement().querySelector('.property-marker');
+                    if (markerElement) {
+                        // Remove active class from all markers first
+                        document.querySelectorAll('.property-marker.active').forEach(m => {
+                            m.classList.remove('active');
+                        });
+                        
+                        // Add active class to this marker with animation
+                        markerElement.classList.add('active');
+                        
+                        // Optional: Add ripple effect
+                        addRippleEffect(markerElement);
+                    }
+                    
+                    // Update property details with animation
+                    updatePropertyDetails(property, true);
                 });
             });
             
@@ -316,7 +332,23 @@ function loadDemoProperties(map, markerCluster) {
         
         // Handle click event
         marker.on('click', function() {
-            updatePropertyDetails(property);
+            // Add active animation class to marker
+            const markerElement = this.getElement().querySelector('.property-marker');
+            if (markerElement) {
+                // Remove active class from all markers first
+                document.querySelectorAll('.property-marker.active').forEach(m => {
+                    m.classList.remove('active');
+                });
+                
+                // Add active class to this marker with animation
+                markerElement.classList.add('active');
+                
+                // Optional: Add ripple effect
+                addRippleEffect(markerElement);
+            }
+            
+            // Update property details with animation
+            updatePropertyDetails(property, true);
         });
     });
     
