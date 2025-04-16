@@ -1182,12 +1182,7 @@ except Exception as e:
 # We already registered the assessment API routes above
 # So this section is redundant and can be removed
 
-@app.route('/avatars')
-def avatars():
-    """
-    Display fun user and agent avatars for the application
-    """
-    return render_template('avatars.html')
+
 
 # Initialize API for third-party and microservice integration
 try:
