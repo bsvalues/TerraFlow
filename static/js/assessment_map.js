@@ -125,8 +125,11 @@ function loadProperties(map, markerCluster) {
             // Add marker cluster to map
             map.addLayer(markerCluster);
             
-            // Update layer count
-            document.getElementById('layer-count').textContent = properties.length;
+            // Update layer count if element exists
+            const layerCountElement = document.getElementById('layer-count');
+            if (layerCountElement) {
+                layerCountElement.textContent = properties.length;
+            }
             
             // Fit map to markers
             if (properties.length > 0) {
@@ -320,8 +323,11 @@ function loadDemoProperties(map, markerCluster) {
     // Add marker cluster to map
     map.addLayer(markerCluster);
     
-    // Update layer count
-    document.getElementById('layer-count').textContent = demoProperties.length;
+    // Update layer count if element exists
+    const layerCountElement = document.getElementById('layer-count');
+    if (layerCountElement) {
+        layerCountElement.textContent = demoProperties.length;
+    }
     
     // Fit map to markers
     map.fitBounds(markerCluster.getBounds());
