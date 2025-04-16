@@ -574,9 +574,11 @@
                             <div class="d-flex align-items-center">
                                 <span>${colName}</span>
                                 ${suggestedMapping && suggestedMapping.ai_suggested ? 
-                                    `<span class="badge rounded-pill bg-info ms-2" title="AI Suggested Match">AI</span>` : ''}
+                                    getConfidenceIndicator(suggestedMapping.confidence, suggestedMapping.ai_suggested) : ''}
                             </div>
                             <small class="text-muted">Type: ${dataType}</small>
+                            ${suggestedMapping && suggestedMapping.ai_suggested && suggestedMapping.description ? 
+                                `<div class="mt-1 small fst-italic text-muted">${suggestedMapping.description}</div>` : ''}
                             ${colInfo.sample_values ? 
                                 `<br><small class="text-muted">Sample: ${colInfo.sample_values.slice(0, 2).join(', ')}</small>` : ''}
                         </td>
@@ -880,5 +882,117 @@
             conversionId = null;
         }
     });
+    
+    // AI Assistance Level Functionality
+    $(document).ready(function() {
+        // Handle AI assistance level changes
+        $("#ai-assistance-level").on("input", function() {
+            updateAIAssistanceLevel($(this).val());
+        });
+        
+        // Initial setting
+        updateAIAssistanceLevel($("#ai-assistance-level").val());
+        
+        // Handle auto-map functionality based on AI level
+        $("#analyze-btn").on("click", function() {
+            // Store AI level to use in the mapping process
+            currentAILevel = $("#ai-assistance-level").val();
+        });
+    });
+    
+    /**
+     * Update the AI assistance level UI
+     * @param {string} level - The selected AI assistance level (0-3)
+     */
+    function updateAIAssistanceLevel(level) {
+        const labels = ["None", "Suggestions", "Auto-mapping", "Full"];
+        $("#ai-level-label").text(labels[level]);
+        
+        // Highlight the corresponding text in the range
+        $(".form-text small span").removeClass("fw-bold text-primary");
+        $(".form-text small span").eq(level).addClass("fw-bold text-primary");
+        
+        // Update UI based on selected level
+        if (level == 0) {
+            $("#ai-status-message").html("AI assistance is disabled. You'll need to manually map all fields.");
+        } else if (level == 1) {
+            $("#ai-status-message").html("AI will suggest possible mappings but won't apply them automatically.");
+        } else if (level == 2) {
+            $("#ai-status-message").html("AI will automatically map fields with high confidence scores.");
+        } else if (level == 3) {
+            $("#ai-status-message").html("AI will handle the entire mapping process with domain-specific optimizations.");
+        }
+    }
+    
+    /**
+     * Process mappings based on AI assistance level
+     * @param {Array} mappings - The suggested mappings from the server
+     * @param {number} aiLevel - The current AI assistance level
+     * @returns {Array} - Processed mappings based on AI level
+     */
+    function processMappingsByAILevel(mappings, aiLevel) {
+        if (!mappings || !mappings.length) return [];
+        
+        // Make a copy to avoid modifying the original
+        let processedMappings = JSON.parse(JSON.stringify(mappings));
+        
+        switch(parseInt(aiLevel)) {
+            case 0: // None - clear all ai_suggested flags
+                processedMappings.forEach(mapping => {
+                    mapping.ai_suggested = false;
+                    mapping.auto_apply = false;
+                });
+                break;
+                
+            case 1: // Suggestions - mark as suggestions but don't auto-apply
+                processedMappings.forEach(mapping => {
+                    mapping.auto_apply = false;
+                });
+                break;
+                
+            case 2: // Auto-mapping - auto-apply high confidence mappings
+                processedMappings.forEach(mapping => {
+                    mapping.auto_apply = mapping.confidence > 0.75;
+                });
+                break;
+                
+            case 3: // Full - auto-apply all AI suggestions
+                processedMappings.forEach(mapping => {
+                    mapping.auto_apply = true;
+                });
+                break;
+        }
+        
+        return processedMappings;
+    }
+    
+    /**
+     * Display AI confidence indicators in the mapping table
+     * @param {number} confidence - Confidence score between 0 and 1
+     * @param {boolean} aiSuggested - Whether this was AI suggested
+     * @returns {string} - HTML for the confidence indicator
+     */
+    function getConfidenceIndicator(confidence, aiSuggested) {
+        if (!aiSuggested) return '';
+        
+        let color, icon;
+        if (confidence >= 0.9) {
+            color = 'success';
+            icon = 'check-circle-fill';
+        } else if (confidence >= 0.7) {
+            color = 'primary';
+            icon = 'check-circle';
+        } else if (confidence >= 0.5) {
+            color = 'warning';
+            icon = 'exclamation-circle';
+        } else {
+            color = 'danger';
+            icon = 'question-circle';
+        }
+        
+        return `<span class="badge bg-${color} ms-2" title="AI confidence: ${Math.round(confidence*100)}%">
+                  <i class="bi bi-${icon} me-1"></i>${Math.round(confidence*100)}%
+                </span>`;
+    }
 </script>
 {% endblock %}

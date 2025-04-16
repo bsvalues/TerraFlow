@@ -1901,7 +1901,13 @@ def suggest_mappings():
     
     file = request.files["file"]
     target_schema = request.form.get("target_schema")
+    ai_assistance_level = request.form.get("ai_assistance_level", "2")  # Default to auto-mapping
     
+    try:
+        ai_assistance_level = int(ai_assistance_level)
+    except ValueError:
+        ai_assistance_level = 2  # Default to auto-mapping if invalid
+        
     if file.filename == "":
         return jsonify({"error": "No file selected"}), 400
     
@@ -1914,8 +1920,29 @@ def suggest_mappings():
     file.save(file_path)
     
     try:
-        # Suggest mappings
-        mappings = legacy_converter.suggest_mappings(file_path, target_schema)
+        # Suggest mappings using the AI assistance level
+        config = ConversionConfig(
+            source_format="auto",
+            target_schema=target_schema,
+            ai_assistance_level=ai_assistance_level
+        )
+        
+        # Pass the config to ensure proper AI level is used
+        mappings = legacy_converter.suggest_mappings(file_path, target_schema, config)
+        
+        # Determine which mappings should be automatically applied based on AI level
+        for mapping in mappings:
+            if ai_assistance_level == 0:  # None
+                mapping.ai_suggested = False  # Don't mark as AI suggested at all
+            elif ai_assistance_level == 1:  # Suggestions only
+                # Mark as suggested but don't auto-apply
+                mapping.auto_apply = False
+            elif ai_assistance_level == 2:  # Auto-mapping
+                # Auto-apply only high confidence mappings
+                mapping.auto_apply = mapping.confidence > 0.75
+            elif ai_assistance_level == 3:  # Full
+                # Auto-apply all AI suggestions
+                mapping.auto_apply = True
         
         # Convert to serializable format
         mapping_dicts = []
@@ -1928,11 +1955,28 @@ def suggest_mappings():
                 "validation_rules": mapping.validation_rules,
                 "description": mapping.description,
                 "confidence": mapping.confidence,
-                "ai_suggested": mapping.ai_suggested
+                "ai_suggested": mapping.ai_suggested,
+                "auto_apply": getattr(mapping, 'auto_apply', False)
             }
             mapping_dicts.append(mapping_dict)
         
-        return jsonify({"mappings": mapping_dicts})
+        # Include metadata about the AI process
+        metadata = {
+            "ai_assistance_level": ai_assistance_level,
+            "assistance_description": [
+                "Manual mapping only",
+                "AI suggests mappings",
+                "AI auto-maps high confidence fields",
+                "AI fully manages mapping"
+            ][ai_assistance_level],
+            "domain_knowledge_applied": True,
+            "property_assessment_optimized": True
+        }
+        
+        return jsonify({
+            "mappings": mapping_dicts,
+            "metadata": metadata
+        })
     except Exception as e:
         logger.error(f"Error suggesting mappings: {str(e)}")
         return jsonify({"error": str(e)}), 500
