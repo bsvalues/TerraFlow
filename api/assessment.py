@@ -1,149 +1,109 @@
 """
-Assessment API Module
+Assessment API Blueprint
 
-This module provides API endpoints for property assessment data and functionality.
+This module provides API endpoints for assessment map data visualization.
 """
 
+import uuid
 import logging
 import json
-import os
-from typing import Dict, List, Any, Optional
 from datetime import datetime, date
 from decimal import Decimal
-from uuid import UUID
+import random
+from typing import Dict, List, Any, Optional, Tuple, Union
+
 from flask import Blueprint, jsonify, request, current_app
-from sqlalchemy import func, desc, cast, Float
+from sqlalchemy import func, desc, asc
 from shapely.geometry import Point, shape
 import geopandas as gpd
 
-from models import db, Property, User, GISProject, File
-from app import login_required, permission_required
+from app import db
+from auth import permission_required
+from models import Property, Assessment, TaxRecord
 
-# Custom JSON encoder for handling special types
-class CustomJSONEncoder(json.JSONEncoder):
-    """Custom JSON encoder that can handle UUID, Decimal, datetime and date objects"""
-    def default(self, obj):
-        if isinstance(obj, UUID):
-            return str(obj)
-        if isinstance(obj, Decimal):
-            return float(obj)
-        if isinstance(obj, (datetime, date)):
-            return obj.isoformat()
-        return super(CustomJSONEncoder, self).default(obj)
-
-# Create blueprint
-assessment_bp = Blueprint('assessment', __name__, url_prefix='/api/assessment')
-
-# Setup logging
+# Configure logging
 logger = logging.getLogger(__name__)
 
+# Create blueprint
+assessment_bp = Blueprint('assessment_api', __name__, url_prefix='/api/assessment')
+
+# Custom JSON encoder for handling dates and UUID objects
+class AssessmentJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, (date, datetime)):
+            return obj.isoformat()
+        elif isinstance(obj, Decimal):
+            return float(obj)
+        elif isinstance(obj, uuid.UUID):
+            return str(obj)
+        return json.JSONEncoder.default(self, obj)
+
+# Routes
 @assessment_bp.route('/properties', methods=['GET'])
-@login_required
-@permission_required('view_properties')
 def get_properties():
-    """
-    Get properties based on filter criteria
-    
-    Query parameters:
-    - property_type: Filter by property type (residential, commercial, etc.)
-    - min_value: Minimum assessed value
-    - max_value: Maximum assessed value
-    - year_built_min: Minimum year built
-    - year_built_max: Maximum year built
-    - limit: Maximum number of properties to return (default 100)
-    - offset: Offset for pagination (default 0)
-    
-    Returns:
-        JSON response with properties
-    """
+    """Get all properties with assessment data"""
     try:
         # Get query parameters
-        property_type = request.args.get('property_type')
-        min_value = request.args.get('min_value', type=float)
-        max_value = request.args.get('max_value', type=float)
-        year_built_min = request.args.get('year_built_min', type=int)
-        year_built_max = request.args.get('year_built_max', type=int)
-        limit = request.args.get('limit', 100, type=int)
-        offset = request.args.get('offset', 0, type=int)
+        search = request.args.get('search', '')
+        limit = int(request.args.get('limit', 100))
+        offset = int(request.args.get('offset', 0))
         
-        # Build query
-        query = Property.query
+        # Query database
+        query = db.session.query(Property).order_by(Property.address)
         
-        # Apply filters
-        if property_type:
-            query = query.filter(Property.property_type == property_type)
+        # Apply search filter if provided
+        if search:
+            query = query.filter(
+                db.or_(
+                    Property.address.ilike(f'%{search}%'),
+                    Property.parcel_id.ilike(f'%{search}%'),
+                    Property.owner_name.ilike(f'%{search}%')
+                )
+            )
         
-        if min_value is not None:
-            query = query.filter(cast(Property.assessed_value, Float) >= min_value)
+        # Get total count (for pagination)
+        total_count = query.count()
         
-        if max_value is not None:
-            query = query.filter(cast(Property.assessed_value, Float) <= max_value)
-        
-        if year_built_min is not None:
-            query = query.filter(Property.year_built >= year_built_min)
-        
-        if year_built_max is not None:
-            query = query.filter(Property.year_built <= year_built_max)
-        
-        # Execute query with limit and offset
+        # Apply limit and offset
         properties = query.limit(limit).offset(offset).all()
         
-        # Convert to dictionaries
-        property_list = []
+        # Transform to list of dictionaries
+        result = []
         for prop in properties:
-            # Get coordinates from location GeoJSON
-            coordinates = None
-            if prop.location and isinstance(prop.location, dict) and 'coordinates' in prop.location:
-                coordinates = prop.location['coordinates']
+            # Get the latest assessment for the property
+            latest_assessment = Assessment.query.filter_by(property_id=prop.id).order_by(Assessment.assessment_date.desc()).first()
             
-            # Build property dictionary
-            property_dict = {
+            # Calculate assessed value
+            assessed_value = latest_assessment.total_value if latest_assessment else None
+            
+            # Get property location coordinates
+            lat, lng = None, None
+            if prop.location and prop.location.get('coordinates'):
+                lng, lat = prop.location.get('coordinates')
+            
+            # Create property object
+            property_data = {
                 'id': str(prop.id),
                 'parcel_id': prop.parcel_id,
                 'address': prop.address,
+                'city': prop.city,
+                'state': prop.state,
+                'zip_code': prop.zip_code,
                 'property_type': prop.property_type,
-                'assessed_value': float(prop.assessed_value) if prop.assessed_value else None,
-                'lot_size': prop.lot_size,
-                'year_built': prop.year_built,
-                'owner_name': prop.owner_name,
-                'zoning': prop.property_metadata.get('zoning', None) if prop.property_metadata else None
+                'assessed_value': float(assessed_value) if assessed_value else None,
+                'lat': lat,
+                'lng': lng
             }
             
-            # Add property-type specific fields
-            if prop.property_type == 'residential':
-                property_dict.update({
-                    'bedrooms': prop.features.get('bedrooms', None) if prop.features else None,
-                    'bathrooms': prop.features.get('bathrooms', None) if prop.features else None,
-                    'total_area': prop.total_area
-                })
-            elif prop.property_type in ['commercial', 'industrial']:
-                property_dict.update({
-                    'building_area': prop.features.get('building_area', None) if prop.features else None
-                })
-            
-            # Add coordinates if available
-            if coordinates:
-                property_dict.update({
-                    'lng': coordinates[0],
-                    'lat': coordinates[1]
-                })
-            else:
-                # Fallback to dummy coordinates if not available
-                # In real app, this would come from geocoding or stored coordinates
-                property_dict.update({
-                    'lng': -119.2 + (offset * 0.01),
-                    'lat': 46.2 + (offset * 0.01)
-                })
-            
-            property_list.append(property_dict)
+            result.append(property_data)
         
-        # Return JSON response
         return jsonify({
             'success': True,
-            'count': len(property_list),
-            'properties': property_list
+            'properties': result,
+            'total_count': total_count,
+            'limit': limit,
+            'offset': offset
         })
-    
     except Exception as e:
         logger.error(f"Error getting properties: {str(e)}")
         return jsonify({
@@ -152,440 +112,498 @@ def get_properties():
         }), 500
 
 @assessment_bp.route('/properties/<property_id>', methods=['GET'])
-@login_required
-@permission_required('view_properties')
 def get_property(property_id):
-    """
-    Get a specific property by ID
-    
-    Args:
-        property_id: Property ID (UUID)
-    
-    Returns:
-        JSON response with property details
-    """
+    """Get property details by ID"""
     try:
-        # Get property
-        property = Property.query.get(property_id)
+        # Query database
+        prop = Property.query.get(property_id)
         
-        if not property:
+        if not prop:
+            # In demo mode, generate mock property data
+            if request.args.get('demo') == 'true':
+                return get_demo_property(property_id)
+            
             return jsonify({
                 'success': False,
                 'message': 'Property not found'
             }), 404
         
-        # Get coordinates from location GeoJSON
-        coordinates = None
-        if property.location and isinstance(property.location, dict) and 'coordinates' in property.location:
-            coordinates = property.location['coordinates']
+        # Get the latest assessment for the property
+        latest_assessment = Assessment.query.filter_by(property_id=prop.id).order_by(Assessment.assessment_date.desc()).first()
         
-        # Build property dictionary with all details
+        # Create property object
         property_data = {
-            'id': str(property.id),
-            'parcel_id': property.parcel_id,
-            'address': property.address,
-            'city': property.city,
-            'state': property.state,
-            'zip_code': property.zip_code,
-            'property_type': property.property_type,
-            'assessed_value': float(property.assessed_value) if property.assessed_value else None,
-            'lot_size': property.lot_size,
-            'total_area': property.total_area,
-            'year_built': property.year_built,
-            'bedrooms': property.bedrooms,
-            'bathrooms': property.bathrooms,
-            'owner_name': property.owner_name,
-            'owner_address': property.owner_address,
-            'purchase_date': property.purchase_date.isoformat() if property.purchase_date else None,
-            'purchase_price': float(property.purchase_price) if property.purchase_price else None,
-            'features': property.features,
-            'metadata': property.property_metadata
+            'id': str(prop.id),
+            'parcel_id': prop.parcel_id,
+            'address': prop.address,
+            'city': prop.city,
+            'state': prop.state,
+            'zip_code': prop.zip_code,
+            'property_type': prop.property_type,
+            'lot_size': prop.lot_size,
+            'year_built': prop.year_built,
+            'bedrooms': prop.bedrooms,
+            'bathrooms': prop.bathrooms,
+            'total_area': prop.total_area,
+            'owner_name': prop.owner_name,
+            'owner_address': prop.owner_address,
+            'purchase_date': prop.purchase_date,
+            'purchase_price': prop.purchase_price,
+            'assessed_value': latest_assessment.total_value if latest_assessment else None,
+            'location': prop.location,
+            'features': prop.features,
+            'property_metadata': prop.property_metadata
         }
         
-        # Add coordinates if available
-        if coordinates:
-            property_data.update({
-                'location': {
-                    'type': 'Point',
-                    'coordinates': coordinates
-                }
-            })
-        
-        # Return JSON response
         return jsonify({
             'success': True,
             'property': property_data
         })
-    
     except Exception as e:
-        logger.error(f"Error getting property {property_id}: {str(e)}")
+        logger.error(f"Error getting property: {str(e)}")
         return jsonify({
             'success': False,
             'message': f"Error getting property: {str(e)}"
         }), 500
 
-@assessment_bp.route('/properties/<property_id>', methods=['PUT'])
-@login_required
-@permission_required('edit_properties')
-def update_property(property_id):
-    """
-    Update a property
-    
-    Args:
-        property_id: Property ID (UUID)
-    
-    Returns:
-        JSON response with updated property
-    """
-    try:
-        # Get property
-        property = Property.query.get(property_id)
-        
-        if not property:
-            return jsonify({
-                'success': False,
-                'message': 'Property not found'
-            }), 404
-        
-        # Get request data
-        data = request.get_json()
-        
-        if not data:
-            return jsonify({
-                'success': False,
-                'message': 'No data provided'
-            }), 400
-        
-        # Update fields
-        for field in ['address', 'city', 'state', 'zip_code', 'property_type', 
-                    'lot_size', 'total_area', 'year_built', 'bedrooms', 'bathrooms',
-                    'owner_name', 'owner_address']:
-            if field in data:
-                setattr(property, field, data[field])
-        
-        # Update decimal fields
-        if 'assessed_value' in data:
-            property.assessed_value = Decimal(str(data['assessed_value']))
-            
-        if 'purchase_price' in data:
-            property.purchase_price = Decimal(str(data['purchase_price']))
-        
-        # Update date fields
-        if 'purchase_date' in data and data['purchase_date']:
-            property.purchase_date = datetime.fromisoformat(data['purchase_date'])
-        
-        # Update JSON fields
-        if 'features' in data:
-            property.features = data['features']
-            
-        if 'metadata' in data:
-            property.property_metadata = data['metadata']
-        
-        # Update location
-        if 'location' in data and data['location']:
-            property.location = data['location']
-        
-        # Save changes
-        db.session.commit()
-        
-        # Return success
-        return jsonify({
-            'success': True,
-            'message': 'Property updated successfully',
-            'property_id': str(property.id)
-        })
-    
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Error updating property {property_id}: {str(e)}")
-        return jsonify({
-            'success': False,
-            'message': f"Error updating property: {str(e)}"
-        }), 500
-
-@assessment_bp.route('/zoning', methods=['GET'])
-@login_required
-def get_zoning():
-    """
-    Get zoning data as GeoJSON
-    
-    Returns:
-        JSON response with zoning GeoJSON
-    """
-    try:
-        # In a real app, this would fetch zoning data from the database
-        # or a GIS service. For demo purposes, we'll return sample data.
-        
-        # Check if we have a zoning file available
-        zoning_file = File.query.filter(
-            File.filename.like('%zoning%'),
-            File.filename.like('%.geojson')
-        ).first()
-        
-        if zoning_file:
-            # Load the zoning GeoJSON file
-            file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 
-                                    str(zoning_file.id), 
-                                    zoning_file.filename)
-            
-            with open(file_path, 'r') as f:
-                zoning_data = json.load(f)
-            
-            return jsonify({
-                'success': True,
-                'zoning': zoning_data
-            })
-        else:
-            # Return empty data
-            return jsonify({
-                'success': True,
-                'zoning': {
-                    'type': 'FeatureCollection',
-                    'features': []
-                }
-            })
-    
-    except Exception as e:
-        logger.error(f"Error getting zoning data: {str(e)}")
-        return jsonify({
-            'success': False,
-            'message': f"Error getting zoning data: {str(e)}"
-        }), 500
-
 @assessment_bp.route('/valuation/<property_id>', methods=['GET'])
-@login_required
-@permission_required('view_properties')
 def get_valuation_history(property_id):
-    """
-    Get valuation history for a property
-    
-    Args:
-        property_id: Property ID (UUID)
-    
-    Returns:
-        JSON response with valuation history
-    """
+    """Get valuation history for a property"""
     try:
-        # Get property
-        property = Property.query.get(property_id)
+        # Query database
+        property_exists = Property.query.get(property_id) is not None
         
-        if not property:
+        if not property_exists:
+            # In demo mode, generate mock valuation history
+            if request.args.get('demo') == 'true':
+                return get_demo_valuation_history(property_id)
+            
             return jsonify({
                 'success': False,
                 'message': 'Property not found'
             }), 404
         
-        # In a real app, this would fetch valuation history from the database
-        # For demo purposes, we'll generate sample data
+        # Get assessments for the property
+        assessments = Assessment.query.filter_by(property_id=property_id).order_by(Assessment.assessment_date.asc()).all()
         
-        # Get current year
-        current_year = datetime.now().year
-        
-        # Generate 5 years of history
-        history = []
-        base_value = float(property.assessed_value) if property.assessed_value else 300000
-        
-        for i in range(5):
-            year = current_year - 4 + i
+        # Transform to list of dictionaries
+        result = []
+        for assessment in assessments:
+            year = assessment.assessment_date.year
             
-            # Each previous year is a percentage of the current value
-            if i < 4:
-                value = base_value * (0.75 + (i * 0.1))
-            else:
-                value = base_value  # Current year value
-            
-            history.append({
+            valuation_data = {
                 'year': year,
-                'assessed_value': value,
-                'land_value': value * 0.3,  # Land value is approximately 30% of total
-                'improvement_value': value * 0.7  # Improvement value is approximately 70% of total
-            })
+                'assessed_value': float(assessment.total_value) if assessment.total_value else None,
+                'land_value': float(assessment.land_value) if assessment.land_value else None,
+                'improvement_value': float(assessment.improvement_value) if assessment.improvement_value else None
+            }
+            
+            result.append(valuation_data)
         
-        # Return JSON response
         return jsonify({
             'success': True,
-            'property_id': str(property.id),
-            'valuation_history': history
+            'valuation_history': result
         })
-    
     except Exception as e:
-        logger.error(f"Error getting valuation history for property {property_id}: {str(e)}")
+        logger.error(f"Error getting valuation history: {str(e)}")
         return jsonify({
             'success': False,
             'message': f"Error getting valuation history: {str(e)}"
         }), 500
 
 @assessment_bp.route('/comparable-properties/<property_id>', methods=['GET'])
-@login_required
-@permission_required('view_properties')
 def get_comparable_properties(property_id):
-    """
-    Get comparable properties for a property
-    
-    Args:
-        property_id: Property ID (UUID)
-    
-    Returns:
-        JSON response with comparable properties
-    """
+    """Get comparable properties for a given property"""
     try:
-        # Get property
-        property = Property.query.get(property_id)
+        # Query database
+        prop = Property.query.get(property_id)
         
-        if not property:
+        if not prop:
+            # In demo mode, generate mock comparable properties
+            if request.args.get('demo') == 'true':
+                return get_demo_comparable_properties(property_id)
+            
             return jsonify({
                 'success': False,
                 'message': 'Property not found'
             }), 404
         
-        # Get property type and assessed value
-        property_type = property.property_type
-        assessed_value = property.assessed_value
+        # Find properties with similar characteristics
+        similar_props = Property.query.filter(
+            Property.id != property_id,
+            Property.property_type == prop.property_type,
+            Property.city == prop.city
+        ).limit(5).all()
         
-        if not assessed_value:
-            return jsonify({
-                'success': False,
-                'message': 'Property has no assessed value'
-            }), 400
-        
-        # Find comparable properties
-        # - Same property type
-        # - Similar assessed value (within 20%)
-        # - Not the same property
-        min_value = float(assessed_value) * 0.8
-        max_value = float(assessed_value) * 1.2
-        
-        query = Property.query.filter(
-            Property.id != property.id,
-            Property.property_type == property_type,
-            cast(Property.assessed_value, Float) >= min_value,
-            cast(Property.assessed_value, Float) <= max_value
-        ).limit(5)
-        
-        comparable_properties = query.all()
-        
-        # Format result
+        # Transform to list of dictionaries
         result = []
-        for comp in comparable_properties:
-            # Get coordinates from location GeoJSON
-            coordinates = None
-            if comp.location and isinstance(comp.location, dict) and 'coordinates' in comp.location:
-                coordinates = comp.location['coordinates']
+        for similar_prop in similar_props:
+            # Get the latest assessment for the property
+            latest_assessment = Assessment.query.filter_by(property_id=similar_prop.id).order_by(Assessment.assessment_date.desc()).first()
             
-            comp_dict = {
-                'id': str(comp.id),
-                'parcel_id': comp.parcel_id,
-                'address': comp.address,
-                'property_type': comp.property_type,
-                'assessed_value': float(comp.assessed_value) if comp.assessed_value else None,
-                'lot_size': comp.lot_size,
-                'year_built': comp.year_built
+            # Calculate assessed value
+            assessed_value = latest_assessment.total_value if latest_assessment else None
+            
+            # Create property object
+            property_data = {
+                'id': str(similar_prop.id),
+                'parcel_id': similar_prop.parcel_id,
+                'address': similar_prop.address,
+                'city': similar_prop.city,
+                'property_type': similar_prop.property_type,
+                'lot_size': similar_prop.lot_size,
+                'year_built': similar_prop.year_built,
+                'assessed_value': float(assessed_value) if assessed_value else None,
             }
             
-            # Add property-type specific fields
-            if comp.property_type == 'residential':
-                comp_dict.update({
-                    'bedrooms': comp.features.get('bedrooms', None) if comp.features else None,
-                    'bathrooms': comp.features.get('bathrooms', None) if comp.features else None,
-                    'total_area': comp.total_area
-                })
-            
-            # Add coordinates if available
-            if coordinates:
-                comp_dict.update({
-                    'lng': coordinates[0],
-                    'lat': coordinates[1]
-                })
-            
-            result.append(comp_dict)
+            result.append(property_data)
         
-        # Return JSON response
         return jsonify({
             'success': True,
-            'property_id': str(property.id),
             'comparable_properties': result
         })
-    
     except Exception as e:
-        logger.error(f"Error getting comparable properties for property {property_id}: {str(e)}")
+        logger.error(f"Error getting comparable properties: {str(e)}")
         return jsonify({
             'success': False,
             'message': f"Error getting comparable properties: {str(e)}"
         }), 500
 
-@assessment_bp.route('/statistics', methods=['GET'])
-@login_required
-def get_statistics():
-    """
-    Get property assessment statistics
-    
-    Returns:
-        JSON response with statistics
-    """
+@assessment_bp.route('/spatial-query', methods=['POST'])
+def spatial_query():
+    """Perform a spatial query for properties"""
     try:
-        # In a real app, this would fetch statistics from the database
-        # For demo purposes, we'll return sample data
+        data = request.json
         
-        # Get property type counts
-        property_type_counts = db.session.query(
-            Property.property_type,
-            func.count(Property.id)
-        ).group_by(Property.property_type).all()
+        # Get query parameters
+        bounds = data.get('bounds', {})
+        property_type = data.get('property_type')
         
-        # Format property type counts
-        property_types = {}
-        for property_type, count in property_type_counts:
-            property_types[property_type] = count
+        # Extract bounds coordinates
+        north = bounds.get('north')
+        south = bounds.get('south')
+        east = bounds.get('east')
+        west = bounds.get('west')
         
-        # Get value distribution
-        value_distribution = {
-            'under_250k': db.session.query(Property).filter(cast(Property.assessed_value, Float) < 250000).count(),
-            '250k_to_500k': db.session.query(Property).filter(
-                cast(Property.assessed_value, Float) >= 250000,
-                cast(Property.assessed_value, Float) < 500000
-            ).count(),
-            '500k_to_1m': db.session.query(Property).filter(
-                cast(Property.assessed_value, Float) >= 500000,
-                cast(Property.assessed_value, Float) < 1000000
-            ).count(),
-            'over_1m': db.session.query(Property).filter(cast(Property.assessed_value, Float) >= 1000000).count()
-        }
+        if not all([north, south, east, west]):
+            return jsonify({
+                'success': False,
+                'message': 'Invalid bounds parameters'
+            }), 400
         
-        # Get total assessed value by property type
-        value_by_type = db.session.query(
-            Property.property_type,
-            func.sum(cast(Property.assessed_value, Float))
-        ).group_by(Property.property_type).all()
+        # Query database for properties within bounds
+        # This is a simplified approach using PostgreSQL's jsonb functions
+        # For production, use PostGIS for more efficient spatial queries
+        properties = Property.query.filter(
+            func.json_extract_path_text(Property.location, 'coordinates', '0').cast(db.Float) >= west,
+            func.json_extract_path_text(Property.location, 'coordinates', '0').cast(db.Float) <= east,
+            func.json_extract_path_text(Property.location, 'coordinates', '1').cast(db.Float) >= south,
+            func.json_extract_path_text(Property.location, 'coordinates', '1').cast(db.Float) <= north
+        )
         
-        # Format value by type
-        value_by_property_type = {}
-        for property_type, total_value in value_by_type:
-            value_by_property_type[property_type] = total_value
+        # Filter by property type if provided
+        if property_type:
+            properties = properties.filter(Property.property_type == property_type)
         
-        # Return statistics
+        # Apply limit
+        properties = properties.limit(100).all()
+        
+        # Transform to list of dictionaries
+        result = []
+        for prop in properties:
+            # Get the latest assessment for the property
+            latest_assessment = Assessment.query.filter_by(property_id=prop.id).order_by(Assessment.assessment_date.desc()).first()
+            
+            # Calculate assessed value
+            assessed_value = latest_assessment.total_value if latest_assessment else None
+            
+            # Get property location coordinates
+            lat, lng = None, None
+            if prop.location and prop.location.get('coordinates'):
+                lng, lat = prop.location.get('coordinates')
+            
+            # Create property object
+            property_data = {
+                'id': str(prop.id),
+                'parcel_id': prop.parcel_id,
+                'address': prop.address,
+                'property_type': prop.property_type,
+                'assessed_value': float(assessed_value) if assessed_value else None,
+                'lat': lat,
+                'lng': lng
+            }
+            
+            result.append(property_data)
+        
         return jsonify({
             'success': True,
-            'property_count': db.session.query(Property).count(),
-            'property_types': property_types,
-            'value_distribution': value_distribution,
-            'value_by_property_type': value_by_property_type,
-            'latest_update': datetime.now().isoformat()
+            'properties': result,
+            'total_count': len(result)
         })
-    
     except Exception as e:
-        logger.error(f"Error getting statistics: {str(e)}")
+        logger.error(f"Error performing spatial query: {str(e)}")
         return jsonify({
             'success': False,
-            'message': f"Error getting statistics: {str(e)}"
+            'message': f"Error performing spatial query: {str(e)}"
         }), 500
 
-def register_blueprint(app):
-    """
-    Register assessment blueprint with the application
+# Helper functions for demo mode
+def get_demo_property(property_id):
+    """Generate a demo property for testing"""
+    property_types = {
+        '1': 'residential',
+        '2': 'residential',
+        '3': 'commercial',
+        '4': 'agricultural'
+    }
     
-    Args:
-        app: Flask application
-    """
-    app.register_blueprint(assessment_bp)
-    app.json_encoder = CustomJSONEncoder
-    logger.info("Assessment API routes registered")
+    property_type = property_types.get(property_id, 'residential')
+    
+    # Generate mock property data based on property type
+    if property_type == 'residential':
+        return jsonify({
+            'success': True,
+            'property': {
+                'id': property_id,
+                'parcel_id': f'R{property_id}12345',
+                'address': f'{property_id}23 Main St',
+                'city': 'Kennewick',
+                'state': 'WA',
+                'zip_code': '99336',
+                'property_type': 'residential',
+                'lot_size': 8500.0,
+                'year_built': 1995,
+                'bedrooms': 3,
+                'bathrooms': 2.0,
+                'total_area': 2100.0,
+                'owner_name': 'John Smith',
+                'owner_address': '789 Oak Ave',
+                'purchase_date': '2015-06-15',
+                'purchase_price': 285000.0,
+                'assessed_value': 320000.0,
+                'location': {
+                    'type': 'Point',
+                    'coordinates': [-119.210, 46.226]
+                },
+                'features': {
+                    'bedrooms': 3,
+                    'bathrooms': 2,
+                    'garage': '2 car attached',
+                    'amenities': ['Fireplace', 'Deck']
+                },
+                'property_metadata': {
+                    'zoning': 'R1 - Residential',
+                    'school_district': 'Kennewick School District',
+                    'flood_zone': 'None'
+                }
+            }
+        })
+    elif property_type == 'commercial':
+        return jsonify({
+            'success': True,
+            'property': {
+                'id': property_id,
+                'parcel_id': f'C{property_id}12345',
+                'address': f'{property_id}89 Commerce Blvd',
+                'city': 'Kennewick',
+                'state': 'WA',
+                'zip_code': '99336',
+                'property_type': 'commercial',
+                'lot_size': 25000.0,
+                'year_built': 2000,
+                'total_area': 15000.0,
+                'owner_name': 'Tri-Cities Properties LLC',
+                'owner_address': '100 Business Plaza',
+                'purchase_date': '2010-08-10',
+                'purchase_price': 950000.0,
+                'assessed_value': 1250000.0,
+                'location': {
+                    'type': 'Point',
+                    'coordinates': [-119.235, 46.215]
+                },
+                'features': {
+                    'building_type': 'Retail',
+                    'building_area': 15000,
+                    'parking_spaces': 50,
+                    'amenities': ['Corner Lot', 'Highway Access']
+                },
+                'property_metadata': {
+                    'zoning': 'C1 - Commercial',
+                    'property_class': 'B',
+                    'flood_zone': 'None'
+                }
+            }
+        })
+    else:  # agricultural
+        return jsonify({
+            'success': True,
+            'property': {
+                'id': property_id,
+                'parcel_id': f'A{property_id}12345',
+                'address': f'{property_id}00 Farm Rd',
+                'city': 'Prosser',
+                'state': 'WA',
+                'zip_code': '99350',
+                'property_type': 'agricultural',
+                'lot_size': 2000000.0,
+                'year_built': 1975,
+                'owner_name': 'Washington Wine Growers',
+                'owner_address': '300 Farm Road',
+                'purchase_date': '2005-03-15',
+                'purchase_price': 680000.0,
+                'assessed_value': 780000.0,
+                'location': {
+                    'type': 'Point',
+                    'coordinates': [-119.310, 46.180]
+                },
+                'features': {
+                    'land_type': 'Vineyard',
+                    'water_rights': True,
+                    'acres': 45.9,
+                    'amenities': ['Irrigation', 'Outbuildings']
+                },
+                'property_metadata': {
+                    'zoning': 'AG - Agricultural',
+                    'flood_zone': 'None'
+                }
+            }
+        })
+
+def get_demo_valuation_history(property_id):
+    """Generate demo valuation history for testing"""
+    # Generate random valuation history for the last 5 years
+    current_year = datetime.now().year
+    history = []
+    
+    # Base value depends on property ID
+    base_value = 300000 if property_id == '1' else 400000 if property_id == '2' else 1000000 if property_id == '3' else 700000
+    
+    for year in range(current_year - 4, current_year + 1):
+        # Add some variation to the values
+        year_factor = (year - (current_year - 4)) / 4  # 0.0 to 1.0
+        total_value = base_value * (1 + year_factor * 0.2)  # 0% to 20% increase
+        
+        # Add some random variation
+        total_value *= (1 + (random.random() - 0.5) * 0.1)  # -5% to +5% variation
+        
+        # Split into land and improvement values
+        if property_id == '3':  # Commercial
+            land_ratio = 0.25
+        elif property_id == '4':  # Agricultural
+            land_ratio = 0.8
+        else:  # Residential
+            land_ratio = 0.3
+            
+        land_value = total_value * land_ratio
+        improvement_value = total_value - land_value
+        
+        history.append({
+            'year': year,
+            'assessed_value': round(total_value),
+            'land_value': round(land_value),
+            'improvement_value': round(improvement_value)
+        })
+    
+    return jsonify({
+        'success': True,
+        'valuation_history': history
+    })
+
+def get_demo_comparable_properties(property_id):
+    """Generate demo comparable properties for testing"""
+    property_types = {
+        '1': 'residential',
+        '2': 'residential',
+        '3': 'commercial',
+        '4': 'agricultural'
+    }
+    
+    property_type = property_types.get(property_id, 'residential')
+    
+    # Generate mock comparable properties based on property type
+    comparables = []
+    
+    if property_type == 'residential':
+        comparables = [
+            {
+                'id': '101',
+                'parcel_id': 'R987612345',
+                'address': '125 Maple St, Kennewick',
+                'city': 'Kennewick',
+                'property_type': 'residential',
+                'lot_size': 7900.0,
+                'year_built': 1994,
+                'assessed_value': 315000.0,
+            },
+            {
+                'id': '102',
+                'parcel_id': 'R876523456',
+                'address': '789 Elm Ave, Kennewick',
+                'city': 'Kennewick',
+                'property_type': 'residential',
+                'lot_size': 8200.0,
+                'year_built': 1997,
+                'assessed_value': 330000.0,
+            },
+            {
+                'id': '103',
+                'parcel_id': 'R765434567',
+                'address': '456 Cedar Dr, Kennewick',
+                'city': 'Kennewick',
+                'property_type': 'residential',
+                'lot_size': 8800.0,
+                'year_built': 1992,
+                'assessed_value': 298000.0,
+            }
+        ]
+    elif property_type == 'commercial':
+        comparables = [
+            {
+                'id': '201',
+                'parcel_id': 'C987612345',
+                'address': '250 Business Way, Kennewick',
+                'city': 'Kennewick',
+                'property_type': 'commercial',
+                'lot_size': 20000.0,
+                'year_built': 2002,
+                'assessed_value': 1150000.0,
+            },
+            {
+                'id': '202',
+                'parcel_id': 'C876523456',
+                'address': '780 Commerce St, Kennewick',
+                'city': 'Kennewick',
+                'property_type': 'commercial',
+                'lot_size': 30000.0,
+                'year_built': 1999,
+                'assessed_value': 1350000.0,
+            }
+        ]
+    else:  # agricultural
+        comparables = [
+            {
+                'id': '301',
+                'parcel_id': 'A987612345',
+                'address': '200 Vineyard Rd, Prosser',
+                'city': 'Prosser',
+                'property_type': 'agricultural',
+                'lot_size': 1800000.0,
+                'year_built': 1980,
+                'assessed_value': 750000.0,
+            },
+            {
+                'id': '302',
+                'parcel_id': 'A876523456',
+                'address': '350 Orchard Ave, Prosser',
+                'city': 'Prosser',
+                'property_type': 'agricultural',
+                'lot_size': 2200000.0,
+                'year_built': 1965,
+                'assessed_value': 820000.0,
+            }
+        ]
+    
+    return jsonify({
+        'success': True,
+        'comparable_properties': comparables
+    })

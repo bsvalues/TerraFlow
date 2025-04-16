@@ -1,47 +1,25 @@
 """
-API Package for Benton County GIS System
+GeoAssessmentPro API Package
 
-This package provides a comprehensive API for integrating with the
-Benton County GIS system, including database access, file operations,
-and GIS functionality.
+This package contains API endpoints for the GeoAssessmentPro application.
 """
 
-from api.endpoints import register_api_endpoints
-from api.database import db_api
-from api.connection_manager import connection_manager
+import logging
+
+logger = logging.getLogger(__name__)
 
 def init_api(app):
-    """
-    Initialize API components with Flask app
+    """Initialize the API package"""
+    logger.info("Initializing API package")
     
-    Args:
-        app: Flask application instance
-    """
-    # Register API endpoints
-    register_api_endpoints(app)
+    # Register API modules and blueprints
+    try:
+        from api.assessment import assessment_bp
+        app.register_blueprint(assessment_bp)
+        logger.info("Assessment API registered")
+    except Exception as e:
+        logger.error(f"Error registering Assessment API: {str(e)}")
     
-    # Set up API-specific configuration
-    app.config.setdefault('API_KEYS', [])
+    # Add more API registrations here
     
-    # Register error handlers
-    @app.errorhandler(404)
-    def not_found(error):
-        from flask import jsonify, request
-        
-        # Check if this is an API request
-        if request.path.startswith('/api/'):
-            return jsonify({"error": "Not found"}), 404
-        
-        # Otherwise, let Flask handle it normally
-        return error
-    
-    @app.errorhandler(500)
-    def server_error(error):
-        from flask import jsonify, request
-        
-        # Check if this is an API request
-        if request.path.startswith('/api/'):
-            return jsonify({"error": "Internal server error"}), 500
-        
-        # Otherwise, let Flask handle it normally
-        return error
+    return True

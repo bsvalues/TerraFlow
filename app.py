@@ -541,10 +541,50 @@ def assessment_map():
     except Exception:
         property_count = 0
     
+    # Create sample demo data for display (this will be served by the API)
+    sample_data = {
+        'demo_mode': True if property_count == 0 else False,
+        'sample_properties': [
+            {
+                'id': '1',
+                'parcel_id': 'R123456789',
+                'address': '123 Main St, Kennewick',
+                'property_type': 'residential',
+                'assessed_value': 350000,
+                'lat': 46.226, 'lng': -119.210
+            },
+            {
+                'id': '2',
+                'parcel_id': 'R987654321',
+                'address': '456 Oak Ave, Richland',
+                'property_type': 'residential',
+                'assessed_value': 425000,
+                'lat': 46.275, 'lng': -119.280
+            },
+            {
+                'id': '3',
+                'parcel_id': 'C12345678',
+                'address': '789 Commerce Blvd, Kennewick',
+                'property_type': 'commercial',
+                'assessed_value': 1250000,
+                'lat': 46.215, 'lng': -119.235
+            },
+            {
+                'id': '4',
+                'parcel_id': 'A987654321',
+                'address': '100 Farm Rd, Prosser',
+                'property_type': 'agricultural',
+                'assessed_value': 780000,
+                'lat': 46.180, 'lng': -119.310
+            }
+        ]
+    }
+    
     return render_template('assessment_map.html', 
                            gis_files=gis_files, 
                            projects=projects,
-                           property_count=property_count)
+                           property_count=property_count,
+                           sample_data=sample_data)
 
 @app.route('/map-data/<int:file_id>')
 @login_required
@@ -918,6 +958,14 @@ try:
 except Exception as e:
     app.logger.error(f"Error registering data quality routes: {str(e)}")
 
+# Register assessment API blueprint
+try:
+    from api.assessment import assessment_bp
+    app.register_blueprint(assessment_bp)
+    app.logger.info("Assessment API routes registered successfully")
+except Exception as e:
+    app.logger.error(f"Error registering assessment API routes: {str(e)}")
+
 # Register authentication routes
 try:
     from auth_routes import auth_bp
@@ -1072,13 +1120,8 @@ try:
 except Exception as e:
     app.logger.error(f"Error registering property routes: {str(e)}")
 
-# Register Assessment API routes
-try:
-    from api.assessment import register_blueprint
-    register_blueprint(app)
-    app.logger.info("Assessment API routes registered successfully")
-except Exception as e:
-    app.logger.error(f"Error registering assessment API routes: {str(e)}")
+# We already registered the assessment API routes above
+# So this section is redundant and can be removed
 
 # Initialize API for third-party and microservice integration
 try:

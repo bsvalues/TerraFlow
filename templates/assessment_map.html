@@ -546,6 +546,11 @@
         
         // Load demo properties as a fallback
         function loadDemoProperties() {
+            // Check if server provided sample data
+            {% if sample_data and sample_data.demo_mode %}
+            // Use sample data from server
+            const demoProperties = {{ sample_data.sample_properties|tojson }};
+            {% else %}
             // Create some demo properties
             const demoProperties = [
                 {
@@ -581,6 +586,7 @@
                     lat: 46.180, lng: -119.310
                 }
             ];
+            {% endif %}
             
             // Add demo properties to map
             demoProperties.forEach(property => {
