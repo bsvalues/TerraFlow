@@ -516,6 +516,36 @@ def map_viewer():
     
     return render_template('map_viewer.html', gis_files=gis_files, projects=projects)
 
+@app.route('/assessment-map')
+@login_required
+def assessment_map():
+    """
+    Property Assessment Map view with enhanced functionality
+    """
+    # Get GIS files (GeoJSON and Shapefile) for the user
+    gis_files = File.query.filter(
+        File.user_id == session['user']['id'],
+        db.or_(
+            File.filename.like('%.geojson'),
+            File.filename.like('%.shp')
+        )
+    ).all()
+    
+    # Get projects to organize files
+    projects = GISProject.query.filter_by(user_id=session['user']['id']).all()
+    
+    # Get property count if Properties table exists
+    try:
+        from models import Property
+        property_count = db.session.query(Property).count()
+    except Exception:
+        property_count = 0
+    
+    return render_template('assessment_map.html', 
+                           gis_files=gis_files, 
+                           projects=projects,
+                           property_count=property_count)
+
 @app.route('/map-data/<int:file_id>')
 @login_required
 def map_data(file_id):
