@@ -366,37 +366,58 @@ function formatArea(area) {
 
 // Show an alert message
 function showAlert(message, type = 'info') {
-    // Check if an alert container exists, if not create one
-    let alertContainer = document.getElementById('alert-container');
-    if (!alertContainer) {
-        alertContainer = document.createElement('div');
-        alertContainer.id = 'alert-container';
-        alertContainer.className = 'position-fixed top-0 end-0 p-3';
-        alertContainer.style.zIndex = '9999';
-        document.body.appendChild(alertContainer);
+    // Use console.log as a temporary fallback for alerts
+    console.log(`[${type.toUpperCase()}] ${message}`);
+    
+    // Check if the body is available (sometimes it might not be ready)
+    if (!document.body) {
+        console.warn('Document body not available for alerts');
+        return;
     }
     
-    // Create alert element
-    const alertId = 'alert-' + Date.now();
-    const alertEl = document.createElement('div');
-    alertEl.className = `alert alert-${type} alert-dismissible fade show`;
-    alertEl.id = alertId;
-    alertEl.innerHTML = `
-        ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    `;
-    
-    // Add to container
-    alertContainer.appendChild(alertEl);
-    
-    // Auto-dismiss after 5 seconds
-    setTimeout(() => {
-        const alert = document.getElementById(alertId);
-        if (alert) {
-            const bsAlert = new bootstrap.Alert(alert);
-            bsAlert.close();
+    try {
+        // Check if an alert container exists, if not create one
+        let alertContainer = document.getElementById('alert-container');
+        if (!alertContainer) {
+            alertContainer = document.createElement('div');
+            alertContainer.id = 'alert-container';
+            alertContainer.className = 'position-fixed top-0 end-0 p-3';
+            alertContainer.style.zIndex = '9999';
+            document.body.appendChild(alertContainer);
         }
-    }, 5000);
+        
+        // Create alert element
+        const alertId = 'alert-' + Date.now();
+        const alertEl = document.createElement('div');
+        alertEl.className = `alert alert-${type} alert-dismissible fade show`;
+        alertEl.id = alertId;
+        alertEl.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+        
+        // Add to container
+        alertContainer.appendChild(alertEl);
+        
+        // Auto-dismiss after 5 seconds
+        setTimeout(() => {
+            const alert = document.getElementById(alertId);
+            if (alert) {
+                if (typeof bootstrap !== 'undefined' && bootstrap.Alert) {
+                    const bsAlert = new bootstrap.Alert(alert);
+                    bsAlert.close();
+                } else {
+                    // Fallback if Bootstrap JS is not available
+                    alert.style.display = 'none';
+                    if (alert.parentNode) {
+                        alert.parentNode.removeChild(alert);
+                    }
+                }
+            }
+        }, 5000);
+    } catch (e) {
+        console.error('Error showing alert:', e);
+    }
 }
 
 // Setup filter form functionality

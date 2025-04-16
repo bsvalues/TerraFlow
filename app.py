@@ -586,6 +586,65 @@ def assessment_map():
                            property_count=property_count,
                            sample_data=sample_data)
 
+@app.route('/api/assessment/properties')
+@login_required
+def api_assessment_properties():
+    """
+    API endpoint for property assessment data
+    Returns property data for the assessment map
+    """
+    try:
+        # Import the Property model
+        from models import Property
+        
+        # Get properties from database
+        properties_query = db.session.query(Property).all()
+        
+        # Format properties for map display
+        properties = []
+        for prop in properties_query:
+            # Get coordinates from location if it exists, otherwise use zeros
+            if prop.location and 'coordinates' in prop.location:
+                lng, lat = prop.location['coordinates']
+            else:
+                lat, lng = 0, 0
+                
+            # Get assessment value
+            assessed_value = 0
+            if hasattr(prop, 'purchase_price') and prop.purchase_price:
+                assessed_value = prop.purchase_price
+                
+            # Create property dict
+            property_data = {
+                'id': prop.id,
+                'parcel_id': prop.parcel_id,
+                'address': f"{prop.address}, {prop.city}, {prop.state}",
+                'property_type': prop.property_type,
+                'year_built': prop.year_built,
+                'lot_size': prop.lot_size,
+                'bedrooms': prop.bedrooms,
+                'bathrooms': prop.bathrooms,
+                'owner_name': prop.owner_name,
+                'assessed_value': assessed_value,
+                'purchase_date': prop.purchase_date.strftime('%Y-%m-%d') if prop.purchase_date else None,
+                'lat': lat,
+                'lng': lng,
+                'zoning': prop.property_metadata.get('zoning', 'Unknown') if prop.property_metadata else 'Unknown'
+            }
+            properties.append(property_data)
+            
+        return jsonify({
+            'success': True,
+            'properties': properties
+        })
+    except Exception as e:
+        app.logger.error(f"Error fetching properties: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': 'Error fetching properties',
+            'properties': []
+        })
+
 @app.route('/map-data/<int:file_id>')
 @login_required
 def map_data(file_id):
