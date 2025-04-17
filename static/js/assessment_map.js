@@ -89,6 +89,12 @@ function updateCoordinates(e) {
 // Load and display properties
 function loadProperties(map, markerCluster) {
     // Show loading indicator
+    const loadingDiv = document.createElement('div');
+    loadingDiv.id = 'map-loading';
+    loadingDiv.className = 'map-loading-indicator';
+    loadingDiv.innerHTML = '<div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>';
+    map.getContainer().appendChild(loadingDiv);
+    
     showAlert('Loading property data...', 'info');
     
     // Load sample properties from the demo data endpoint

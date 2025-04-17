@@ -327,3 +327,32 @@ h3 {
 .modal-footer {
     border-top: 1px solid #dee2e6;
 }
+
+@media (max-width: 767.98px) {
+    .auth-container {
+        max-width: 100%;
+        padding: 0 15px;
+    }
+
+    .property-detail-header {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .map-controls {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(5px);
+        z-index: 1000;
+        padding: 10px;
+        border-top: 1px solid rgba(0,0,0,0.1);
+    }
+
+    .feedback-button {
+        padding: 8px 12px;
+        font-size: 14px;
+    }
+}
