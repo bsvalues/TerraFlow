@@ -8,6 +8,7 @@ and user management using Supabase Auth.
 import os
 import logging
 import json
+import time
 from typing import Dict, Any, List, Optional
 
 from flask import Blueprint, render_template, redirect, url_for, flash, request, session, jsonify
@@ -337,6 +338,79 @@ def profile():
     user = get_current_user()
     
     return render_template('profile.html', user=user)
+    
+@auth_bp.route('/upload-avatar', methods=['POST'])
+@login_required
+def upload_avatar():
+    """
+    Process user avatar upload.
+    """
+    if 'avatar' not in request.files:
+        flash('No avatar file provided', 'danger')
+        return redirect(url_for('auth.profile'))
+        
+    avatar_file = request.files['avatar']
+    
+    if avatar_file.filename == '':
+        flash('No file selected', 'danger')
+        return redirect(url_for('auth.profile'))
+        
+    # Check file type
+    if not avatar_file.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+        flash('Invalid file type. Please upload an image file (PNG, JPG, GIF)', 'danger')
+        return redirect(url_for('auth.profile'))
+    
+    # Create upload directory if it doesn't exist
+    upload_dir = os.path.join('static', 'uploads', 'avatars')
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    # Generate unique filename
+    filename = f"avatar_{get_current_user().id}_{int(time.time())}.{avatar_file.filename.rsplit('.', 1)[1].lower()}"
+    filepath = os.path.join(upload_dir, filename)
+    
+    # Save the file
+    avatar_file.save(filepath)
+    
+    # Update user record in database
+    avatar_path = os.path.join('uploads', 'avatars', filename)
+    client = None
+    
+    try:
+        # Get a Supabase client
+        client = supabase_auth.client()
+        if not client:
+            flash('Could not connect to database', 'danger')
+            return redirect(url_for('auth.profile'))
+        
+        # First, get the current user data
+        user_id = get_current_user().id
+        response = client.from_('users').select('*').eq('id', user_id).single().execute()
+        
+        if not response.data:
+            flash('User data not found', 'danger')
+            return redirect(url_for('auth.profile'))
+            
+        # Update the user's avatar path
+        user_data = response.data
+        user_data['avatar_path'] = avatar_path
+        
+        # Update the user in Supabase
+        update_response = client.from_('users').update(user_data).eq('id', user_id).execute()
+        
+        if update_response.data:
+            flash('Avatar updated successfully', 'success')
+        else:
+            flash('Failed to update avatar', 'danger')
+            
+    except Exception as e:
+        logger.error(f"Error updating user avatar: {str(e)}")
+        flash(f'Error updating avatar: {str(e)}', 'danger')
+    finally:
+        # Release the client
+        if client:
+            release_supabase_client(client)
+    
+    return redirect(url_for('auth.profile'))
 
 @auth_bp.route('/users')
 def user_list():

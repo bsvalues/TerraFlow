@@ -50,6 +50,9 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     full_name = db.Column(db.String(128))
     department = db.Column(db.String(128))
+    avatar_path = db.Column(db.String(512))  # Path to user's custom avatar
+    phone = db.Column(db.String(20))  # Phone number
+    bio = db.Column(db.Text)  # User bio/description
     ad_object_id = db.Column(db.String(128))  # Azure AD Object ID
     mfa_enabled = db.Column(db.Boolean, default=False)
     mfa_secret = db.Column(db.String(64))  # For TOTP MFA
