@@ -30,6 +30,8 @@ from ai_agents.anomaly_detection_agent import AnomalyDetectionAgent
 from ai_agents.data_validation_agent import DataValidationAgent
 from ai_agents.security_monitoring_agent import SecurityMonitoringAgent
 from ai_agents.data_recovery_agent import DataRecoveryAgent
+from ai_agents.predictive_analytics_agent import PredictiveAnalyticsAgent
+from ai_agents.property_valuation_agent import PropertyValuationAgent
 
 logger = logging.getLogger(__name__)
 
@@ -154,7 +156,9 @@ class DataStabilityFramework:
                     "anomaly_detection": True,
                     "data_validation": True,
                     "security_monitoring": True,
-                    "data_recovery": True
+                    "data_recovery": True,
+                    "predictive_analytics": True,
+                    "property_valuation": True
                 }
             }
         }
@@ -229,6 +233,26 @@ class DataStabilityFramework:
                 name="DataRecoveryAgent",
                 description="Provides intelligent data recovery capabilities",
                 monitoring_interval=3600  # 1 hour
+            )
+        
+        # Register and create predictive analytics agent
+        if agent_types.get("predictive_analytics", True):
+            self.agent_manager.register_agent_type("predictive_analytics", PredictiveAnalyticsAgent)
+            self.predictive_agent = self.agent_manager.create_agent(
+                agent_type="predictive_analytics",
+                name="PredictiveAnalyticsAgent",
+                description="Predicts future anomalies using machine learning techniques",
+                prediction_interval=3600  # 1 hour
+            )
+        
+        # Register and create property valuation agent
+        if agent_types.get("property_valuation", True):
+            self.agent_manager.register_agent_type("property_valuation", PropertyValuationAgent)
+            self.valuation_agent = self.agent_manager.create_agent(
+                agent_type="property_valuation",
+                name="PropertyValuationAgent",
+                description="Provides AI-powered property valuations",
+                market_update_interval=86400  # 1 day
             )
         
         logger.info("AI Agents initialized")

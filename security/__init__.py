@@ -1,22 +1,11 @@
 """
 Security Package
 
-This package implements the security framework for Benton County
-Washington Assessor's Office, including encryption, identity and access management,
-monitoring, and auditing components.
+This package provides security features for the GeoAssessmentPro application,
+including security scanning, encryption, and access control.
 """
 
-from security.encryption import EncryptionManager, encryption_manager
-from security.access_control import AccessControlManager, access_control_manager
-from security.monitoring import SecurityMonitor, AuditLogger, security_monitor, audit_logger
+# Import commonly used components
+from security.security_scanner import SecurityScanner
 
-__all__ = [
-    'EncryptionManager',
-    'encryption_manager',
-    'AccessControlManager',
-    'access_control_manager',
-    'SecurityMonitor',
-    'AuditLogger',
-    'security_monitor',
-    'audit_logger'
-]
+__all__ = ['SecurityScanner']
