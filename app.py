@@ -46,6 +46,13 @@ db_config = get_database_config()
 env_mode = config.get("env_mode", "development")
 logger.info(f"Environment mode: {env_mode}")
 
+# Import visualizations
+try:
+    from visualizations.anomaly_map import anomaly_map_bp
+except ImportError as e:
+    logger.warning(f"Anomaly map visualization not available: {str(e)}")
+    anomaly_map_bp = None
+
 # If Supabase is configured, use the PostgreSQL connection string from config
 if is_supabase_enabled():
     logger.info(f"Using Supabase PostgreSQL database for {env_mode} environment")
@@ -302,6 +309,11 @@ with app.app_context():
         logger.info("Feature flag system initialized successfully")
     except ImportError as e:
         logger.warning(f"Feature flag system not available: {str(e)}")
+    
+    # Register visualization blueprints
+    if anomaly_map_bp:
+        app.register_blueprint(anomaly_map_bp)
+        logger.info("Anomaly Map visualization registered successfully")
     
     # Initialize secrets manager
     try:

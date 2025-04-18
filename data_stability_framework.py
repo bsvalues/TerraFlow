@@ -1,407 +1,843 @@
 """
-Data Stability and Security Framework
+Data Stability Framework
 
-This module integrates all components of the comprehensive data stability
-and security framework for the Benton County Washington Assessor's Office.
-It provides a unified interface to access the various subsystems and features.
+A comprehensive framework for creating the most data-stable and secure system possible
+for the Benton County Washington Assessor's Office, with particular focus on data conversion processes.
 """
 
 import os
 import logging
 import json
 import datetime
-from typing import Dict, List, Any, Optional, Union, Tuple
+import threading
+import time
+from typing import Dict, List, Any, Optional
 
-# Import all framework components
-from data_governance.data_classification import classification_manager
-from data_governance.data_sovereignty import sovereignty_manager
-from security.encryption import encryption_manager
-from security.access_control import access_control_manager
-from security.monitoring import security_monitor, audit_logger
-from data_conversion.conversion_controls import conversion_manager
-from disaster_recovery.recovery_manager import recovery_manager
+# Import core modules
+from data_governance.data_classification import DataClassificationManager
+from data_governance.data_sovereignty import DataSovereigntyManager
+from security.encryption import EncryptionManager
+from security.access_control import AccessControlManager
+from security.security_monitoring import SecurityMonitoringManager
+from security.audit_logging import AuditLogger
+from data_conversion.conversion_manager import ConversionManager
+from data_conversion.validation_agents import ValidationManager
+from disaster_recovery.recovery_manager import RecoveryManager
+
+# Import AI agents
+from ai_agents.agent_manager import AIAgentManager, agent_manager
+from ai_agents.anomaly_detection_agent import AnomalyDetectionAgent
+from ai_agents.data_validation_agent import DataValidationAgent
+from ai_agents.security_monitoring_agent import SecurityMonitoringAgent
+from ai_agents.data_recovery_agent import DataRecoveryAgent
 
 logger = logging.getLogger(__name__)
 
 class DataStabilityFramework:
     """
-    Master controller for the data stability and security framework.
-    Provides a unified interface to access and coordinate all framework components.
+    The main framework class that integrates all data stability and security components.
+    Provides a unified interface for implementing data stability, security, and compliance.
     """
     
-    def __init__(self):
-        """Initialize the framework"""
-        # Framework components
-        self.classification = classification_manager
-        self.sovereignty = sovereignty_manager
-        self.encryption = encryption_manager
-        self.access_control = access_control_manager
-        self.security_monitor = security_monitor
-        self.audit = audit_logger
-        self.conversion = conversion_manager
-        self.recovery = recovery_manager
+    def __init__(self, config_path: str = None):
+        """
+        Initialize the data stability framework.
         
-        # Framework configuration
-        self.config = {
-            'framework_version': '1.0.0',
-            'environment': os.environ.get('ENV', 'development'),
-            'log_level': os.environ.get('LOG_LEVEL', 'INFO'),
-            'components_enabled': {
-                'classification': True,
-                'sovereignty': True,
-                'encryption': True,
-                'access_control': True,
-                'security_monitoring': True,
-                'audit_logging': True,
-                'conversion_controls': True,
-                'disaster_recovery': True
+        Args:
+            config_path: Path to the configuration file
+        """
+        # Load configuration
+        self.config = self._load_config(config_path)
+        
+        # Initialize core managers
+        self.classification = DataClassificationManager(self.config.get("classification", {}))
+        self.sovereignty = DataSovereigntyManager(self.config.get("sovereignty", {}))
+        self.encryption = EncryptionManager(self.config.get("encryption", {}))
+        self.access_control = AccessControlManager(self.config.get("access_control", {}))
+        self.security_monitoring = SecurityMonitoringManager(self.config.get("security_monitoring", {}))
+        self.audit = AuditLogger(self.config.get("audit_logging", {}))
+        self.conversion = ConversionManager(self.config.get("conversion", {}))
+        self.validation = ValidationManager(self.config.get("validation", {}))
+        self.recovery = RecoveryManager(self.config.get("recovery", {}))
+        
+        # Initialize AI agent manager
+        self.agent_manager = agent_manager
+        self._initialize_ai_agents()
+        
+        # Framework state
+        self.initialized = True
+        
+        # Start monitoring thread
+        self.monitoring_thread = None
+        self.monitoring_running = False
+        self._start_monitoring()
+        
+        logger.info("Data Stability Framework initialized")
+    
+    def _load_config(self, config_path: str) -> Dict[str, Any]:
+        """
+        Load framework configuration.
+        
+        Args:
+            config_path: Path to the configuration file
+            
+        Returns:
+            Configuration dictionary
+        """
+        default_config = {
+            "log_level": "INFO",
+            "components_enabled": {
+                "classification": True,
+                "sovereignty": True,
+                "encryption": True,
+                "access_control": True,
+                "security_monitoring": True,
+                "audit_logging": True,
+                "conversion_controls": True,
+                "disaster_recovery": True,
+                "ai_agents": True
+            },
+            "classification": {
+                "levels": [
+                    {"id": 1, "name": "Public", "description": "General property information already in the public domain"},
+                    {"id": 2, "name": "Internal", "description": "Administrative data requiring basic protection"},
+                    {"id": 3, "name": "Confidential", "description": "Personal taxpayer information requiring enhanced security"},
+                    {"id": 4, "name": "Restricted", "description": "Highly sensitive information requiring maximum protection"}
+                ],
+                "default_level": 2
+            },
+            "sovereignty": {
+                "jurisdiction": "washington",
+                "residency_requirements": True,
+                "cross_border_transfers": False
+            },
+            "encryption": {
+                "data_at_rest": True,
+                "data_in_transit": True,
+                "field_level_encryption": True,
+                "key_rotation_days": 90
+            },
+            "access_control": {
+                "rbac_enabled": True,
+                "abac_enabled": True,
+                "jit_access_enabled": True,
+                "mfa_required": True
+            },
+            "security_monitoring": {
+                "real_time_monitoring": True,
+                "anomaly_detection": True,
+                "threat_intelligence": True
+            },
+            "audit_logging": {
+                "immutable_logs": True,
+                "log_retention_days": 365,
+                "log_all_access": True
+            },
+            "conversion": {
+                "validation_level": "strict",
+                "rollback_enabled": True,
+                "performance_monitoring": True
+            },
+            "validation": {
+                "validate_source": True,
+                "validate_destination": True,
+                "validate_transformation": True
+            },
+            "recovery": {
+                "backup_frequency_hours": 24,
+                "backup_retention_days": 30,
+                "test_recovery_days": 7
+            },
+            "ai_agents": {
+                "enabled": True,
+                "agent_types": {
+                    "anomaly_detection": True,
+                    "data_validation": True,
+                    "security_monitoring": True,
+                    "data_recovery": True
+                }
             }
         }
         
-        # Initialize framework
-        self._initialize_framework()
-        
-        logger.info("Data Stability and Security Framework initialized")
-    
-    def _initialize_framework(self):
-        """Initialize the framework components"""
-        # Set up logging
-        log_level = getattr(logging, self.config['log_level'], logging.INFO)
-        logging.basicConfig(level=log_level)
-        
-        # Load additional configuration if available
-        self._load_framework_config()
-        
-        # Disable components if needed
-        for component, enabled in self.config['components_enabled'].items():
-            if not enabled:
-                logger.warning(f"Component disabled: {component}")
-    
-    def _load_framework_config(self):
-        """Load framework configuration from file if available"""
-        config_file = os.environ.get('FRAMEWORK_CONFIG', 'framework_config.json')
-        if os.path.exists(config_file):
+        # Load configuration file if provided
+        config = default_config
+        if config_path and os.path.exists(config_path):
             try:
-                with open(config_file, 'r') as f:
-                    config = json.load(f)
-                    # Update configuration
-                    self.config.update(config)
-                logger.info(f"Loaded framework configuration from {config_file}")
+                with open(config_path, "r") as f:
+                    file_config = json.load(f)
+                
+                # Merge configs (shallow merge for simplicity)
+                for key, value in file_config.items():
+                    if isinstance(value, dict) and key in config and isinstance(config[key], dict):
+                        config[key].update(value)
+                    else:
+                        config[key] = value
+                
+                logger.info(f"Loaded configuration from {config_path}")
             except Exception as e:
-                logger.error(f"Error loading framework configuration: {str(e)}")
+                logger.error(f"Error loading configuration: {str(e)}")
+        
+        return config
     
-    def encrypt_sensitive_data(self, data: Dict[str, Any], 
-                              table_name: str) -> Dict[str, Any]:
+    def _initialize_ai_agents(self):
+        """Initialize and register AI agents"""
+        if not self.config.get("ai_agents", {}).get("enabled", True):
+            logger.info("AI Agents disabled in configuration")
+            return
+        
+        # Start the agent manager
+        self.agent_manager.start()
+        
+        # Register agent types
+        agent_types = self.config.get("ai_agents", {}).get("agent_types", {})
+        
+        # Register and create anomaly detection agent
+        if agent_types.get("anomaly_detection", True):
+            self.agent_manager.register_agent_type("anomaly_detection", AnomalyDetectionAgent)
+            self.anomaly_agent = self.agent_manager.create_agent(
+                agent_type="anomaly_detection",
+                name="AnomalyDetectionAgent",
+                description="Detects data anomalies in property assessment data",
+                scan_interval=300  # 5 minutes
+            )
+        
+        # Register and create data validation agent
+        if agent_types.get("data_validation", True):
+            self.agent_manager.register_agent_type("data_validation", DataValidationAgent)
+            self.validation_agent = self.agent_manager.create_agent(
+                agent_type="data_validation",
+                name="DataValidationAgent",
+                description="Validates property assessment data integrity",
+                validation_interval=3600  # 1 hour
+            )
+        
+        # Register and create security monitoring agent
+        if agent_types.get("security_monitoring", True):
+            self.agent_manager.register_agent_type("security_monitoring", SecurityMonitoringAgent)
+            self.security_agent = self.agent_manager.create_agent(
+                agent_type="security_monitoring",
+                name="SecurityMonitoringAgent",
+                description="Monitors system security and access patterns",
+                monitoring_interval=600  # 10 minutes
+            )
+        
+        # Register and create data recovery agent
+        if agent_types.get("data_recovery", True):
+            self.agent_manager.register_agent_type("data_recovery", DataRecoveryAgent)
+            self.recovery_agent = self.agent_manager.create_agent(
+                agent_type="data_recovery",
+                name="DataRecoveryAgent",
+                description="Provides intelligent data recovery capabilities",
+                monitoring_interval=3600  # 1 hour
+            )
+        
+        logger.info("AI Agents initialized")
+    
+    def _start_monitoring(self):
+        """Start the framework monitoring thread"""
+        self.monitoring_running = True
+        self.monitoring_thread = threading.Thread(target=self._monitoring_loop)
+        self.monitoring_thread.daemon = True
+        self.monitoring_thread.start()
+        
+        logger.info("Framework monitoring started")
+    
+    def _monitoring_loop(self):
+        """Monitoring loop to check component health"""
+        while self.monitoring_running:
+            try:
+                # Check component health
+                self._check_component_health()
+                
+                # Sleep until next check
+                time.sleep(300)  # 5 minutes
+            except Exception as e:
+                logger.error(f"Error in monitoring loop: {str(e)}")
+                time.sleep(60)  # Sleep longer after error
+    
+    def _check_component_health(self):
+        """Check health of all framework components"""
+        component_status = {
+            "classification": self._check_classification_health(),
+            "sovereignty": self._check_sovereignty_health(),
+            "encryption": self._check_encryption_health(),
+            "access_control": self._check_access_control_health(),
+            "security_monitoring": self._check_security_monitoring_health(),
+            "audit": self._check_audit_health(),
+            "conversion": self._check_conversion_health(),
+            "validation": self._check_validation_health(),
+            "recovery": self._check_recovery_health(),
+            "ai_agents": self._check_ai_agents_health()
+        }
+        
+        # Log any unhealthy components
+        unhealthy = [comp for comp, status in component_status.items() if status["status"] != "healthy"]
+        if unhealthy:
+            logger.warning(f"Unhealthy components: {', '.join(unhealthy)}")
+            for comp in unhealthy:
+                logger.warning(f"{comp} status: {component_status[comp]['message']}")
+    
+    def _check_classification_health(self) -> Dict[str, Any]:
+        """Check health of classification component"""
+        try:
+            # Basic check that classification levels are defined
+            if not self.classification.get_classification_levels():
+                return {
+                    "status": "degraded",
+                    "message": "No classification levels defined"
+                }
+            
+            return {
+                "status": "healthy",
+                "message": "Classification component healthy"
+            }
+        except Exception as e:
+            return {
+                "status": "unhealthy",
+                "message": f"Classification error: {str(e)}"
+            }
+    
+    def _check_sovereignty_health(self) -> Dict[str, Any]:
+        """Check health of sovereignty component"""
+        try:
+            # Basic check that jurisdiction is defined
+            if not self.sovereignty.get_jurisdiction():
+                return {
+                    "status": "degraded",
+                    "message": "No jurisdiction defined"
+                }
+            
+            return {
+                "status": "healthy",
+                "message": "Sovereignty component healthy"
+            }
+        except Exception as e:
+            return {
+                "status": "unhealthy",
+                "message": f"Sovereignty error: {str(e)}"
+            }
+    
+    def _check_encryption_health(self) -> Dict[str, Any]:
+        """Check health of encryption component"""
+        try:
+            # Basic check that encryption is initialized
+            if not self.encryption.is_initialized():
+                return {
+                    "status": "degraded",
+                    "message": "Encryption not initialized"
+                }
+            
+            return {
+                "status": "healthy",
+                "message": "Encryption component healthy"
+            }
+        except Exception as e:
+            return {
+                "status": "unhealthy",
+                "message": f"Encryption error: {str(e)}"
+            }
+    
+    def _check_access_control_health(self) -> Dict[str, Any]:
+        """Check health of access control component"""
+        try:
+            # Basic check that access control is initialized
+            if not self.access_control.is_initialized():
+                return {
+                    "status": "degraded",
+                    "message": "Access control not initialized"
+                }
+            
+            return {
+                "status": "healthy",
+                "message": "Access control component healthy"
+            }
+        except Exception as e:
+            return {
+                "status": "unhealthy",
+                "message": f"Access control error: {str(e)}"
+            }
+    
+    def _check_security_monitoring_health(self) -> Dict[str, Any]:
+        """Check health of security monitoring component"""
+        try:
+            # Basic check that security monitoring is running
+            if not self.security_monitoring.is_running():
+                return {
+                    "status": "degraded",
+                    "message": "Security monitoring not running"
+                }
+            
+            return {
+                "status": "healthy",
+                "message": "Security monitoring component healthy"
+            }
+        except Exception as e:
+            return {
+                "status": "unhealthy",
+                "message": f"Security monitoring error: {str(e)}"
+            }
+    
+    def _check_audit_health(self) -> Dict[str, Any]:
+        """Check health of audit component"""
+        try:
+            # Basic check that audit logging is initialized
+            if not self.audit.is_initialized():
+                return {
+                    "status": "degraded",
+                    "message": "Audit logging not initialized"
+                }
+            
+            return {
+                "status": "healthy",
+                "message": "Audit component healthy"
+            }
+        except Exception as e:
+            return {
+                "status": "unhealthy",
+                "message": f"Audit error: {str(e)}"
+            }
+    
+    def _check_conversion_health(self) -> Dict[str, Any]:
+        """Check health of conversion component"""
+        try:
+            # Basic check that conversion manager is initialized
+            if not self.conversion.is_initialized():
+                return {
+                    "status": "degraded",
+                    "message": "Conversion manager not initialized"
+                }
+            
+            return {
+                "status": "healthy",
+                "message": "Conversion component healthy"
+            }
+        except Exception as e:
+            return {
+                "status": "unhealthy",
+                "message": f"Conversion error: {str(e)}"
+            }
+    
+    def _check_validation_health(self) -> Dict[str, Any]:
+        """Check health of validation component"""
+        try:
+            # Basic check that validation manager is initialized
+            if not self.validation.is_initialized():
+                return {
+                    "status": "degraded",
+                    "message": "Validation manager not initialized"
+                }
+            
+            return {
+                "status": "healthy",
+                "message": "Validation component healthy"
+            }
+        except Exception as e:
+            return {
+                "status": "unhealthy",
+                "message": f"Validation error: {str(e)}"
+            }
+    
+    def _check_recovery_health(self) -> Dict[str, Any]:
+        """Check health of recovery component"""
+        try:
+            # Basic check that recovery manager is initialized
+            if not self.recovery.is_initialized():
+                return {
+                    "status": "degraded",
+                    "message": "Recovery manager not initialized"
+                }
+            
+            return {
+                "status": "healthy",
+                "message": "Recovery component healthy"
+            }
+        except Exception as e:
+            return {
+                "status": "unhealthy",
+                "message": f"Recovery error: {str(e)}"
+            }
+    
+    def _check_ai_agents_health(self) -> Dict[str, Any]:
+        """Check health of AI agents"""
+        try:
+            if not self.config.get("ai_agents", {}).get("enabled", True):
+                return {
+                    "status": "disabled",
+                    "message": "AI Agents disabled in configuration"
+                }
+            
+            # Get status of all agents
+            agent_info = self.agent_manager.get_all_agents_info()
+            
+            if not agent_info:
+                return {
+                    "status": "degraded",
+                    "message": "No AI agents registered"
+                }
+            
+            # Check for unhealthy agents
+            unhealthy_agents = [
+                agent["name"] for agent in agent_info
+                if agent["status"] not in ["running", "paused"]
+            ]
+            
+            if unhealthy_agents:
+                return {
+                    "status": "degraded",
+                    "message": f"Unhealthy agents: {', '.join(unhealthy_agents)}"
+                }
+            
+            return {
+                "status": "healthy",
+                "message": f"All {len(agent_info)} AI agents healthy"
+            }
+        except Exception as e:
+            return {
+                "status": "unhealthy",
+                "message": f"AI agents error: {str(e)}"
+            }
+    
+    def shutdown(self):
+        """Shutdown the framework and its components"""
+        logger.info("Shutting down Data Stability Framework")
+        
+        # Stop monitoring
+        self.monitoring_running = False
+        if self.monitoring_thread:
+            self.monitoring_thread.join(timeout=2.0)
+        
+        # Shutdown AI agents
+        if self.agent_manager:
+            self.agent_manager.stop()
+        
+        # Shutdown components
+        components = [
+            self.classification,
+            self.sovereignty,
+            self.encryption,
+            self.access_control,
+            self.security_monitoring,
+            self.audit,
+            self.conversion,
+            self.validation,
+            self.recovery
+        ]
+        
+        for component in components:
+            try:
+                if hasattr(component, "shutdown"):
+                    component.shutdown()
+            except Exception as e:
+                logger.error(f"Error shutting down component: {str(e)}")
+        
+        logger.info("Data Stability Framework shutdown complete")
+    
+    #
+    # Public API methods
+    #
+    
+    def classify_data(self, table_name: str, field_name: str = None, data=None) -> int:
         """
-        Encrypt sensitive data based on classification.
+        Classify data based on content and context.
         
         Args:
-            data: Dictionary of field names and values
-            table_name: Database table name
+            table_name: Name of the data table
+            field_name: Optional name of the field
+            data: Optional data value to classify
+            
+        Returns:
+            Classification level (1-4)
+        """
+        return self.classification.classify_data(table_name, field_name, data)
+    
+    def get_field_classification(self, table_name: str, field_name: str) -> Dict[str, Any]:
+        """
+        Get classification information for a field.
+        
+        Args:
+            table_name: Name of the data table
+            field_name: Name of the field
+            
+        Returns:
+            Classification information
+        """
+        return self.classification.get_field_classification(table_name, field_name)
+    
+    def check_data_sovereignty(self, operation: str, data_type: str, location: str) -> bool:
+        """
+        Check if a data operation complies with sovereignty requirements.
+        
+        Args:
+            operation: Operation type (store, process, transfer)
+            data_type: Type of data
+            location: Data location
+            
+        Returns:
+            True if compliant, False otherwise
+        """
+        return self.sovereignty.check_compliance(operation, data_type, location)
+    
+    def encrypt_sensitive_data(self, data: Dict[str, Any], table_name: str) -> Dict[str, Any]:
+        """
+        Encrypt sensitive fields in data based on classification.
+        
+        Args:
+            data: Data dictionary to encrypt
+            table_name: Name of the data table
             
         Returns:
             Data with sensitive fields encrypted
         """
-        if not self.config['components_enabled']['encryption']:
-            logger.warning("Encryption component is disabled")
+        if not data:
             return data
         
-        result = {}
+        encrypted_data = data.copy()
         
         for field_name, value in data.items():
-            # Get classification level
-            sensitivity = self.classification.get_field_classification(table_name, field_name)
+            classification = self.classification.get_field_classification(table_name, field_name)
+            level = classification.get("level", 1)
             
-            # Encrypt based on sensitivity level
-            if sensitivity.value >= 3:  # CONFIDENTIAL or RESTRICTED
-                if value is not None:
-                    # Encrypt the field value
-                    encrypted_value = self.encryption.encrypt_field(value, field_name, table_name)
-                    result[field_name] = encrypted_value
-                else:
-                    result[field_name] = None
-            else:
-                # No encryption needed
-                result[field_name] = value
+            # Encrypt fields with classification level 3 or higher
+            if level >= 3 and value is not None:
+                encrypted_data[field_name] = self.encryption.encrypt_field(value, table_name, field_name)
         
-        return result
+        return encrypted_data
     
-    def decrypt_sensitive_data(self, data: Dict[str, Any], 
-                              table_name: str) -> Dict[str, Any]:
+    def decrypt_sensitive_data(self, data: Dict[str, Any], table_name: str) -> Dict[str, Any]:
         """
-        Decrypt sensitive data.
+        Decrypt sensitive fields in data.
         
         Args:
-            data: Dictionary of field names and values
-            table_name: Database table name
+            data: Data dictionary with encrypted fields
+            table_name: Name of the data table
             
         Returns:
             Data with sensitive fields decrypted
         """
-        if not self.config['components_enabled']['encryption']:
-            logger.warning("Encryption component is disabled")
+        if not data:
             return data
         
-        result = {}
+        decrypted_data = data.copy()
         
         for field_name, value in data.items():
-            # Get classification level
-            sensitivity = self.classification.get_field_classification(table_name, field_name)
+            classification = self.classification.get_field_classification(table_name, field_name)
+            level = classification.get("level", 1)
             
-            # Decrypt based on sensitivity level
-            if sensitivity.value >= 3 and value is not None:  # CONFIDENTIAL or RESTRICTED
-                try:
-                    # Check if the value is encrypted (JSON string)
-                    if isinstance(value, str) and value.startswith('{') and value.endswith('}'):
-                        try:
-                            # Try to parse as JSON
-                            json.loads(value)
-                            # Decrypt the field value
-                            decrypted_value = self.encryption.decrypt_field(value)
-                            result[field_name] = decrypted_value
-                        except json.JSONDecodeError:
-                            # Not valid JSON, just a regular string
-                            result[field_name] = value
-                    else:
-                        # Not encrypted
-                        result[field_name] = value
-                except Exception as e:
-                    logger.error(f"Error decrypting field {field_name}: {str(e)}")
-                    # Return original value if decryption fails
-                    result[field_name] = value
-            else:
-                # No decryption needed
-                result[field_name] = value
+            # Decrypt fields with classification level 3 or higher
+            if level >= 3 and value is not None:
+                decrypted_data[field_name] = self.encryption.decrypt_field(value, table_name, field_name)
         
-        return result
+        return decrypted_data
     
-    def check_access_permission(self, user_id: int, permission: str, 
-                              context: Dict[str, Any] = None) -> bool:
+    def check_access(self, user_id: str, operation: str, resource: str, 
+                    resource_id: str = None, context: Dict[str, Any] = None) -> bool:
         """
-        Check if a user has permission to perform an action.
+        Check if a user has access to a resource.
         
         Args:
-            user_id: User ID
-            permission: Permission to check
-            context: Additional context for attribute-based access control
+            user_id: ID of the user
+            operation: Operation type (view, edit, delete)
+            resource: Resource type
+            resource_id: Optional resource ID
+            context: Optional context information
             
         Returns:
-            True if access is permitted, False otherwise
+            True if access is granted, False otherwise
         """
-        if not self.config['components_enabled']['access_control']:
-            logger.warning("Access control component is disabled")
-            return True
-        
-        return self.access_control.has_permission(user_id, permission, context)
+        return self.access_control.check_access(user_id, operation, resource, resource_id, context)
     
-    def apply_data_masking(self, user_id: int, data: Dict[str, Any], 
-                          table_name: str) -> Dict[str, Any]:
+    def apply_data_masking(self, user_id: str, data: Dict[str, Any], 
+                         table_name: str) -> Dict[str, Any]:
         """
         Apply data masking based on user permissions.
         
         Args:
-            user_id: User ID
-            data: Dictionary of field names and values
-            table_name: Database table name
+            user_id: ID of the user
+            data: Data to mask
+            table_name: Name of the data table
             
         Returns:
-            Data with sensitive fields masked if user lacks permission
+            Data with sensitive fields masked
         """
-        if not self.config['components_enabled']['classification'] or \
-           not self.config['components_enabled']['access_control']:
-            logger.warning("Classification or access control component is disabled")
+        if not data:
             return data
         
-        # Get user permissions
-        user_roles = self.access_control.get_user_roles(user_id)
-        user_permissions = self.access_control.get_role_permissions(user_roles)
+        masked_data = data.copy()
         
-        # Apply masking
-        masked_data = self.classification.mask_sensitive_data(table_name, data, user_permissions)
+        for field_name, value in data.items():
+            classification = self.classification.get_field_classification(table_name, field_name)
+            level = classification.get("level", 1)
+            
+            # Check if user has access to this field
+            field_resource = f"{table_name}.{field_name}"
+            has_access = self.access_control.check_access(user_id, "view", field_resource)
+            
+            # Mask fields that user doesn't have access to
+            if not has_access and level >= 2:
+                masked_data[field_name] = self._get_masked_value(value)
         
         return masked_data
     
-    def log_security_event(self, event_type: str, user_id: int, 
-                          details: Dict[str, Any]) -> None:
+    def _get_masked_value(self, value):
+        """Get a masked version of a value"""
+        if value is None:
+            return None
+        elif isinstance(value, str):
+            if len(value) <= 4:
+                return "****"
+            else:
+                return value[:2] + "*" * (len(value) - 4) + value[-2:]
+        else:
+            return "******"
+    
+    def log_security_event(self, event_type: str, user_id: str, details: Dict[str, Any]) -> bool:
         """
         Log a security event.
         
         Args:
             event_type: Type of security event
-            user_id: User ID associated with the event
+            user_id: ID of the user
             details: Event details
-        """
-        if not self.config['components_enabled']['audit_logging']:
-            logger.warning("Audit logging component is disabled")
-            return
-        
-        # Determine category based on event type
-        if event_type.startswith('auth_'):
-            category = 'user_authentication'
-        elif event_type.startswith('data_'):
-            category = 'data_access'
-        elif event_type.startswith('admin_'):
-            category = 'administrative'
-        elif event_type.startswith('security_'):
-            category = 'security_events'
-        else:
-            category = 'system_events'
-        
-        # Log the event
-        self.audit.log_event(category, event_type, user_id, details)
-        
-        # Also log to security monitor if it's a security-relevant event
-        if category in ['user_authentication', 'data_access', 'administrative', 'security_events']:
-            activity_type = category
-            activity_subtype = event_type
-            
-            ip_address = details.get('ip_address')
-            source = details.get('source')
-            
-            self.security_monitor.log_activity(
-                activity_type, activity_subtype, user_id, details, ip_address, source)
-    
-    def verify_data_sovereignty(self, storage_region: str, 
-                              data_sensitivity: str) -> bool:
-        """
-        Verify that data storage complies with sovereignty requirements.
-        
-        Args:
-            storage_region: Storage region or location
-            data_sensitivity: Data sensitivity level
             
         Returns:
-            True if compliant, False otherwise
+            True if successful, False otherwise
         """
-        if not self.config['components_enabled']['sovereignty']:
-            logger.warning("Data sovereignty component is disabled")
-            return True
-        
-        is_compliant, reason = self.sovereignty.verify_storage_compliance(storage_region, data_sensitivity)
-        
-        if not is_compliant:
-            logger.warning(f"Data sovereignty violation: {reason}")
-        
-        return is_compliant
+        return self.audit.log_security_event(event_type, user_id, details)
     
     def start_data_conversion(self, source_type: str, target_type: str, 
-                             source_data: Any, validation_level: str = 'standard', 
-                             error_handling: str = 'abort_on_error') -> str:
+                             source_data: Any, validation_level: str = "strict",
+                             error_handling: str = "fail") -> str:
         """
-        Start a data conversion job with all security controls applied.
+        Start a data conversion job.
         
         Args:
-            source_type: Source data type or format
-            target_type: Target data type or format
+            source_type: Type of source data
+            target_type: Type of target data
             source_data: Source data to convert
-            validation_level: Validation level ('minimal', 'standard', 'strict')
-            error_handling: Error handling mode
+            validation_level: Validation level (strict, normal, lenient)
+            error_handling: Error handling mode (fail, continue, continue_with_reporting)
             
         Returns:
-            Job ID for tracking
+            Job ID
         """
-        if not self.config['components_enabled']['conversion_controls']:
-            logger.warning("Conversion controls component is disabled")
-            return None
-        
-        # Register the conversion job
-        job_id = self.conversion.register_conversion_job(
-            source_type, target_type, validation_level, error_handling,
-            f"Convert from {source_type} to {target_type}"
+        return self.conversion.start_conversion(
+            source_type, target_type, source_data, validation_level, error_handling
         )
+    
+    def get_conversion_status(self, job_id: str) -> Dict[str, Any]:
+        """
+        Get status of a conversion job.
         
-        if not job_id:
-            logger.error("Failed to register conversion job")
-            return None
-        
-        # Start the conversion
-        success = self.conversion.start_conversion_job(job_id, source_data)
-        
-        if not success:
-            logger.error(f"Failed to start conversion job {job_id}")
-            return None
-        
-        logger.info(f"Started conversion job {job_id}: {source_type} to {target_type}")
-        return job_id
+        Args:
+            job_id: ID of the conversion job
+            
+        Returns:
+            Job status information
+        """
+        return self.conversion.get_job_status(job_id)
     
     def create_backup(self, backup_type: str, source: str, 
-                     priority: str = 'normal') -> str:
+                     priority: str = "normal") -> str:
         """
-        Create a backup with all security controls applied.
+        Create a data backup.
         
         Args:
-            backup_type: Type of backup ('database', 'files', 'configuration')
+            backup_type: Type of backup
             source: Source to backup
-            priority: Backup priority ('critical', 'important', 'normal', 'archival')
+            priority: Backup priority
             
         Returns:
-            Backup ID for tracking
+            Backup ID
         """
-        if not self.config['components_enabled']['disaster_recovery']:
-            logger.warning("Disaster recovery component is disabled")
-            return None
-        
-        # Create the backup
-        backup_id = self.recovery.create_backup(backup_type, source, priority)
-        
-        if not backup_id:
-            logger.error(f"Failed to create {backup_type} backup for {source}")
-            return None
-        
-        # Log the backup event
-        self.log_security_event('backup_created', 0, {
-            'backup_id': backup_id,
-            'backup_type': backup_type,
-            'source': source,
-            'priority': priority
-        })
-        
-        logger.info(f"Created backup {backup_id} for {source}")
-        return backup_id
+        return self.recovery.create_backup(backup_type, source, priority)
     
-    def generate_security_report(self) -> Dict[str, Any]:
+    def get_backup_status(self) -> Dict[str, Any]:
         """
-        Generate a comprehensive security report.
+        Get backup status information.
         
         Returns:
-            Dictionary with security report data
+            Backup status
         """
-        # Get current timestamp
-        timestamp = datetime.datetime.now()
+        task = {"type": "get_backup_status"}
+        result = self.recovery_agent.process_task(task)
+        return result.get("backup_status", {})
+    
+    def create_recovery_plan(self, scenario: str) -> Dict[str, Any]:
+        """
+        Create a recovery plan for a scenario.
         
-        # Generate report ID
-        report_id = f"security_report_{timestamp.strftime('%Y%m%d_%H%M%S')}"
+        Args:
+            scenario: Recovery scenario
+            
+        Returns:
+            Recovery plan
+        """
+        return self.recovery.create_recovery_plan(scenario)
+    
+    def detect_anomalies(self, table: str, methods: List[str] = None) -> Dict[str, Any]:
+        """
+        Run anomaly detection on a table.
         
-        # Initialize report data
-        report = {
-            'id': report_id,
-            'generated_at': timestamp.isoformat(),
-            'framework_version': self.config['framework_version'],
-            'environment': self.config['environment'],
-            'components': {}
+        Args:
+            table: Table to analyze
+            methods: Detection methods to use
+            
+        Returns:
+            Detected anomalies
+        """
+        task = {
+            "type": "scan_for_anomalies",
+            "tables": [table],
+            "methods": methods or ["statistical", "rule_based"]
         }
+        return self.anomaly_agent.process_task(task)
+    
+    def validate_data(self, table: str, scope: str = "incremental") -> Dict[str, Any]:
+        """
+        Validate data in a table.
         
-        # Get component status
-        for component, enabled in self.config['components_enabled'].items():
-            report['components'][component] = {
-                'enabled': enabled,
-                'status': 'active' if enabled else 'disabled'
-            }
+        Args:
+            table: Table to validate
+            scope: Validation scope (full or incremental)
+            
+        Returns:
+            Validation results
+        """
+        task = {
+            "type": "validate_table",
+            "table": table,
+            "scope": scope
+        }
+        return self.validation_agent.process_task(task)
+    
+    def get_security_events(self, filters: Dict[str, Any] = None, 
+                          limit: int = 100) -> Dict[str, Any]:
+        """
+        Get security events.
         
-        # Get recovery readiness
-        if self.config['components_enabled']['disaster_recovery']:
-            readiness_result = self.recovery.analyze_recovery_readiness()
-            if readiness_result['success']:
-                report['recovery_readiness'] = readiness_result['report']
+        Args:
+            filters: Event filters
+            limit: Maximum number of events to return
+            
+        Returns:
+            Security events
+        """
+        task = {
+            "type": "get_security_events",
+            "filters": filters or {},
+            "limit": limit
+        }
+        return self.security_agent.process_task(task)
+    
+    def run_recovery_test(self) -> Dict[str, Any]:
+        """
+        Run a recovery test.
         
-        # Save report to file
-        os.makedirs('reports', exist_ok=True)
-        report_file = os.path.join('reports', f"{report_id}.json")
-        with open(report_file, 'w') as f:
-            json.dump(report, f, indent=2)
-        
-        logger.info(f"Generated security report: {report_id}")
-        return report
+        Returns:
+            Test results
+        """
+        task = {"type": "run_recovery_test"}
+        return self.recovery_agent.process_task(task)
 
 # Create a singleton instance
 framework = DataStabilityFramework()

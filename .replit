@@ -2,6 +2,7 @@ modules = ["python-3.11", "postgresql-16"]
 
 [nix]
 channel = "stable-24_05"
+packages = ["bash", "cargo", "cyrus_sasl", "fontconfig", "geckodriver", "geos", "ghostscript", "glib", "glibcLocales", "harfbuzz", "libiconv", "libxcrypt", "openldap", "openssl", "pango", "pkg-config", "rustc", "unixODBC"]
 
 [deployment]
 deploymentTarget = "autoscale"

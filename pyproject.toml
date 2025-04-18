@@ -43,4 +43,6 @@ dependencies = [
     "python-json-logger>=3.3.0",
     "colorlog>=6.9.0",
     "cryptography>=44.0.2",
+    "data-conversion>=0.0.4",
+    "security>=1.3.1",
 ]
