@@ -68,22 +68,22 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if '/sync' in request.path and not '/verification' in request.path %}active{% endif %}" href="{{ url_for('sync.index') }}">
+                        <a class="nav-link {% if '/sync' in request.path and not '/verification' in request.path %}active{% endif %}" href="/sync/">
                             <i class="fas fa-sync me-1"></i> Sync Service
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if '/verification' in request.path %}active{% endif %}" href="{{ url_for('verification.verification_dashboard') }}">
+                        <a class="nav-link {% if '/verification' in request.path %}active{% endif %}" href="/verification/dashboard">
                             <i class="fas fa-check-circle me-1"></i> Verification
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if '/data-quality' in request.path %}active{% endif %}" href="{{ url_for('data_quality.dashboard') }}">
+                        <a class="nav-link {% if '/data-quality' in request.path %}active{% endif %}" href="/data-quality/dashboard">
                             <i class="fas fa-shield-alt me-1"></i> Data Quality
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if '/visualizations/anomaly-map' in request.path %}active{% endif %}" href="{{ url_for('anomaly_map.anomaly_map_view') }}">
+                        <a class="nav-link {% if '/visualizations/anomaly-map' in request.path %}active{% endif %}" href="/visualizations/anomaly-map">
                             <i class="fas fa-map-marked-alt me-1"></i> Anomaly Map
                         </a>
                     </li>

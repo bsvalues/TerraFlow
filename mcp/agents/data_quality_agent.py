@@ -153,52 +153,6 @@ class DataQualityAgent(BaseAgent):
             elif dataset_name:
                 # Check completeness of a named dataset
                 completeness_results = self._check_dataset_completeness(dataset_name)
-
-def monitor_conversion(self, source_data: Any, target_schema: Dict[str, Any]) -> Dict[str, Any]:
-    """Monitor data conversion process in real-time
-    
-    Args:
-        source_data: Source data being converted
-        target_schema: Target schema requirements
-        
-    Returns:
-        Monitoring results
-    """
-    monitoring_results = {
-        "conversion_status": "in_progress",
-        "data_integrity": 100.0,
-        "schema_compliance": 100.0,
-        "issues": [],
-        "warnings": []
-    }
-    
-    try:
-        # Validate schema compliance
-        for field, requirements in target_schema.items():
-            if field not in source_data:
-                monitoring_results["schema_compliance"] -= 1
-                monitoring_results["issues"].append(f"Missing required field: {field}")
-                
-        # Check data integrity
-        for field, value in source_data.items():
-            if value is None and field in target_schema:
-                monitoring_results["data_integrity"] -= 1
-                monitoring_results["warnings"].append(f"Null value in field: {field}")
-                
-        # Set final status
-        if monitoring_results["issues"]:
-            monitoring_results["conversion_status"] = "failed"
-        elif monitoring_results["warnings"]:
-            monitoring_results["conversion_status"] = "completed_with_warnings"
-        else:
-            monitoring_results["conversion_status"] = "completed_successfully"
-            
-    except Exception as e:
-        monitoring_results["conversion_status"] = "error"
-        monitoring_results["issues"].append(str(e))
-        
-    return monitoring_results
-
                 results.update(completeness_results)
             elif property_id:
                 # Check completeness of a single property record
@@ -403,6 +357,51 @@ def monitor_conversion(self, source_data: Any, target_schema: Dict[str, Any]) ->
 
     # Validation implementations
     
+    def monitor_conversion(self, source_data: Any, target_schema: Dict[str, Any]) -> Dict[str, Any]:
+        """Monitor data conversion process in real-time
+        
+        Args:
+            source_data: Source data being converted
+            target_schema: Target schema requirements
+            
+        Returns:
+            Monitoring results
+        """
+        monitoring_results = {
+            "conversion_status": "in_progress",
+            "data_integrity": 100.0,
+            "schema_compliance": 100.0,
+            "issues": [],
+            "warnings": []
+        }
+        
+        try:
+            # Validate schema compliance
+            for field, requirements in target_schema.items():
+                if field not in source_data:
+                    monitoring_results["schema_compliance"] -= 1
+                    monitoring_results["issues"].append(f"Missing required field: {field}")
+                    
+            # Check data integrity
+            for field, value in source_data.items():
+                if value is None and field in target_schema:
+                    monitoring_results["data_integrity"] -= 1
+                    monitoring_results["warnings"].append(f"Null value in field: {field}")
+                    
+            # Set final status
+            if monitoring_results["issues"]:
+                monitoring_results["conversion_status"] = "failed"
+            elif monitoring_results["warnings"]:
+                monitoring_results["conversion_status"] = "completed_with_warnings"
+            else:
+                monitoring_results["conversion_status"] = "completed_successfully"
+                
+        except Exception as e:
+            monitoring_results["conversion_status"] = "error"
+            monitoring_results["issues"].append(str(e))
+            
+        return monitoring_results
+            
     def _validate_current_use_valuation(self, property_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Validate current use valuation data

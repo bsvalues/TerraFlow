@@ -53,48 +53,62 @@ except ImportError as e:
     logger.warning(f"Anomaly map visualization not available: {str(e)}")
     anomaly_map_bp = None
 
-# If Supabase is configured, use the PostgreSQL connection string from config
-if is_supabase_enabled():
-    logger.info(f"Using Supabase PostgreSQL database for {env_mode} environment")
-    app.config["SQLALCHEMY_DATABASE_URI"] = db_config.get("connection_string")
+# Always use the provided DATABASE_URL from environment variables
+database_url = os.environ.get("DATABASE_URL")
+if database_url:
+    logger.info(f"Using environment DATABASE_URL")
+    app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 else:
-    # Handle environment-specific database URLs
-    if env_mode == "training":
-        training_db_url = os.environ.get("DATABASE_URL_TRAINING")
-        if training_db_url:
-            logger.info("Using training database URL")
-            app.config["SQLALCHEMY_DATABASE_URI"] = training_db_url
-        else:
-            # Try with suffix
-            training_db_suffix = os.environ.get(f"DATABASE_URL_{env_mode.upper()}")
-            if training_db_suffix:
-                logger.info(f"Using {env_mode} database URL with suffix")
-                app.config["SQLALCHEMY_DATABASE_URI"] = training_db_suffix
-            else:
-                logger.warning("No training database URL found, falling back to default")
-                app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", "sqlite:///benton_gis.db")
-    elif env_mode == "production":
-        production_db_url = os.environ.get("DATABASE_URL_PRODUCTION")
-        if production_db_url:
-            logger.info("Using production database URL")
-            app.config["SQLALCHEMY_DATABASE_URI"] = production_db_url
-        else:
-            # Try with suffix
-            production_db_suffix = os.environ.get(f"DATABASE_URL_{env_mode.upper()}")
-            if production_db_suffix:
-                logger.info(f"Using {env_mode} database URL with suffix")
-                app.config["SQLALCHEMY_DATABASE_URI"] = production_db_suffix
-            else:
-                logger.warning("No production database URL found, falling back to default")
-                app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", "sqlite:///benton_gis.db")
+    # Fallback to other database URLs if DATABASE_URL isn't set
+    if is_supabase_enabled():
+        logger.info(f"Using Supabase PostgreSQL database for {env_mode} environment")
+        app.config["SQLALCHEMY_DATABASE_URI"] = db_config.get("connection_string")
     else:
-        # Default development environment
-        logger.info("Using standard database connection for development")
-        app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", "sqlite:///benton_gis.db")
+        # Handle environment-specific database URLs
+        if env_mode == "training":
+            training_db_url = os.environ.get("DATABASE_URL_TRAINING")
+            if training_db_url:
+                logger.info("Using training database URL")
+                app.config["SQLALCHEMY_DATABASE_URI"] = training_db_url
+            else:
+                # Try with suffix
+                training_db_suffix = os.environ.get(f"DATABASE_URL_{env_mode.upper()}")
+                if training_db_suffix:
+                    logger.info(f"Using {env_mode} database URL with suffix")
+                    app.config["SQLALCHEMY_DATABASE_URI"] = training_db_suffix
+                else:
+                    logger.warning("No training database URL found, falling back to default")
+                    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///benton_gis.db"
+        elif env_mode == "production":
+            production_db_url = os.environ.get("DATABASE_URL_PRODUCTION")
+            if production_db_url:
+                logger.info("Using production database URL")
+                app.config["SQLALCHEMY_DATABASE_URI"] = production_db_url
+            else:
+                # Try with suffix
+                production_db_suffix = os.environ.get(f"DATABASE_URL_{env_mode.upper()}")
+                if production_db_suffix:
+                    logger.info(f"Using {env_mode} database URL with suffix")
+                    app.config["SQLALCHEMY_DATABASE_URI"] = production_db_suffix
+                else:
+                    logger.warning("No production database URL found, falling back to default")
+                    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///benton_gis.db"
+        else:
+            # Default development environment
+            logger.info("Using standard database connection for development (SQLite)")
+            app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///benton_gis.db"
 
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_recycle": 300,
     "pool_pre_ping": True,
+    "connect_args": {
+        "sslmode": "require",
+        "application_name": "BCBSGeoAssessmentPro",
+        "keepalives": 1,
+        "keepalives_idle": 30,
+        "keepalives_interval": 10,
+        "keepalives_count": 5
+    }
 }
 
 # Configure file uploads
