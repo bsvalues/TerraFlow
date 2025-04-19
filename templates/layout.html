@@ -51,65 +51,64 @@
                 {% if session.user %}
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link {% if request.path == url_for('index') %}active{% endif %}" href="{{ url_for('index') }}">
-                            <i class="fas fa-home me-1"></i> Home
+                        <a class="nav-link {% if request.path == url_for('index') %}active{% endif %}" href="{{ url_for('index') }}" style="color: var(--tf-gray-800);">
+                            <i class="fas fa-home me-1" style="color: var(--tf-flow-aqua);"></i> Dashboard
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.path == url_for('file_manager') %}active{% endif %}" href="{{ url_for('file_manager') }}">
-                            <i class="fas fa-file me-1"></i> File Manager
+                        <a class="nav-link {% if request.path == url_for('file_manager') %}active{% endif %}" href="{{ url_for('file_manager') }}" style="color: var(--tf-gray-800);">
+                            <i class="fas fa-file me-1" style="color: var(--tf-flow-aqua);"></i> Files
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.path == url_for('map_viewer') %}active{% endif %}" href="{{ url_for('map_viewer') }}">
-                            <i class="fas fa-map me-1"></i> Map Viewer
+                        <a class="nav-link {% if request.path == url_for('map_viewer') %}active{% endif %}" href="{{ url_for('map_viewer') }}" style="color: var(--tf-gray-800);">
+                            <i class="fas fa-map me-1" style="color: var(--tf-map-green);"></i> {{ module_lockup('Map') }}
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.path == url_for('search_page') %}active{% endif %}" href="{{ url_for('search_page') }}">
-                            <i class="fas fa-search me-1"></i> Search
+                        <a class="nav-link {% if request.path == url_for('search_page') %}active{% endif %}" href="{{ url_for('search_page') }}" style="color: var(--tf-gray-800);">
+                            <i class="fas fa-search me-1" style="color: var(--tf-flow-aqua);"></i> Search
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.path == url_for('mcp_dashboard') %}active{% endif %}" href="{{ url_for('mcp_dashboard') }}">
-                            <i class="fas fa-microchip me-1"></i> MCP Dashboard
+                        <a class="nav-link {% if request.path == url_for('mcp_dashboard') %}active{% endif %}" href="{{ url_for('mcp_dashboard') }}" style="color: var(--tf-gray-800);">
+                            <i class="fas fa-microchip me-1" style="color: var(--tf-insight-violet);"></i> {{ module_lockup('Insight') }}
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.path == url_for('power_query') %}active{% endif %}" href="{{ url_for('power_query') }}">
-                            <i class="fas fa-database me-1"></i> Power Query
+                        <a class="nav-link {% if request.path == url_for('power_query') %}active{% endif %}" href="{{ url_for('power_query') }}" style="color: var(--tf-gray-800);">
+                            <i class="fas fa-database me-1" style="color: var(--tf-flow-aqua);"></i> Power Query
                         </a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if '/sync' in request.path and not '/verification' in request.path %}active{% endif %}" href="/sync/">
-                            <i class="fas fa-sync me-1"></i> Sync Service
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {% if '/sync' in request.path %}active{% endif %}" href="#" id="syncDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" style="color: var(--tf-gray-800);">
+                            <i class="fas fa-sync me-1" style="color: var(--tf-flow-aqua);"></i> {{ module_lockup('Flow') }} Tools
                         </a>
+                        <ul class="dropdown-menu" aria-labelledby="syncDropdown">
+                            <li><a class="dropdown-item" href="/sync/">
+                                <i class="fas fa-sync me-1" style="color: var(--tf-flow-aqua);"></i> Sync Service
+                            </a></li>
+                            <li><a class="dropdown-item" href="/verification/dashboard">
+                                <i class="fas fa-check-circle me-1" style="color: var(--tf-flow-aqua);"></i> Verification
+                            </a></li>
+                            <li><a class="dropdown-item" href="/data-quality/dashboard">
+                                <i class="fas fa-shield-alt me-1" style="color: var(--tf-flow-aqua);"></i> Data Quality
+                            </a></li>
+                            <li><a class="dropdown-item" href="/visualizations/anomaly-map">
+                                <i class="fas fa-map-marked-alt me-1" style="color: var(--tf-map-green);"></i> Anomaly Map
+                            </a></li>
+                        </ul>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if '/verification' in request.path %}active{% endif %}" href="/verification/dashboard">
-                            <i class="fas fa-check-circle me-1"></i> Verification
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if '/data-quality' in request.path %}active{% endif %}" href="/data-quality/dashboard">
-                            <i class="fas fa-shield-alt me-1"></i> Data Quality
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if '/visualizations/anomaly-map' in request.path %}active{% endif %}" href="/visualizations/anomaly-map">
-                            <i class="fas fa-map-marked-alt me-1"></i> Anomaly Map
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == url_for('api_tester') %}active{% endif %}" href="{{ url_for('api_tester') }}">
-                            <i class="fas fa-code me-1"></i> API Tester
+                        <a class="nav-link {% if request.path == url_for('api_tester') %}active{% endif %}" href="{{ url_for('api_tester') }}" style="color: var(--tf-gray-800);">
+                            <i class="fas fa-code me-1" style="color: var(--tf-sketch-orange);"></i> {{ module_lockup('Sketch') }}
                         </a>
                     </li>
                 </ul>
                 <ul class="navbar-nav">
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="fas fa-user-circle me-1"></i>
+                        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" style="color: var(--tf-gray-800);">
+                            <i class="fas fa-user-circle me-1" style="color: var(--tf-flow-aqua);"></i>
                             {{ session.user.username }}
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
@@ -148,14 +147,29 @@
     </main>
 
     <!-- Footer -->
-    <footer class="footer" style="background-color: #005288; color: white; padding: 15px 0;">
+    <footer class="footer" style="background-color: white; border-top: 1px solid var(--tf-gray-200); padding: 15px 0;">
         <div class="container">
             <div class="row">
-                <div class="col-md-6">
-                    <p class="mb-0">&copy; {{ now.year }} Benton County Assessor's Office</p>
+                <div class="col-md-4">
+                    <div class="d-flex align-items-center mb-2">
+                        <i class="fas fa-wave-square me-2" style="color: var(--tf-flow-aqua);"></i>
+                        {{ module_lockup('Flow') }}
+                    </div>
+                    <p class="text-muted small mb-0">Data Integration & ETL Pipeline</p>
                 </div>
-                <div class="col-md-6 text-md-end">
-                    <p class="mb-0">GIS Data Management System</p>
+                <div class="col-md-4 text-md-center">
+                    <p class="mb-0" style="color: var(--tf-gray-700);">
+                        <strong>TerraFusion</strong> Platform
+                    </p>
+                    <p class="text-muted small mb-0">&copy; {{ now.year }} Benton County Assessor's Office</p>
+                </div>
+                <div class="col-md-4 text-md-end">
+                    <p class="mb-0" style="color: var(--tf-gray-700);">
+                        <a href="{{ url_for('index') }}" class="text-decoration-none" style="color: var(--tf-flow-aqua);">Home</a> |
+                        <a href="/sync/" class="text-decoration-none" style="color: var(--tf-flow-aqua);">Sync</a> |
+                        <a href="/data-quality/dashboard" class="text-decoration-none" style="color: var(--tf-flow-aqua);">Quality</a>
+                    </p>
+                    <p class="text-muted small mb-0">Version 2.1.0</p>
                 </div>
             </div>
         </div>

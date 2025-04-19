@@ -1,23 +1,31 @@
 {% extends 'layout.html' %}
 
+{% from 'components/module_card.html' import module_card %}
+
 {% block content %}
 <div class="container">
     <div class="row mb-4">
         <div class="col-12">
-            <div class="bg-light p-4 rounded border">
-                <h1 class="display-5">Welcome to Benton County GIS System</h1>
-                <p class="lead">Manage, visualize, and search geographic information for Benton County Assessor's Office.</p>
-                <hr class="my-4">
-                <p>Use the tools below to navigate the system functionality.</p>
+            <div class="bg-white p-4 rounded shadow-sm">
+                <div class="d-flex align-items-center mb-2">
+                    <i class="fas fa-wave-square me-2" style="color: var(--tf-flow-aqua);"></i>
+                    <h1 class="h3 mb-0">
+                        {% from 'components/module_lockup.html' import module_lockup %}
+                        {{ module_lockup('Flow') }} Dashboard
+                    </h1>
+                </div>
+                <p class="lead" style="color: var(--tf-gray-700);">Manage, integrate, and synchronize assessment data for Benton County.</p>
+                <hr class="my-4" style="border-color: var(--tf-gray-200);">
+                <p style="color: var(--tf-gray-700);">Access the TerraFusion platform modules below.</p>
                 <div class="d-flex flex-wrap gap-2">
-                    <a href="{{ url_for('file_manager') }}" class="btn btn-primary">
+                    <a href="{{ url_for('file_manager') }}" class="tf-button flow">
                         <i class="fas fa-file me-2"></i> File Manager
                     </a>
-                    <a href="{{ url_for('map_viewer') }}" class="btn btn-success">
+                    <a href="{{ url_for('map_viewer') }}" class="tf-button map">
                         <i class="fas fa-map me-2"></i> Map Viewer
                     </a>
-                    <a href="{{ url_for('search_page') }}" class="btn btn-info">
-                        <i class="fas fa-search me-2"></i> Search GIS Data
+                    <a href="{{ url_for('search_page') }}" class="tf-button flow">
+                        <i class="fas fa-search me-2"></i> Search Data
                     </a>
                 </div>
             </div>
@@ -26,91 +34,134 @@
 
     <div class="row mb-4">
         <div class="col-md-4">
-            <div class="stats-card bg-light">
-                <div class="stats-icon text-primary">
-                    <i class="fas fa-file"></i>
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="rounded-circle p-3 me-3" style="background-color: rgba(0, 191, 214, 0.15);">
+                            <i class="fas fa-file" style="color: var(--tf-flow-aqua);"></i>
+                        </div>
+                        <div>
+                            <h2 class="mb-0 h4">{{ file_count|default('0') }}</h2>
+                            <p class="text-muted mb-0">GIS Files</p>
+                        </div>
+                    </div>
+                    <div class="progress" style="height: 4px;">
+                        <div class="progress-bar" role="progressbar" style="width: 75%; background-color: var(--tf-flow-aqua);" aria-valuenow="75" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
                 </div>
-                <div class="stats-number">{{ file_count|default('0') }}</div>
-                <div class="stats-label">GIS Files</div>
             </div>
         </div>
         <div class="col-md-4">
-            <div class="stats-card bg-light">
-                <div class="stats-icon text-success">
-                    <i class="fas fa-folder"></i>
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="rounded-circle p-3 me-3" style="background-color: rgba(46, 125, 50, 0.15);">
+                            <i class="fas fa-folder" style="color: var(--tf-map-green);"></i>
+                        </div>
+                        <div>
+                            <h2 class="mb-0 h4">{{ project_count|default('0') }}</h2>
+                            <p class="text-muted mb-0">Projects</p>
+                        </div>
+                    </div>
+                    <div class="progress" style="height: 4px;">
+                        <div class="progress-bar" role="progressbar" style="width: 60%; background-color: var(--tf-map-green);" aria-valuenow="60" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
                 </div>
-                <div class="stats-number">{{ project_count|default('0') }}</div>
-                <div class="stats-label">Projects</div>
             </div>
         </div>
         <div class="col-md-4">
-            <div class="stats-card bg-light">
-                <div class="stats-icon text-info">
-                    <i class="fas fa-search"></i>
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="rounded-circle p-3 me-3" style="background-color: rgba(122, 31, 255, 0.15);">
+                            <i class="fas fa-search" style="color: var(--tf-insight-violet);"></i>
+                        </div>
+                        <div>
+                            <h2 class="mb-0 h4">{{ query_count|default('0') }}</h2>
+                            <p class="text-muted mb-0">Searches</p>
+                        </div>
+                    </div>
+                    <div class="progress" style="height: 4px;">
+                        <div class="progress-bar" role="progressbar" style="width: 40%; background-color: var(--tf-insight-violet);" aria-valuenow="40" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
                 </div>
-                <div class="stats-number">{{ query_count|default('0') }}</div>
-                <div class="stats-label">Searches</div>
             </div>
         </div>
     </div>
 
     <div class="row">
         <div class="col-md-6">
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-clock me-2"></i> Recent File Activity
-                    </h5>
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white py-3 d-flex align-items-center" style="border-bottom: 1px solid var(--tf-gray-200);">
+                    <div class="rounded-circle p-2 me-2" style="background-color: rgba(0, 191, 214, 0.15);">
+                        <i class="fas fa-clock" style="color: var(--tf-flow-aqua);"></i>
+                    </div>
+                    <h5 class="card-title mb-0" style="color: var(--tf-gray-800);">Recent File Activity</h5>
                 </div>
-                <div class="card-body">
+                <div class="card-body p-0">
                     {% if recent_files %}
                         <ul class="list-group list-group-flush">
                             {% for file in recent_files %}
-                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <li class="list-group-item border-0 px-4 py-3 d-flex justify-content-between align-items-center">
                                     <div>
-                                        <strong>{{ file.filename }}</strong>
+                                        <strong style="color: var(--tf-gray-800);">{{ file.filename }}</strong>
                                         <small class="d-block text-muted">{{ file.upload_date.strftime('%Y-%m-%d %H:%M') }}</small>
                                     </div>
-                                    <a href="{{ url_for('download_file', file_id=file.id) }}" class="btn btn-sm btn-outline-secondary">
+                                    <a href="{{ url_for('download_file', file_id=file.id) }}" class="tf-button flow btn-sm">
                                         <i class="fas fa-download"></i>
                                     </a>
                                 </li>
                             {% endfor %}
                         </ul>
                     {% else %}
-                        <p class="text-muted">No recent file activity</p>
+                        <p class="text-muted p-4">No recent file activity</p>
                     {% endif %}
                 </div>
-                <div class="card-footer text-end">
-                    <a href="{{ url_for('file_manager') }}" class="btn btn-sm btn-outline-primary">View All Files</a>
+                <div class="card-footer bg-white text-end py-3 px-4" style="border-top: 1px solid var(--tf-gray-200);">
+                    <a href="{{ url_for('file_manager') }}" class="tf-button flow">View All Files</a>
                 </div>
             </div>
         </div>
         <div class="col-md-6">
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-search me-2"></i> Recent Searches
-                    </h5>
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white py-3 d-flex align-items-center" style="border-bottom: 1px solid var(--tf-gray-200);">
+                    <div class="rounded-circle p-2 me-2" style="background-color: rgba(122, 31, 255, 0.15);">
+                        <i class="fas fa-search" style="color: var(--tf-insight-violet);"></i>
+                    </div>
+                    <h5 class="card-title mb-0" style="color: var(--tf-gray-800);">Recent Searches</h5>
                 </div>
-                <div class="card-body">
+                <div class="card-body p-0">
                     {% if recent_queries %}
                         <ul class="list-group list-group-flush">
                             {% for query in recent_queries %}
-                                <li class="list-group-item">
+                                <li class="list-group-item border-0 px-4 py-3">
                                     <div class="mb-1">
-                                        <strong>"{{ query.query }}"</strong>
+                                        <strong style="color: var(--tf-gray-800);">"{{ query.query }}"</strong>
                                     </div>
                                     <small class="text-muted">{{ query.timestamp.strftime('%Y-%m-%d %H:%M') }}</small>
                                 </li>
                             {% endfor %}
                         </ul>
                     {% else %}
-                        <p class="text-muted">No recent searches</p>
+                        <p class="text-muted p-4">No recent searches</p>
                     {% endif %}
                 </div>
-                <div class="card-footer text-end">
-                    <a href="{{ url_for('search_page') }}" class="btn btn-sm btn-outline-primary">New Search</a>
+                <div class="card-footer bg-white text-end py-3 px-4" style="border-top: 1px solid var(--tf-gray-200);">
+                    <a href="{{ url_for('search_page') }}" class="tf-button insight">New Search</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-12 mb-4">
+            <div class="row">
+                <div class="col-md-4">
+                    {{ module_card('Flow', 'Sync Service', 'Manage data synchronization between systems', icon_class='fa-sync', link='/sync/', btn_text='Access Hub') }}
+                </div>
+                <div class="col-md-4">
+                    {{ module_card('Map', 'Property Map', 'Visualize property data spatially', icon_class='fa-map', link=url_for('map_viewer'), btn_text='Open Map') }}
+                </div>
+                <div class="col-md-4">
+                    {{ module_card('Insight', 'Data Quality', 'Monitor and maintain data integrity', icon_class='fa-shield-alt', link='/data-quality/dashboard', btn_text='View Metrics') }}
                 </div>
             </div>
         </div>
