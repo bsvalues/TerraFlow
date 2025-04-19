@@ -51,57 +51,57 @@
                 {% if session.user %}
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link {% if request.path == url_for('index') %}active{% endif %}" href="{{ url_for('index') }}" style="color: var(--tf-gray-800);">
+                        <a class="nav-link {% if request.path == url_for('index') %}active{% endif %}" href="{{ url_for('index') }}" style="color: var(--tf-gray-900); font-weight: 500;">
                             <i class="fas fa-home me-1" style="color: var(--tf-flow-aqua);"></i> Home
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.path == url_for('file_manager') %}active{% endif %}" href="{{ url_for('file_manager') }}" style="color: var(--tf-gray-800);">
+                        <a class="nav-link {% if request.path == url_for('file_manager') %}active{% endif %}" href="{{ url_for('file_manager') }}" style="color: var(--tf-gray-900); font-weight: 500;">
                             <i class="fas fa-file me-1" style="color: var(--tf-flow-aqua);"></i> File Manager
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.path == url_for('map_viewer') %}active{% endif %}" href="{{ url_for('map_viewer') }}" style="color: var(--tf-gray-800);">
+                        <a class="nav-link {% if request.path == url_for('map_viewer') %}active{% endif %}" href="{{ url_for('map_viewer') }}" style="color: var(--tf-gray-900); font-weight: 500;">
                             <i class="fas fa-map me-1" style="color: var(--tf-map-green);"></i> Map Viewer
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.path == url_for('search_page') %}active{% endif %}" href="{{ url_for('search_page') }}" style="color: var(--tf-gray-800);">
-                            <i class="fas fa-search me-1" style="color: var(--tf-flow-aqua);"></i> Search
+                        <a class="nav-link {% if request.path == url_for('search_page') %}active{% endif %}" href="{{ url_for('search_page') }}" style="color: var(--tf-gray-900); font-weight: 500;">
+                            <i class="fas fa-search me-1" style="color: var(--tf-insight-violet);"></i> Search
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.path == url_for('mcp_dashboard') %}active{% endif %}" href="{{ url_for('mcp_dashboard') }}" style="color: var(--tf-gray-800);">
-                            <i class="fas fa-microchip me-1" style="color: var(--tf-flow-aqua);"></i> MCP Dashboard
+                        <a class="nav-link {% if request.path == url_for('mcp_dashboard') %}active{% endif %}" href="{{ url_for('mcp_dashboard') }}" style="color: var(--tf-gray-900); font-weight: 500;">
+                            <i class="fas fa-microchip me-1" style="color: var(--tf-insight-violet);"></i> MCP Dashboard
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.path == url_for('power_query') %}active{% endif %}" href="{{ url_for('power_query') }}" style="color: var(--tf-gray-800);">
-                            <i class="fas fa-database me-1" style="color: var(--tf-flow-aqua);"></i> Power Query
+                        <a class="nav-link {% if request.path == url_for('power_query') %}active{% endif %}" href="{{ url_for('power_query') }}" style="color: var(--tf-gray-900); font-weight: 500;">
+                            <i class="fas fa-database me-1" style="color: var(--tf-sketch-orange);"></i> Power Query
                         </a>
                     </li>
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {% if '/sync' in request.path or '/verification' in request.path or '/data-quality' in request.path or '/visualizations/anomaly-map' in request.path %}active{% endif %}" href="#" id="syncDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" style="color: var(--tf-gray-800);">
+                        <a class="nav-link dropdown-toggle {% if '/sync' in request.path or '/verification' in request.path or '/data-quality' in request.path or '/visualizations/anomaly-map' in request.path %}active{% endif %}" href="#" id="syncDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" style="color: var(--tf-gray-900); font-weight: 500;">
                             <i class="fas fa-sync me-1" style="color: var(--tf-flow-aqua);"></i> Services
                         </a>
                         <ul class="dropdown-menu" aria-labelledby="syncDropdown">
-                            <li><a class="dropdown-item" href="/sync/">
+                            <li><a class="dropdown-item" href="/sync/" style="font-weight: 500;">
                                 <i class="fas fa-sync me-1" style="color: var(--tf-flow-aqua);"></i> Sync Service
                             </a></li>
-                            <li><a class="dropdown-item" href="/verification/dashboard">
+                            <li><a class="dropdown-item" href="/verification/dashboard" style="font-weight: 500;">
                                 <i class="fas fa-check-circle me-1" style="color: var(--tf-flow-aqua);"></i> Verification
                             </a></li>
-                            <li><a class="dropdown-item" href="/data-quality/dashboard">
-                                <i class="fas fa-shield-alt me-1" style="color: var(--tf-flow-aqua);"></i> Data Quality
+                            <li><a class="dropdown-item" href="/data-quality/dashboard" style="font-weight: 500;">
+                                <i class="fas fa-shield-alt me-1" style="color: var(--tf-insight-violet);"></i> Data Quality
                             </a></li>
-                            <li><a class="dropdown-item" href="/visualizations/anomaly-map">
+                            <li><a class="dropdown-item" href="/visualizations/anomaly-map" style="font-weight: 500;">
                                 <i class="fas fa-map-marked-alt me-1" style="color: var(--tf-map-green);"></i> Anomaly Map
                             </a></li>
                         </ul>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.path == url_for('api_tester') %}active{% endif %}" href="{{ url_for('api_tester') }}" style="color: var(--tf-gray-800);">
-                            <i class="fas fa-code me-1" style="color: var(--tf-flow-aqua);"></i> API Tester
+                        <a class="nav-link {% if request.path == url_for('api_tester') %}active{% endif %}" href="{{ url_for('api_tester') }}" style="color: var(--tf-gray-900); font-weight: 500;">
+                            <i class="fas fa-code me-1" style="color: var(--tf-sketch-orange);"></i> API Tester
                         </a>
                     </li>
                 </ul>
