@@ -1,0 +1,177 @@
+/* TerraFusion Brand System CSS */
+
+:root {
+  /* Module Color Variables */
+  --tf-flow-aqua: #00BFD6;
+  --tf-flow-gradient: #00E3A1;
+  --tf-map-green: #2E7D32;
+  --tf-map-gradient: #5CD65C;
+  --tf-insight-violet: #7A1FFF;
+  --tf-insight-gradient: #C760FF;
+  --tf-sketch-orange: #FF7A29;
+  --tf-sketch-gradient: #FFB366;
+  --tf-levy-gold: #C49A00;
+  --tf-levy-gradient: #FFDA3B;
+  
+  /* System colors */
+  --tf-gray-900: #212121;
+  --tf-gray-800: #424242;
+  --tf-gray-700: #616161;
+  --tf-gray-600: #757575;
+  --tf-gray-500: #9E9E9E;
+  --tf-gray-400: #BDBDBD;
+  --tf-gray-300: #E0E0E0;
+  --tf-gray-200: #EEEEEE;
+  --tf-gray-100: #F5F5F5;
+  --tf-gray-50: #FAFAFA;
+  
+  /* Font variables */
+  --tf-font-head: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  --tf-font-body: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* Module Lockup Styling */
+.module-lockup {
+  font-family: var(--tf-font-head);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.module-lockup span.prefix {
+  color: var(--tf-gray-900);
+}
+
+.module-lockup span.name {
+  text-transform: uppercase;
+}
+
+/* Module-specific styling */
+.module-flow span.name {
+  color: var(--tf-flow-aqua);
+}
+
+.module-map span.name {
+  color: var(--tf-map-green);
+}
+
+.module-insight span.name {
+  color: var(--tf-insight-violet);
+}
+
+.module-sketch span.name {
+  color: var(--tf-sketch-orange);
+}
+
+.module-levy span.name {
+  color: var(--tf-levy-gold);
+}
+
+/* Module card styling */
+.module-card {
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.module-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Module-specific card headers */
+.module-card.flow .card-header {
+  background: linear-gradient(to right, var(--tf-flow-aqua), var(--tf-flow-gradient));
+  color: white;
+}
+
+.module-card.map .card-header {
+  background: linear-gradient(to right, var(--tf-map-green), var(--tf-map-gradient));
+  color: white;
+}
+
+.module-card.insight .card-header {
+  background: linear-gradient(to right, var(--tf-insight-violet), var(--tf-insight-gradient));
+  color: white;
+}
+
+.module-card.sketch .card-header {
+  background: linear-gradient(to right, var(--tf-sketch-orange), var(--tf-sketch-gradient));
+  color: white;
+}
+
+.module-card.levy .card-header {
+  background: linear-gradient(to right, var(--tf-levy-gold), var(--tf-levy-gradient));
+  color: white;
+}
+
+/* Navigation styling for TerraFusion */
+.terrafusion-nav {
+  background-color: white;
+  border-bottom: 1px solid var(--tf-gray-200);
+}
+
+.terrafusion-nav .brand {
+  font-family: var(--tf-font-head);
+  font-weight: 700;
+  font-size: 1.5rem;
+  color: var(--tf-gray-900);
+}
+
+/* Button styling */
+.tf-button {
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-weight: 600;
+  transition: all 0.2s;
+  border: none;
+  cursor: pointer;
+}
+
+.tf-button.flow {
+  background-color: var(--tf-flow-aqua);
+  color: white;
+}
+
+.tf-button.flow:hover {
+  background-color: #00a8bd;
+}
+
+.tf-button.map {
+  background-color: var(--tf-map-green);
+  color: white;
+}
+
+.tf-button.map:hover {
+  background-color: #246b2a;
+}
+
+.tf-button.insight {
+  background-color: var(--tf-insight-violet);
+  color: white;
+}
+
+.tf-button.insight:hover {
+  background-color: #6419d2;
+}
+
+.tf-button.sketch {
+  background-color: var(--tf-sketch-orange);
+  color: white;
+}
+
+.tf-button.sketch:hover {
+  background-color: #e86a1d;
+}
+
+.tf-button.levy {
+  background-color: var(--tf-levy-gold);
+  color: white;
+}
+
+.tf-button.levy:hover {
+  background-color: #ab8700;
+}
