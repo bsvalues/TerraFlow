@@ -52,17 +52,17 @@
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
                         <a class="nav-link {% if request.path == url_for('index') %}active{% endif %}" href="{{ url_for('index') }}" style="color: var(--tf-gray-800);">
-                            <i class="fas fa-home me-1" style="color: var(--tf-flow-aqua);"></i> Dashboard
+                            <i class="fas fa-home me-1" style="color: var(--tf-flow-aqua);"></i> Home
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {% if request.path == url_for('file_manager') %}active{% endif %}" href="{{ url_for('file_manager') }}" style="color: var(--tf-gray-800);">
-                            <i class="fas fa-file me-1" style="color: var(--tf-flow-aqua);"></i> Files
+                            <i class="fas fa-file me-1" style="color: var(--tf-flow-aqua);"></i> File Manager
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {% if request.path == url_for('map_viewer') %}active{% endif %}" href="{{ url_for('map_viewer') }}" style="color: var(--tf-gray-800);">
-                            <i class="fas fa-map me-1" style="color: var(--tf-map-green);"></i> {{ module_lockup('Map') }}
+                            <i class="fas fa-map me-1" style="color: var(--tf-map-green);"></i> Map Viewer
                         </a>
                     </li>
                     <li class="nav-item">
@@ -72,7 +72,7 @@
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {% if request.path == url_for('mcp_dashboard') %}active{% endif %}" href="{{ url_for('mcp_dashboard') }}" style="color: var(--tf-gray-800);">
-                            <i class="fas fa-microchip me-1" style="color: var(--tf-insight-violet);"></i> {{ module_lockup('Insight') }}
+                            <i class="fas fa-microchip me-1" style="color: var(--tf-flow-aqua);"></i> MCP Dashboard
                         </a>
                     </li>
                     <li class="nav-item">
@@ -81,8 +81,8 @@
                         </a>
                     </li>
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {% if '/sync' in request.path %}active{% endif %}" href="#" id="syncDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" style="color: var(--tf-gray-800);">
-                            <i class="fas fa-sync me-1" style="color: var(--tf-flow-aqua);"></i> {{ module_lockup('Flow') }} Tools
+                        <a class="nav-link dropdown-toggle {% if '/sync' in request.path or '/verification' in request.path or '/data-quality' in request.path or '/visualizations/anomaly-map' in request.path %}active{% endif %}" href="#" id="syncDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" style="color: var(--tf-gray-800);">
+                            <i class="fas fa-sync me-1" style="color: var(--tf-flow-aqua);"></i> Services
                         </a>
                         <ul class="dropdown-menu" aria-labelledby="syncDropdown">
                             <li><a class="dropdown-item" href="/sync/">
@@ -101,7 +101,7 @@
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {% if request.path == url_for('api_tester') %}active{% endif %}" href="{{ url_for('api_tester') }}" style="color: var(--tf-gray-800);">
-                            <i class="fas fa-code me-1" style="color: var(--tf-sketch-orange);"></i> {{ module_lockup('Sketch') }}
+                            <i class="fas fa-code me-1" style="color: var(--tf-flow-aqua);"></i> API Tester
                         </a>
                     </li>
                 </ul>
