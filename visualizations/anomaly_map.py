@@ -17,10 +17,38 @@ from typing import Dict, List, Any, Optional
 from flask import Blueprint, render_template, jsonify, request
 from sqlalchemy import text
 
-from data_stability_framework import framework
-
 # Initialize logger
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+# Import required modules
+try:
+    # Import security monitoring
+    from security.security_monitoring import security_monitoring_manager
+    from security.audit_logging import audit_logger
+    
+    # Import data stability framework
+    try:
+        import data_stability_framework
+        logger.info("Successfully imported data_stability_framework")
+    except ImportError as e:
+        logger.warning(f"Could not import data_stability_framework: {str(e)}")
+        # Create a simple placeholder if the framework is not available
+        class DummyFramework:
+            def __init__(self):
+                self.name = "DummyFramework"
+            
+            def detect_anomalies(self, *args, **kwargs):
+                return []
+                
+        data_stability_framework = DummyFramework()
+        logger.warning("Created dummy data stability framework")
+    
+    logger.info("Successfully initialized required modules")
+except ImportError as e:
+    logger.error(f"Failed to import required modules: {str(e)}")
+
+logger.info("anomaly_map module initialized")
 
 # Create blueprint
 anomaly_map_bp = Blueprint('anomaly_map', __name__, template_folder='templates')

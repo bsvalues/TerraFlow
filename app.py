@@ -150,7 +150,10 @@ def load_user(user_id):
 # Add template context processors
 @app.context_processor
 def inject_now():
-    return {'now': datetime.datetime.now()}
+    return {
+        'now': datetime.datetime.now(),
+        'datetime': datetime
+    }
 
 # Import views and models after app is created to avoid circular imports
 with app.app_context():
