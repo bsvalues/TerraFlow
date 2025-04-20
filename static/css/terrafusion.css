@@ -1,17 +1,32 @@
 /* TerraFusion Brand System CSS */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700&display=swap');
 
 :root {
   /* Module Color Variables */
   --tf-flow-aqua: #00BFD6;
   --tf-flow-gradient: #00E3A1;
+  --tf-flow-light: rgba(0, 191, 214, 0.15);
+  --tf-flow-dark: #0098A8;
+  
   --tf-map-green: #2E7D32;
   --tf-map-gradient: #5CD65C;
+  --tf-map-light: rgba(46, 125, 50, 0.15);
+  --tf-map-dark: #1B5E20;
+  
   --tf-insight-violet: #7A1FFF;
   --tf-insight-gradient: #C760FF;
+  --tf-insight-light: rgba(122, 31, 255, 0.15);
+  --tf-insight-dark: #6200EA;
+  
   --tf-sketch-orange: #FF7A29;
   --tf-sketch-gradient: #FFB366;
+  --tf-sketch-light: rgba(255, 122, 41, 0.15);
+  --tf-sketch-dark: #E65100;
+  
   --tf-levy-gold: #C49A00;
   --tf-levy-gradient: #FFDA3B;
+  --tf-levy-light: rgba(196, 154, 0, 0.15);
+  --tf-levy-dark: #A67C00;
   
   /* System colors */
   --tf-gray-900: #212121;
@@ -26,8 +41,116 @@
   --tf-gray-50: #FAFAFA;
   
   /* Font variables */
-  --tf-font-head: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  --tf-font-head: 'Poppins', 'Helvetica Neue', Arial, sans-serif;
   --tf-font-body: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  --tf-font-mono: 'Roboto Mono', monospace;
+  
+  /* Shadows */
+  --tf-shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
+  --tf-shadow-md: 0 4px 8px rgba(0, 0, 0, 0.08);
+  --tf-shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* Base styling */
+body {
+  font-family: var(--tf-font-body);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--tf-gray-800);
+  background-color: var(--tf-gray-50);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--tf-font-head);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  color: var(--tf-gray-900);
+  margin-bottom: 0.75rem;
+}
+
+.main-content {
+  min-height: calc(100vh - 180px);
+}
+
+/* Card styling */
+.card {
+  border: none;
+  border-radius: 12px;
+  box-shadow: var(--tf-shadow-sm);
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.card:hover {
+  box-shadow: var(--tf-shadow-md);
+}
+
+.card-header {
+  background-color: white;
+  border-bottom: 1px solid var(--tf-gray-200);
+  padding: 1rem 1.25rem;
+  font-weight: 600;
+}
+
+.card-title {
+  font-family: var(--tf-font-head);
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  color: var(--tf-gray-900);
+}
+
+/* Stats cards */
+.stats-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 1.25rem;
+}
+
+/* Tables */
+.table th {
+  font-weight: 600;
+  color: var(--tf-gray-900);
+  border-top: none;
+  border-bottom-width: 1px;
+  background-color: var(--tf-gray-50);
+}
+
+.table td {
+  vertical-align: middle;
+}
+
+/* Pagination */
+.pagination .page-link {
+  border: none;
+  color: var(--tf-gray-800);
+  padding: 0.5rem 0.75rem;
+  font-weight: 500;
+  border-radius: 6px;
+  margin: 0 0.15rem;
+}
+
+.pagination .page-item.active .page-link {
+  background-color: var(--tf-flow-aqua);
+  color: white;
+}
+
+/* Footer styling */
+.footer {
+  background-color: white;
+  border-top: 1px solid var(--tf-gray-200);
+  padding: 1.5rem 0;
+}
+
+/* Component transitions */
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.3s;
+}
+.fade-enter, .fade-leave-to {
+  opacity: 0;
 }
 
 /* Module Lockup Styling */
@@ -39,16 +162,27 @@
   align-items: center;
   gap: 0.25rem;
   margin-right: 5px;
+  position: relative;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.module-lockup:hover {
+  background-color: var(--tf-gray-100);
 }
 
 .module-lockup span.prefix {
   color: var(--tf-gray-900);
-  font-size: 14px;
+  font-size: 15px;
+  font-weight: 600;
 }
 
 .module-lockup span.name {
   text-transform: uppercase;
-  font-size: 14px;
+  font-size: 15px;
+  font-weight: 700;
+  position: relative;
 }
 
 /* Module-specific styling */
@@ -74,64 +208,184 @@
 
 /* Module card styling */
 .module-card {
-  border-radius: 8px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  border: none;
+  box-shadow: var(--tf-shadow-md);
   overflow: hidden;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
+  height: 100%;
+  position: relative;
+  background-color: white;
 }
 
 .module-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-6px);
+  box-shadow: var(--tf-shadow-lg);
+}
+
+.module-card:hover .card-header {
+  padding-top: 25px;
+  padding-bottom: 25px;
 }
 
 /* Module-specific card headers */
+.module-card .card-header {
+  padding: 22px 20px;
+  font-family: var(--tf-font-head);
+  font-weight: 600;
+  font-size: 1.1rem;
+  border: none;
+  transition: all 0.3s ease;
+}
+
+.module-card .card-body {
+  padding: 1.5rem;
+}
+
 .module-card.flow .card-header {
-  background: linear-gradient(to right, var(--tf-flow-aqua), var(--tf-flow-gradient));
+  background: linear-gradient(135deg, var(--tf-flow-aqua), var(--tf-flow-gradient));
   color: white;
+  box-shadow: 0 4px 12px rgba(0, 191, 214, 0.3);
 }
 
 .module-card.map .card-header {
-  background: linear-gradient(to right, var(--tf-map-green), var(--tf-map-gradient));
+  background: linear-gradient(135deg, var(--tf-map-green), var(--tf-map-gradient));
   color: white;
+  box-shadow: 0 4px 12px rgba(46, 125, 50, 0.3);
 }
 
 .module-card.insight .card-header {
-  background: linear-gradient(to right, var(--tf-insight-violet), var(--tf-insight-gradient));
+  background: linear-gradient(135deg, var(--tf-insight-violet), var(--tf-insight-gradient));
   color: white;
+  box-shadow: 0 4px 12px rgba(122, 31, 255, 0.3);
 }
 
 .module-card.sketch .card-header {
-  background: linear-gradient(to right, var(--tf-sketch-orange), var(--tf-sketch-gradient));
+  background: linear-gradient(135deg, var(--tf-sketch-orange), var(--tf-sketch-gradient));
   color: white;
+  box-shadow: 0 4px 12px rgba(255, 122, 41, 0.3);
 }
 
 .module-card.levy .card-header {
-  background: linear-gradient(to right, var(--tf-levy-gold), var(--tf-levy-gradient));
+  background: linear-gradient(135deg, var(--tf-levy-gold), var(--tf-levy-gradient));
   color: white;
+  box-shadow: 0 4px 12px rgba(196, 154, 0, 0.3);
+}
+
+.module-card .card-title {
+  margin-bottom: 0;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  font-size: 1.25rem;
+}
+
+.module-card .card-subtitle {
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 400;
+  margin-top: 5px;
+  font-size: 0.9rem;
 }
 
 /* Navigation styling for TerraFusion */
 .terrafusion-nav {
   background-color: white;
   border-bottom: 1px solid var(--tf-gray-200);
+  box-shadow: var(--tf-shadow-sm);
+  padding: 0.75rem 0;
 }
 
-.terrafusion-nav .brand {
+.terrafusion-nav .navbar-brand {
   font-family: var(--tf-font-head);
   font-weight: 700;
   font-size: 1.5rem;
   color: var(--tf-gray-900);
+  letter-spacing: -0.02em;
+  padding: 0.25rem 0.5rem;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.navbar-nav .nav-link {
+  font-family: var(--tf-font-head);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  padding: 0.5rem 0.75rem;
+  margin: 0 0.15rem;
+  border-radius: 6px;
+  transition: all 0.25s ease;
+  display: flex;
+  align-items: center;
+}
+
+.navbar-nav .nav-link:hover {
+  background-color: var(--tf-gray-100);
+}
+
+.navbar-nav .nav-link.active {
+  font-weight: 600;
+  background-color: var(--tf-gray-100);
+}
+
+.navbar-nav .nav-link i {
+  margin-right: 6px;
+  font-size: 1rem;
+  transition: transform 0.2s ease;
+}
+
+.navbar-nav .nav-link:hover i {
+  transform: scale(1.15);
+}
+
+.dropdown-menu {
+  border-radius: 8px;
+  box-shadow: var(--tf-shadow-md);
+  border: 1px solid var(--tf-gray-200);
+  padding: 0.75rem 0;
+  margin-top: 10px;
+}
+
+.dropdown-item {
+  padding: 0.6rem 1.2rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.dropdown-item:hover {
+  background-color: var(--tf-gray-100);
 }
 
 /* Button styling */
 .tf-button {
-  padding: 8px 16px;
-  border-radius: 4px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-family: var(--tf-font-head);
   font-weight: 600;
-  transition: all 0.2s;
+  letter-spacing: -0.01em;
+  transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
   border: none;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.08);
+}
+
+.tf-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.12);
+  text-decoration: none;
+}
+
+.tf-button:active {
+  transform: translateY(0);
+}
+
+.tf-button.btn-sm {
+  padding: 6px 12px;
+  font-size: 0.875rem;
+  border-radius: 6px;
 }
 
 .tf-button.flow {
@@ -140,7 +394,8 @@
 }
 
 .tf-button.flow:hover {
-  background-color: #00a8bd;
+  background-color: var(--tf-flow-dark);
+  color: white;
 }
 
 .tf-button.map {
@@ -149,7 +404,8 @@
 }
 
 .tf-button.map:hover {
-  background-color: #246b2a;
+  background-color: var(--tf-map-dark);
+  color: white;
 }
 
 .tf-button.insight {
@@ -158,7 +414,8 @@
 }
 
 .tf-button.insight:hover {
-  background-color: #6419d2;
+  background-color: var(--tf-insight-dark);
+  color: white;
 }
 
 .tf-button.sketch {
@@ -167,7 +424,8 @@
 }
 
 .tf-button.sketch:hover {
-  background-color: #e86a1d;
+  background-color: var(--tf-sketch-dark);
+  color: white;
 }
 
 .tf-button.levy {
@@ -176,5 +434,6 @@
 }
 
 .tf-button.levy:hover {
-  background-color: #ab8700;
+  background-color: var(--tf-levy-dark);
+  color: white;
 }
