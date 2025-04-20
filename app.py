@@ -540,7 +540,7 @@ def map_viewer():
     # Get projects to organize files
     projects = GISProject.query.filter_by(user_id=session['user']['id']).all()
     
-    return render_template('map_viewer.html', gis_files=gis_files, projects=projects)
+    return render_template('map_view_redesign.html', gis_files=gis_files, projects=projects)
 
 @app.route('/assessment-map')
 @login_required
