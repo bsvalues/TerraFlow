@@ -5,9 +5,11 @@
     <div class="card-header">
         <div class="d-flex align-items-center">
             <i class="fas {{ icon_class }} me-2"></i>
-            <h5 class="card-title">{{ module_lockup(module_name) }}</h5>
+            <div>
+                {{ module_lockup(module_name) }}
+                <p class="card-subtitle">{{ title }}</p>
+            </div>
         </div>
-        <p class="card-subtitle">{{ title }}</p>
     </div>
     <div class="card-body">
         <p class="card-text">{{ description }}</p>
