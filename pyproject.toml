@@ -5,10 +5,10 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "geoassessmentpro"
 version = "0.1.0"
+description = "A Geographic Information System (GIS) data management platform"
 authors = [
   { name="Benton County Assessor's Office", email="tech@bentonassessor.gov" },
 ]
-description = "A Geographic Information System (GIS) data management platform for the Benton County Assessor's Office"
 readme = "README.md"
 requires-python = ">=3.9"
 classifiers = [
@@ -77,3 +77,15 @@ exclude = '''
   | migrations
 )/
 '''
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = [
+    "api",
+    "mcp",
+    "logs",
+    "security", 
+    "sync_service",
+    "vector_db",
+    "ai_agents"
+]
