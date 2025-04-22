@@ -1,0 +1,256 @@
+/* 
+ * GeoAssessmentPro Mobile Responsive Styles
+ * Enhanced mobile experience for field assessors and users on small screens
+ */
+
+/* Base Mobile Styles */
+@media (max-width: 768px) {
+  body {
+    font-size: 0.95rem;
+  }
+  
+  .container {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+  
+  /* Improve touch targets */
+  button, 
+  .btn,
+  .nav-link,
+  select,
+  input[type="checkbox"],
+  input[type="radio"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Make form controls easier to use on mobile */
+  .form-control {
+    font-size: 1rem;
+    padding: 0.5rem;
+    height: auto;
+  }
+  
+  /* Improved spacing for mobile */
+  .mb-mobile-3 {
+    margin-bottom: 1rem !important;
+  }
+  
+  .pt-mobile-3 {
+    padding-top: 1rem !important;
+  }
+  
+  /* Make tables responsive */
+  .table-responsive {
+    border: none;
+    margin-bottom: 1rem;
+  }
+  
+  /* Card adjustments */
+  .card {
+    margin-bottom: 1rem;
+  }
+  
+  .card-header {
+    padding: 0.75rem 1rem;
+  }
+  
+  .card-body {
+    padding: 1rem;
+  }
+  
+  /* Modal adjustments */
+  .modal-header {
+    padding: 0.75rem 1rem;
+  }
+  
+  .modal-body {
+    padding: 1rem;
+  }
+  
+  .modal-footer {
+    padding: 0.75rem;
+  }
+  
+  /* Navbar adjustments */
+  .navbar-brand {
+    font-size: 1.1rem;
+  }
+  
+  .dropdown-menu {
+    border-radius: 0;
+    margin-top: 0;
+    width: 100%;
+  }
+}
+
+/* Field Assessment Mode */
+.field-assessment-mode {
+  /* High contrast mode for outdoor visibility */
+  --primary-color: #0066CC;
+  --text-color: #000000;
+  --background-color: #FFFFFF;
+  --success-color: #007700;
+  --danger-color: #CC0000;
+  --warning-color: #FF6600;
+  --input-bg: #F5F5F5;
+}
+
+.field-assessment-mode body {
+  background-color: var(--background-color);
+  color: var(--text-color);
+  font-size: 1.1rem;
+}
+
+.field-assessment-mode .btn-primary {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+  font-weight: bold;
+}
+
+.field-assessment-mode .form-control {
+  background-color: var(--input-bg);
+  border-width: 2px;
+  font-size: 1.1rem;
+}
+
+.field-assessment-mode .card {
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+/* Offline Mode Indicator */
+.offline-indicator {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background-color: #FF6600;
+  color: white;
+  text-align: center;
+  padding: 5px;
+  font-weight: bold;
+  z-index: 1050;
+  display: none;
+}
+
+body.offline .offline-indicator {
+  display: block;
+}
+
+/* Mobile Map Optimizations */
+@media (max-width: 768px) {
+  .map-container {
+    height: calc(100vh - 120px);
+  }
+  
+  .map-controls {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    right: 10px;
+    background-color: rgba(255, 255, 255, 0.9);
+    padding: 10px;
+    border-radius: 4px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    z-index: 1000;
+  }
+  
+  .map-controls .btn {
+    padding: 8px 12px;
+    margin-right: 5px;
+  }
+  
+  /* Property popup for maps */
+  .property-popup {
+    width: 280px;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+  
+  .property-popup h5 {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .property-popup p {
+    margin-bottom: 0.3rem;
+    font-size: 0.9rem;
+  }
+}
+
+/* Mobile Assessment Form */
+@media (max-width: 768px) {
+  .assessment-form-container .tab-content {
+    padding: 1rem;
+  }
+  
+  .assessment-form-section {
+    margin-bottom: 1.5rem;
+  }
+  
+  .assessment-quick-actions {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: #fff;
+    padding: 10px;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+    z-index: 1030;
+    display: flex;
+    justify-content: space-around;
+  }
+  
+  .assessment-quick-actions .btn {
+    flex: 1;
+    margin: 0 5px;
+  }
+  
+  /* Add padding to bottom to account for fixed action bar */
+  body.has-quick-actions {
+    padding-bottom: 70px;
+  }
+  
+  /* Collapsible sections for long forms */
+  .mobile-collapsible .card-header {
+    cursor: pointer;
+  }
+  
+  .mobile-collapsible .card-header::after {
+    content: "▾";
+    float: right;
+    font-size: 1.2rem;
+  }
+  
+  .mobile-collapsible .card-header.collapsed::after {
+    content: "▸";
+  }
+}
+
+/* Mobile Dashboard Optimizations */
+@media (max-width: 768px) {
+  .dashboard-card {
+    margin-bottom: 1rem;
+  }
+  
+  .dashboard-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+  
+  .dashboard-chart-container {
+    height: 250px;
+    margin-bottom: 1.5rem;
+  }
+  
+  .recent-activity-item {
+    padding: 0.75rem;
+  }
+  
+  .dashboard-alert {
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+}
