@@ -39,42 +39,6 @@ class DataSanitizer:
             "social_security_number": self._sanitize_ssn,
             "street_address": self._sanitize_address,
             "date_of_birth": self._sanitize_date,
-
-def validate_field_integrity(self, field_data: Any, field_type: str) -> Dict[str, Any]:
-    """Validate field data integrity with advanced rules
-    
-    Args:
-        field_data: Data to validate
-        field_type: Type of field
-        
-    Returns:
-        Validation results
-    """
-    validation_results = {
-        "is_valid": True,
-        "issues": [],
-        "risk_level": "low"
-    }
-    
-    # Type-specific validation
-    if field_type == "parcel_number":
-        if not re.match(r"^\d{3}-\d{3}-\d{3}$", str(field_data)):
-            validation_results["is_valid"] = False
-            validation_results["issues"].append("Invalid parcel number format")
-            validation_results["risk_level"] = "high"
-            
-    elif field_type == "coordinate":
-        try:
-            lat, lon = map(float, str(field_data).split(","))
-            if not (-90 <= lat <= 90 and -180 <= lon <= 180):
-                validation_results["is_valid"] = False
-                validation_results["issues"].append("Coordinates out of valid range")
-        except:
-            validation_results["is_valid"] = False
-            validation_results["issues"].append("Invalid coordinate format")
-            
-    return validation_results
-
             "personal_date": self._sanitize_date,
             "credit_card": self._sanitize_credit_card
         }
@@ -203,6 +167,41 @@ def validate_field_integrity(self, field_data: Any, field_type: str) -> Dict[str
                     return field_type
         
         return None
+    
+    def validate_field_integrity(self, field_data: Any, field_type: str) -> Dict[str, Any]:
+        """Validate field data integrity with advanced rules
+        
+        Args:
+            field_data: Data to validate
+            field_type: Type of field
+            
+        Returns:
+            Validation results
+        """
+        validation_results = {
+            "is_valid": True,
+            "issues": [],
+            "risk_level": "low"
+        }
+        
+        # Type-specific validation
+        if field_type == "parcel_number":
+            if not re.match(r"^\d{3}-\d{3}-\d{3}$", str(field_data)):
+                validation_results["is_valid"] = False
+                validation_results["issues"].append("Invalid parcel number format")
+                validation_results["risk_level"] = "high"
+                
+        elif field_type == "coordinate":
+            try:
+                lat, lon = map(float, str(field_data).split(","))
+                if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+                    validation_results["is_valid"] = False
+                    validation_results["issues"].append("Coordinates out of valid range")
+            except:
+                validation_results["is_valid"] = False
+                validation_results["issues"].append("Invalid coordinate format")
+                
+        return validation_results
     
     # Sanitization methods
     
