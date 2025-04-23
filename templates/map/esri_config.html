@@ -1,0 +1,251 @@
+{% extends "layout.html" %}
+
+{% block additionalcss %}
+<!-- Leaflet draw plugin -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1>Map Configuration</h1>
+            <p class="lead">Configure map providers and layers for property visualization</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">ESRI Map Configuration</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="{{ url_for('save_map_config') }}">
+                        <input type="hidden" name="config_type" value="esri">
+                        
+                        <!-- Base Maps Section -->
+                        <h5 class="text-primary mb-3">Base Maps</h5>
+                        <div class="mb-4">
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="imagery" name="base_layers[]" value="imagery" checked>
+                                <label class="form-check-label fw-semibold" for="imagery">
+                                    Imagery
+                                    <small class="d-block text-muted">World imagery from ArcGIS Online</small>
+                                </label>
+                            </div>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="street" name="base_layers[]" value="street" checked>
+                                <label class="form-check-label fw-semibold" for="street">
+                                    Street Map
+                                    <small class="d-block text-muted">World street map from ArcGIS Online</small>
+                                </label>
+                            </div>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="topo" name="base_layers[]" value="topo" checked>
+                                <label class="form-check-label fw-semibold" for="topo">
+                                    Topographic
+                                    <small class="d-block text-muted">Topographic map from ArcGIS Online</small>
+                                </label>
+                            </div>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="fema" name="base_layers[]" value="fema" checked>
+                                <label class="form-check-label fw-semibold" for="fema">
+                                    FEMA Flood
+                                    <small class="d-block text-muted">FEMA flood hazard zones</small>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Viewable Layers Section -->
+                        <h5 class="text-primary mb-3">Viewable Layers</h5>
+                        <div class="mb-4">
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="parcels" name="viewable_layers[]" value="parcels" checked>
+                                <label class="form-check-label fw-semibold" for="parcels">
+                                    Parcels
+                                    <small class="d-block text-muted">Property parcels and assessment data</small>
+                                </label>
+                            </div>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="short_plats" name="viewable_layers[]" value="short_plats">
+                                <label class="form-check-label fw-semibold" for="short_plats">
+                                    Short Plats
+                                    <small class="d-block text-muted">Short subdivision plats</small>
+                                </label>
+                            </div>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="long_plats" name="viewable_layers[]" value="long_plats">
+                                <label class="form-check-label fw-semibold" for="long_plats">
+                                    Long Plats
+                                    <small class="d-block text-muted">Long subdivision plats</small>
+                                </label>
+                            </div>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="flood_zones" name="viewable_layers[]" value="flood_zones">
+                                <label class="form-check-label fw-semibold" for="flood_zones">
+                                    Flood Zones
+                                    <small class="d-block text-muted">Detailed flood zone boundaries</small>
+                                </label>
+                            </div>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="zoning" name="viewable_layers[]" value="zoning">
+                                <label class="form-check-label fw-semibold" for="zoning">
+                                    Zoning
+                                    <small class="d-block text-muted">Zoning boundaries and classifications</small>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- GIS Identification Settings -->
+                        <h5 class="text-primary mb-3">Property Identification</h5>
+                        <div class="mb-4">
+                            <div class="mb-3">
+                                <label for="pin_field" class="form-label fw-semibold">PIN Field Name</label>
+                                <input type="text" class="form-control" id="pin_field" name="pin_field" value="Prop_ID">
+                                <div class="form-text">Field name in the GIS data that contains the property identifier</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="spatial_filter" class="form-label fw-semibold">Spatial Filter</label>
+                                <input type="text" class="form-control" id="spatial_filter" name="spatial_filter" value="prop_id > 0">
+                                <div class="form-text">SQL-like filter to limit visible features</div>
+                            </div>
+                        </div>
+
+                        <!-- Map Settings -->
+                        <h5 class="text-primary mb-3">Map Display Settings</h5>
+                        <div class="mb-4">
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Selection Styling</label>
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label for="selection_fill_opacity" class="form-label">Fill Opacity</label>
+                                        <input type="number" class="form-control" id="selection_fill_opacity" name="selection_fill_opacity" value="0.15" min="0" max="1" step="0.05">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="selection_border_thickness" class="form-label">Border Thickness</label>
+                                        <input type="number" class="form-control" id="selection_border_thickness" name="selection_border_thickness" value="1" min="1" max="5">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="selection_border_color" class="form-label">Border Color</label>
+                                        <input type="color" class="form-control form-control-color" id="selection_border_color" name="selection_border_color" value="#00FFFF">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="show_scale_bar" name="show_scale_bar">
+                                <label class="form-check-label fw-semibold" for="show_scale_bar">Show Scale Bar</label>
+                            </div>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="show_legal_text" name="show_legal_text">
+                                <label class="form-check-label fw-semibold" for="show_legal_text">Show Legal Disclaimer</label>
+                            </div>
+                        </div>
+
+                        <!-- Legal Disclaimer -->
+                        <div class="mb-4">
+                            <label for="legal_text" class="form-label fw-semibold">Legal Disclaimer Text</label>
+                            <textarea class="form-control" id="legal_text" name="legal_text" rows="3">THIS PRODUCT IS FOR INFORMATIONAL PURPOSES AND MAY NOT HAVE BEEN PREPARED FOR OR BE SUITABLE FOR LEGAL, ENGINEERING, OR SURVEYING PURPOSES. IT DOES NOT REPRESENT AN ON-THE-GROUND SURVEY AND REPRESENTS ONLY THE APPROXIMATE RELATIVE LOCATION OF PROPERTY BOUNDARIES.</textarea>
+                        </div>
+
+                        <div class="d-flex justify-content-end">
+                            <button type="reset" class="btn btn-secondary me-2">Reset</button>
+                            <button type="submit" class="btn btn-primary">Save Configuration</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="tf-card flow">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Google Maps Configuration</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="{{ url_for('save_map_config') }}">
+                        <input type="hidden" name="config_type" value="google">
+                        
+                        <div class="mb-3">
+                            <label for="google_api_key" class="form-label fw-semibold">Google Maps API Key</label>
+                            <input type="text" class="form-control" id="google_api_key" name="google_api_key" value="AIzaSyCf_fFOyBTgJcMh-PVFKB1go6dznluhu74">
+                        </div>
+                        
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="allow_dev_tools" name="allow_dev_tools">
+                            <label class="form-check-label fw-semibold" for="allow_dev_tools">
+                                Allow Developer Tools
+                            </label>
+                        </div>
+                        
+                        <div class="d-flex justify-content-end">
+                            <button type="submit" class="btn btn-primary">Save Configuration</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="tf-card map mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Available Modules</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="{{ url_for('save_module_config') }}">
+                        <h6 class="mb-3 text-secondary">Launchable Modules</h6>
+                        
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="esri_map" name="modules[]" value="ESRI Map" checked>
+                            <label class="form-check-label" for="esri_map">ESRI Map</label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="cama_data" name="modules[]" value="CAMA Data" checked>
+                            <label class="form-check-label" for="cama_data">CAMA Data</label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="parcel_list" name="modules[]" value="Parcel List" checked>
+                            <label class="form-check-label" for="parcel_list">Parcel List</label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="pictometry" name="modules[]" value="Pictometry Online" checked>
+                            <label class="form-check-label" for="pictometry">Pictometry Online</label>
+                        </div>
+                        <div class="form-check mb-4">
+                            <input class="form-check-input" type="checkbox" id="app_to_app" name="modules[]" value="App to App" checked>
+                            <label class="form-check-label" for="app_to_app">App to App</label>
+                        </div>
+                        
+                        <div class="d-flex justify-content-end">
+                            <button type="submit" class="btn btn-success">Save Module Settings</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+    
+    // Form validation
+    const forms = document.querySelectorAll('.needs-validation');
+    Array.from(forms).forEach(form => {
+        form.addEventListener('submit', event => {
+            if (!form.checkValidity()) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            form.classList.add('was-validated');
+        }, false);
+    });
+});
+</script>
+{% endblock %}

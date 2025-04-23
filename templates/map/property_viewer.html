@@ -1,0 +1,713 @@
+{% extends "layout.html" %}
+{% from 'components/ui_components.html' import tf_card, tf_button, tf_alert %}
+
+{% block additionalcss %}
+<style>
+    #map-container {
+        position: relative;
+        height: 600px;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: var(--tf-shadow-md);
+    }
+    
+    #property-map {
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+    }
+    
+    .map-controls {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 1000;
+        background-color: white;
+        border-radius: 8px;
+        padding: 10px;
+        box-shadow: var(--tf-shadow-md);
+    }
+    
+    .layer-control {
+        position: absolute;
+        bottom: 20px;
+        right: 10px;
+        z-index: 1000;
+        background-color: white;
+        border-radius: 8px;
+        padding: 12px;
+        box-shadow: var(--tf-shadow-md);
+        max-width: 300px;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    
+    .search-control {
+        position: absolute;
+        top: 10px;
+        left: 50px;
+        z-index: 1000;
+        min-width: 350px;
+    }
+    
+    .property-popup {
+        min-width: 250px;
+    }
+    
+    .property-popup-header {
+        border-bottom: 1px solid var(--tf-gray-200);
+        padding-bottom: 8px;
+        margin-bottom: 8px;
+    }
+    
+    .property-attribute {
+        margin-bottom: 5px;
+    }
+    
+    .property-attribute-label {
+        font-weight: 600;
+        color: var(--tf-gray-700);
+    }
+    
+    .property-attribute-value {
+        color: var(--tf-gray-900);
+    }
+    
+    .base-map-selector {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        z-index: 1000;
+    }
+    
+    .base-map-option {
+        background-color: white;
+        border: 1px solid var(--tf-gray-300);
+        border-radius: 4px;
+        padding: 4px 8px;
+        margin-bottom: 5px;
+        cursor: pointer;
+        font-size: 12px;
+        display: block;
+        text-align: center;
+        color: var(--tf-gray-700);
+        width: 90px;
+    }
+    
+    .base-map-option:hover {
+        background-color: var(--tf-gray-100);
+    }
+    
+    .base-map-option.active {
+        background-color: var(--tf-flow-aqua);
+        color: white;
+        border-color: var(--tf-flow-aqua);
+    }
+    
+    .scale-bar {
+        position: absolute;
+        bottom: 10px;
+        left: 10px;
+        z-index: 1000;
+        color: var(--tf-gray-800);
+        font-size: 12px;
+        background-color: rgba(255, 255, 255, 0.8);
+        padding: 4px 8px;
+        border-radius: 4px;
+    }
+    
+    .property-details-sidebar {
+        background-color: white;
+        border-radius: 12px;
+        box-shadow: var(--tf-shadow-md);
+        padding: 0;
+        height: 600px;
+        overflow-y: auto;
+    }
+    
+    .sidebar-section {
+        border-bottom: 1px solid var(--tf-gray-200);
+        padding: 15px;
+    }
+    
+    .sidebar-section:last-child {
+        border-bottom: none;
+    }
+    
+    .sidebar-section-title {
+        font-weight: 600;
+        color: var(--tf-gray-900);
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+    }
+    
+    .sidebar-section-title i {
+        margin-right: 8px;
+        color: var(--tf-flow-aqua);
+    }
+    
+    .detail-item {
+        margin-bottom: 8px;
+        font-size: 14px;
+    }
+    
+    .detail-label {
+        color: var(--tf-gray-600);
+        margin-bottom: 2px;
+    }
+    
+    .detail-value {
+        font-weight: 500;
+        color: var(--tf-gray-900);
+    }
+    
+    .assessment-history {
+        max-height: 200px;
+        overflow-y: auto;
+    }
+    
+    .google-streetview {
+        height: 250px;
+        background-color: var(--tf-gray-100);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-top: 10px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Home</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('map_viewer') }}">Map Viewer</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Property Assessment Map</li>
+                </ol>
+            </nav>
+            <h1>Property Assessment Map</h1>
+            <p class="lead">Visualize property data with detailed geospatial layers</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div id="map-container">
+                <div id="property-map"></div>
+                
+                <div class="base-map-selector">
+                    <button class="base-map-option active" data-map="imagery">Imagery</button>
+                    <button class="base-map-option" data-map="streets">Streets</button>
+                    <button class="base-map-option" data-map="topo">Topo</button>
+                </div>
+                
+                <div class="search-control">
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="property-search" placeholder="Search by Property ID, Owner, or Address">
+                        <button class="btn btn-primary" type="button" id="search-button">
+                            <i class="fas fa-search"></i> Search
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="map-controls">
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="zoom-in">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="zoom-out">
+                            <i class="fas fa-minus"></i>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="reset-view">
+                            <i class="fas fa-home"></i>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="measure-tool">
+                            <i class="fas fa-ruler"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="layer-control">
+                    <h6 class="mb-3 fw-semibold">Map Layers</h6>
+                    
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="layer-parcels" checked>
+                        <label class="form-check-label" for="layer-parcels">
+                            Property Parcels
+                        </label>
+                    </div>
+                    
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="layer-zoning">
+                        <label class="form-check-label" for="layer-zoning">
+                            Zoning
+                        </label>
+                    </div>
+                    
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="layer-flood">
+                        <label class="form-check-label" for="layer-flood">
+                            Flood Zones
+                        </label>
+                    </div>
+                    
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="layer-plats">
+                        <label class="form-check-label" for="layer-plats">
+                            Plats
+                        </label>
+                    </div>
+                    
+                    <h6 class="mt-3 mb-2 fw-semibold">Data Visualization</h6>
+                    
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="radio" name="data-viz" id="viz-none" checked>
+                        <label class="form-check-label" for="viz-none">
+                            None
+                        </label>
+                    </div>
+                    
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="radio" name="data-viz" id="viz-value">
+                        <label class="form-check-label" for="viz-value">
+                            Property Value
+                        </label>
+                    </div>
+                    
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="radio" name="data-viz" id="viz-land-use">
+                        <label class="form-check-label" for="viz-land-use">
+                            Land Use
+                        </label>
+                    </div>
+                    
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="radio" name="data-viz" id="viz-year-built">
+                        <label class="form-check-label" for="viz-year-built">
+                            Year Built
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="scale-bar" id="scale-bar">
+                    Scale: 1:10,000
+                </div>
+            </div>
+            
+            <div class="d-flex justify-content-between align-items-center mt-3 mb-4">
+                <div>
+                    <button class="btn btn-sm btn-primary me-2" id="saved-locations-btn">
+                        <i class="fas fa-bookmark me-1"></i> Saved Locations
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary me-2" id="save-location-btn">
+                        <i class="fas fa-save me-1"></i> Save Current View
+                    </button>
+                </div>
+                
+                <div>
+                    <button class="btn btn-sm btn-success me-2" id="export-map-btn">
+                        <i class="fas fa-file-export me-1"></i> Export Map
+                    </button>
+                    <button class="btn btn-sm btn-info" id="print-map-btn">
+                        <i class="fas fa-print me-1"></i> Print
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="property-details-sidebar">
+                <div class="sidebar-section">
+                    <div class="sidebar-section-title">
+                        <i class="fas fa-info-circle"></i> Property Information
+                    </div>
+                    <div id="property-info">
+                        <p class="text-muted text-center my-5">Select a property on the map to view details</p>
+                    </div>
+                </div>
+                
+                <div class="sidebar-section">
+                    <div class="sidebar-section-title">
+                        <i class="fas fa-chart-line"></i> Assessment History
+                    </div>
+                    <div id="assessment-history" class="assessment-history">
+                        <p class="text-muted text-center my-3">No assessment history available</p>
+                    </div>
+                </div>
+                
+                <div class="sidebar-section">
+                    <div class="sidebar-section-title">
+                        <i class="fas fa-street-view"></i> Street View
+                    </div>
+                    <div id="google-streetview" class="google-streetview">
+                        <span class="text-muted">Street view not available</span>
+                    </div>
+                </div>
+                
+                <div class="sidebar-section">
+                    <div class="sidebar-section-title">
+                        <i class="fas fa-tools"></i> Tools
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-sm btn-outline-primary d-flex justify-content-between align-items-center" id="export-data-btn">
+                            <span><i class="fas fa-file-csv me-1"></i> Export Property Data</span> 
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-primary d-flex justify-content-between align-items-center" id="pictometry-btn">
+                            <span><i class="fas fa-image me-1"></i> View Pictometry</span> 
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-primary d-flex justify-content-between align-items-center" id="property-compare-btn">
+                            <span><i class="fas fa-balance-scale me-1"></i> Compare Properties</span> 
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Property Details Template (will be cloned and populated with JS) -->
+    <template id="property-details-template">
+        <div class="property-details">
+            <h5 class="mb-3 property-title fw-bold"></h5>
+            
+            <div class="row mb-3">
+                <div class="col-12">
+                    <div class="detail-item">
+                        <div class="detail-label">Owner</div>
+                        <div class="detail-value property-owner"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-6">
+                    <div class="detail-item">
+                        <div class="detail-label">Property ID</div>
+                        <div class="detail-value property-id"></div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="detail-item">
+                        <div class="detail-label">Property Type</div>
+                        <div class="detail-value property-type"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-6">
+                    <div class="detail-item">
+                        <div class="detail-label">Parcel Size</div>
+                        <div class="detail-value property-size"></div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="detail-item">
+                        <div class="detail-label">Year Built</div>
+                        <div class="detail-value property-year"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row mb-3">
+                <div class="col-6">
+                    <div class="detail-item">
+                        <div class="detail-label">Total Value</div>
+                        <div class="detail-value fw-bold property-value text-success"></div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="detail-item">
+                        <div class="detail-label">Land Value</div>
+                        <div class="detail-value property-land-value"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <button class="btn btn-sm btn-primary w-100">
+                <i class="fas fa-external-link-alt me-1"></i> View Full Details
+            </button>
+        </div>
+    </template>
+    
+    <!-- Assessment History Template -->
+    <template id="assessment-history-template">
+        <table class="table table-sm table-hover">
+            <thead>
+                <tr>
+                    <th>Year</th>
+                    <th>Land Value</th>
+                    <th>Improvement Value</th>
+                    <th>Total Value</th>
+                </tr>
+            </thead>
+            <tbody class="assessment-records">
+                <!-- Will be populated dynamically -->
+            </tbody>
+        </table>
+    </template>
+</div>
+
+<!-- Saved Locations Modal -->
+<div class="modal fade" id="saved-locations-modal" tabindex="-1" aria-labelledby="savedLocationsModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="savedLocationsModalLabel">Saved Locations</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="list-group" id="saved-locations-list">
+                    <!-- Sample saved locations, will be populated dynamically -->
+                    <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" data-location-id="1">
+                        <div>
+                            <strong>Commercial Properties</strong>
+                            <small class="d-block text-muted">Commercial area with high-value properties</small>
+                        </div>
+                        <i class="fas fa-chevron-right text-muted"></i>
+                    </button>
+                    <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" data-location-id="2">
+                        <div>
+                            <strong>New Development</strong>
+                            <small class="d-block text-muted">Area with recent construction activity</small>
+                        </div>
+                        <i class="fas fa-chevron-right text-muted"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Save Location Modal -->
+<div class="modal fade" id="save-location-modal" tabindex="-1" aria-labelledby="saveLocationModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="saveLocationModalLabel">Save Current Location</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="save-location-form">
+                    <div class="mb-3">
+                        <label for="location-name" class="form-label">Location Name</label>
+                        <input type="text" class="form-control" id="location-name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="location-description" class="form-label">Description</label>
+                        <textarea class="form-control" id="location-description" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="save-location-confirm">Save Location</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize map (placeholder for actual map implementation)
+    const initMap = () => {
+        // Here would be the actual map initialization code
+        console.log('Initializing property map with TerraFlow design system');
+        
+        // Simulating map events for demonstration
+        document.getElementById('property-search').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                simulatePropertySearch(this.value);
+            }
+        });
+        
+        document.getElementById('search-button').addEventListener('click', function() {
+            simulatePropertySearch(document.getElementById('property-search').value);
+        });
+        
+        // Base map selector
+        document.querySelectorAll('.base-map-option').forEach(option => {
+            option.addEventListener('click', function() {
+                document.querySelectorAll('.base-map-option').forEach(opt => {
+                    opt.classList.remove('active');
+                });
+                this.classList.add('active');
+                console.log(`Changed base map to: ${this.dataset.map}`);
+            });
+        });
+        
+        // Map controls
+        document.getElementById('zoom-in').addEventListener('click', () => console.log('Zoom in'));
+        document.getElementById('zoom-out').addEventListener('click', () => console.log('Zoom out'));
+        document.getElementById('reset-view').addEventListener('click', () => console.log('Reset view'));
+        document.getElementById('measure-tool').addEventListener('click', () => console.log('Measure tool toggled'));
+        
+        // Layer toggles
+        document.querySelectorAll('.layer-control .form-check-input').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                console.log(`Layer ${this.id} toggled: ${this.checked}`);
+            });
+        });
+        
+        // Saved locations modal
+        document.getElementById('saved-locations-btn').addEventListener('click', function() {
+            const modal = new bootstrap.Modal(document.getElementById('saved-locations-modal'));
+            modal.show();
+        });
+        
+        // Save location modal
+        document.getElementById('save-location-btn').addEventListener('click', function() {
+            const modal = new bootstrap.Modal(document.getElementById('save-location-modal'));
+            modal.show();
+        });
+        
+        document.getElementById('save-location-confirm').addEventListener('click', function() {
+            const name = document.getElementById('location-name').value;
+            const description = document.getElementById('location-description').value;
+            
+            if (name) {
+                console.log(`Saving location: ${name} - ${description}`);
+                bootstrap.Modal.getInstance(document.getElementById('save-location-modal')).hide();
+                
+                // Would normally save to database here
+                // For now, just show a success message
+                const alertHtml = `
+                    <div class="alert alert-success alert-dismissible fade show" role="alert">
+                        Location "${name}" saved successfully.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                `;
+                document.querySelector('.container-fluid').insertAdjacentHTML('afterbegin', alertHtml);
+            }
+        });
+        
+        // Export and print buttons
+        document.getElementById('export-map-btn').addEventListener('click', () => console.log('Export map'));
+        document.getElementById('print-map-btn').addEventListener('click', () => console.log('Print map'));
+        
+        // Sidebar tool buttons
+        document.getElementById('export-data-btn').addEventListener('click', () => console.log('Export data'));
+        document.getElementById('pictometry-btn').addEventListener('click', () => console.log('View Pictometry'));
+        document.getElementById('property-compare-btn').addEventListener('click', () => console.log('Compare properties'));
+        
+        // Simulate clicking on a property after 2 seconds to show UI functionality
+        setTimeout(() => {
+            simulatePropertySelection({
+                prop_id: '1234567890',
+                situs_display: '123 Main St',
+                owner: 'John Doe',
+                prop_type_cd: 'RES',
+                living_area: 2200,
+                land_acres: 0.25,
+                yr_blt: 1998,
+                appraised_val: 450000,
+                land_val: 125000,
+                latitude: 46.2506, 
+                longitude: -119.2844
+            });
+        }, 2000);
+    };
+    
+    // Helper function to simulate property search
+    const simulatePropertySearch = (searchTerm) => {
+        console.log(`Searching for: ${searchTerm}`);
+        
+        // Simulate search result and property selection
+        setTimeout(() => {
+            simulatePropertySelection({
+                prop_id: '0987654321',
+                situs_display: '456 Elm St',
+                owner: 'Jane Smith',
+                prop_type_cd: 'COM',
+                living_area: 5000,
+                land_acres: 0.75,
+                yr_blt: 2005,
+                appraised_val: 950000,
+                land_val: 350000,
+                latitude: 46.2508,
+                longitude: -119.2850
+            });
+        }, 1000);
+    };
+    
+    // Helper function to simulate property selection
+    const simulatePropertySelection = (property) => {
+        console.log('Property selected:', property);
+        
+        // Populate property info sidebar
+        const template = document.getElementById('property-details-template');
+        const detailsContainer = document.getElementById('property-info');
+        
+        // Clear previous content and append new content
+        detailsContainer.innerHTML = '';
+        const clone = document.importNode(template.content, true);
+        
+        clone.querySelector('.property-title').textContent = property.situs_display;
+        clone.querySelector('.property-owner').textContent = property.owner;
+        clone.querySelector('.property-id').textContent = property.prop_id;
+        clone.querySelector('.property-type').textContent = property.prop_type_cd === 'RES' ? 'Residential' : 'Commercial';
+        clone.querySelector('.property-size').textContent = `${property.land_acres} acres / ${property.living_area} sq ft`;
+        clone.querySelector('.property-year').textContent = property.yr_blt;
+        clone.querySelector('.property-value').textContent = `$${property.appraised_val.toLocaleString()}`;
+        clone.querySelector('.property-land-value').textContent = `$${property.land_val.toLocaleString()}`;
+        
+        detailsContainer.appendChild(clone);
+        
+        // Populate assessment history
+        const historyTemplate = document.getElementById('assessment-history-template');
+        const historyContainer = document.getElementById('assessment-history');
+        
+        // Clear previous content and append new content
+        historyContainer.innerHTML = '';
+        const historyClone = document.importNode(historyTemplate.content, true);
+        const historyBody = historyClone.querySelector('.assessment-records');
+        
+        // Add sample assessment history records
+        const currentYear = new Date().getFullYear();
+        for (let i = 0; i < 5; i++) {
+            const year = currentYear - i;
+            const depreciation = i * 0.03; // 3% depreciation per year for sample data
+            
+            const landValue = Math.round(property.land_val * (1 - (depreciation / 2)));
+            const improvementValue = Math.round((property.appraised_val - property.land_val) * (1 - depreciation));
+            const totalValue = landValue + improvementValue;
+            
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${year}</td>
+                <td>$${landValue.toLocaleString()}</td>
+                <td>$${improvementValue.toLocaleString()}</td>
+                <td>$${totalValue.toLocaleString()}</td>
+            `;
+            historyBody.appendChild(row);
+        }
+        
+        historyContainer.appendChild(historyClone);
+        
+        // Update Street View (just a placeholder - would be actual Google Street View in production)
+        const streetViewContainer = document.getElementById('google-streetview');
+        streetViewContainer.innerHTML = `
+            <div class="d-flex flex-column align-items-center justify-content-center h-100">
+                <img src="https://via.placeholder.com/350x200?text=Street+View" class="img-fluid rounded mb-2" alt="Street View">
+                <small class="text-muted">Street view for ${property.situs_display}</small>
+            </div>
+        `;
+    };
+    
+    // Initialize the map
+    initMap();
+});
+</script>
+{% endblock %}

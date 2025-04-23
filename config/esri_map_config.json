@@ -1,0 +1,19 @@
+{
+  "base_layers": [
+    "imagery",
+    "street",
+    "topo",
+    "fema"
+  ],
+  "viewable_layers": [
+    "parcels"
+  ],
+  "pin_field": "Prop_ID",
+  "spatial_filter": "prop_id > 0",
+  "selection_fill_opacity": "0.15",
+  "selection_border_thickness": "1",
+  "selection_border_color": "#00FFFF",
+  "show_scale_bar": false,
+  "show_legal_text": false,
+  "legal_text": "THIS PRODUCT IS FOR INFORMATIONAL PURPOSES AND MAY NOT HAVE BEEN PREPARED FOR OR BE SUITABLE FOR LEGAL, ENGINEERING, OR SURVEYING PURPOSES. IT DOES NOT REPRESENT AN ON-THE-GROUND SURVEY AND REPRESENTS ONLY THE APPROXIMATE RELATIVE LOCATION OF PROPERTY BOUNDARIES."
+}
