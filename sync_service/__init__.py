@@ -187,6 +187,15 @@ def register_blueprints(app):
         except ImportError as e:
             logger.warning(f"Could not load Field Mapping module: {e}")
             has_field_mapping = False
+            
+        # Try to import project sync routes
+        try:
+            from sync_service.project_sync_routes import register_project_sync_blueprint
+            has_project_sync = True
+            logger.info("Project Sync module loaded successfully")
+        except ImportError as e:
+            logger.warning(f"Could not load Project Sync module: {e}")
+            has_project_sync = False
         
         # Register the blueprints
         app.register_blueprint(sync_bp)
@@ -215,6 +224,11 @@ def register_blueprints(app):
         if has_field_mapping:
             register_mapping_routes(app)
             logger.info("Field Mapping routes registered successfully")
+            
+        # Register project sync blueprint if available
+        if has_project_sync:
+            register_project_sync_blueprint(app)
+            logger.info("Project Sync routes registered successfully")
         
         # Initialize models
         with app.app_context():
