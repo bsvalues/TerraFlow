@@ -9,10 +9,10 @@ from flask import render_template, jsonify, request, flash, redirect, url_for, s
 from app import app
 from auth import login_required, permission_required
 
-@app.route('/maps/viewer')
+@app.route('/maps/property-viewer')
 @login_required
-def map_viewer():
-    """Display the main map viewer page"""
+def property_map_viewer():
+    """Display the main property map viewer page"""
     return render_template('map/property_viewer.html')
 
 @app.route('/maps/config')

@@ -60,6 +60,14 @@ try:
 except ImportError as e:
     logger.warning(f"Could not register API endpoints: {str(e)}")
 
+# Import map routes
+try:
+    logger.info("Registering map routes")
+    import map_routes  # noqa: F401
+    logger.info("Map routes registered successfully")
+except ImportError as e:
+    logger.warning(f"Could not register map routes: {str(e)}")
+
 # Initialize Performance Optimization
 try:
     logger.info("Initializing Performance Optimization")
