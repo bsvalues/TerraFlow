@@ -1,5 +1,35 @@
 /* TerraFlow - TerraFusion Platform Custom Styles */
 
+/* Global Variables - TerraFlow Design System */
+:root {
+    /* Override Bootstrap primary colors with TerraFusion palette */
+    --primary-color: var(--tf-flow-aqua);
+    --secondary-color: var(--tf-gray-700);
+    --success-color: var(--tf-map-green);
+    --warning-color: var(--tf-sketch-orange);
+    --danger-color: #dc3545;
+    --info-color: var(--tf-insight-violet);
+    --light-color: var(--tf-gray-50);
+    --dark-color: var(--tf-gray-900);
+    
+    /* Consistent design values */
+    --border-radius: 0.5rem;
+    --border-radius-lg: 0.75rem;
+    --border-radius-sm: 0.375rem;
+    --transition-speed: 0.3s;
+    --box-shadow: var(--tf-shadow-md);
+    
+    /* Bootstrap overrides */
+    --bs-primary: var(--tf-flow-aqua);
+    --bs-secondary: var(--tf-gray-700);
+    --bs-success: var(--tf-map-green);
+    --bs-warning: var(--tf-sketch-orange);
+    --bs-danger: #dc3545;
+    --bs-info: var(--tf-insight-violet);
+    --bs-light: var(--tf-gray-50);
+    --bs-dark: var(--tf-gray-900);
+}
+
 /* General styles - Using TerraFusion design system */
 body {
     min-height: 100vh;
@@ -17,23 +47,83 @@ body {
     color: var(--tf-gray-700) !important;
 }
 
-/* Navbar styling using TerraFusion design system */
-.navbar-dark {
-    background-color: white !important;
-    box-shadow: var(--tf-shadow-sm);
+/* Bootstrap overrides for TerraFlow */
+.btn-primary {
+    background-color: var(--tf-flow-aqua);
+    border-color: var(--tf-flow-aqua);
 }
 
-.nav-link {
-    color: var(--tf-gray-900) !important;
-    font-weight: 600;
-    transition: all 0.2s ease;
-    padding: 0.5rem 0.75rem;
-    border-radius: 6px;
+.btn-primary:hover,
+.btn-primary:focus {
+    background-color: var(--tf-flow-dark);
+    border-color: var(--tf-flow-dark);
 }
 
-.nav-link:hover {
-    color: var(--tf-flow-aqua) !important;
-    background-color: var(--tf-gray-100);
+.btn-success {
+    background-color: var(--tf-map-green);
+    border-color: var(--tf-map-green);
+}
+
+.btn-success:hover,
+.btn-success:focus {
+    background-color: var(--tf-map-dark);
+    border-color: var(--tf-map-dark);
+}
+
+.btn-info {
+    background-color: var(--tf-insight-violet);
+    border-color: var(--tf-insight-violet);
+    color: white;
+}
+
+.btn-info:hover,
+.btn-info:focus {
+    background-color: var(--tf-insight-dark);
+    border-color: var(--tf-insight-dark);
+    color: white;
+}
+
+.btn-warning {
+    background-color: var(--tf-sketch-orange);
+    border-color: var(--tf-sketch-orange);
+    color: white;
+}
+
+.btn-warning:hover,
+.btn-warning:focus {
+    background-color: var(--tf-sketch-dark);
+    border-color: var(--tf-sketch-dark);
+    color: white;
+}
+
+.alert-primary {
+    color: var(--tf-flow-dark);
+    background-color: rgba(0, 191, 214, 0.15);
+    border-color: rgba(0, 191, 214, 0.3);
+}
+
+.alert-success {
+    color: var(--tf-map-dark);
+    background-color: rgba(46, 125, 50, 0.15);
+    border-color: rgba(46, 125, 50, 0.3);
+}
+
+.alert-info {
+    color: var(--tf-insight-dark);
+    background-color: rgba(122, 31, 255, 0.15);
+    border-color: rgba(122, 31, 255, 0.3);
+}
+
+.alert-warning {
+    color: var(--tf-sketch-dark);
+    background-color: rgba(255, 122, 41, 0.15);
+    border-color: rgba(255, 122, 41, 0.3);
+}
+
+.form-control:focus, 
+.form-select:focus {
+    border-color: var(--tf-flow-aqua);
+    box-shadow: 0 0 0 0.25rem rgba(0, 191, 214, 0.25);
 }
 
 .main-content {
