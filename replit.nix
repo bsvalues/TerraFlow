@@ -1,5 +1,6 @@
 {pkgs}: {
   deps = [
+    pkgs.gh
     pkgs.pkg-config
     pkgs.libxcrypt
     pkgs.geckodriver
