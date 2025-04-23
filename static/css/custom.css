@@ -228,109 +228,185 @@ h3 {
 }
 
 /* Power Query Page Improvements */
-/* Cards with enhanced visibility - Using Benton County-inspired colors */
+/* Cards with TerraFusion design system */
 .card {
-    border: 1px solid #ddd;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    border: none;
+    border-radius: 12px;
+    box-shadow: var(--tf-shadow-sm);
     margin-bottom: 1.5rem;
     background-color: #fff;
-}
-
-.card-header {
-    background-color: #005288 !important; /* Benton County blue */
-    color: #ffffff !important;
-    font-weight: 500;
-    padding: 12px 15px;
-    border-bottom: 1px solid #ddd;
-}
-
-.card-body {
-    padding: 1.25rem;
-}
-
-/* Form controls with better contrast - Using Benton County styling */
-.form-control, .form-select {
-    font-size: 1rem;
-    padding: 10px 12px;
-    border: 1px solid #ced4da;
-}
-
-.form-control:focus, .form-select:focus {
-    border-color: #005288; /* Benton County blue */
-    box-shadow: 0 0 0 0.25rem rgba(0, 82, 136, 0.25);
-}
-
-/* Buttons with better visibility - Using Benton County styling */
-.btn {
-    font-weight: 500;
-    padding: 8px 16px;
+    overflow: hidden;
     transition: all 0.2s ease;
 }
 
+.card:hover {
+    box-shadow: var(--tf-shadow-md);
+}
+
+.card-header {
+    background-color: white !important;
+    border-bottom: 1px solid var(--tf-gray-200) !important;
+    color: var(--tf-gray-900) !important;
+    font-weight: 600;
+    padding: 1rem 1.25rem;
+}
+
+.card-body {
+    padding: 1.5rem;
+}
+
+/* Form controls with TerraFusion design system */
+.form-control, .form-select {
+    font-size: 1rem;
+    padding: 10px 12px;
+    border: 1px solid var(--tf-gray-300);
+    border-radius: 8px;
+    font-family: var(--tf-font-body);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--tf-flow-aqua);
+    box-shadow: 0 0 0 0.25rem rgba(0, 191, 214, 0.25);
+    outline: none;
+}
+
+/* Buttons with TerraFusion design system */
+.btn {
+    font-family: var(--tf-font-head);
+    font-weight: 600;
+    padding: 10px 20px;
+    border-radius: 8px;
+    letter-spacing: -0.01em;
+    transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.08);
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.12);
+}
+
+.btn:active {
+    transform: translateY(0);
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 0.875rem;
+    border-radius: 6px;
+}
+
 .btn-primary {
-    background-color: #005288 !important; /* Benton County blue */
-    border-color: #005288 !important;
-    color: #ffffff !important;
+    background-color: var(--tf-flow-aqua) !important;
+    border-color: var(--tf-flow-aqua) !important;
+    color: white !important;
 }
 
 .btn-primary:hover {
-    background-color: #003d66 !important; /* Darker blue */
-    border-color: #003d66 !important;
+    background-color: var(--tf-flow-dark) !important;
+    border-color: var(--tf-flow-dark) !important;
 }
 
 .btn-outline-primary {
-    border-color: #005288 !important;
-    color: #005288 !important;
+    border: 1px solid var(--tf-flow-aqua) !important;
+    color: var(--tf-flow-aqua) !important;
     background-color: transparent !important;
 }
 
 .btn-outline-primary:hover {
-    background-color: #005288 !important;
-    color: #ffffff !important;
+    background-color: var(--tf-flow-aqua) !important;
+    color: white !important;
 }
 
-.btn-outline-secondary {
-    border-color: #6c757d !important;
-    color: #6c757d !important;
-    background-color: transparent !important;
+.btn-success {
+    background-color: var(--tf-map-green) !important;
+    border-color: var(--tf-map-green) !important;
 }
 
-.btn-outline-secondary:hover {
-    background-color: #6c757d !important;
-    color: #ffffff !important;
-    border-color: #6c757d !important;
+.btn-success:hover {
+    background-color: var(--tf-map-dark) !important;
+    border-color: var(--tf-map-dark) !important;
 }
 
-/* Table improvements - Using Benton County styling */
+.btn-info {
+    background-color: var(--tf-insight-violet) !important;
+    border-color: var(--tf-insight-violet) !important;
+    color: white !important;
+}
+
+.btn-info:hover {
+    background-color: var(--tf-insight-dark) !important;
+    border-color: var(--tf-insight-dark) !important;
+}
+
+.btn-warning {
+    background-color: var(--tf-sketch-orange) !important;
+    border-color: var(--tf-sketch-orange) !important;
+    color: white !important;
+}
+
+.btn-warning:hover {
+    background-color: var(--tf-sketch-dark) !important;
+    border-color: var(--tf-sketch-dark) !important;
+}
+
+/* Table improvements - TerraFusion styling */
 .table {
-    border-color: #dee2e6;
+    border-color: var(--tf-gray-200);
+    font-family: var(--tf-font-body);
 }
 
 .table-striped tbody tr:nth-of-type(odd) {
-    background-color: rgba(0, 0, 0, 0.05);
+    background-color: var(--tf-gray-50);
 }
 
 .table thead th {
-    background-color: #005288; /* Benton County blue */
-    color: #ffffff;
-    font-weight: 500;
-    border-bottom: 2px solid #003d66;
+    background-color: var(--tf-gray-50);
+    color: var(--tf-gray-900);
+    font-weight: 600;
+    border-top: none;
+    border-bottom-width: 1px;
+    border-bottom-color: var(--tf-gray-200);
+    padding: 0.75rem 1rem;
 }
 
-/* Modal improvements - Using Benton County styling */
+.table td {
+    vertical-align: middle;
+    padding: 0.75rem 1rem;
+    border-color: var(--tf-gray-200);
+}
+
+/* Modal improvements - TerraFusion styling */
 .modal-content {
-    border: 1px solid rgba(0, 0, 0, 0.2);
-    box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.15);
+    border: none;
+    border-radius: 12px;
+    box-shadow: var(--tf-shadow-lg);
+    overflow: hidden;
 }
 
 .modal-header {
-    background-color: #005288; /* Benton County blue */
-    color: #ffffff;
-    border-bottom: 1px solid #dee2e6;
+    background-color: white;
+    color: var(--tf-gray-900);
+    border-bottom: 1px solid var(--tf-gray-200);
+    padding: 1.25rem 1.5rem;
+}
+
+.modal-header .modal-title {
+    font-family: var(--tf-font-head);
+    font-weight: 700;
+    font-size: 1.25rem;
+}
+
+.modal-body {
+    padding: 1.5rem;
 }
 
 .modal-footer {
-    border-top: 1px solid #dee2e6;
+    border-top: 1px solid var(--tf-gray-200);
+    padding: 1.25rem 1.5rem;
 }
 
 @media (max-width: 767.98px) {
