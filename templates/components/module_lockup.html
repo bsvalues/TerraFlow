@@ -1,6 +1,5 @@
-{% macro module_lockup(module_name, prefix='Terra') %}
-<div class="module-lockup module-{{ module_name|lower }}">
-    <span class="prefix">{{ prefix }}</span>
-    <span class="name">{{ module_name }}</span>
-</div>
-{% endmacro %}
+{% macro module_lockup(module_name) -%}
+<span class="module-lockup">
+    <span class="brand-prefix">Terra<span class="module-name-wrapper">{{ module_name }}</span></span>
+</span>
+{%- endmacro %}

@@ -1,225 +1,374 @@
 {% extends "layout.html" %}
 
-{% block additionalcss %}
-<!-- Leaflet draw plugin -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+{% block title %}TerraFlow Map Configuration{% endblock %}
+
+{% block styles %}
+<style>
+    .config-section {
+        margin-bottom: 2rem;
+    }
+    .layer-item {
+        padding: 0.75rem;
+        margin-bottom: 0.5rem;
+        border: 1px solid #e9ecef;
+        border-radius: 0.375rem;
+        background-color: #f8f9fa;
+    }
+    .layer-controls {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+    }
+    .preview-map {
+        height: 300px;
+        width: 100%;
+        margin-top: 1rem;
+        border: 1px solid #ddd;
+        border-radius: 0.375rem;
+    }
+    .file-upload {
+        margin-bottom: 1rem;
+    }
+    .file-upload .form-control {
+        border-top-right-radius: 0;
+        border-bottom-right-radius: 0;
+    }
+    .file-upload .btn {
+        border-top-left-radius: 0;
+        border-bottom-left-radius: 0;
+    }
+    .color-picker {
+        height: 38px;
+    }
+    .tab-content {
+        padding: 1.5rem;
+        border: 1px solid #dee2e6;
+        border-top: none;
+        border-radius: 0 0 0.375rem 0.375rem;
+    }
+    .nav-tabs .nav-link.active {
+        background-color: var(--tf-map-green-50);
+        border-color: #dee2e6 #dee2e6 #fff;
+    }
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="container">
+<div class="container-fluid">
     <div class="row mb-4">
-        <div class="col-12">
-            <h1>Map Configuration</h1>
-            <p class="lead">Configure map providers and layers for property visualization</p>
-        </div>
-    </div>
-
-    <div class="row">
-        <div class="col-lg-8">
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">ESRI Map Configuration</h5>
+        <div class="col-lg-12">
+            <div class="card shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center" style="background-color: var(--tf-map-green-100);">
+                    <div>
+                        <i class="fas fa-cog me-2" style="color: var(--tf-map-green);"></i>
+                        <span class="card-title h5 mb-0">{{ module_lockup('Map') }} Configuration</span>
+                    </div>
+                    <div>
+                        <a href="{{ url_for('database_config') }}" class="btn btn-sm btn-outline-secondary me-2">
+                            <i class="fas fa-database me-1"></i> Database Config
+                        </a>
+                        <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#importConfigModal">
+                            <i class="fas fa-file-import me-1"></i> Import Configuration
+                        </button>
+                    </div>
                 </div>
                 <div class="card-body">
-                    <form method="post" action="{{ url_for('save_map_config') }}">
-                        <input type="hidden" name="config_type" value="esri">
-                        
-                        <!-- Base Maps Section -->
-                        <h5 class="text-primary mb-3">Base Maps</h5>
-                        <div class="mb-4">
-                            <div class="form-check mb-2">
-                                <input class="form-check-input" type="checkbox" id="imagery" name="base_layers[]" value="imagery" checked>
-                                <label class="form-check-label fw-semibold" for="imagery">
-                                    Imagery
-                                    <small class="d-block text-muted">World imagery from ArcGIS Online</small>
-                                </label>
-                            </div>
-                            <div class="form-check mb-2">
-                                <input class="form-check-input" type="checkbox" id="street" name="base_layers[]" value="street" checked>
-                                <label class="form-check-label fw-semibold" for="street">
-                                    Street Map
-                                    <small class="d-block text-muted">World street map from ArcGIS Online</small>
-                                </label>
-                            </div>
-                            <div class="form-check mb-2">
-                                <input class="form-check-input" type="checkbox" id="topo" name="base_layers[]" value="topo" checked>
-                                <label class="form-check-label fw-semibold" for="topo">
-                                    Topographic
-                                    <small class="d-block text-muted">Topographic map from ArcGIS Online</small>
-                                </label>
-                            </div>
-                            <div class="form-check mb-2">
-                                <input class="form-check-input" type="checkbox" id="fema" name="base_layers[]" value="fema" checked>
-                                <label class="form-check-label fw-semibold" for="fema">
-                                    FEMA Flood
-                                    <small class="d-block text-muted">FEMA flood hazard zones</small>
-                                </label>
-                            </div>
-                        </div>
-
-                        <!-- Viewable Layers Section -->
-                        <h5 class="text-primary mb-3">Viewable Layers</h5>
-                        <div class="mb-4">
-                            <div class="form-check mb-2">
-                                <input class="form-check-input" type="checkbox" id="parcels" name="viewable_layers[]" value="parcels" checked>
-                                <label class="form-check-label fw-semibold" for="parcels">
-                                    Parcels
-                                    <small class="d-block text-muted">Property parcels and assessment data</small>
-                                </label>
-                            </div>
-                            <div class="form-check mb-2">
-                                <input class="form-check-input" type="checkbox" id="short_plats" name="viewable_layers[]" value="short_plats">
-                                <label class="form-check-label fw-semibold" for="short_plats">
-                                    Short Plats
-                                    <small class="d-block text-muted">Short subdivision plats</small>
-                                </label>
-                            </div>
-                            <div class="form-check mb-2">
-                                <input class="form-check-input" type="checkbox" id="long_plats" name="viewable_layers[]" value="long_plats">
-                                <label class="form-check-label fw-semibold" for="long_plats">
-                                    Long Plats
-                                    <small class="d-block text-muted">Long subdivision plats</small>
-                                </label>
-                            </div>
-                            <div class="form-check mb-2">
-                                <input class="form-check-input" type="checkbox" id="flood_zones" name="viewable_layers[]" value="flood_zones">
-                                <label class="form-check-label fw-semibold" for="flood_zones">
-                                    Flood Zones
-                                    <small class="d-block text-muted">Detailed flood zone boundaries</small>
-                                </label>
-                            </div>
-                            <div class="form-check mb-2">
-                                <input class="form-check-input" type="checkbox" id="zoning" name="viewable_layers[]" value="zoning">
-                                <label class="form-check-label fw-semibold" for="zoning">
-                                    Zoning
-                                    <small class="d-block text-muted">Zoning boundaries and classifications</small>
-                                </label>
-                            </div>
-                        </div>
-
-                        <!-- GIS Identification Settings -->
-                        <h5 class="text-primary mb-3">Property Identification</h5>
-                        <div class="mb-4">
-                            <div class="mb-3">
-                                <label for="pin_field" class="form-label fw-semibold">PIN Field Name</label>
-                                <input type="text" class="form-control" id="pin_field" name="pin_field" value="Prop_ID">
-                                <div class="form-text">Field name in the GIS data that contains the property identifier</div>
-                            </div>
-                            
-                            <div class="mb-3">
-                                <label for="spatial_filter" class="form-label fw-semibold">Spatial Filter</label>
-                                <input type="text" class="form-control" id="spatial_filter" name="spatial_filter" value="prop_id > 0">
-                                <div class="form-text">SQL-like filter to limit visible features</div>
-                            </div>
-                        </div>
-
-                        <!-- Map Settings -->
-                        <h5 class="text-primary mb-3">Map Display Settings</h5>
-                        <div class="mb-4">
-                            <div class="mb-3">
-                                <label class="form-label fw-semibold">Selection Styling</label>
-                                <div class="row g-3">
-                                    <div class="col-md-4">
-                                        <label for="selection_fill_opacity" class="form-label">Fill Opacity</label>
-                                        <input type="number" class="form-control" id="selection_fill_opacity" name="selection_fill_opacity" value="0.15" min="0" max="1" step="0.05">
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label for="selection_border_thickness" class="form-label">Border Thickness</label>
-                                        <input type="number" class="form-control" id="selection_border_thickness" name="selection_border_thickness" value="1" min="1" max="5">
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label for="selection_border_color" class="form-label">Border Color</label>
-                                        <input type="color" class="form-control form-control-color" id="selection_border_color" name="selection_border_color" value="#00FFFF">
+                    <ul class="nav nav-tabs" id="configTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="esri-tab" data-bs-toggle="tab" data-bs-target="#esri" type="button" role="tab" aria-controls="esri" aria-selected="true">
+                                <i class="fas fa-map me-1"></i> ESRI Map
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="google-tab" data-bs-toggle="tab" data-bs-target="#google" type="button" role="tab" aria-controls="google" aria-selected="false">
+                                <i class="fas fa-globe me-1"></i> Google Maps
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="modules-tab" data-bs-toggle="tab" data-bs-target="#modules" type="button" role="tab" aria-controls="modules" aria-selected="false">
+                                <i class="fas fa-puzzle-piece me-1"></i> Map Modules
+                            </button>
+                        </li>
+                    </ul>
+                    
+                    <div class="tab-content" id="configTabsContent">
+                        <!-- ESRI Map Configuration -->
+                        <div class="tab-pane fade show active" id="esri" role="tabpanel" aria-labelledby="esri-tab">
+                            <form id="esriConfigForm" action="{{ url_for('save_map_config') }}" method="post">
+                                <input type="hidden" name="config_type" value="esri">
+                                
+                                <div class="config-section">
+                                    <h5>General Settings</h5>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="pin_field" class="form-label">Property Identifier Field</label>
+                                                <input type="text" class="form-control" id="pin_field" name="pin_field" placeholder="e.g., PARCEL_ID">
+                                                <small class="text-muted">Field used to identify properties (typically parcel ID)</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="spatial_filter" class="form-label">Spatial Filter</label>
+                                                <input type="text" class="form-control" id="spatial_filter" name="spatial_filter" placeholder="e.g., 1=1">
+                                                <small class="text-muted">SQL clause for spatial queries (leave empty for no filtering)</small>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                            <div class="form-check mb-2">
-                                <input class="form-check-input" type="checkbox" id="show_scale_bar" name="show_scale_bar">
-                                <label class="form-check-label fw-semibold" for="show_scale_bar">Show Scale Bar</label>
-                            </div>
-                            <div class="form-check mb-2">
-                                <input class="form-check-input" type="checkbox" id="show_legal_text" name="show_legal_text">
-                                <label class="form-check-label fw-semibold" for="show_legal_text">Show Legal Disclaimer</label>
-                            </div>
+                                
+                                <div class="config-section">
+                                    <h5>Base Layers</h5>
+                                    <div class="mb-3">
+                                        <button type="button" class="btn btn-sm btn-outline-primary" id="addBaseLayerBtn">
+                                            <i class="fas fa-plus me-1"></i> Add Base Layer
+                                        </button>
+                                    </div>
+                                    <div id="baseLayersContainer">
+                                        <!-- Base layers will be added here -->
+                                    </div>
+                                </div>
+                                
+                                <div class="config-section">
+                                    <h5>Viewable Layers</h5>
+                                    <div class="mb-3">
+                                        <button type="button" class="btn btn-sm btn-outline-primary" id="addViewableLayerBtn">
+                                            <i class="fas fa-plus me-1"></i> Add Viewable Layer
+                                        </button>
+                                    </div>
+                                    <div id="viewableLayersContainer">
+                                        <!-- Viewable layers will be added here -->
+                                    </div>
+                                </div>
+                                
+                                <div class="config-section">
+                                    <h5>Selection Style</h5>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="selection_fill_opacity" class="form-label">Fill Opacity</label>
+                                                <input type="range" class="form-range" id="selection_fill_opacity" name="selection_fill_opacity" min="0" max="1" step="0.05" value="0.3">
+                                                <small class="text-muted">Opacity of the selected area fill (0-1)</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="selection_border_thickness" class="form-label">Border Thickness</label>
+                                                <input type="number" class="form-control" id="selection_border_thickness" name="selection_border_thickness" min="1" max="5" value="2">
+                                                <small class="text-muted">Thickness of the selection border in pixels</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="selection_border_color" class="form-label">Border Color</label>
+                                                <input type="color" class="form-control color-picker" id="selection_border_color" name="selection_border_color" value="#00FFFF">
+                                                <small class="text-muted">Color of the selection border</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="config-section">
+                                    <h5>Display Options</h5>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="form-check mb-3">
+                                                <input class="form-check-input" type="checkbox" id="show_scale_bar" name="show_scale_bar" checked>
+                                                <label class="form-check-label" for="show_scale_bar">
+                                                    Show Scale Bar
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="form-check mb-3">
+                                                <input class="form-check-input" type="checkbox" id="show_legal_text" name="show_legal_text">
+                                                <label class="form-check-label" for="show_legal_text">
+                                                    Show Legal Disclaimer
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="mb-3" id="legalTextContainer" style="display: none;">
+                                        <label for="legal_text" class="form-label">Legal Disclaimer Text</label>
+                                        <textarea class="form-control" id="legal_text" name="legal_text" rows="3"></textarea>
+                                    </div>
+                                </div>
+                                
+                                <div class="config-section">
+                                    <h5>Preview</h5>
+                                    <div class="preview-map" id="esriMapPreview"></div>
+                                </div>
+                                
+                                <div class="d-flex justify-content-end">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-1"></i> Save ESRI Configuration
+                                    </button>
+                                </div>
+                            </form>
                         </div>
-
-                        <!-- Legal Disclaimer -->
-                        <div class="mb-4">
-                            <label for="legal_text" class="form-label fw-semibold">Legal Disclaimer Text</label>
-                            <textarea class="form-control" id="legal_text" name="legal_text" rows="3">THIS PRODUCT IS FOR INFORMATIONAL PURPOSES AND MAY NOT HAVE BEEN PREPARED FOR OR BE SUITABLE FOR LEGAL, ENGINEERING, OR SURVEYING PURPOSES. IT DOES NOT REPRESENT AN ON-THE-GROUND SURVEY AND REPRESENTS ONLY THE APPROXIMATE RELATIVE LOCATION OF PROPERTY BOUNDARIES.</textarea>
+                        
+                        <!-- Google Maps Configuration -->
+                        <div class="tab-pane fade" id="google" role="tabpanel" aria-labelledby="google-tab">
+                            <form id="googleConfigForm" action="{{ url_for('save_map_config') }}" method="post">
+                                <input type="hidden" name="config_type" value="google">
+                                
+                                <div class="config-section">
+                                    <h5>API Configuration</h5>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="google_api_key" class="form-label">Google Maps API Key</label>
+                                                <input type="text" class="form-control" id="google_api_key" name="google_api_key" placeholder="Enter your Google Maps API key">
+                                                <small class="text-muted">Your Google Maps API key with appropriate permissions</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="form-check mb-3" style="margin-top: 2rem;">
+                                                <input class="form-check-input" type="checkbox" id="allow_dev_tools" name="allow_dev_tools">
+                                                <label class="form-check-label" for="allow_dev_tools">
+                                                    Allow Developer Tools
+                                                </label>
+                                                <small class="d-block text-muted">Enable Map developer tools for debugging</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="config-section">
+                                    <h5>Preview</h5>
+                                    <div class="preview-map" id="googleMapPreview"></div>
+                                </div>
+                                
+                                <div class="d-flex justify-content-end">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-1"></i> Save Google Configuration
+                                    </button>
+                                </div>
+                            </form>
                         </div>
-
-                        <div class="d-flex justify-content-end">
-                            <button type="reset" class="btn btn-secondary me-2">Reset</button>
-                            <button type="submit" class="btn btn-primary">Save Configuration</button>
+                        
+                        <!-- Map Modules Configuration -->
+                        <div class="tab-pane fade" id="modules" role="tabpanel" aria-labelledby="modules-tab">
+                            <form id="modulesConfigForm" action="{{ url_for('save_module_config') }}" method="post">
+                                <div class="config-section">
+                                    <h5>Available Map Modules</h5>
+                                    <p class="text-muted">Enable or disable map modules in the TerraFlow platform.</p>
+                                    
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" id="module_esri" name="modules[]" value="esri" checked>
+                                        <label class="form-check-label" for="module_esri">
+                                            <i class="fas fa-map me-1" style="color: var(--tf-map-green);"></i>
+                                            ESRI Map
+                                        </label>
+                                        <small class="d-block text-muted">ArcGIS-powered interactive mapping</small>
+                                    </div>
+                                    
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" id="module_google" name="modules[]" value="google">
+                                        <label class="form-check-label" for="module_google">
+                                            <i class="fas fa-globe me-1" style="color: var(--tf-map-green);"></i>
+                                            Google Maps
+                                        </label>
+                                        <small class="d-block text-muted">Google Maps-powered mapping</small>
+                                    </div>
+                                    
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" id="module_pictometry" name="modules[]" value="pictometry">
+                                        <label class="form-check-label" for="module_pictometry">
+                                            <i class="fas fa-images me-1" style="color: var(--tf-map-green);"></i>
+                                            Pictometry Online
+                                        </label>
+                                        <small class="d-block text-muted">Aerial imagery and measurement tools</small>
+                                    </div>
+                                    
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" id="module_property_viewer" name="modules[]" value="property_viewer" checked>
+                                        <label class="form-check-label" for="module_property_viewer">
+                                            <i class="fas fa-home me-1" style="color: var(--tf-map-green);"></i>
+                                            Property Viewer
+                                        </label>
+                                        <small class="d-block text-muted">Enhanced property assessment viewer</small>
+                                    </div>
+                                    
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" id="module_anomaly_map" name="modules[]" value="anomaly_map" checked>
+                                        <label class="form-check-label" for="module_anomaly_map">
+                                            <i class="fas fa-exclamation-triangle me-1" style="color: var(--tf-sketch-orange);"></i>
+                                            Anomaly Map
+                                        </label>
+                                        <small class="d-block text-muted">Geospatial visualization of data anomalies</small>
+                                    </div>
+                                </div>
+                                
+                                <div class="d-flex justify-content-end">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-1"></i> Save Module Configuration
+                                    </button>
+                                </div>
+                            </form>
                         </div>
-                    </form>
+                    </div>
                 </div>
             </div>
         </div>
+    </div>
+</div>
 
-        <div class="col-lg-4">
-            <div class="tf-card flow">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">Google Maps Configuration</h5>
-                </div>
-                <div class="card-body">
-                    <form method="post" action="{{ url_for('save_map_config') }}">
-                        <input type="hidden" name="config_type" value="google">
-                        
+<!-- Import Configuration Modal -->
+<div class="modal fade" id="importConfigModal" tabindex="-1" aria-labelledby="importConfigModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header" style="background-color: var(--tf-map-green-100);">
+                <h5 class="modal-title" id="importConfigModalLabel">
+                    <i class="fas fa-file-import me-2"></i> Import Configuration
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <ul class="nav nav-tabs" id="importTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="import-file-tab" data-bs-toggle="tab" data-bs-target="#import-file" type="button" role="tab" aria-controls="import-file" aria-selected="true">
+                            <i class="fas fa-file me-1"></i> File Upload
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="import-xml-tab" data-bs-toggle="tab" data-bs-target="#import-xml" type="button" role="tab" aria-controls="import-xml" aria-selected="false">
+                            <i class="fas fa-code me-1"></i> XML Import
+                        </button>
+                    </li>
+                </ul>
+                <div class="tab-content pt-3" id="importTabsContent">
+                    <div class="tab-pane fade show active" id="import-file" role="tabpanel" aria-labelledby="import-file-tab">
+                        <div class="file-upload d-flex">
+                            <input type="file" class="form-control" id="configFile" accept=".xml,.json,.config">
+                            <button type="button" class="btn btn-primary" id="uploadConfigFileBtn">Upload</button>
+                        </div>
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Upload your existing configuration files to import settings.
+                            Supported formats: XML, JSON, .config
+                        </div>
+                    </div>
+                    <div class="tab-pane fade" id="import-xml" role="tabpanel" aria-labelledby="import-xml-tab">
                         <div class="mb-3">
-                            <label for="google_api_key" class="form-label fw-semibold">Google Maps API Key</label>
-                            <input type="text" class="form-control" id="google_api_key" name="google_api_key" value="AIzaSyCf_fFOyBTgJcMh-PVFKB1go6dznluhu74">
+                            <label for="xmlContent" class="form-label">XML Configuration</label>
+                            <textarea class="form-control" id="xmlContent" rows="10" placeholder="Paste your XML configuration here..."></textarea>
                         </div>
-                        
-                        <div class="form-check mb-3">
-                            <input class="form-check-input" type="checkbox" id="allow_dev_tools" name="allow_dev_tools">
-                            <label class="form-check-label fw-semibold" for="allow_dev_tools">
-                                Allow Developer Tools
-                            </label>
+                        <div class="mb-3">
+                            <label for="xmlConfigType" class="form-label">Configuration Type</label>
+                            <select class="form-select" id="xmlConfigType">
+                                <option value="esri">ESRI Map Configuration</option>
+                                <option value="google">Google Maps Configuration</option>
+                                <option value="data_connections">Data Connections</option>
+                                <option value="shared_state">Shared State Settings</option>
+                            </select>
                         </div>
-                        
-                        <div class="d-flex justify-content-end">
-                            <button type="submit" class="btn btn-primary">Save Configuration</button>
-                        </div>
-                    </form>
+                        <button type="button" class="btn btn-primary" id="importXmlBtn">Import XML</button>
+                    </div>
                 </div>
             </div>
-
-            <div class="tf-card map mt-4">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">Available Modules</h5>
-                </div>
-                <div class="card-body">
-                    <form method="post" action="{{ url_for('save_module_config') }}">
-                        <h6 class="mb-3 text-secondary">Launchable Modules</h6>
-                        
-                        <div class="form-check mb-2">
-                            <input class="form-check-input" type="checkbox" id="esri_map" name="modules[]" value="ESRI Map" checked>
-                            <label class="form-check-label" for="esri_map">ESRI Map</label>
-                        </div>
-                        <div class="form-check mb-2">
-                            <input class="form-check-input" type="checkbox" id="cama_data" name="modules[]" value="CAMA Data" checked>
-                            <label class="form-check-label" for="cama_data">CAMA Data</label>
-                        </div>
-                        <div class="form-check mb-2">
-                            <input class="form-check-input" type="checkbox" id="parcel_list" name="modules[]" value="Parcel List" checked>
-                            <label class="form-check-label" for="parcel_list">Parcel List</label>
-                        </div>
-                        <div class="form-check mb-2">
-                            <input class="form-check-input" type="checkbox" id="pictometry" name="modules[]" value="Pictometry Online" checked>
-                            <label class="form-check-label" for="pictometry">Pictometry Online</label>
-                        </div>
-                        <div class="form-check mb-4">
-                            <input class="form-check-input" type="checkbox" id="app_to_app" name="modules[]" value="App to App" checked>
-                            <label class="form-check-label" for="app_to_app">App to App</label>
-                        </div>
-                        
-                        <div class="d-flex justify-content-end">
-                            <button type="submit" class="btn btn-success">Save Module Settings</button>
-                        </div>
-                    </form>
-                </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
@@ -227,25 +376,325 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://js.arcgis.com/4.25/"></script>
+<script src="{{ url_for('static', filename='js/map-utils.js') }}"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Initialize tooltips
-    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl);
+    // Initialize the configuration interface
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize preview maps
+        initializeEsriPreview();
+        initializeGooglePreview();
+        
+        // Base layer template
+        const baseLayerTemplate = `
+            <div class="layer-item base-layer">
+                <div class="row">
+                    <div class="col-md-5">
+                        <div class="mb-2">
+                            <label class="form-label">Layer Name</label>
+                            <input type="text" class="form-control" name="base_layers[]" placeholder="e.g., Streets Base Map">
+                        </div>
+                    </div>
+                    <div class="col-md-5">
+                        <div class="mb-2">
+                            <label class="form-label">Layer URL</label>
+                            <input type="text" class="form-control" name="base_layer_urls[]" placeholder="e.g., https://services.arcgisonline.com/...">
+                        </div>
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <div class="mb-2 layer-controls">
+                            <div class="form-check me-2">
+                                <input class="form-check-input" type="checkbox" name="base_layer_visible[]" checked>
+                                <label class="form-check-label small">Visible</label>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-danger remove-layer-btn">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Viewable layer template
+        const viewableLayerTemplate = `
+            <div class="layer-item viewable-layer">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="mb-2">
+                            <label class="form-label">Layer Name</label>
+                            <input type="text" class="form-control" name="viewable_layers[]" placeholder="e.g., Property Parcels">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-2">
+                            <label class="form-label">Layer URL</label>
+                            <input type="text" class="form-control" name="viewable_layer_urls[]" placeholder="e.g., https://services.arcgisonline.com/...">
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="mb-2">
+                            <label class="form-label">Layer Type</label>
+                            <select class="form-select" name="viewable_layer_types[]">
+                                <option value="FeatureLayer">Feature Layer</option>
+                                <option value="MapImageLayer">Map Image Layer</option>
+                                <option value="TileLayer">Tile Layer</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <div class="mb-2 layer-controls">
+                            <div class="form-check me-2">
+                                <input class="form-check-input" type="checkbox" name="viewable_layer_visible[]" checked>
+                                <label class="form-check-label small">Visible</label>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-danger remove-layer-btn">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="viewable_layer_selectable[]">
+                            <label class="form-check-label">Enable Selection</label>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-2">
+                            <label class="form-label">Selection Layer ID</label>
+                            <input type="text" class="form-control" name="viewable_layer_selection_ids[]" placeholder="e.g., 0">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-2">
+                            <label class="form-label">Display Order</label>
+                            <input type="number" class="form-control" name="viewable_layer_orders[]" min="0" value="0">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Add base layer button
+        document.getElementById('addBaseLayerBtn').addEventListener('click', function() {
+            const baseLayersContainer = document.getElementById('baseLayersContainer');
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = baseLayerTemplate;
+            baseLayersContainer.appendChild(tempDiv.firstElementChild);
+            
+            // Add event listener to the new remove button
+            const removeBtn = baseLayersContainer.lastElementChild.querySelector('.remove-layer-btn');
+            removeBtn.addEventListener('click', function() {
+                this.closest('.layer-item').remove();
+            });
+        });
+        
+        // Add viewable layer button
+        document.getElementById('addViewableLayerBtn').addEventListener('click', function() {
+            const viewableLayersContainer = document.getElementById('viewableLayersContainer');
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = viewableLayerTemplate;
+            viewableLayersContainer.appendChild(tempDiv.firstElementChild);
+            
+            // Add event listener to the new remove button
+            const removeBtn = viewableLayersContainer.lastElementChild.querySelector('.remove-layer-btn');
+            removeBtn.addEventListener('click', function() {
+                this.closest('.layer-item').remove();
+            });
+        });
+        
+        // Toggle legal text textarea
+        document.getElementById('show_legal_text').addEventListener('change', function() {
+            document.getElementById('legalTextContainer').style.display = this.checked ? 'block' : 'none';
+        });
+        
+        // Import XML button
+        document.getElementById('importXmlBtn').addEventListener('click', function() {
+            const xmlContent = document.getElementById('xmlContent').value;
+            const configType = document.getElementById('xmlConfigType').value;
+            
+            if (!xmlContent) {
+                alert('Please paste XML configuration content');
+                return;
+            }
+            
+            try {
+                // Use map-utils.js to parse the XML
+                let parsedConfig = {};
+                
+                switch (configType) {
+                    case 'esri':
+                        parsedConfig = MapUtils.convertEsriConfig(xmlContent);
+                        populateEsriConfig(parsedConfig);
+                        break;
+                    case 'google':
+                        parsedConfig = MapUtils.convertGoogleConfig(xmlContent);
+                        populateGoogleConfig(parsedConfig);
+                        break;
+                    case 'data_connections':
+                        // Add data connections parsing
+                        alert('Data connections import not yet implemented');
+                        break;
+                    case 'shared_state':
+                        // Add shared state parsing
+                        alert('Shared state import not yet implemented');
+                        break;
+                }
+                
+                // Close the modal
+                $('#importConfigModal').modal('hide');
+                
+                // Switch to the appropriate tab
+                if (configType === 'esri') {
+                    document.getElementById('esri-tab').click();
+                } else if (configType === 'google') {
+                    document.getElementById('google-tab').click();
+                }
+            } catch (e) {
+                console.error('Error parsing XML:', e);
+                alert('Error parsing XML: ' + e.message);
+            }
+        });
+        
+        // Add a base layer and viewable layer by default
+        document.getElementById('addBaseLayerBtn').click();
+        document.getElementById('addViewableLayerBtn').click();
     });
     
-    // Form validation
-    const forms = document.querySelectorAll('.needs-validation');
-    Array.from(forms).forEach(form => {
-        form.addEventListener('submit', event => {
-            if (!form.checkValidity()) {
-                event.preventDefault();
-                event.stopPropagation();
-            }
-            form.classList.add('was-validated');
-        }, false);
-    });
-});
+    // Initialize ESRI preview map
+    function initializeEsriPreview() {
+        require([
+            "esri/Map",
+            "esri/views/MapView",
+            "esri/layers/FeatureLayer"
+        ], function(Map, MapView, FeatureLayer) {
+            // Create a simple map for preview
+            const map = new Map({
+                basemap: "streets"
+            });
+            
+            const view = new MapView({
+                container: "esriMapPreview",
+                map: map,
+                zoom: 6,
+                center: [-119.2844, 46.2506]  // Benton County, WA
+            });
+            
+            // Add a sample feature layer
+            const parcelsLayer = new FeatureLayer({
+                url: "https://mapservices.bentoncountywa.gov/arcgis/rest/services/Parcels/MapServer/0",
+                outFields: ["*"],
+                visible: true
+            });
+            map.add(parcelsLayer);
+        });
+    }
+    
+    // Initialize Google Maps preview
+    function initializeGooglePreview() {
+        // Check if Google Maps API is available
+        if (typeof google !== 'undefined' && google.maps) {
+            const map = new google.maps.Map(document.getElementById("googleMapPreview"), {
+                center: { lat: 46.2506, lng: -119.2844 },  // Benton County, WA
+                zoom: 6,
+                mapTypeId: google.maps.MapTypeId.ROADMAP
+            });
+        } else {
+            // If API not available, show placeholder
+            const previewElem = document.getElementById("googleMapPreview");
+            previewElem.innerHTML = `
+                <div class="d-flex align-items-center justify-content-center h-100 bg-light">
+                    <div class="text-center">
+                        <i class="fas fa-globe fa-3x mb-3" style="color: var(--tf-map-green);"></i>
+                        <p>Google Maps API key required for preview</p>
+                    </div>
+                </div>
+            `;
+        }
+    }
+    
+    // Populate ESRI configuration form
+    function populateEsriConfig(config) {
+        console.log('Populating ESRI config:', config);
+        
+        // Set field values
+        document.getElementById('pin_field').value = config.gisFieldName || '';
+        document.getElementById('spatial_filter').value = config.spatialFilter || '';
+        document.getElementById('selection_fill_opacity').value = config.selectionFillOpacity || 0.3;
+        document.getElementById('selection_border_thickness').value = config.selectionBorderThickness || 2;
+        
+        // Convert RGB string to hex for color picker
+        const borderColor = config.selectionBorderColor || '0,255,255';
+        const rgbParts = borderColor.split(',').map(p => parseInt(p.trim(), 10));
+        const hexColor = rgbToHex(rgbParts[0], rgbParts[1], rgbParts[2]);
+        document.getElementById('selection_border_color').value = hexColor;
+        
+        // Set checkboxes
+        document.getElementById('show_scale_bar').checked = config.showScaleBar || false;
+        document.getElementById('show_legal_text').checked = !!config.legalText;
+        document.getElementById('legalTextContainer').style.display = config.legalText ? 'block' : 'none';
+        document.getElementById('legal_text').value = config.legalText || '';
+        
+        // Clear existing layers
+        document.getElementById('baseLayersContainer').innerHTML = '';
+        document.getElementById('viewableLayersContainer').innerHTML = '';
+        
+        // Add base layers
+        if (config.baseLayers && config.baseLayers.length) {
+            config.baseLayers.forEach(layer => {
+                document.getElementById('addBaseLayerBtn').click();
+                const layerItem = document.getElementById('baseLayersContainer').lastElementChild;
+                
+                const nameInput = layerItem.querySelector('input[name="base_layers[]"]');
+                const urlInput = layerItem.querySelector('input[name="base_layer_urls[]"]');
+                const visibleInput = layerItem.querySelector('input[name="base_layer_visible[]"]');
+                
+                nameInput.value = layer.name || '';
+                urlInput.value = layer.url || '';
+                visibleInput.checked = layer.visible || false;
+            });
+        }
+        
+        // Add viewable layers
+        if (config.viewableLayers && config.viewableLayers.length) {
+            config.viewableLayers.forEach(layer => {
+                document.getElementById('addViewableLayerBtn').click();
+                const layerItem = document.getElementById('viewableLayersContainer').lastElementChild;
+                
+                const nameInput = layerItem.querySelector('input[name="viewable_layers[]"]');
+                const urlInput = layerItem.querySelector('input[name="viewable_layer_urls[]"]');
+                const typeSelect = layerItem.querySelector('select[name="viewable_layer_types[]"]');
+                const visibleInput = layerItem.querySelector('input[name="viewable_layer_visible[]"]');
+                const selectableInput = layerItem.querySelector('input[name="viewable_layer_selectable[]"]');
+                const selectionIdInput = layerItem.querySelector('input[name="viewable_layer_selection_ids[]"]');
+                const orderInput = layerItem.querySelector('input[name="viewable_layer_orders[]"]');
+                
+                nameInput.value = layer.name || '';
+                urlInput.value = layer.url || '';
+                if (layer.type) {
+                    typeSelect.value = layer.type;
+                }
+                visibleInput.checked = layer.visible || false;
+                selectableInput.checked = layer.enableSelection || false;
+                selectionIdInput.value = layer.selectionLayerID || '';
+                orderInput.value = layer.order || 0;
+            });
+        }
+    }
+    
+    // Populate Google configuration form
+    function populateGoogleConfig(config) {
+        console.log('Populating Google config:', config);
+        
+        document.getElementById('google_api_key').value = config.apiKey || '';
+        document.getElementById('allow_dev_tools').checked = config.allowDevTools || false;
+    }
+    
+    // Helper function to convert RGB to hex
+    function rgbToHex(r, g, b) {
+        return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+    }
 </script>
 {% endblock %}

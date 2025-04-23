@@ -1,529 +1,497 @@
-/* TerraFlow - TerraFusion Platform Custom Styles */
+/**
+ * TerraFlow - Custom Bootstrap Overrides
+ * 
+ * This file contains custom overrides for Bootstrap components
+ * to match the TerraFusion design system.
+ */
 
-/* Global Variables - TerraFlow Design System */
-:root {
-    /* Override Bootstrap primary colors with TerraFusion palette */
-    --primary-color: var(--tf-flow-aqua);
-    --secondary-color: var(--tf-gray-700);
-    --success-color: var(--tf-map-green);
-    --warning-color: var(--tf-sketch-orange);
-    --danger-color: #dc3545;
-    --info-color: var(--tf-insight-violet);
-    --light-color: var(--tf-gray-50);
-    --dark-color: var(--tf-gray-900);
-    
-    /* Consistent design values */
-    --border-radius: 0.5rem;
-    --border-radius-lg: 0.75rem;
-    --border-radius-sm: 0.375rem;
-    --transition-speed: 0.3s;
-    --box-shadow: var(--tf-shadow-md);
-    
-    /* Bootstrap overrides */
-    --bs-primary: var(--tf-flow-aqua);
-    --bs-secondary: var(--tf-gray-700);
-    --bs-success: var(--tf-map-green);
-    --bs-warning: var(--tf-sketch-orange);
-    --bs-danger: #dc3545;
-    --bs-info: var(--tf-insight-violet);
-    --bs-light: var(--tf-gray-50);
-    --bs-dark: var(--tf-gray-900);
+/* Navbar customization */
+.navbar {
+    padding: 0.75rem 1rem;
+    background-color: #fff;
+    border-bottom: 1px solid var(--tf-gray-200);
 }
 
-/* General styles - Using TerraFusion design system */
-body {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    font-size: 16px;
-    line-height: 1.6;
-    background-color: #f5f5f5;
-    color: var(--tf-gray-900);
-    font-family: var(--tf-font-body);
-}
-
-/* Increase contrast for better readability */
-.text-muted {
-    color: var(--tf-gray-700) !important;
-}
-
-/* Bootstrap overrides for TerraFlow */
-.btn-primary {
-    background-color: var(--tf-flow-aqua);
-    border-color: var(--tf-flow-aqua);
-}
-
-.btn-primary:hover,
-.btn-primary:focus {
-    background-color: var(--tf-flow-dark);
-    border-color: var(--tf-flow-dark);
-}
-
-.btn-success {
-    background-color: var(--tf-map-green);
-    border-color: var(--tf-map-green);
-}
-
-.btn-success:hover,
-.btn-success:focus {
-    background-color: var(--tf-map-dark);
-    border-color: var(--tf-map-dark);
-}
-
-.btn-info {
-    background-color: var(--tf-insight-violet);
-    border-color: var(--tf-insight-violet);
-    color: white;
-}
-
-.btn-info:hover,
-.btn-info:focus {
-    background-color: var(--tf-insight-dark);
-    border-color: var(--tf-insight-dark);
-    color: white;
-}
-
-.btn-warning {
-    background-color: var(--tf-sketch-orange);
-    border-color: var(--tf-sketch-orange);
-    color: white;
-}
-
-.btn-warning:hover,
-.btn-warning:focus {
-    background-color: var(--tf-sketch-dark);
-    border-color: var(--tf-sketch-dark);
-    color: white;
-}
-
-.alert-primary {
-    color: var(--tf-flow-dark);
-    background-color: rgba(0, 191, 214, 0.15);
-    border-color: rgba(0, 191, 214, 0.3);
-}
-
-.alert-success {
-    color: var(--tf-map-dark);
-    background-color: rgba(46, 125, 50, 0.15);
-    border-color: rgba(46, 125, 50, 0.3);
-}
-
-.alert-info {
-    color: var(--tf-insight-dark);
-    background-color: rgba(122, 31, 255, 0.15);
-    border-color: rgba(122, 31, 255, 0.3);
-}
-
-.alert-warning {
-    color: var(--tf-sketch-dark);
-    background-color: rgba(255, 122, 41, 0.15);
-    border-color: rgba(255, 122, 41, 0.3);
-}
-
-.form-control:focus, 
-.form-select:focus {
-    border-color: var(--tf-flow-aqua);
-    box-shadow: 0 0 0 0.25rem rgba(0, 191, 214, 0.25);
-}
-
-.main-content {
-    flex: 1;
-    padding: 30px 0; /* Add more padding */
-}
-
-.footer {
-    background-color: white;
-    color: var(--tf-gray-900);
-    border-top: 1px solid var(--tf-gray-200);
-    padding: 1.5rem 0;
-    margin-top: auto;
-    box-shadow: var(--tf-shadow-sm);
-}
-
-/* Login page */
-.login-container {
-    max-width: 400px;
-    margin: 0 auto;
-    padding: 2rem;
-    background-color: var(--bs-light);
-    border-radius: 0.5rem;
-    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-}
-
-.login-logo {
-    text-align: center;
-    margin-bottom: 2rem;
-}
-
-/* File manager */
-.file-card {
-    transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.file-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
-}
-
-.file-icon {
-    font-size: 2rem;
-    text-align: center;
-    width: 48px;
-    height: 48px;
-    margin-right: 1rem;
-    color: var(--bs-primary);
-}
-
-.file-actions {
-    display: flex;
-    gap: 0.5rem;
-}
-
-.upload-zone {
-    border: 2px dashed var(--bs-gray-400);
-    padding: 2rem;
-    text-align: center;
-    border-radius: 0.5rem;
-    margin-bottom: 2rem;
-    transition: border-color 0.2s;
-}
-
-.upload-zone:hover {
-    border-color: var(--bs-primary);
-}
-
-.file-input-label {
-    cursor: pointer;
-}
-
-/* Map viewer */
-#map {
-    width: 100%;
-    height: 600px;
-    border-radius: 0.5rem;
-    margin-bottom: 1rem;
-}
-
-.map-controls {
-    background-color: var(--bs-light);
-    padding: 1rem;
-    border-radius: 0.5rem;
-    margin-bottom: 1rem;
-}
-
-.feature-popup table {
-    margin-bottom: 0;
-}
-
-.map-sidebar {
-    max-height: 600px;
-    overflow-y: auto;
-}
-
-.map-coordinates {
-    font-family: monospace;
-    background-color: rgba(255, 255, 255, 0.8);
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.25rem;
-    font-size: 0.875rem;
-}
-
-/* Search page */
-.search-container {
-    max-width: 800px;
-    margin: 0 auto;
-}
-
-.search-form {
-    margin-bottom: 2rem;
-}
-
-.search-result-box {
-    margin-bottom: 1.5rem;
-}
-
-.answer-content {
-    line-height: 1.6;
-    margin-top: 1rem;
-}
-
-/* Metadata modal */
-.metadata-modal-body {
-    max-height: 70vh;
-    overflow-y: auto;
-}
-
-pre code {
-    background-color: var(--bs-gray-100);
-    border: 1px solid var(--bs-gray-300);
-    border-radius: 0.25rem;
-    padding: 0.5rem;
-    white-space: pre-wrap;
-    font-size: 0.875rem;
-}
-
-/* Dashboard */
-.stats-card {
-    text-align: center;
-    padding: 1.5rem;
-    border-radius: 0.5rem;
-    margin-bottom: 1.5rem;
-    box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.05);
-}
-
-.stats-icon {
-    font-size: 2.5rem;
-    margin-bottom: 1rem;
-}
-
-.stats-number {
-    font-size: 2rem;
-    font-weight: bold;
-    margin-bottom: 0.5rem;
-}
-
-.recent-activity {
-    margin-top: 2rem;
-}
-
-/* Improved Headings - Using TerraFusion design system */
-h1, h2, h3, h4, h5, h6 {
-    font-family: var(--tf-font-head);
+.navbar-brand {
+    font-size: 1.5rem;
     font-weight: 700;
-    margin-bottom: 1.2rem;
-    color: var(--tf-gray-900);
     letter-spacing: -0.01em;
 }
 
-h1 {
-    font-size: 2.25rem;
-    border-bottom: 2px solid var(--tf-flow-aqua);
-    padding-bottom: 0.5rem;
-    margin-bottom: 1.5rem;
+.navbar-brand .brand-prefix {
+    color: var(--tf-primary);
 }
 
-h2 {
-    font-size: 1.875rem;
-    color: var(--tf-gray-800);
+.navbar-brand .tf-flow {
+    color: var(--tf-flow-aqua);
 }
 
-h3 {
-    font-size: 1.5rem;
-    color: var(--tf-gray-800);
+.navbar-brand .tf-map {
+    color: var(--tf-map-green);
 }
 
-/* Add a subtle highlight effect to heading containers */
-.mb-4 h1, .mb-4 h2, .mb-4 h3 {
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.05);
+.navbar-brand .tf-insight {
+    color: var(--tf-insight-violet);
 }
 
-/* Power Query Page Improvements */
-/* Cards with TerraFusion design system */
+.navbar-brand .tf-sketch {
+    color: var(--tf-sketch-orange);
+}
+
+.dropdown-item.active, 
+.dropdown-item:active {
+    background-color: var(--tf-primary-light);
+}
+
+/* Card customizations */
 .card {
     border: none;
-    border-radius: 12px;
-    box-shadow: var(--tf-shadow-sm);
-    margin-bottom: 1.5rem;
-    background-color: #fff;
-    overflow: hidden;
-    transition: all 0.2s ease;
+    box-shadow: var(--tf-shadow);
+    transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .card:hover {
+    transform: translateY(-2px);
     box-shadow: var(--tf-shadow-md);
 }
 
 .card-header {
-    background-color: white !important;
-    border-bottom: 1px solid var(--tf-gray-200) !important;
-    color: var(--tf-gray-900) !important;
     font-weight: 600;
-    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--tf-gray-200);
 }
 
-.card-body {
-    padding: 1.5rem;
-}
-
-/* Form controls with TerraFusion design system */
-.form-control, .form-select {
-    font-size: 1rem;
-    padding: 10px 12px;
-    border: 1px solid var(--tf-gray-300);
-    border-radius: 8px;
-    font-family: var(--tf-font-body);
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.form-control:focus, .form-select:focus {
-    border-color: var(--tf-flow-aqua);
-    box-shadow: 0 0 0 0.25rem rgba(0, 191, 214, 0.25);
-    outline: none;
-}
-
-/* Buttons with TerraFusion design system */
+/* Button customizations */
 .btn {
-    font-family: var(--tf-font-head);
-    font-weight: 600;
-    padding: 10px 20px;
-    border-radius: 8px;
-    letter-spacing: -0.01em;
-    transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
-    border: none;
-    cursor: pointer;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.08);
-}
-
-.btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.12);
-}
-
-.btn:active {
-    transform: translateY(0);
-}
-
-.btn-sm {
-    padding: 6px 12px;
-    font-size: 0.875rem;
-    border-radius: 6px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
 }
 
 .btn-primary {
-    background-color: var(--tf-flow-aqua) !important;
-    border-color: var(--tf-flow-aqua) !important;
-    color: white !important;
+    background-color: var(--tf-primary);
+    border-color: var(--tf-primary);
 }
 
-.btn-primary:hover {
-    background-color: var(--tf-flow-dark) !important;
-    border-color: var(--tf-flow-dark) !important;
-}
-
-.btn-outline-primary {
-    border: 1px solid var(--tf-flow-aqua) !important;
-    color: var(--tf-flow-aqua) !important;
-    background-color: transparent !important;
-}
-
-.btn-outline-primary:hover {
-    background-color: var(--tf-flow-aqua) !important;
-    color: white !important;
+.btn-primary:hover, 
+.btn-primary:focus {
+    background-color: var(--tf-primary-dark);
+    border-color: var(--tf-primary-dark);
 }
 
 .btn-success {
-    background-color: var(--tf-map-green) !important;
-    border-color: var(--tf-map-green) !important;
-}
-
-.btn-success:hover {
-    background-color: var(--tf-map-dark) !important;
-    border-color: var(--tf-map-dark) !important;
+    background-color: var(--tf-success);
+    border-color: var(--tf-success);
 }
 
 .btn-info {
-    background-color: var(--tf-insight-violet) !important;
-    border-color: var(--tf-insight-violet) !important;
-    color: white !important;
-}
-
-.btn-info:hover {
-    background-color: var(--tf-insight-dark) !important;
-    border-color: var(--tf-insight-dark) !important;
+    background-color: var(--tf-info);
+    border-color: var(--tf-info);
+    color: #fff;
 }
 
 .btn-warning {
-    background-color: var(--tf-sketch-orange) !important;
-    border-color: var(--tf-sketch-orange) !important;
-    color: white !important;
+    background-color: var(--tf-warning);
+    border-color: var(--tf-warning);
 }
 
-.btn-warning:hover {
-    background-color: var(--tf-sketch-dark) !important;
-    border-color: var(--tf-sketch-dark) !important;
+.btn-danger {
+    background-color: var(--tf-danger);
+    border-color: var(--tf-danger);
 }
 
-/* Table improvements - TerraFusion styling */
+.btn-outline-primary {
+    border-color: var(--tf-primary);
+    color: var(--tf-primary);
+}
+
+.btn-outline-primary:hover {
+    background-color: var(--tf-primary);
+    color: white;
+}
+
+/* Form customizations */
+.form-control:focus {
+    border-color: var(--tf-primary-light);
+    box-shadow: 0 0 0 0.2rem rgba(15, 76, 92, 0.15);
+}
+
+.form-label {
+    font-weight: 500;
+    color: var(--tf-gray-700);
+}
+
+.form-text {
+    color: var(--tf-gray-500);
+}
+
+/* Badge customizations */
+.badge {
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    padding: 0.35em 0.65em;
+}
+
+.badge-primary {
+    background-color: var(--tf-primary);
+}
+
+.badge-flow {
+    background-color: var(--tf-flow-aqua);
+    color: #fff;
+}
+
+.badge-map {
+    background-color: var(--tf-map-green);
+    color: #fff;
+}
+
+.badge-insight {
+    background-color: var(--tf-insight-violet);
+    color: #fff;
+}
+
+.badge-sketch {
+    background-color: var(--tf-sketch-orange);
+    color: #fff;
+}
+
+/* Alert customizations */
+.alert {
+    border: none;
+    border-left: 4px solid transparent;
+    border-radius: 0.25rem;
+    padding: 1rem 1.5rem;
+    font-weight: 500;
+}
+
+.alert-primary {
+    background-color: rgba(15, 76, 92, 0.1);
+    border-left-color: var(--tf-primary);
+    color: var(--tf-primary-dark);
+}
+
+.alert-success {
+    background-color: var(--tf-success-light);
+    border-left-color: var(--tf-success);
+    color: #166534;
+}
+
+.alert-info {
+    background-color: var(--tf-info-light);
+    border-left-color: var(--tf-info);
+    color: #1E40AF;
+}
+
+.alert-warning {
+    background-color: var(--tf-warning-light);
+    border-left-color: var(--tf-warning);
+    color: #92400E;
+}
+
+.alert-danger {
+    background-color: var(--tf-danger-light);
+    border-left-color: var(--tf-danger);
+    color: #B91C1C;
+}
+
+/* Table customizations */
 .table {
-    border-color: var(--tf-gray-200);
-    font-family: var(--tf-font-body);
-}
-
-.table-striped tbody tr:nth-of-type(odd) {
-    background-color: var(--tf-gray-50);
+    --bs-table-hover-bg: var(--tf-gray-100);
 }
 
 .table thead th {
-    background-color: var(--tf-gray-50);
-    color: var(--tf-gray-900);
+    background-color: var(--tf-gray-100);
+    border-bottom: 2px solid var(--tf-gray-300);
     font-weight: 600;
-    border-top: none;
-    border-bottom-width: 1px;
-    border-bottom-color: var(--tf-gray-200);
-    padding: 0.75rem 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    font-size: 0.75rem;
+    color: var(--tf-gray-700);
 }
 
-.table td {
-    vertical-align: middle;
-    padding: 0.75rem 1rem;
-    border-color: var(--tf-gray-200);
-}
-
-/* Modal improvements - TerraFusion styling */
-.modal-content {
-    border: none;
-    border-radius: 12px;
-    box-shadow: var(--tf-shadow-lg);
-    overflow: hidden;
-}
-
+/* Modal customizations */
 .modal-header {
-    background-color: white;
-    color: var(--tf-gray-900);
     border-bottom: 1px solid var(--tf-gray-200);
-    padding: 1.25rem 1.5rem;
-}
-
-.modal-header .modal-title {
-    font-family: var(--tf-font-head);
-    font-weight: 700;
-    font-size: 1.25rem;
-}
-
-.modal-body {
-    padding: 1.5rem;
 }
 
 .modal-footer {
     border-top: 1px solid var(--tf-gray-200);
-    padding: 1.25rem 1.5rem;
 }
 
-@media (max-width: 767.98px) {
-    .auth-container {
-        max-width: 100%;
-        padding: 0 15px;
-    }
+/* Pagination customizations */
+.page-link {
+    color: var(--tf-primary);
+    border-color: var(--tf-gray-200);
+}
 
-    .property-detail-header {
-        flex-direction: column;
-        text-align: center;
-    }
+.page-link:hover {
+    color: var(--tf-primary-dark);
+    background-color: var(--tf-gray-100);
+    border-color: var(--tf-gray-300);
+}
 
-    .map-controls {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        background: rgba(255, 255, 255, 0.95);
-        backdrop-filter: blur(5px);
-        z-index: 1000;
-        padding: 10px;
-        border-top: 1px solid rgba(0,0,0,0.1);
-    }
+.page-item.active .page-link {
+    background-color: var(--tf-primary);
+    border-color: var(--tf-primary);
+}
 
-    .feedback-button {
-        padding: 8px 12px;
-        font-size: 14px;
-    }
+/* Nav tabs customization */
+.nav-tabs {
+    border-bottom: 1px solid var(--tf-gray-300);
+}
+
+.nav-tabs .nav-link {
+    color: var(--tf-gray-600);
+    font-weight: 500;
+    border: 1px solid transparent;
+    border-top-left-radius: 0.25rem;
+    border-top-right-radius: 0.25rem;
+    padding: 0.75rem 1.25rem;
+}
+
+.nav-tabs .nav-link:hover {
+    border-color: var(--tf-gray-200) var(--tf-gray-200) var(--tf-gray-300);
+    background-color: var(--tf-gray-50);
+}
+
+.nav-tabs .nav-link.active {
+    color: var(--tf-primary);
+    background-color: #fff;
+    border-color: var(--tf-gray-300) var(--tf-gray-300) #fff;
+    font-weight: 600;
+}
+
+/* Progress bar customization */
+.progress {
+    height: 0.75rem;
+    background-color: var(--tf-gray-200);
+}
+
+.progress-bar {
+    background-color: var(--tf-primary);
+}
+
+/* List group customization */
+.list-group-item.active {
+    background-color: var(--tf-primary);
+    border-color: var(--tf-primary);
+}
+
+/* Dropdown customization */
+.dropdown-menu {
+    border: none;
+    box-shadow: var(--tf-shadow-md);
+    border-radius: 0.375rem;
+}
+
+.dropdown-item {
+    padding: 0.5rem 1rem;
+    font-weight: 500;
+}
+
+.dropdown-item:hover {
+    background-color: var(--tf-gray-100);
+}
+
+.dropdown-item:active {
+    background-color: var(--tf-primary);
+}
+
+/* Collapse customization */
+.accordion-button:not(.collapsed) {
+    background-color: var(--tf-gray-100);
+    color: var(--tf-primary);
+}
+
+.accordion-button:focus {
+    border-color: var(--tf-primary-light);
+    box-shadow: 0 0 0 0.25rem rgba(15, 76, 92, 0.15);
+}
+
+/* Toast customization */
+.toast {
+    background-color: #fff;
+    border: none;
+    box-shadow: var(--tf-shadow-md);
+}
+
+.toast-header {
+    background-color: var(--tf-gray-100);
+    border-bottom: 1px solid var(--tf-gray-200);
+    font-weight: 600;
+}
+
+/* Tooltip customization */
+.tooltip-inner {
+    background-color: var(--tf-gray-800);
+    font-weight: 500;
+}
+
+/* Popover customization */
+.popover {
+    border: none;
+    box-shadow: var(--tf-shadow-md);
+}
+
+.popover-header {
+    background-color: var(--tf-gray-100);
+    border-bottom: 1px solid var(--tf-gray-200);
+    font-weight: 600;
+}
+
+/* Badge customization */
+.badge {
+    font-weight: 500;
+    letter-spacing: 0.02em;
+}
+
+/* Module Lockup customization */
+.module-lockup {
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+.brand-prefix {
+    color: var(--tf-primary);
+}
+
+.module-name-wrapper {
+    font-weight: 800;
+}
+
+/* Specific module styles */
+.module-flow .module-name-wrapper {
+    color: var(--tf-flow-aqua);
+}
+
+.module-map .module-name-wrapper {
+    color: var(--tf-map-green);
+}
+
+.module-insight .module-name-wrapper {
+    color: var(--tf-insight-violet);
+}
+
+.module-sketch .module-name-wrapper {
+    color: var(--tf-sketch-orange);
+}
+
+/* Dashboard cards */
+.stats-card {
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    background-color: white;
+    box-shadow: var(--tf-shadow);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.stats-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--tf-shadow-lg);
+}
+
+.stats-card .stats-icon {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    font-size: 2.5rem;
+    opacity: 0.15;
+}
+
+.stats-card .stats-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.stats-card .stats-label {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--tf-gray-600);
+}
+
+.stats-card.flow-card {
+    border-top: 4px solid var(--tf-flow-aqua);
+}
+
+.stats-card.map-card {
+    border-top: 4px solid var(--tf-map-green);
+}
+
+.stats-card.insight-card {
+    border-top: 4px solid var(--tf-insight-violet);
+}
+
+.stats-card.sketch-card {
+    border-top: 4px solid var(--tf-sketch-orange);
+}
+
+/* Custom utility classes */
+.bg-light-primary {
+    background-color: rgba(15, 76, 92, 0.1);
+}
+
+.bg-light-success {
+    background-color: var(--tf-success-light);
+}
+
+.bg-light-danger {
+    background-color: var(--tf-danger-light);
+}
+
+.bg-light-warning {
+    background-color: var(--tf-warning-light);
+}
+
+.bg-light-info {
+    background-color: var(--tf-info-light);
+}
+
+.text-flow {
+    color: var(--tf-flow-aqua) !important;
+}
+
+.text-map {
+    color: var(--tf-map-green) !important;
+}
+
+.text-insight {
+    color: var(--tf-insight-violet) !important;
+}
+
+.text-sketch {
+    color: var(--tf-sketch-orange) !important;
+}
+
+.bg-flow {
+    background-color: var(--tf-flow-aqua) !important;
+}
+
+.bg-map {
+    background-color: var(--tf-map-green) !important;
+}
+
+.bg-insight {
+    background-color: var(--tf-insight-violet) !important;
+}
+
+.bg-sketch {
+    background-color: var(--tf-sketch-orange) !important;
+}
+
+.bg-flow-light {
+    background-color: var(--tf-flow-aqua-light) !important;
+}
+
+.bg-map-light {
+    background-color: var(--tf-map-green-light) !important;
+}
+
+.bg-insight-light {
+    background-color: var(--tf-insight-violet-light) !important;
+}
+
+.bg-sketch-light {
+    background-color: var(--tf-sketch-orange-light) !important;
 }

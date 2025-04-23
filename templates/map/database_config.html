@@ -1,248 +1,483 @@
 {% extends "layout.html" %}
-{% from 'components/ui_components.html' import tf_card, tf_button, tf_alert, tf_input, tf_select %}
+
+{% block title %}TerraFlow Database Configuration{% endblock %}
+
+{% block styles %}
+<style>
+    .config-section {
+        margin-bottom: 2rem;
+    }
+    .query-editor {
+        font-family: monospace;
+        font-size: 0.9rem;
+        min-height: 120px;
+    }
+    .preview-table {
+        max-height: 300px;
+        overflow-y: auto;
+    }
+    .table-sm td, .table-sm th {
+        padding: 0.3rem;
+        font-size: 0.9rem;
+    }
+    .tab-content {
+        padding: 1.5rem;
+        border: 1px solid #dee2e6;
+        border-top: none;
+        border-radius: 0 0 0.375rem 0.375rem;
+    }
+    .nav-tabs .nav-link.active {
+        background-color: var(--tf-map-green-50);
+        border-color: #dee2e6 #dee2e6 #fff;
+    }
+    .test-connection-btn {
+        margin-top: 32px;
+    }
+    .connection-status {
+        display: none;
+        padding: 1rem;
+        margin-top: 1rem;
+        border-radius: 0.375rem;
+    }
+    .connection-status.success {
+        display: block;
+        background-color: var(--tf-success-light);
+        border: 1px solid var(--tf-success);
+    }
+    .connection-status.error {
+        display: block;
+        background-color: var(--tf-danger-light);
+        border: 1px solid var(--tf-danger);
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="container">
+<div class="container-fluid">
     <div class="row mb-4">
-        <div class="col-12">
-            <h1>Database Connections</h1>
-            <p class="lead">Configure data sources for the property assessment system</p>
-        </div>
-    </div>
-
-    <div class="row">
-        <div class="col-lg-8">
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">PACS Database Connection</h5>
+        <div class="col-lg-12">
+            <div class="card shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center" style="background-color: var(--tf-map-green-100);">
+                    <div>
+                        <i class="fas fa-database me-2" style="color: var(--tf-map-green);"></i>
+                        <span class="card-title h5 mb-0">{{ module_lockup('Map') }} Database Configuration</span>
+                    </div>
+                    <div>
+                        <a href="{{ url_for('map_config') }}" class="btn btn-sm btn-outline-secondary me-2">
+                            <i class="fas fa-map me-1"></i> Map Config
+                        </a>
+                        <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#importConfigModal">
+                            <i class="fas fa-file-import me-1"></i> Import Configuration
+                        </button>
+                    </div>
                 </div>
                 <div class="card-body">
-                    <form method="post" action="{{ url_for('save_db_config') }}">
-                        <input type="hidden" name="config_type" value="pacs">
-                        
-                        <div class="row mb-4">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="connection_name" class="form-label fw-semibold">Connection Name</label>
-                                    <input type="text" class="form-control" id="connection_name" name="connection_name" value="PACS Database" required>
+                    <ul class="nav nav-tabs" id="configTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="pacs-tab" data-bs-toggle="tab" data-bs-target="#pacs" type="button" role="tab" aria-controls="pacs" aria-selected="true">
+                                <i class="fas fa-database me-1"></i> PACS Database
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="postgis-tab" data-bs-toggle="tab" data-bs-target="#postgis" type="button" role="tab" aria-controls="postgis" aria-selected="false">
+                                <i class="fas fa-globe me-1"></i> PostGIS Database
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="file-tab" data-bs-toggle="tab" data-bs-target="#file" type="button" role="tab" aria-controls="file" aria-selected="false">
+                                <i class="fas fa-file me-1"></i> File Geodatabase
+                            </button>
+                        </li>
+                    </ul>
+                    
+                    <div class="tab-content" id="configTabsContent">
+                        <!-- PACS Database Configuration -->
+                        <div class="tab-pane fade show active" id="pacs" role="tabpanel" aria-labelledby="pacs-tab">
+                            <form id="pacsConfigForm" action="{{ url_for('save_db_config') }}" method="post">
+                                <input type="hidden" name="config_type" value="pacs">
+                                
+                                <div class="config-section">
+                                    <h5>Connection Settings</h5>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="connection_name" class="form-label">Connection Name</label>
+                                                <input type="text" class="form-control" id="connection_name" name="connection_name" placeholder="e.g., PACS Production">
+                                                <small class="text-muted">Descriptive name for this connection</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="connection_type" class="form-label">Connection Type</label>
+                                                <select class="form-select" id="connection_type" name="connection_type">
+                                                    <option value="odbc">ODBC</option>
+                                                    <option value="oledb">OLE DB</option>
+                                                    <option value="sqlserver">SQL Server</option>
+                                                    <option value="file">File DSN</option>
+                                                </select>
+                                                <small class="text-muted">Database connection method</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="key_field" class="form-label">Key Field</label>
+                                                <input type="text" class="form-control" id="key_field" name="key_field" placeholder="e.g., PROP_ID">
+                                                <small class="text-muted">Primary key field for property records</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-8">
+                                            <div class="mb-3">
+                                                <label for="connection_path" class="form-label">Connection String / Path</label>
+                                                <input type="text" class="form-control" id="connection_path" name="connection_path" placeholder="e.g., Driver={SQL Server};Server=myserver;Database=mydb;Trusted_Connection=yes;">
+                                                <small class="text-muted">Connection string or file path to the database</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <div class="mb-3">
+                                                <label for="search_fetch_size" class="form-label">Fetch Size</label>
+                                                <input type="number" class="form-control" id="search_fetch_size" name="search_fetch_size" min="10" max="1000" value="100">
+                                                <small class="text-muted">Results per page</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <div class="mb-3">
+                                                <label for="max_data_records" class="form-label">Max Records</label>
+                                                <input type="number" class="form-control" id="max_data_records" name="max_data_records" min="100" max="50000" value="5000">
+                                                <small class="text-muted">Max query limit</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-9">
+                                            <!-- Connection status will appear here -->
+                                            <div id="pacsConnectionStatus" class="connection-status">
+                                                <i class="fas fa-check-circle me-2"></i> Connection successful
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <button type="button" class="btn btn-outline-primary w-100 test-connection-btn" id="testPacsConnectionBtn">
+                                                <i class="fas fa-plug me-1"></i> Test Connection
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                                 
-                                <div class="mb-3">
-                                    <label for="connection_type" class="form-label fw-semibold">Connection Type</label>
-                                    <select class="form-select" id="connection_type" name="connection_type" required>
-                                        <option value="SQLAdvanced" selected>SQL Advanced</option>
-                                        <option value="SQLStandard">SQL Standard</option>
-                                        <option value="OracleAdvanced">Oracle Advanced</option>
-                                        <option value="PostgreSQL">PostgreSQL</option>
-                                    </select>
-                                </div>
-                            </div>
-                            
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="connection_path" class="form-label fw-semibold">Connection String</label>
-                                    <input type="text" class="form-control" id="connection_path" name="connection_path" value="Data Source=JCHARRISPACS;Initial Catalog=pacs_oltp;Integrated Security=True">
-                                    <div class="form-text">Database connection string for SQL Server</div>
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <label for="key_field" class="form-label fw-semibold">Key Field</label>
-                                    <input type="text" class="form-control" id="key_field" name="key_field" value="Property_ID">
-                                    <div class="form-text">Primary identifier field for properties</div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Query Definitions Section -->
-                        <h5 class="text-primary mb-3">Query Definitions</h5>
-                        
-                        <div class="card mb-4 border border-light">
-                            <div class="card-header bg-light">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <h6 class="mb-0">Property Query</h6>
-                                    <button type="button" class="btn btn-sm btn-outline-primary">
-                                        <i class="fas fa-pencil-alt"></i> Edit
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <div class="mb-3">
-                                    <label for="query_property_name" class="form-label fw-semibold">Name</label>
-                                    <input type="text" class="form-control" id="query_property_name" name="query_property_name" value="Property">
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <label for="query_property_desc" class="form-label fw-semibold">Description</label>
-                                    <input type="text" class="form-control" id="query_property_desc" name="query_property_desc" value="Property">
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <label for="query_property_sql" class="form-label fw-semibold">SQL Query</label>
-                                    <textarea class="form-control font-monospace small" id="query_property_sql" name="query_property_sql" rows="5">SELECT t.prop_id as Property_ID, s.situs_display as Situs, t.[prop_val_yr], t.[sup_num], [update_dt], [school_id], [city_id], [state_cd], [class_cd], [land_type_cd], [yr_blt], [living_area], [imprv_unit_price], [imprv_add_val], [land_sqft], [land_acres], [land_front_feet], [land_depth], [land_lot], [land_unit_price], [region], [abs_subdv], [neighborhood], [subset], t.[map_id], t.[appraised_val], [land_num_lots], [land_appr_method], [land_total_sqft], [eff_yr_blt], [cond_cd], [accrued_depr_val], [constr_type_cd], [roof_type_cd], [foundation_cd], [ext_wall_cd], [quality_cd], [phys_depr], [funct_depr], [econ_depr], [disc_land], [disc_imprv], [homesite_val], [homesite_acres], [native_pasture_val], [native_pasture_acres], [imp_pasture_val], [imp_pasture_acres], [crop_val], [crop_acres], [orchard_val], [orchard_acres], [waste_val], [waste_acres], [timber_val], [timber_acres], [minerals_val], [min_inval_reason], [income_val], [market_val], [ag_use_val], [restricted_land_val], [prior_land_val], [prior_market_val]  FROM property_val t WITH (nolock) INNER JOIN situs s WITH (nolock) ON t.prop_id = s.prop_id and t.prop_val_yr = s.owner_tax_yr and t.sup_num = s.sup_num and t.prop_inactive_dt is null</textarea>
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="query_property_immediate" name="query_property_immediate">
+                                <div class="config-section">
+                                    <h5>Property Query</h5>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="query_property_name" class="form-label">Query Name</label>
+                                                <input type="text" class="form-control" id="query_property_name" name="query_property_name" value="Property Information">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="query_property_desc" class="form-label">Description</label>
+                                                <input type="text" class="form-control" id="query_property_desc" name="query_property_desc" value="Retrieves basic property information">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="query_property_sql" class="form-label">SQL Query</label>
+                                        <textarea class="form-control query-editor" id="query_property_sql" name="query_property_sql" rows="6">SELECT p.PROP_ID, p.SITUS_DISPLAY, o.OWNER, p.PROP_TYPE_CD, p.LIVING_AREA, p.LAND_ACRES, p.YR_BLT, a.APPRAISED_VAL, a.LAND_VAL FROM PROPERTY p JOIN OWNER o ON p.PROP_ID = o.PROP_ID JOIN ASSESSMENT a ON p.PROP_ID = a.PROP_ID WHERE p.PROP_ID = ?</textarea>
+                                        <small class="text-muted">Use ? as parameter placeholder for property ID</small>
+                                    </div>
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" id="query_property_immediate" name="query_property_immediate" checked>
                                         <label class="form-check-label" for="query_property_immediate">
                                             Execute Immediately
                                         </label>
+                                        <small class="d-block text-muted">Run query when property is selected</small>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-                        
-                        <div class="card mb-4 border border-light">
-                            <div class="card-header bg-light">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <h6 class="mb-0">Sales Query</h6>
-                                    <button type="button" class="btn btn-sm btn-outline-primary">
-                                        <i class="fas fa-pencil-alt"></i> Edit
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <div class="mb-3">
-                                    <label for="query_sales_name" class="form-label fw-semibold">Name</label>
-                                    <input type="text" class="form-control" id="query_sales_name" name="query_sales_name" value="Sales">
-                                </div>
                                 
-                                <div class="mb-3">
-                                    <label for="query_sales_desc" class="form-label fw-semibold">Description</label>
-                                    <input type="text" class="form-control" id="query_sales_desc" name="query_sales_desc" value="Sales">
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <label for="query_sales_sql" class="form-label fw-semibold">SQL Query</label>
-                                    <textarea class="form-control font-monospace small" id="query_sales_sql" name="query_sales_sql" rows="5">SELECT pv.prop_id as Property_ID, pv.hood_cd as 'NBHD', pp.state_cd, pp.class_cd, ac.file_as_name as Current_Owner, pv.legal_acreage, s.sl_type_cd, s.sl_ratio_type_cd, s.land_only_sale, pp.ls_table, CAST(s.sl_dt as datetime) as Sale_Date, s.sl_price, s.adjusted_sl_price, case when s.sl_price != 0 then CAST(ROUND((pv.market / s.sl_price), 2) as decimal (10,2)) else 0 end as Sales_Ratio, (pv.land_hstd_val + pv.land_non_hstd_val + pv.timber_market + pv.ag_market) as Land_Value, (pv.imprv_val) as Improvement_Value, pv.market as Market_Value FROM property_val pv WITH (nolock) INNER JOIN property_pro pp WITH ( nolock ) ON pv.prop_id = pp.prop_id AND pv.prop_val_yr = pp.owner_tax_yr AND pv.sup_num = pp.sup_num AND pv.prop_inactive_dt is null INNER JOIN owner o WITH (nolock) ON pv.prop_id = o.prop_id AND pv.prop_val_yr = o.owner_tax_yr AND pv.sup_num = o.sup_num AND primary_owner = 1 INNER JOIN account ac WITH (nolock) ON o.owner_id = ac.acct_id INNER JOIN sales s WITH (nolock) ON pv.prop_id = s.prop_id AND pv.prop_val_yr = s.sl_dt_yr AND pv.sup_num = s.sup_num WHERE s.sl_dt_yr >= 2020</textarea>
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <div class="form-check">
+                                <div class="config-section">
+                                    <h5>Sales Query</h5>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="query_sales_name" class="form-label">Query Name</label>
+                                                <input type="text" class="form-control" id="query_sales_name" name="query_sales_name" value="Sales History">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="query_sales_desc" class="form-label">Description</label>
+                                                <input type="text" class="form-control" id="query_sales_desc" name="query_sales_desc" value="Retrieves property sales history">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="query_sales_sql" class="form-label">SQL Query</label>
+                                        <textarea class="form-control query-editor" id="query_sales_sql" name="query_sales_sql" rows="6">SELECT s.SALE_ID, s.SALE_DATE, s.SALE_PRICE, s.DOCUMENT_NUM, s.EXCISE_NUM, s.VERIFIED, s.VALID_SALE_FLAG FROM SALES s WHERE s.PROP_ID = ? ORDER BY s.SALE_DATE DESC</textarea>
+                                        <small class="text-muted">Use ? as parameter placeholder for property ID</small>
+                                    </div>
+                                    <div class="form-check mb-3">
                                         <input class="form-check-input" type="checkbox" id="query_sales_immediate" name="query_sales_immediate">
                                         <label class="form-check-label" for="query_sales_immediate">
                                             Execute Immediately
                                         </label>
+                                        <small class="d-block text-muted">Run query when property is selected</small>
                                     </div>
                                 </div>
+                                
+                                <div class="config-section">
+                                    <h5>Preview Results</h5>
+                                    <p>Property query sample results:</p>
+                                    <div class="preview-table">
+                                        <table class="table table-sm table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>PROP_ID</th>
+                                                    <th>SITUS_DISPLAY</th>
+                                                    <th>OWNER</th>
+                                                    <th>PROP_TYPE_CD</th>
+                                                    <th>LIVING_AREA</th>
+                                                    <th>LAND_ACRES</th>
+                                                    <th>YR_BLT</th>
+                                                    <th>APPRAISED_VAL</th>
+                                                    <th>LAND_VAL</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    <td>1234567890</td>
+                                                    <td>123 MAIN ST</td>
+                                                    <td>JOHN DOE</td>
+                                                    <td>RES</td>
+                                                    <td>2200</td>
+                                                    <td>0.25</td>
+                                                    <td>1998</td>
+                                                    <td>450000</td>
+                                                    <td>125000</td>
+                                                </tr>
+                                                <tr>
+                                                    <td>0987654321</td>
+                                                    <td>456 ELM ST</td>
+                                                    <td>JANE SMITH</td>
+                                                    <td>COM</td>
+                                                    <td>5000</td>
+                                                    <td>0.75</td>
+                                                    <td>2005</td>
+                                                    <td>950000</td>
+                                                    <td>350000</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                
+                                <div class="d-flex justify-content-end">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-1"></i> Save Database Configuration
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                        
+                        <!-- PostGIS Database Configuration -->
+                        <div class="tab-pane fade" id="postgis" role="tabpanel" aria-labelledby="postgis-tab">
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i>
+                                PostGIS database configuration is managed through the main TerraFlow platform settings.
+                                <a href="/data-quality/dashboard" class="alert-link">Go to Data Quality Dashboard</a> to configure PostGIS connections.
                             </div>
                         </div>
                         
-                        <!-- Add Query Button -->
-                        <div class="d-flex mb-4">
-                            <button type="button" class="btn btn-outline-primary">
-                                <i class="fas fa-plus"></i> Add New Query
-                            </button>
-                        </div>
-                        
-                        <!-- Connection Settings -->
-                        <h5 class="text-primary mb-3">Connection Settings</h5>
-                        
-                        <div class="row mb-4">
-                            <div class="col-md-6">
+                        <!-- File Geodatabase Configuration -->
+                        <div class="tab-pane fade" id="file" role="tabpanel" aria-labelledby="file-tab">
+                            <div class="alert alert-info mb-4">
+                                <i class="fas fa-info-circle me-2"></i>
+                                Configure connection to File Geodatabases (ESRI .gdb) or Shapefiles.
+                            </div>
+                            
+                            <div class="config-section">
+                                <h5>File Connection</h5>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="file_connection_name" class="form-label">Connection Name</label>
+                                            <input type="text" class="form-control" id="file_connection_name" name="file_connection_name" placeholder="e.g., Parcels GDB">
+                                            <small class="text-muted">Descriptive name for this connection</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="file_type" class="form-label">File Type</label>
+                                            <select class="form-select" id="file_type" name="file_type">
+                                                <option value="gdb">File Geodatabase (.gdb)</option>
+                                                <option value="shp">Shapefile (.shp)</option>
+                                                <option value="geojson">GeoJSON (.geojson)</option>
+                                            </select>
+                                            <small class="text-muted">Type of spatial file</small>
+                                        </div>
+                                    </div>
+                                </div>
                                 <div class="mb-3">
-                                    <label for="search_fetch_size" class="form-label fw-semibold">Search Fetch Size</label>
-                                    <input type="number" class="form-control" id="search_fetch_size" name="search_fetch_size" value="500">
-                                    <div class="form-text">Number of records to fetch in search results</div>
+                                    <label for="file_path" class="form-label">File Path</label>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="file_path" name="file_path" placeholder="e.g., /data/parcels.gdb">
+                                        <button class="btn btn-outline-secondary" type="button" id="browseBtn">Browse</button>
+                                    </div>
+                                    <small class="text-muted">Path to the geodatabase or shapefile</small>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="feature_class" class="form-label">Feature Class / Layer</label>
+                                    <input type="text" class="form-control" id="feature_class" name="feature_class" placeholder="e.g., Parcels">
+                                    <small class="text-muted">Name of the feature class or layer to use</small>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="id_field" class="form-label">ID Field</label>
+                                    <input type="text" class="form-control" id="id_field" name="id_field" placeholder="e.g., OBJECTID">
+                                    <small class="text-muted">Field containing unique identifiers</small>
                                 </div>
                             </div>
                             
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="max_data_records" class="form-label fw-semibold">Max Data Records</label>
-                                    <input type="number" class="form-control" id="max_data_records" name="max_data_records" value="10000">
-                                    <div class="form-text">Maximum number of records to retrieve</div>
+                            <div class="config-section">
+                                <h5>Field Mapping</h5>
+                                <p class="text-muted">Map fields from the file to TerraFlow property fields</p>
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label for="map_parcel_id" class="form-label">Parcel ID</label>
+                                            <input type="text" class="form-control" id="map_parcel_id" name="map_parcel_id" placeholder="e.g., PIN">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label for="map_address" class="form-label">Address</label>
+                                            <input type="text" class="form-control" id="map_address" name="map_address" placeholder="e.g., SITUS">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label for="map_owner" class="form-label">Owner</label>
+                                            <input type="text" class="form-control" id="map_owner" name="map_owner" placeholder="e.g., OWNER_NAME">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <div class="mb-3">
+                                            <label for="map_property_type" class="form-label">Property Type</label>
+                                            <input type="text" class="form-control" id="map_property_type" name="map_property_type" placeholder="e.g., PROP_TYPE">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="mb-3">
+                                            <label for="map_year_built" class="form-label">Year Built</label>
+                                            <input type="text" class="form-control" id="map_year_built" name="map_year_built" placeholder="e.g., YEAR_BUILT">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="mb-3">
+                                            <label for="map_living_area" class="form-label">Living Area</label>
+                                            <input type="text" class="form-control" id="map_living_area" name="map_living_area" placeholder="e.g., SQ_FT">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="mb-3">
+                                            <label for="map_land_acres" class="form-label">Land Area</label>
+                                            <input type="text" class="form-control" id="map_land_acres" name="map_land_acres" placeholder="e.g., ACRES">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label for="map_appraised_val" class="form-label">Appraised Value</label>
+                                            <input type="text" class="form-control" id="map_appraised_val" name="map_appraised_val" placeholder="e.g., TOTAL_VAL">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label for="map_land_val" class="form-label">Land Value</label>
+                                            <input type="text" class="form-control" id="map_land_val" name="map_land_val" placeholder="e.g., LAND_VAL">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label for="map_geometry" class="form-label">Geometry Field</label>
+                                            <input type="text" class="form-control" id="map_geometry" name="map_geometry" placeholder="e.g., SHAPE">
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
+                            
+                            <div class="d-flex justify-content-end">
+                                <button type="button" class="btn btn-secondary me-2" id="scanFieldsBtn">
+                                    <i class="fas fa-search me-1"></i> Scan Fields
+                                </button>
+                                <button type="button" class="btn btn-primary" id="saveFileConfigBtn">
+                                    <i class="fas fa-save me-1"></i> Save File Configuration
+                                </button>
+                            </div>
                         </div>
-                        
-                        <div class="d-flex justify-content-end">
-                            <button type="button" class="btn btn-secondary me-2">Test Connection</button>
-                            <button type="submit" class="btn btn-primary">Save Configuration</button>
-                        </div>
-                    </form>
+                    </div>
                 </div>
             </div>
         </div>
-        
-        <div class="col-lg-4">
-            <div class="tf-card insight">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">Query Management</h5>
-                </div>
-                <div class="card-body">
-                    <div class="text-center mb-4">
-                        <i class="fas fa-database text-info" style="font-size: 32px;"></i>
-                        <h6 class="mt-3">Manage Data Queries</h6>
-                        <p class="text-muted small">Create, edit, and organize queries for accessing property data</p>
+    </div>
+</div>
+
+<!-- Import Configuration Modal -->
+<div class="modal fade" id="importConfigModal" tabindex="-1" aria-labelledby="importConfigModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header" style="background-color: var(--tf-map-green-100);">
+                <h5 class="modal-title" id="importConfigModalLabel">
+                    <i class="fas fa-file-import me-2"></i> Import Database Configuration
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <ul class="nav nav-tabs" id="importTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="import-file-tab" data-bs-toggle="tab" data-bs-target="#import-file" type="button" role="tab" aria-controls="import-file" aria-selected="true">
+                            <i class="fas fa-file me-1"></i> File Upload
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="import-xml-tab" data-bs-toggle="tab" data-bs-target="#import-xml" type="button" role="tab" aria-controls="import-xml" aria-selected="false">
+                            <i class="fas fa-code me-1"></i> XML Import
+                        </button>
+                    </li>
+                </ul>
+                <div class="tab-content pt-3" id="importTabsContent">
+                    <div class="tab-pane fade show active" id="import-file" role="tabpanel" aria-labelledby="import-file-tab">
+                        <div class="input-group mb-3">
+                            <input type="file" class="form-control" id="configFile" accept=".xml,.json,.config">
+                            <button type="button" class="btn btn-primary" id="uploadConfigFileBtn">Upload</button>
+                        </div>
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Upload your existing database configuration files to import settings.
+                            Supported formats: XML, JSON, .config
+                        </div>
                     </div>
-                    
-                    <div class="list-group mb-3">
-                        <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                            <span>
-                                <i class="fas fa-table text-primary me-2"></i>
-                                Property Data
-                            </span>
-                            <span class="badge bg-primary rounded-pill">Active</span>
-                        </a>
-                        <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                            <span>
-                                <i class="fas fa-chart-line text-success me-2"></i>
-                                Sales History
-                            </span>
-                            <span class="badge bg-primary rounded-pill">Active</span>
-                        </a>
-                        <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                            <span>
-                                <i class="fas fa-home text-warning me-2"></i>
-                                Land Details
-                            </span>
-                            <span class="badge bg-primary rounded-pill">Active</span>
-                        </a>
-                        <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                            <span>
-                                <i class="fas fa-file-invoice-dollar text-danger me-2"></i>
-                                Tax Information
-                            </span>
-                            <span class="badge bg-primary rounded-pill">Active</span>
-                        </a>
+                    <div class="tab-pane fade" id="import-xml" role="tabpanel" aria-labelledby="import-xml-tab">
+                        <div class="mb-3">
+                            <label for="xmlContent" class="form-label">XML Configuration</label>
+                            <textarea class="form-control" id="xmlContent" rows="10" placeholder="Paste your XML configuration here..."></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="xmlConfigType" class="form-label">Configuration Type</label>
+                            <select class="form-select" id="xmlConfigType">
+                                <option value="data_connections">Data Connections</option>
+                                <option value="pacs">PACS Database</option>
+                                <option value="postgis">PostGIS Database</option>
+                                <option value="file">File Geodatabase</option>
+                            </select>
+                        </div>
+                        <button type="button" class="btn btn-primary" id="importXmlBtn">Import XML</button>
                     </div>
-                    
-                    <a href="#" class="btn btn-outline-primary w-100">
-                        <i class="fas fa-cog me-1"></i> Manage Query Templates
-                    </a>
                 </div>
             </div>
-            
-            <div class="tf-card flow mt-4">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">Connection Settings</h5>
-                </div>
-                <div class="card-body">
-                    <h6 class="mb-3 fw-semibold">Current Tax Year</h6>
-                    <div class="form-group mb-4">
-                        <select class="form-select" id="tax_year" name="tax_year">
-                            <option value="2025" selected>2025</option>
-                            <option value="2024">2024</option>
-                            <option value="2023">2023</option>
-                            <option value="2022">2022</option>
-                            <option value="2021">2021</option>
-                        </select>
-                    </div>
-                    
-                    <h6 class="mb-3 fw-semibold">Connection Status</h6>
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="d-flex align-items-center me-3">
-                            <div class="bg-success rounded-circle me-2" style="width: 10px; height: 10px;"></div>
-                            <span class="text-muted small">Connected</span>
-                        </div>
-                        <div class="text-muted small">Last updated: Today, 2:15 PM</div>
-                    </div>
-                    
-                    <button class="btn btn-sm btn-outline-primary w-100">
-                        <i class="fas fa-sync-alt me-1"></i> Refresh Connection
-                    </button>
-                </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
@@ -250,45 +485,158 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/map-utils.js') }}"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Test connection button functionality
-    document.querySelector('button.btn-secondary').addEventListener('click', function() {
-        const connectionPath = document.getElementById('connection_path').value;
-        const connectionName = document.getElementById('connection_name').value;
-        
-        // Show a testing message
-        const button = this;
-        const originalText = button.innerHTML;
-        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
-        button.disabled = true;
-        
-        // Simulate a connection test
-        setTimeout(() => {
-            // Reset button
-            button.innerHTML = originalText;
-            button.disabled = false;
+    document.addEventListener('DOMContentLoaded', function() {
+        // Test PACS database connection
+        document.getElementById('testPacsConnectionBtn').addEventListener('click', function() {
+            const connectionString = document.getElementById('connection_path').value;
+            const connectionType = document.getElementById('connection_type').value;
             
-            // Show success message
-            const alertHtml = `
-                <div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
-                    <i class="fas fa-check-circle me-2"></i> Successfully connected to database <strong>${connectionName}</strong>.
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            `;
-            document.querySelector('.card-body form').insertAdjacentHTML('afterbegin', alertHtml);
-        }, 1500);
+            if (!connectionString) {
+                alert('Please enter a connection string or path');
+                return;
+            }
+            
+            // Simulate connection test
+            const statusElem = document.getElementById('pacsConnectionStatus');
+            statusElem.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Testing connection...';
+            statusElem.className = 'connection-status';
+            statusElem.style.display = 'block';
+            
+            // Simulate AJAX request
+            setTimeout(function() {
+                const success = Math.random() > 0.3; // 70% success rate for demo
+                
+                if (success) {
+                    statusElem.innerHTML = '<i class="fas fa-check-circle me-2"></i> Connection successful!';
+                    statusElem.className = 'connection-status success';
+                } else {
+                    statusElem.innerHTML = '<i class="fas fa-times-circle me-2"></i> Connection failed. Please check your connection settings.';
+                    statusElem.className = 'connection-status error';
+                }
+            }, 1500);
+        });
+        
+        // Scan fields button for file geodatabase
+        document.getElementById('scanFieldsBtn').addEventListener('click', function() {
+            const filePath = document.getElementById('file_path').value;
+            const featureClass = document.getElementById('feature_class').value;
+            
+            if (!filePath || !featureClass) {
+                alert('Please enter file path and feature class name');
+                return;
+            }
+            
+            // Simulate field scanning
+            alert('Scanning fields... This would identify fields in the geodatabase in a real implementation.');
+            
+            // Simulate field mapping suggestions
+            document.getElementById('map_parcel_id').value = 'PARCEL_ID';
+            document.getElementById('map_address').value = 'SITE_ADDR';
+            document.getElementById('map_owner').value = 'OWNER_NAME';
+            document.getElementById('map_property_type').value = 'USE_CODE';
+            document.getElementById('map_year_built').value = 'YEAR_BUILT';
+            document.getElementById('map_living_area').value = 'BLDG_SQFT';
+            document.getElementById('map_land_acres').value = 'ACRES';
+            document.getElementById('map_appraised_val').value = 'TOTAL_VAL';
+            document.getElementById('map_land_val').value = 'LAND_VAL';
+            document.getElementById('map_geometry').value = 'SHAPE';
+        });
+        
+        // Save file configuration
+        document.getElementById('saveFileConfigBtn').addEventListener('click', function() {
+            alert('This would save the file geodatabase configuration in a real implementation.');
+        });
+        
+        // Import XML button
+        document.getElementById('importXmlBtn').addEventListener('click', function() {
+            const xmlContent = document.getElementById('xmlContent').value;
+            const configType = document.getElementById('xmlConfigType').value;
+            
+            if (!xmlContent) {
+                alert('Please paste XML configuration content');
+                return;
+            }
+            
+            try {
+                // Parse XML and populate form
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlContent, "text/xml");
+                
+                if (configType === 'data_connections') {
+                    parseDataConnections(xmlDoc);
+                } else if (configType === 'pacs') {
+                    parsePacsConfig(xmlDoc);
+                }
+                
+                // Close the modal
+                $('#importConfigModal').modal('hide');
+            } catch (e) {
+                console.error('Error parsing XML:', e);
+                alert('Error parsing XML: ' + e.message);
+            }
+        });
     });
     
-    // Form validation
-    const form = document.querySelector('form');
-    form.addEventListener('submit', function(event) {
-        if (!form.checkValidity()) {
-            event.preventDefault();
-            event.stopPropagation();
+    // Parse DataConnections XML
+    function parseDataConnections(xmlDoc) {
+        try {
+            const connections = xmlDoc.getElementsByTagName("DataConnection");
+            if (connections.length === 0) {
+                alert('No data connections found in XML');
+                return;
+            }
+            
+            // Get first connection for demo
+            const conn = connections[0];
+            
+            // Populate PACS form
+            document.getElementById('pacs-tab').click();
+            document.getElementById('connection_name').value = getNodeValue(conn, "Name") || '';
+            document.getElementById('connection_type').value = getNodeValue(conn, "ConnectionType")?.toLowerCase() || 'sqlserver';
+            document.getElementById('connection_path').value = getNodeValue(conn, "ConnectionString") || '';
+            document.getElementById('key_field').value = getNodeValue(conn, "KeyField") || 'PROP_ID';
+            
+            alert('Data connection imported successfully!');
+        } catch (e) {
+            console.error('Error parsing data connections:', e);
+            alert('Error parsing data connections: ' + e.message);
         }
-        form.classList.add('was-validated');
-    });
-});
+    }
+    
+    // Parse PACS Database Config XML
+    function parsePacsConfig(xmlDoc) {
+        try {
+            // Set values in the form
+            document.getElementById('pacs-tab').click();
+            document.getElementById('connection_name').value = 'PACS Database';
+            document.getElementById('connection_type').value = 'sqlserver';
+            document.getElementById('key_field').value = 'PROP_ID';
+            document.getElementById('connection_path').value = 'Driver={SQL Server};Server=PACSDB;Database=PACS;Trusted_Connection=yes;';
+            document.getElementById('search_fetch_size').value = '100';
+            document.getElementById('max_data_records').value = '5000';
+            
+            // Set query values
+            document.getElementById('query_property_name').value = 'Property Information';
+            document.getElementById('query_property_desc').value = 'Retrieves basic property information';
+            document.getElementById('query_property_immediate').checked = true;
+            
+            document.getElementById('query_sales_name').value = 'Sales History';
+            document.getElementById('query_sales_desc').value = 'Retrieves property sales history';
+            document.getElementById('query_sales_immediate').checked = false;
+            
+            alert('PACS configuration imported successfully!');
+        } catch (e) {
+            console.error('Error parsing PACS config:', e);
+            alert('Error parsing PACS config: ' + e.message);
+        }
+    }
+    
+    // Helper function to get node value
+    function getNodeValue(parentNode, nodeName) {
+        const node = parentNode.getElementsByTagName(nodeName)[0];
+        return node ? node.textContent : null;
+    }
 </script>
 {% endblock %}
