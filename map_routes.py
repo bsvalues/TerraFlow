@@ -5,9 +5,26 @@ This module provides Flask routes for the map functionality in TerraFlow.
 """
 import os
 import json
+import logging
 from flask import render_template, jsonify, request, flash, redirect, url_for, session
 from app import app
 from auth import login_required, permission_required
+from map_config_parser import generate_map_config_from_files, is_configured, process_xml_files
+
+# Configure logging
+logger = logging.getLogger(__name__)
+
+# Ensure map configuration is processed
+if not is_configured():
+    try:
+        logger.info("Processing map configuration XML files")
+        success = process_xml_files()
+        if success:
+            logger.info("Map configuration XML files processed successfully")
+        else:
+            logger.error("Failed to process map configuration XML files")
+    except Exception as e:
+        logger.error(f"Error processing map configuration: {str(e)}")
 
 @app.route('/maps/property-viewer')
 @login_required
@@ -272,3 +289,66 @@ def api_save_location():
     # This would normally save to the database
     # For now, just return success
     return jsonify({'success': True, 'id': 3, 'message': 'Location saved successfully'})
+
+
+@app.route('/api/map-config')
+@login_required
+def api_map_config():
+    """API endpoint to get map configuration"""
+    try:
+        # Generate current map configuration
+        map_config = generate_map_config_from_files()
+        return jsonify(map_config)
+    except Exception as e:
+        logger.error(f"Error retrieving map configuration: {str(e)}")
+        return jsonify({'error': 'Failed to retrieve map configuration'}), 500
+
+
+@app.route('/api/process-xml-config', methods=['POST'])
+@login_required
+@permission_required('admin.maps.configure')
+def api_process_xml_config():
+    """API endpoint to process XML configuration files"""
+    try:
+        # Process XML files
+        success = process_xml_files()
+        if success:
+            # Generate configuration
+            map_config = generate_map_config_from_files()
+            return jsonify({
+                'success': True, 
+                'message': 'XML configuration processed successfully',
+                'config': map_config
+            })
+        else:
+            return jsonify({
+                'success': False, 
+                'message': 'Failed to process XML configuration files'
+            }), 500
+    except Exception as e:
+        logger.error(f"Error processing XML configuration: {str(e)}")
+        return jsonify({
+            'success': False, 
+            'message': f'Error processing XML configuration: {str(e)}'
+        }), 500
+
+
+@app.route('/api/map-layers')
+@login_required
+def api_map_layers():
+    """API endpoint to get map layers for the property viewer"""
+    try:
+        # Generate current map configuration
+        map_config = generate_map_config_from_files()
+        
+        # Extract layers
+        base_layers = map_config.get('baseLayers', [])
+        feature_layers = map_config.get('viewableLayers', [])
+        
+        return jsonify({
+            'baseLayers': base_layers,
+            'featureLayers': feature_layers
+        })
+    except Exception as e:
+        logger.error(f"Error retrieving map layers: {str(e)}")
+        return jsonify({'error': 'Failed to retrieve map layers'}), 500
