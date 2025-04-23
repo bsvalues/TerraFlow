@@ -1,10 +1,10 @@
-# GeoAssessmentPro
+# TerraFlow
 
-A comprehensive Geographic Information System (GIS) and property assessment platform for the Benton County Assessor's Office, featuring advanced data quality management, validation capabilities, and integration with Supabase.
+A comprehensive Geographic Information System (GIS) and property assessment platform for the Benton County Assessor's Office, featuring advanced data quality management, validation capabilities, and integration with Supabase. Part of the TerraFusion Platform.
 
 ## Overview
 
-GeoAssessmentPro provides a sophisticated platform for managing Geographic Information System (GIS) data with enhanced data quality monitoring, valuation capabilities, and Supabase integration. The application supports multiple environments (development, training, production) and serves as a central hub that coordinates with specialized modules for property assessment tasks.
+TerraFlow provides a sophisticated platform for managing Geographic Information System (GIS) data with enhanced data quality monitoring, valuation capabilities, and Supabase integration. The application supports multiple environments (development, training, production) and serves as a central hub that coordinates with specialized modules for property assessment tasks.
 
 ## Features
 
@@ -80,7 +80,7 @@ The system supports both local file storage and Supabase Storage. When Supabase 
 
 ## Multi-Environment Support
 
-GeoAssessmentPro supports multiple environments for development, training, and production deployments. Each environment can have its own database, Supabase project, and configuration settings.
+TerraFlow supports multiple environments for development, training, and production deployments. Each environment can have its own database, Supabase project, and configuration settings.
 
 ### Environment Setup
 
@@ -164,8 +164,8 @@ python deploy.py training --skip-verify
 
 ```bash
 # Clone the repository
-git clone https://github.com/benton-county/geoassessmentpro.git
-cd geoassessmentpro
+git clone https://github.com/benton-county/terraflow.git
+cd terraflow
 
 # Install dependencies
 pip install -r requirements.txt
