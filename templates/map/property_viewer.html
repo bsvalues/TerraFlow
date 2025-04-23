@@ -1,258 +1,384 @@
 {% extends "layout.html" %}
 
-{% block title %}TerraFlow Property Viewer{% endblock %}
+{% block title %}TerraFlow | Property Viewer{% endblock %}
 
-{% block styles %}
-<link rel="stylesheet" href="https://js.arcgis.com/4.25/esri/themes/light/main.css">
+{% block additionalcss %}
 <style>
-    #mapViewContainer {
+    #property-map {
         height: 600px;
         width: 100%;
+        border-radius: var(--tf-radius-lg);
+        box-shadow: var(--tf-shadow-md);
+    }
+    
+    .property-sidebar {
+        height: 600px;
+        overflow-y: auto;
+        padding-right: 1rem;
+    }
+    
+    .tab-content {
+        padding: 1.5rem;
+        background-color: var(--tf-white);
+        border: 1px solid var(--tf-gray-200);
+        border-top: none;
+        border-bottom-left-radius: var(--tf-radius);
+        border-bottom-right-radius: var(--tf-radius);
+    }
+    
+    .nav-tabs .nav-link.active {
+        background-color: var(--tf-white);
+        border-bottom-color: var(--tf-white);
+    }
+    
+    .property-sidebar .card-header {
+        background-color: var(--tf-map-green-50);
+        font-weight: 700;
+    }
+    
+    .property-value {
+        font-weight: 600;
+    }
+    
+    .data-source-badge {
+        background-color: var(--tf-gray-200);
+        color: var(--tf-gray-700);
+        font-size: 0.75rem;
+        padding: 0.125rem 0.5rem;
+        border-radius: var(--tf-radius-full);
+        display: inline-block;
+    }
+    
+    .property-detail-row {
+        border-bottom: 1px solid var(--tf-gray-200);
+        padding: 0.5rem 0;
+        display: flex;
+        justify-content: space-between;
+    }
+    
+    .property-detail-row:last-child {
+        border-bottom: none;
+    }
+    
+    .property-detail-label {
+        font-weight: 500;
+        color: var(--tf-gray-700);
+    }
+    
+    .property-detail-value {
+        font-weight: 600;
+        color: var(--tf-gray-900);
+    }
+    
+    .tools-card {
+        background-color: var(--tf-map-green-100);
+    }
+    
+    .tool-button {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding: 0.75rem;
+        border-radius: var(--tf-radius);
+        background-color: var(--tf-white);
+        box-shadow: var(--tf-shadow-sm);
+        transition: all 0.2s;
+        margin-bottom: 1rem;
+        text-decoration: none;
+        color: var(--tf-gray-800);
+    }
+    
+    .tool-button:hover {
+        transform: translateY(-3px);
+        box-shadow: var(--tf-shadow-md);
+        color: var(--tf-map-green);
+    }
+    
+    .tool-button i {
+        font-size: 1.5rem;
+        margin-bottom: 0.5rem;
+        color: var(--tf-map-green);
+    }
+    
+    .property-history-card {
+        margin-bottom: 1rem;
+    }
+    
+    .history-timeline {
         position: relative;
+        padding-left: 2rem;
+        margin-bottom: 1rem;
     }
-    .map-controls {
+    
+    .history-timeline::before {
+        content: '';
         position: absolute;
-        top: 15px;
-        right: 15px;
-        z-index: 1000;
-        background: rgba(255, 255, 255, 0.8);
-        border-radius: 4px;
-        padding: 10px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        left: 0.5rem;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background-color: var(--tf-gray-300);
     }
-    .property-info-panel {
-        max-height: 600px;
-        overflow-y: auto;
+    
+    .timeline-item {
+        position: relative;
+        padding-bottom: 1.5rem;
     }
-    .layer-list {
-        max-height: 300px;
-        overflow-y: auto;
-    }
-    .esri-popup__main-container {
-        max-width: 350px !important;
-    }
-    .assessment-history {
-        font-size: 0.9em;
-    }
-    .assessment-history th, .assessment-history td {
-        padding: 0.4rem;
-    }
-    .toolbar-button {
-        margin: 0 3px;
-    }
-    #coordinateDisplay {
+    
+    .timeline-item::before {
+        content: '';
         position: absolute;
-        bottom: 10px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: rgba(255, 255, 255, 0.8);
-        padding: 5px 10px;
-        border-radius: 4px;
-        font-size: 0.8em;
-        z-index: 1000;
+        left: -1.5rem;
+        top: 0.3rem;
+        width: 1rem;
+        height: 1rem;
+        border-radius: 50%;
+        background-color: var(--tf-map-green);
+    }
+    
+    .timeline-date {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--tf-map-green);
+    }
+    
+    .timeline-content {
+        margin-top: 0.25rem;
+    }
+    
+    .timeline-caption {
+        color: var(--tf-gray-600);
+        font-size: 0.875rem;
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid">
+<!-- Import module components -->
+{% from 'components/module_lockup.html' import module_lockup, module_header %}
+
+<div class="container">
+    {{ module_header('Map', 'Property Viewer', 'View and analyze property data with geospatial context') }}
+    
+    <!-- Main Content Area -->
     <div class="row">
-        <div class="col-lg-12">
-            <div class="card shadow-sm mb-4">
-                <div class="card-header d-flex justify-content-between align-items-center" style="background-color: var(--tf-map-green-100);">
-                    <div>
-                        <i class="fas fa-map-marked-alt me-2" style="color: var(--tf-map-green);"></i>
-                        <span class="card-title h5 mb-0">{{ module_lockup('Map') }} Property Viewer</span>
-                    </div>
-                    <div>
-                        <button type="button" class="btn btn-sm btn-outline-secondary toolbar-button" id="btnMeasure" title="Measure distance and area">
-                            <i class="fas fa-ruler"></i>
-                        </button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary toolbar-button" id="btnLayers" title="Toggle layers" data-bs-toggle="modal" data-bs-target="#layersModal">
-                            <i class="fas fa-layer-group"></i>
-                        </button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary toolbar-button" id="btnSearch" title="Search properties" data-bs-toggle="modal" data-bs-target="#searchModal">
-                            <i class="fas fa-search"></i>
-                        </button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary toolbar-button" id="btnBookmark" title="Saved locations" data-bs-toggle="modal" data-bs-target="#bookmarksModal">
-                            <i class="fas fa-bookmark"></i>
-                        </button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary toolbar-button" id="btnExport" title="Export map">
-                            <i class="fas fa-download"></i>
-                        </button>
-                    </div>
-                </div>
-                <div class="card-body p-0">
-                    <div id="mapViewContainer">
-                        <div id="mapView"></div>
-                        <div id="coordinateDisplay">Lat: 0.000000, Lng: 0.000000</div>
+        <!-- Property Map -->
+        <div class="col-lg-8">
+            <div id="property-map"></div>
+            
+            <!-- Property Tools and Actions -->
+            <div class="card mt-4 tools-card">
+                <div class="card-body">
+                    <h5 class="card-title">Property Tools</h5>
+                    <div class="row">
+                        <div class="col-md-3 col-6">
+                            <a href="#" class="tool-button" id="btn-measure">
+                                <i class="fas fa-ruler"></i>
+                                <span>Measure</span>
+                            </a>
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <a href="#" class="tool-button" id="btn-streetview">
+                                <i class="fas fa-street-view"></i>
+                                <span>Street View</span>
+                            </a>
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <a href="#" class="tool-button" id="btn-download">
+                                <i class="fas fa-download"></i>
+                                <span>Export</span>
+                            </a>
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <a href="#" class="tool-button" id="btn-print">
+                                <i class="fas fa-print"></i>
+                                <span>Print</span>
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
-
-    <div class="row" id="propertyDetails" style="display: none;">
-        <div class="col-lg-12">
-            <div class="card shadow-sm mb-4">
-                <div class="card-header" style="background-color: var(--tf-map-green-100);">
-                    <i class="fas fa-home me-2" style="color: var(--tf-map-green);"></i>
-                    <span class="card-title h5 mb-0">Property Details</span>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <h4 id="propertyAddress">123 Main Street</h4>
-                            <p class="mb-1"><strong>Parcel ID:</strong> <span id="propertyParcelId">R123456789</span></p>
-                            <p class="mb-1"><strong>Owner:</strong> <span id="propertyOwner">John Doe</span></p>
-                            <p class="mb-1"><strong>Property Type:</strong> <span id="propertyType">Residential</span></p>
-                            <p class="mb-1"><strong>Year Built:</strong> <span id="propertyYearBuilt">1985</span></p>
-                            <p class="mb-1"><strong>Living Area:</strong> <span id="propertyLivingArea">2,200 sq ft</span></p>
-                            <p class="mb-1"><strong>Land Area:</strong> <span id="propertyLandArea">0.25 acres</span></p>
+        
+        <!-- Property Sidebar -->
+        <div class="col-lg-4">
+            <div class="property-sidebar">
+                <!-- Property Summary Card -->
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>Property Summary</span>
+                        <span class="data-source-badge">PACS</span>
+                    </div>
+                    <div class="card-body">
+                        <h4 class="mb-3" id="property-address">123 Main Street, Richland, WA 99352</h4>
+                        <div class="property-detail-row">
+                            <span class="property-detail-label">Property ID:</span>
+                            <span class="property-detail-value" id="property-id">12345678</span>
                         </div>
-                        <div class="col-md-6">
-                            <h5>Current Assessment (2025)</h5>
-                            <div class="row mb-3">
-                                <div class="col-md-4">
-                                    <div class="card bg-light">
-                                        <div class="card-body p-2 text-center">
-                                            <p class="mb-0 small text-muted">Land Value</p>
-                                            <h5 class="mb-0" id="landValue">$125,000</h5>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="card bg-light">
-                                        <div class="card-body p-2 text-center">
-                                            <p class="mb-0 small text-muted">Improvement Value</p>
-                                            <h5 class="mb-0" id="improvementValue">$325,000</h5>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="card" style="background-color: var(--tf-map-green-100);">
-                                        <div class="card-body p-2 text-center">
-                                            <p class="mb-0 small text-muted">Total Value</p>
-                                            <h5 class="mb-0" id="totalValue">$450,000</h5>
-                                        </div>
-                                    </div>
+                        <div class="property-detail-row">
+                            <span class="property-detail-label">Owner:</span>
+                            <span class="property-detail-value" id="property-owner">John & Jane Smith</span>
+                        </div>
+                        <div class="property-detail-row">
+                            <span class="property-detail-label">Appraised Value:</span>
+                            <span class="property-detail-value" id="property-value">$285,000</span>
+                        </div>
+                        <div class="property-detail-row">
+                            <span class="property-detail-label">Land Value:</span>
+                            <span class="property-detail-value" id="land-value">$75,000</span>
+                        </div>
+                        <div class="property-detail-row">
+                            <span class="property-detail-label">Acres:</span>
+                            <span class="property-detail-value" id="property-acres">0.25</span>
+                        </div>
+                        <div class="property-detail-row">
+                            <span class="property-detail-label">Year Built:</span>
+                            <span class="property-detail-value" id="year-built">1998</span>
+                        </div>
+                        <div class="property-detail-row">
+                            <span class="property-detail-label">Property Class:</span>
+                            <span class="property-detail-value" id="property-class">Residential</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Property Detail Tabs -->
+                <ul class="nav nav-tabs" id="propertyTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="details-tab" data-bs-toggle="tab" data-bs-target="#details" type="button" role="tab" aria-controls="details" aria-selected="true">Details</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#history" type="button" role="tab" aria-controls="history" aria-selected="false">History</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="tax-tab" data-bs-toggle="tab" data-bs-target="#tax" type="button" role="tab" aria-controls="tax" aria-selected="false">Tax</button>
+                    </li>
+                </ul>
+                <div class="tab-content" id="propertyTabsContent">
+                    <!-- Details Tab -->
+                    <div class="tab-pane fade show active" id="details" role="tabpanel" aria-labelledby="details-tab">
+                        <div class="property-detail-row">
+                            <span class="property-detail-label">Living Area:</span>
+                            <span class="property-detail-value" id="living-area">2,150 sq ft</span>
+                        </div>
+                        <div class="property-detail-row">
+                            <span class="property-detail-label">Land Area:</span>
+                            <span class="property-detail-value" id="land-area">10,890 sq ft</span>
+                        </div>
+                        <div class="property-detail-row">
+                            <span class="property-detail-label">Bedrooms:</span>
+                            <span class="property-detail-value" id="bedrooms">4</span>
+                        </div>
+                        <div class="property-detail-row">
+                            <span class="property-detail-label">Bathrooms:</span>
+                            <span class="property-detail-value" id="bathrooms">2.5</span>
+                        </div>
+                        <div class="property-detail-row">
+                            <span class="property-detail-label">Zoning:</span>
+                            <span class="property-detail-value" id="zoning">R-1</span>
+                        </div>
+                        <div class="property-detail-row">
+                            <span class="property-detail-label">School District:</span>
+                            <span class="property-detail-value" id="school-district">Richland School District</span>
+                        </div>
+                        <div class="property-detail-row">
+                            <span class="property-detail-label">Neighborhood:</span>
+                            <span class="property-detail-value" id="neighborhood">Meadow Springs</span>
+                        </div>
+                        <div class="property-detail-row">
+                            <span class="property-detail-label">Subdivision:</span>
+                            <span class="property-detail-value" id="subdivision">Oak Hills</span>
+                        </div>
+                    </div>
+                    
+                    <!-- History Tab -->
+                    <div class="tab-pane fade" id="history" role="tabpanel" aria-labelledby="history-tab">
+                        <div class="history-timeline">
+                            <div class="timeline-item">
+                                <div class="timeline-date">Jan 15, 2023</div>
+                                <div class="timeline-content">
+                                    <div class="fw-bold">Property Sale</div>
+                                    <div class="timeline-caption">Sale price: $285,000</div>
                                 </div>
                             </div>
-                            
-                            <h5>Assessment History</h5>
-                            <table class="table table-sm assessment-history">
-                                <thead>
-                                    <tr>
-                                        <th>Year</th>
-                                        <th>Land</th>
-                                        <th>Improvements</th>
-                                        <th>Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="assessmentHistory">
-                                    <!-- Will be populated by JavaScript -->
-                                </tbody>
-                            </table>
+                            <div class="timeline-item">
+                                <div class="timeline-date">Nov 30, 2022</div>
+                                <div class="timeline-content">
+                                    <div class="fw-bold">Property Reassessment</div>
+                                    <div class="timeline-caption">Value changed from $265,000 to $280,000</div>
+                                </div>
+                            </div>
+                            <div class="timeline-item">
+                                <div class="timeline-date">Aug 12, 2020</div>
+                                <div class="timeline-content">
+                                    <div class="fw-bold">Renovation Permit</div>
+                                    <div class="timeline-caption">Kitchen remodel, bathroom addition</div>
+                                </div>
+                            </div>
+                            <div class="timeline-item">
+                                <div class="timeline-date">May 4, 2015</div>
+                                <div class="timeline-content">
+                                    <div class="fw-bold">Property Sale</div>
+                                    <div class="timeline-caption">Sale price: $210,000</div>
+                                </div>
+                            </div>
+                            <div class="timeline-item">
+                                <div class="timeline-date">Aug 15, 1998</div>
+                                <div class="timeline-content">
+                                    <div class="fw-bold">Construction Complete</div>
+                                    <div class="timeline-caption">New construction</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Tax Tab -->
+                    <div class="tab-pane fade" id="tax" role="tabpanel" aria-labelledby="tax-tab">
+                        <div class="property-detail-row">
+                            <span class="property-detail-label">Tax Year:</span>
+                            <span class="property-detail-value">2025</span>
+                        </div>
+                        <div class="property-detail-row">
+                            <span class="property-detail-label">Total Tax:</span>
+                            <span class="property-detail-value">$3,420.56</span>
+                        </div>
+                        <div class="property-detail-row">
+                            <span class="property-detail-label">Tax Status:</span>
+                            <span class="property-detail-value">Paid</span>
+                        </div>
+                        <div class="property-detail-row">
+                            <span class="property-detail-label">Payment Date:</span>
+                            <span class="property-detail-value">Apr 15, 2025</span>
+                        </div>
+                        <div class="property-detail-row">
+                            <span class="property-detail-label">Taxable Value:</span>
+                            <span class="property-detail-value">$280,000</span>
+                        </div>
+                        <div class="property-detail-row">
+                            <span class="property-detail-label">Exemptions:</span>
+                            <span class="property-detail-value">None</span>
+                        </div>
+                        
+                        <h6 class="mt-4 mb-2">Tax Rate Breakdown</h6>
+                        <div class="property-detail-row">
+                            <span class="property-detail-label">County:</span>
+                            <span class="property-detail-value">$1,456.00</span>
+                        </div>
+                        <div class="property-detail-row">
+                            <span class="property-detail-label">School District:</span>
+                            <span class="property-detail-value">$1,092.00</span>
+                        </div>
+                        <div class="property-detail-row">
+                            <span class="property-detail-label">City:</span>
+                            <span class="property-detail-value">$728.00</span>
+                        </div>
+                        <div class="property-detail-row">
+                            <span class="property-detail-label">Special Districts:</span>
+                            <span class="property-detail-value">$144.56</span>
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modals -->
-<!-- Search Modal -->
-<div class="modal fade" id="searchModal" tabindex="-1" aria-labelledby="searchModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header" style="background-color: var(--tf-map-green-100);">
-                <h5 class="modal-title" id="searchModalLabel">Search Properties</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form id="searchForm">
-                    <div class="mb-3">
-                        <label for="searchType" class="form-label">Search By</label>
-                        <select class="form-select" id="searchType">
-                            <option value="address">Address</option>
-                            <option value="parcelId">Parcel ID</option>
-                            <option value="owner">Owner Name</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="searchValue" class="form-label">Search Value</label>
-                        <input type="text" class="form-control" id="searchValue" placeholder="Enter search term...">
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary" id="btnRunSearch">Search</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Layers Modal -->
-<div class="modal fade" id="layersModal" tabindex="-1" aria-labelledby="layersModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header" style="background-color: var(--tf-map-green-100);">
-                <h5 class="modal-title" id="layersModalLabel">Map Layers</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <h6>Base Maps</h6>
-                    <div class="list-group layer-list" id="baseLayersList">
-                        <!-- Will be populated by JavaScript -->
-                    </div>
-                </div>
-                <div class="mb-3">
-                    <h6>Operational Layers</h6>
-                    <div class="list-group layer-list" id="operationalLayersList">
-                        <!-- Will be populated by JavaScript -->
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Bookmarks Modal -->
-<div class="modal fade" id="bookmarksModal" tabindex="-1" aria-labelledby="bookmarksModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header" style="background-color: var(--tf-map-green-100);">
-                <h5 class="modal-title" id="bookmarksModalLabel">Saved Locations</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div class="list-group" id="bookmarksList">
-                    <!-- Will be populated by JavaScript -->
-                </div>
-                <hr>
-                <div class="mb-3">
-                    <h6>Create New Location</h6>
-                    <form id="newBookmarkForm">
-                        <div class="mb-3">
-                            <label for="bookmarkName" class="form-label">Name</label>
-                            <input type="text" class="form-control" id="bookmarkName" placeholder="Enter location name">
-                        </div>
-                        <div class="mb-3">
-                            <label for="bookmarkDescription" class="form-label">Description</label>
-                            <textarea class="form-control" id="bookmarkDescription" rows="2" placeholder="Enter location description"></textarea>
-                        </div>
-                        <button type="button" class="btn btn-primary" id="btnSaveBookmark">Save Current View</button>
-                    </form>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
@@ -260,429 +386,138 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="https://js.arcgis.com/4.25/"></script>
+<!-- Leaflet JavaScript -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-measure/dist/leaflet-measure.js"></script>
+
+<!-- TerraFlow Map Utils -->
 <script src="{{ url_for('static', filename='js/map-utils.js') }}"></script>
+
 <script>
-    // Initialize the property viewer map
     document.addEventListener('DOMContentLoaded', function() {
-        // Initialize ESRI map when ArcGIS JS API is loaded
-        require([
-            "esri/Map",
-            "esri/views/MapView",
-            "esri/layers/FeatureLayer",
-            "esri/layers/TileLayer",
-            "esri/widgets/Sketch",
-            "esri/widgets/BasemapToggle",
-            "esri/widgets/ScaleBar",
-            "esri/widgets/Measurement",
-            "esri/geometry/Polygon",
-            "esri/geometry/Point",
-            "esri/Graphic",
-            "esri/widgets/Expand"
-        ], function(
-            Map, MapView, FeatureLayer, TileLayer, Sketch, BasemapToggle, ScaleBar, 
-            Measurement, Polygon, Point, Graphic, Expand
-        ) {
-            // Create the map
-            const map = new Map({
-                basemap: "streets"
-            });
-
-            // Create the view
-            const view = new MapView({
-                container: "mapView",
-                map: map,
-                zoom: 12,
-                center: [-119.2844, 46.2506]  // Default center (Benton County)
-            });
-
-            // Add ScaleBar widget
-            const scaleBar = new ScaleBar({
-                view: view,
-                unit: "dual"
-            });
-            view.ui.add(scaleBar, "bottom-left");
-
-            // Add measurement widget (hidden initially)
-            const measurement = new Measurement({
-                view: view,
-                activeTool: "distance"
-            });
-            const measurementExpand = new Expand({
-                view: view,
-                content: measurement,
-                expanded: false
-            });
-            view.ui.add(measurementExpand, "top-right");
-
-            // Add basemap toggle
-            const basemapToggle = new BasemapToggle({
-                view: view,
-                nextBasemap: "satellite"
-            });
-            view.ui.add(basemapToggle, "bottom-right");
-
-            // Add property parcels layer
-            const parcelsLayer = new FeatureLayer({
-                url: "https://mapservices.bentoncountywa.gov/arcgis/rest/services/Parcels/MapServer/0",
-                outFields: ["*"],
-                visible: true,
-                title: "Property Parcels",
-                popupTemplate: {
-                    title: "{SITUS}",
-                    content: [
-                        {
-                            type: "fields",
-                            fieldInfos: [
-                                {
-                                    fieldName: "PARCEL_ID",
-                                    label: "Parcel ID"
-                                },
-                                {
-                                    fieldName: "OWNER",
-                                    label: "Owner"
-                                },
-                                {
-                                    fieldName: "PROP_TYPE",
-                                    label: "Property Type"
-                                },
-                                {
-                                    fieldName: "ACRES",
-                                    label: "Acres"
-                                },
-                                {
-                                    fieldName: "LAND_VAL",
-                                    label: "Land Value"
-                                },
-                                {
-                                    fieldName: "IMPR_VAL",
-                                    label: "Improvement Value"
-                                },
-                                {
-                                    fieldName: "TOT_VAL",
-                                    label: "Total Value"
-                                }
-                            ]
-                        },
-                        {
-                            type: "custom",
-                            creator: function(feature) {
-                                const parcelId = feature.graphic.attributes.PARCEL_ID;
-                                return `<button class="btn btn-sm btn-primary mt-2" onclick="showPropertyDetails('${parcelId}')">View Details</button>`;
-                            }
-                        }
-                    ]
-                }
-            });
-            map.add(parcelsLayer);
-
-            // Display coordinates when pointer moves
-            view.on("pointer-move", function(evt) {
-                const point = view.toMap({ x: evt.x, y: evt.y });
-                if (point) {
-                    const lat = point.latitude.toFixed(6);
-                    const lng = point.longitude.toFixed(6);
-                    document.getElementById("coordinateDisplay").textContent = `Lat: ${lat}, Lng: ${lng}`;
-                }
-            });
-
-            // Add event listener for Measure button
-            document.getElementById("btnMeasure").addEventListener("click", function() {
-                measurementExpand.expanded = !measurementExpand.expanded;
-                if (measurementExpand.expanded) {
-                    measurement.activeTool = "distance";
-                }
-            });
-
-            // Load bookmarks
-            loadBookmarks();
-
-            // Save bookmark event listener
-            document.getElementById("btnSaveBookmark").addEventListener("click", function() {
-                saveBookmark(view);
-            });
-
-            // Initialize search
-            document.getElementById("btnRunSearch").addEventListener("click", function() {
-                const searchType = document.getElementById("searchType").value;
-                const searchValue = document.getElementById("searchValue").value;
-                searchProperties(searchType, searchValue, view, parcelsLayer);
-            });
-
-            // Initialize layer lists
-            initLayerLists(map, view);
+        // Initialize the property map
+        const propertyMap = initPropertyMap('property-map', {
+            center: [-119.2874, 46.2646], // Benton County, WA coordinates
+            zoom: 15
         });
-    });
-
-    // Function to show property details
-    function showPropertyDetails(parcelId) {
-        fetch(`/api/property/${parcelId}`)
-            .then(response => response.json())
-            .then(data => {
-                // Show property details panel
-                document.getElementById("propertyDetails").style.display = "block";
-                
-                // Populate property details
-                document.getElementById("propertyAddress").textContent = data.situs_display;
-                document.getElementById("propertyParcelId").textContent = data.prop_id;
-                document.getElementById("propertyOwner").textContent = data.owner;
-                document.getElementById("propertyType").textContent = data.prop_type_cd;
-                document.getElementById("propertyYearBuilt").textContent = data.yr_blt;
-                document.getElementById("propertyLivingArea").textContent = formatNumber(data.living_area) + " sq ft";
-                document.getElementById("propertyLandArea").textContent = data.land_acres + " acres";
-                
-                // Current assessment values
-                document.getElementById("landValue").textContent = formatCurrency(data.land_val);
-                document.getElementById("improvementValue").textContent = formatCurrency(data.appraised_val - data.land_val);
-                document.getElementById("totalValue").textContent = formatCurrency(data.appraised_val);
-                
-                // Assessment history
-                const historyTable = document.getElementById("assessmentHistory");
-                historyTable.innerHTML = "";
-                
-                if (data.assessments && data.assessments.length) {
-                    data.assessments.forEach(function(assessment) {
-                        const row = document.createElement("tr");
-                        row.innerHTML = `
-                            <td>${assessment.year}</td>
-                            <td>${formatCurrency(assessment.land_val)}</td>
-                            <td>${formatCurrency(assessment.improvement_val)}</td>
-                            <td>${formatCurrency(assessment.total_val)}</td>
-                        `;
-                        historyTable.appendChild(row);
-                    });
-                } else {
-                    historyTable.innerHTML = `<tr><td colspan="4">No assessment history available</td></tr>`;
+        
+        // Sample property data (this would be loaded from backend)
+        const propertyGeoJson = {
+            type: 'FeatureCollection',
+            features: [
+                {
+                    type: 'Feature',
+                    properties: {
+                        property_id: '12345678',
+                        address: '123 Main Street, Richland, WA 99352',
+                        owner_name: 'John & Jane Smith',
+                        appraised_value: 285000,
+                        acres: 0.25,
+                        year_built: 1998,
+                        property_class: 'Residential',
+                        living_area: 2150,
+                        bedrooms: 4,
+                        bathrooms: 2.5
+                    },
+                    geometry: {
+                        type: 'Polygon',
+                        coordinates: [[
+                            [-119.2874, 46.2646],
+                            [-119.2864, 46.2646],
+                            [-119.2864, 46.2656],
+                            [-119.2874, 46.2656],
+                            [-119.2874, 46.2646]
+                        ]]
+                    }
                 }
-                
-                // Scroll to property details
-                document.getElementById("propertyDetails").scrollIntoView({ behavior: 'smooth' });
-            })
-            .catch(error => {
-                console.error("Error fetching property details:", error);
-                alert("Error loading property details. Please try again.");
-            });
-    }
-
-    // Function to load bookmarks
-    function loadBookmarks() {
-        fetch('/api/saved-locations')
-            .then(response => response.json())
-            .then(data => {
-                const bookmarksList = document.getElementById("bookmarksList");
-                bookmarksList.innerHTML = "";
-                
-                if (data.length === 0) {
-                    bookmarksList.innerHTML = '<div class="alert alert-info">No saved locations found</div>';
-                    return;
-                }
-                
-                data.forEach(function(bookmark) {
-                    const bookmarkItem = document.createElement("a");
-                    bookmarkItem.href = "#";
-                    bookmarkItem.className = "list-group-item list-group-item-action";
-                    bookmarkItem.innerHTML = `
-                        <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1">${bookmark.name}</h6>
-                        </div>
-                        <p class="mb-1 small">${bookmark.description}</p>
-                    `;
-                    bookmarkItem.onclick = function(e) {
-                        e.preventDefault();
-                        zoomToBookmark(bookmark);
-                        $('#bookmarksModal').modal('hide');
-                    };
-                    bookmarksList.appendChild(bookmarkItem);
-                });
-            })
-            .catch(error => {
-                console.error("Error loading bookmarks:", error);
-                const bookmarksList = document.getElementById("bookmarksList");
-                bookmarksList.innerHTML = '<div class="alert alert-danger">Error loading saved locations</div>';
-            });
-    }
-
-    // Function to save a bookmark
-    function saveBookmark(view) {
-        const name = document.getElementById("bookmarkName").value;
-        const description = document.getElementById("bookmarkDescription").value;
-        
-        if (!name) {
-            alert("Please enter a name for this location");
-            return;
-        }
-        
-        // Get current map extent
-        const extent = view.extent;
-        
-        const bookmarkData = {
-            name: name,
-            description: description,
-            spatial_reference: extent.spatialReference.wkid,
-            x_min: extent.xmin,
-            y_min: extent.ymin,
-            x_max: extent.xmax,
-            y_max: extent.ymax
+            ]
         };
         
-        fetch('/api/save-location', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(bookmarkData)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Clear form and reload bookmarks
-                document.getElementById("bookmarkName").value = "";
-                document.getElementById("bookmarkDescription").value = "";
-                loadBookmarks();
-                alert("Location saved successfully");
-            } else {
-                alert("Error saving location: " + data.message);
-            }
-        })
-        .catch(error => {
-            console.error("Error saving bookmark:", error);
-            alert("Error saving location. Please try again.");
-        });
-    }
-
-    // Function to zoom to a bookmark
-    function zoomToBookmark(bookmark) {
-        require(["esri/geometry/Extent", "esri/views/MapView"], function(Extent, MapView) {
-            // Get the current view from the global scope
-            const view = document.querySelector("#mapView").view;
-            
-            if (view) {
-                const extent = new Extent({
-                    xmin: bookmark.x_min,
-                    ymin: bookmark.y_min,
-                    xmax: bookmark.x_max,
-                    ymax: bookmark.y_max,
-                    spatialReference: {
-                        wkid: bookmark.spatial_reference
-                    }
-                });
-                
-                view.goTo(extent);
+        // Load property data on the map
+        loadPropertiesOnMap(propertyMap, propertyGeoJson, {
+            fitBounds: true,
+            onSelect: function(property) {
+                // Update the property details in the sidebar
+                updatePropertyDetails(property);
             }
         });
-    }
-
-    // Function to search properties
-    function searchProperties(searchType, searchValue, view, parcelsLayer) {
-        if (!searchValue) {
-            alert("Please enter a search value");
-            return;
-        }
         
-        let whereClause = "";
-        switch (searchType) {
-            case "address":
-                whereClause = `SITUS LIKE '%${searchValue}%'`;
-                break;
-            case "parcelId":
-                whereClause = `PARCEL_ID = '${searchValue}'`;
-                break;
-            case "owner":
-                whereClause = `OWNER LIKE '%${searchValue}%'`;
-                break;
-        }
-        
-        // Query the parcels layer
-        parcelsLayer.definitionExpression = whereClause;
-        parcelsLayer.queryExtent().then(function(result) {
-            if (result.extent) {
-                view.goTo(result.extent);
-                $('#searchModal').modal('hide');
-            } else {
-                alert("No properties found matching your search criteria");
-            }
+        // Bind tool buttons to actions
+        document.getElementById('btn-measure').addEventListener('click', function(e) {
+            e.preventDefault();
+            toggleMeasureTool(propertyMap);
         });
-    }
-
-    // Function to initialize layer lists
-    function initLayerLists(map, view) {
-        const baseLayersList = document.getElementById("baseLayersList");
-        const operationalLayersList = document.getElementById("operationalLayersList");
         
-        // Base layers
-        baseLayersList.innerHTML = `
-            <a href="#" class="list-group-item list-group-item-action" onclick="changeBasemap('streets')">
-                <div class="d-flex align-items-center">
-                    <div class="me-2"><i class="fas fa-map"></i></div>
-                    <div>Streets</div>
-                </div>
-            </a>
-            <a href="#" class="list-group-item list-group-item-action" onclick="changeBasemap('satellite')">
-                <div class="d-flex align-items-center">
-                    <div class="me-2"><i class="fas fa-satellite"></i></div>
-                    <div>Satellite</div>
-                </div>
-            </a>
-            <a href="#" class="list-group-item list-group-item-action" onclick="changeBasemap('hybrid')">
-                <div class="d-flex align-items-center">
-                    <div class="me-2"><i class="fas fa-globe"></i></div>
-                    <div>Hybrid</div>
-                </div>
-            </a>
-            <a href="#" class="list-group-item list-group-item-action" onclick="changeBasemap('topo')">
-                <div class="d-flex align-items-center">
-                    <div class="me-2"><i class="fas fa-mountain"></i></div>
-                    <div>Topographic</div>
-                </div>
-            </a>
-        `;
+        document.getElementById('btn-streetview').addEventListener('click', function(e) {
+            e.preventDefault();
+            openStreetView(propertyGeoJson.features[0].geometry.coordinates[0][0]);
+        });
         
-        // Operational layers - update this based on available layers
-        map.layers.forEach(function(layer, index) {
-            const layerItem = document.createElement("a");
-            layerItem.href = "#";
-            layerItem.className = "list-group-item list-group-item-action";
-            layerItem.dataset.layerIndex = index;
-            layerItem.innerHTML = `
-                <div class="d-flex align-items-center">
-                    <div class="form-check me-2">
-                        <input class="form-check-input" type="checkbox" value="" id="layer${index}" ${layer.visible ? 'checked' : ''}>
-                    </div>
-                    <div>${layer.title || 'Layer ' + index}</div>
-                </div>
-            `;
-            layerItem.onclick = function(e) {
-                if (e.target.type !== 'checkbox') {
-                    const checkbox = this.querySelector('input[type="checkbox"]');
-                    checkbox.checked = !checkbox.checked;
-                }
-                const layerIndex = parseInt(this.dataset.layerIndex);
-                map.layers.getItemAt(layerIndex).visible = this.querySelector('input[type="checkbox"]').checked;
-            };
-            operationalLayersList.appendChild(layerItem);
+        document.getElementById('btn-download').addEventListener('click', function(e) {
+            e.preventDefault();
+            downloadPropertyData(propertyGeoJson.features[0].properties.property_id);
         });
-    }
-
-    // Function to change basemap
-    function changeBasemap(basemapId) {
-        require(["esri/Map"], function(Map) {
-            // Get the current view from the global scope
-            const view = document.querySelector("#mapView").view;
-            
-            if (view) {
-                view.map.basemap = basemapId;
-            }
+        
+        document.getElementById('btn-print').addEventListener('click', function(e) {
+            e.preventDefault();
+            printPropertyMap();
         });
+        
+        // Initialize with the first property's details
+        updatePropertyDetails(propertyGeoJson.features[0].properties);
+    });
+    
+    // Update the property details in the sidebar
+    function updatePropertyDetails(property) {
+        document.getElementById('property-address').textContent = property.address || 'N/A';
+        document.getElementById('property-id').textContent = property.property_id || 'N/A';
+        document.getElementById('property-owner').textContent = property.owner_name || 'N/A';
+        document.getElementById('property-value').textContent = property.appraised_value ? 
+            '$' + property.appraised_value.toLocaleString() : 'N/A';
+        document.getElementById('land-value').textContent = property.land_value ? 
+            '$' + property.land_value.toLocaleString() : '$75,000';
+        document.getElementById('property-acres').textContent = property.acres ? 
+            property.acres.toFixed(2) : 'N/A';
+        document.getElementById('year-built').textContent = property.year_built || 'N/A';
+        document.getElementById('property-class').textContent = property.property_class || 'N/A';
+        
+        // Update details tab
+        document.getElementById('living-area').textContent = property.living_area ? 
+            property.living_area.toLocaleString() + ' sq ft' : 'N/A';
+        document.getElementById('land-area').textContent = property.land_sqft ? 
+            property.land_sqft.toLocaleString() + ' sq ft' : '10,890 sq ft';
+        document.getElementById('bedrooms').textContent = property.bedrooms || 'N/A';
+        document.getElementById('bathrooms').textContent = property.bathrooms || 'N/A';
+        document.getElementById('zoning').textContent = property.zoning || 'R-1';
+        document.getElementById('school-district').textContent = property.school_district || 'Richland School District';
+        document.getElementById('neighborhood').textContent = property.neighborhood || 'Meadow Springs';
+        document.getElementById('subdivision').textContent = property.subdivision || 'Oak Hills';
     }
-
-    // Helper function to format currency
-    function formatCurrency(value) {
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
+    
+    // Toggle measurement tool
+    function toggleMeasureTool(map) {
+        // This would toggle the measurement tool functionality
+        alert('Measurement tool activated');
     }
-
-    // Helper function to format numbers with commas
-    function formatNumber(value) {
-        return new Intl.NumberFormat('en-US').format(value);
+    
+    // Open Google Street View at location
+    function openStreetView(coordinates) {
+        const lat = coordinates[1];
+        const lng = coordinates[0];
+        const url = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
+        window.open(url, '_blank');
+    }
+    
+    // Download property data
+    function downloadPropertyData(propertyId) {
+        // This would trigger a download of property data
+        alert(`Downloading property data for ID: ${propertyId}`);
+    }
+    
+    // Print property map
+    function printPropertyMap() {
+        // This would generate a printable view
+        window.print();
     }
 </script>
 {% endblock %}
