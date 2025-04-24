@@ -34,6 +34,9 @@ from sync_service.models import (
     SyncConflict, GlobalSetting
 )
 from sync_service.sync_engine import SyncEngine
+from sync_service.data_type_handlers import (
+    DataTypeHandler, get_handler_for_column, register_handler
+)
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -716,8 +719,19 @@ class DatabaseProjectSyncService:
         
         return operations
         
-    def _records_differ(self, record1: Dict[str, Any], record2: Dict[str, Any]) -> bool:
-        """Check if two records have different values."""
+    def _records_differ(self, record1: Dict[str, Any], record2: Dict[str, Any], 
+                         table_schema: Dict[str, str] = None) -> bool:
+        """
+        Check if two records have different values, using data type handlers when available.
+        
+        Args:
+            record1: First record to compare
+            record2: Second record to compare
+            table_schema: Optional schema information mapping column names to data types
+        
+        Returns:
+            True if records differ, False if they are the same
+        """
         for key in record1:
             if key in record2:
                 # Handle None values
@@ -726,14 +740,40 @@ class DatabaseProjectSyncService:
                 
                 if (val1 is None and val2 is not None) or (val1 is not None and val2 is None):
                     return True
+                
+                # Skip comparison if both are None
+                if val1 is None and val2 is None:
+                    continue
+                
+                # If we have schema information, use appropriate data type handler
+                if table_schema and key in table_schema:
+                    column_type = table_schema[key]
+                    handler = get_handler_for_column(column_type)
                     
-                # Compare values, handling numeric types specially
-                if val1 is not None and val2 is not None:
-                    if isinstance(val1, (int, float)) and isinstance(val2, (int, float)):
-                        if abs(val1 - val2) > 1e-9:  # Compare with small epsilon for floating point
+                    if handler:
+                        # Use specialized comparison
+                        if not handler.compare_values(val1, val2):
                             return True
-                    elif str(val1) != str(val2):  # Convert to string for other comparisons
+                        # Skip the default comparison if we used a handler
+                        continue
+                
+                # Default comparison for standard types
+                if isinstance(val1, (int, float)) and isinstance(val2, (int, float)):
+                    if abs(val1 - val2) > 1e-9:  # Compare with small epsilon for floating point
                         return True
+                # Special handling for JSON data
+                elif isinstance(val1, (dict, list)) and isinstance(val2, (dict, list)):
+                    try:
+                        # Compare serialized JSON to account for formatting differences
+                        if json.dumps(val1, sort_keys=True) != json.dumps(val2, sort_keys=True):
+                            return True
+                    except (TypeError, ValueError):
+                        # If JSON serialization fails, fall back to string comparison
+                        if str(val1) != str(val2):
+                            return True
+                # String comparison for other types
+                elif str(val1) != str(val2):
+                    return True
             else:
                 # Key exists in record1 but not in record2
                 return True
