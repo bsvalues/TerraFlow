@@ -198,51 +198,73 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Toast notification system
     function showToast(title, message, type = 'info') {
-        const toastContainer = document.getElementById('toast-container');
-        
-        // Create toast container if it doesn't exist
-        let container = toastContainer;
-        if (!container) {
-            container = document.createElement('div');
-            container.id = 'toast-container';
-            container.className = 'toast-container position-fixed bottom-0 end-0 p-3';
-            container.style.zIndex = '1090';
-            document.body.appendChild(container);
-        }
-        
-        // Create toast element
-        const toastEl = document.createElement('div');
-        toastEl.className = `toast align-items-center text-white bg-${type} border-0`;
-        toastEl.setAttribute('role', 'alert');
-        toastEl.setAttribute('aria-live', 'assertive');
-        toastEl.setAttribute('aria-atomic', 'true');
-        
-        // Create toast content
-        toastEl.innerHTML = `
-            <div class="d-flex">
-                <div class="toast-body">
-                    <strong>${title}</strong><br>
-                    ${message}
+        try {
+            // Try to find the toast container
+            let container = document.getElementById('toast-container');
+            
+            // Create toast container if it doesn't exist
+            if (!container) {
+                try {
+                    container = document.createElement('div');
+                    container.id = 'toast-container';
+                    container.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+                    container.style.zIndex = '1090';
+                    
+                    // Make sure document.body exists before appending
+                    if (document.body) {
+                        document.body.appendChild(container);
+                    } else {
+                        console.error('Document body not available');
+                        return; // Exit if no document body
+                    }
+                } catch (err) {
+                    console.error('Error creating toast container:', err);
+                    return; // Exit if container creation fails
+                }
+            }
+            
+            // Create toast element
+            const toastEl = document.createElement('div');
+            toastEl.className = `toast align-items-center text-white bg-${type} border-0`;
+            toastEl.setAttribute('role', 'alert');
+            toastEl.setAttribute('aria-live', 'assertive');
+            toastEl.setAttribute('aria-atomic', 'true');
+            
+            // Create toast content
+            toastEl.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body">
+                        <strong>${title}</strong><br>
+                        ${message}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
                 </div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
-            </div>
-        `;
-        
-        // Add toast to container - use the container we created above
-        if (container) {
-            container.appendChild(toastEl);
-        } else {
-            console.error('Toast container not found');
+            `;
+            
+            // Add toast to container
+            if (container && container.appendChild) {
+                container.appendChild(toastEl);
+                
+                // Initialize and show toast
+                if (typeof bootstrap !== 'undefined' && bootstrap.Toast) {
+                    const toast = new bootstrap.Toast(toastEl, { autohide: true, delay: 5000 });
+                    toast.show();
+                    
+                    // Remove toast from DOM after it's hidden
+                    toastEl.addEventListener('hidden.bs.toast', function () {
+                        if (toastEl.parentNode) {
+                            toastEl.parentNode.removeChild(toastEl);
+                        }
+                    });
+                } else {
+                    console.error('Bootstrap Toast not available');
+                }
+            } else {
+                console.error('Toast container is not valid for appending');
+            }
+        } catch (err) {
+            console.error('Error showing toast:', err);
         }
-        
-        // Initialize and show toast
-        const toast = new bootstrap.Toast(toastEl, { autohide: true, delay: 5000 });
-        toast.show();
-        
-        // Remove toast from DOM after it's hidden
-        toastEl.addEventListener('hidden.bs.toast', function () {
-            toastEl.remove();
-        });
     }
     
     // Test scenario guide functionality
