@@ -24,3 +24,5 @@ openai
 psutil
 requests
 werkzeug
+anthropic
+trafilatura
