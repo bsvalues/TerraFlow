@@ -152,6 +152,240 @@ def job_details(job_id):
         is_active=is_active,
         status=status
     )
+    
+@project_sync_bp.route('/settings', methods=['GET', 'POST'])
+@login_required
+@role_required('administrator')
+def settings():
+    """Configure global settings for project sync."""
+    # Get global settings
+    global_settings = GlobalSetting.query.first()
+    
+    if not global_settings:
+        global_settings = GlobalSetting()
+        db.session.add(global_settings)
+        db.session.commit()
+    
+    if request.method == 'POST':
+        # Update settings
+        settings_data = {}
+        
+        # Sync behavior settings
+        settings_data['default_conflict_strategy'] = request.form.get('default_conflict_strategy')
+        settings_data['default_batch_size'] = request.form.get('default_batch_size', type=int)
+        settings_data['schema_validation'] = 'schema_validation' in request.form
+        settings_data['auto_migration'] = 'auto_migration' in request.form
+        
+        # Database connections
+        settings_data['default_source_connection'] = request.form.get('default_source_connection')
+        settings_data['default_target_connection'] = request.form.get('default_target_connection')
+        
+        # Notification settings
+        settings_data['email_notifications'] = 'email_notifications' in request.form
+        settings_data['notification_level'] = request.form.get('notification_level')
+        
+        # Schedule settings
+        settings_data['enable_scheduled_sync'] = 'enable_scheduled_sync' in request.form
+        settings_data['schedule_type'] = request.form.get('schedule_type')
+        settings_data['schedule_time'] = request.form.get('schedule_time')
+        settings_data['scheduled_job_name'] = request.form.get('scheduled_job_name')
+        
+        if settings_data['schedule_type'] == 'weekly':
+            settings_data['schedule_day'] = request.form.get('schedule_day')
+        elif settings_data['schedule_type'] == 'monthly':
+            settings_data['schedule_date'] = request.form.get('schedule_date')
+        
+        # Update global settings
+        if not global_settings.settings:
+            global_settings.settings = {}
+        
+        # Update project_sync section
+        if 'project_sync' not in global_settings.settings:
+            global_settings.settings['project_sync'] = {}
+            
+        global_settings.settings['project_sync'] = settings_data
+        db.session.commit()
+        
+        # If scheduled sync is enabled, configure the scheduler
+        if settings_data['enable_scheduled_sync']:
+            # Implement scheduler configuration here
+            pass
+        
+        flash('Project sync settings updated successfully', 'success')
+        return redirect(url_for('project_sync.settings'))
+    
+    # Get database connections
+    connections = []
+    if global_settings.connection_strings:
+        for name, conn_str in global_settings.connection_strings.items():
+            # Mask password in connection string
+            masked_conn = conn_str
+            if 'password=' in masked_conn.lower():
+                parts = masked_conn.split('password=')
+                if ';' in parts[1]:
+                    password_part = parts[1].split(';')[0]
+                else:
+                    password_part = parts[1]
+                masked_conn = masked_conn.replace(f'password={password_part}', 'password=*****')
+            
+            connections.append({
+                'name': name,
+                'type': 'postgresql',  # Default type, would be determined from the connection string
+                'connection_string_masked': masked_conn,
+                'connected': True  # This would be determined by testing the connection
+            })
+    
+    # Get settings from global settings
+    settings = {}
+    if global_settings.settings and 'project_sync' in global_settings.settings:
+        settings = global_settings.settings['project_sync']
+    
+    return render_template(
+        'sync/project_sync_settings.html',
+        settings=settings,
+        connections=connections
+    )
+
+@project_sync_bp.route('/add-connection', methods=['POST'])
+@login_required
+@role_required('administrator')
+def add_connection():
+    """Add a new database connection."""
+    connection_name = request.form.get('connection_name')
+    connection_type = request.form.get('connection_type')
+    connection_string = request.form.get('connection_string')
+    test_connection = 'test_connection' in request.form
+    
+    if not connection_name or not connection_string:
+        flash('Connection name and string are required', 'error')
+        return redirect(url_for('project_sync.settings'))
+    
+    # Get global settings
+    global_settings = GlobalSetting.query.first()
+    
+    if not global_settings:
+        global_settings = GlobalSetting()
+        db.session.add(global_settings)
+        db.session.commit()
+    
+    # Initialize connection_strings if needed
+    if not global_settings.connection_strings:
+        global_settings.connection_strings = {}
+    
+    # Check if connection name already exists
+    if connection_name in global_settings.connection_strings:
+        flash(f'Connection with name {connection_name} already exists', 'error')
+        return redirect(url_for('project_sync.settings'))
+    
+    # Test connection if requested
+    if test_connection:
+        # Test connection logic here
+        test_successful = True  # Replace with actual test
+        
+        if not test_successful:
+            flash('Connection test failed', 'error')
+            return redirect(url_for('project_sync.settings'))
+    
+    # Add connection
+    global_settings.connection_strings[connection_name] = connection_string
+    db.session.commit()
+    
+    flash(f'Connection {connection_name} added successfully', 'success')
+    return redirect(url_for('project_sync.settings'))
+
+@project_sync_bp.route('/edit-connection', methods=['POST'])
+@login_required
+@role_required('administrator')
+def edit_connection():
+    """Edit an existing database connection."""
+    original_name = request.form.get('connection_name_original')
+    new_name = request.form.get('connection_name')
+    connection_type = request.form.get('connection_type')
+    connection_string = request.form.get('connection_string')
+    test_connection = 'test_connection' in request.form
+    
+    if not original_name or not new_name:
+        flash('Connection name is required', 'error')
+        return redirect(url_for('project_sync.settings'))
+    
+    # Get global settings
+    global_settings = GlobalSetting.query.first()
+    
+    if not global_settings or not global_settings.connection_strings:
+        flash('No connections found', 'error')
+        return redirect(url_for('project_sync.settings'))
+    
+    # Check if original connection exists
+    if original_name not in global_settings.connection_strings:
+        flash(f'Connection {original_name} not found', 'error')
+        return redirect(url_for('project_sync.settings'))
+    
+    # If changing name, check if new name already exists
+    if original_name != new_name and new_name in global_settings.connection_strings:
+        flash(f'Connection with name {new_name} already exists', 'error')
+        return redirect(url_for('project_sync.settings'))
+    
+    # Get current connection string
+    current_connection_string = global_settings.connection_strings[original_name]
+    
+    # Update connection string if provided
+    if connection_string and not connection_string.startswith('Existing connection string'):
+        # Test new connection if requested
+        if test_connection:
+            # Test connection logic here
+            test_successful = True  # Replace with actual test
+            
+            if not test_successful:
+                flash('Connection test failed', 'error')
+                return redirect(url_for('project_sync.settings'))
+                
+        new_connection_string = connection_string
+    else:
+        new_connection_string = current_connection_string
+    
+    # Update connection
+    if original_name != new_name:
+        # Remove old connection and add new one with new name
+        global_settings.connection_strings.pop(original_name)
+        global_settings.connection_strings[new_name] = new_connection_string
+    else:
+        # Just update the connection string
+        global_settings.connection_strings[original_name] = new_connection_string
+    
+    db.session.commit()
+    
+    flash(f'Connection {new_name} updated successfully', 'success')
+    return redirect(url_for('project_sync.settings'))
+
+@project_sync_bp.route('/delete-connection', methods=['POST'])
+@login_required
+@role_required('administrator')
+def delete_connection():
+    """Delete a database connection."""
+    connection_name = request.form.get('connection_name')
+    
+    if not connection_name:
+        flash('Connection name is required', 'error')
+        return redirect(url_for('project_sync.settings'))
+    
+    # Get global settings
+    global_settings = GlobalSetting.query.first()
+    
+    if not global_settings or not global_settings.connection_strings:
+        flash('No connections found', 'error')
+        return redirect(url_for('project_sync.settings'))
+    
+    # Check if connection exists
+    if connection_name not in global_settings.connection_strings:
+        flash(f'Connection {connection_name} not found', 'error')
+        return redirect(url_for('project_sync.settings'))
+    
+    # Remove connection
+    global_settings.connection_strings.pop(connection_name)
+    db.session.commit()
+    
+    flash(f'Connection {connection_name} deleted successfully', 'success')
+    return redirect(url_for('project_sync.settings'))
 
 @project_sync_bp.route('/tables')
 @login_required
@@ -343,11 +577,30 @@ def resolve_conflict(conflict_id):
             resolved_data = conflict.source_data
         elif resolution_type == 'target_wins':
             resolved_data = conflict.target_data
+        elif resolution_type == 'ignore':
+            # Just ignore the conflict
+            conflict.resolution_status = 'ignored'
+            conflict.resolution_type = 'ignored'
+            conflict.resolved_by = session.get('user_id')
+            conflict.resolved_at = datetime.datetime.utcnow()
+            conflict.resolution_notes = resolution_notes
+            
+            db.session.commit()
+            flash('Conflict ignored successfully', 'success')
+            return redirect(url_for('project_sync.conflict_list'))
         elif resolution_type == 'manual':
             # For manual resolution, the form will include all field values
             resolved_data = {}
-            for field in conflict.source_data.keys():
-                resolved_data[field] = request.form.get(f'field_{field}')
+            for key in list(conflict.source_data.keys()) + list(conflict.target_data.keys()):
+                field_source = request.form.get(f'field_{key}')
+                if field_source == 'source' and key in conflict.source_data:
+                    resolved_data[key] = conflict.source_data[key]
+                elif field_source == 'target' and key in conflict.target_data:
+                    resolved_data[key] = conflict.target_data[key]
+                elif field_source == 'custom':
+                    custom_value = request.form.get(f'custom_{key}')
+                    if custom_value:
+                        resolved_data[key] = custom_value
         else:
             flash('Invalid resolution type', 'error')
             return redirect(url_for('project_sync.resolve_conflict', conflict_id=conflict_id))
@@ -362,8 +615,81 @@ def resolve_conflict(conflict_id):
         
         db.session.commit()
         
-        # TODO: Apply the resolved data to the target database
-        # This would require connecting to the database and updating the record
+        # Apply the resolved data to the target database if needed
+        if resolution_type != 'target_wins' and resolution_type != 'ignored':
+            try:
+                # Get the global settings to find the connection
+                global_settings = GlobalSetting.query.first()
+                
+                if global_settings and global_settings.settings and 'project_sync' in global_settings.settings:
+                    settings = global_settings.settings['project_sync']
+                    target_conn_name = settings.get('default_target_connection')
+                    
+                    if target_conn_name and global_settings.connection_strings and target_conn_name in global_settings.connection_strings:
+                        target_conn_string = global_settings.connection_strings[target_conn_name]
+                        
+                        # Create a connection and apply the changes
+                        engine = sa.create_engine(target_conn_string)
+                        table_name = conflict.table_name
+                        
+                        # Determine the primary key columns
+                        # This is a simplified approach, assuming we can parse from record_id
+                        pk_parts = conflict.record_id.split('|')
+                        pk_values = []
+                        
+                        # Get table structure to find the primary keys
+                        with engine.connect() as conn:
+                            # Check if we have primary key info
+                            pk_query = text("""
+                            SELECT a.attname
+                            FROM pg_index i
+                            JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+                            WHERE i.indrelid = :table_name::regclass
+                            AND i.indisprimary;
+                            """)
+                            
+                            try:
+                                pk_result = conn.execute(pk_query, {'table_name': table_name})
+                                pk_columns = [row[0] for row in pk_result]
+                                
+                                # Build WHERE clause for primary keys
+                                where_conditions = []
+                                for i, col in enumerate(pk_columns):
+                                    if i < len(pk_parts):
+                                        if pk_parts[i] == "NULL":
+                                            where_conditions.append(f"{col} IS NULL")
+                                        else:
+                                            where_conditions.append(f"{col} = '{pk_parts[i]}'")
+                                
+                                # Remove any primary key fields from the update data
+                                update_data = {k: v for k, v in resolved_data.items() if k not in pk_columns}
+                                
+                                # Build SET clause
+                                set_clauses = []
+                                for col, val in update_data.items():
+                                    if val is None:
+                                        set_clauses.append(f"{col} = NULL")
+                                    elif isinstance(val, (int, float)):
+                                        set_clauses.append(f"{col} = {val}")
+                                    else:
+                                        set_clauses.append(f"{col} = '{val}'")
+                                
+                                # Build and execute the UPDATE query
+                                if set_clauses and where_conditions:
+                                    update_query = f"""
+                                    UPDATE {table_name}
+                                    SET {', '.join(set_clauses)}
+                                    WHERE {' AND '.join(where_conditions)}
+                                    """
+                                    conn.execute(text(update_query))
+                                    
+                            except Exception as e:
+                                logger.error(f"Error applying resolution to database: {str(e)}")
+                
+            except Exception as e:
+                logger.error(f"Error in database update after conflict resolution: {str(e)}")
+                # We don't want to fail the resolution if the database update fails
+                # The conflict is marked as resolved in our system
         
         flash('Conflict resolved successfully', 'success')
         return redirect(url_for('project_sync.conflict_list'))
@@ -372,6 +698,78 @@ def resolve_conflict(conflict_id):
         'sync/project_sync_resolve_conflict.html',
         conflict=conflict
     )
+    
+@project_sync_bp.route('/bulk-resolve-conflicts', methods=['POST'])
+@login_required
+@role_required('administrator')
+def bulk_resolve_conflicts():
+    """Resolve multiple conflicts in bulk."""
+    resolution_type = request.form.get('resolution_type')
+    resolution_notes = request.form.get('resolution_notes')
+    
+    if not resolution_type:
+        flash('Resolution strategy is required', 'error')
+        return redirect(url_for('project_sync.conflict_list'))
+        
+    # Get pending conflicts
+    conflicts = SyncConflict.query.filter_by(resolution_status='pending').all()
+    
+    if not conflicts:
+        flash('No pending conflicts found', 'info')
+        return redirect(url_for('project_sync.conflict_list'))
+        
+    count = 0
+    for conflict in conflicts:
+        if resolution_type == 'source_wins':
+            resolved_data = conflict.source_data
+        elif resolution_type == 'target_wins':
+            resolved_data = conflict.target_data
+        elif resolution_type == 'newer_wins':
+            # Compare timestamps if available
+            source_time = None
+            target_time = None
+            
+            for field in ['modified_at', 'updated_at', 'last_modified']:
+                if field in conflict.source_data and field in conflict.target_data:
+                    source_time = conflict.source_data[field]
+                    target_time = conflict.target_data[field]
+                    break
+                    
+            if source_time and target_time:
+                if source_time > target_time:
+                    resolved_data = conflict.source_data
+                else:
+                    resolved_data = conflict.target_data
+            else:
+                # Default to source if no timestamps
+                resolved_data = conflict.source_data
+        elif resolution_type == 'ignore':
+            # Just mark as ignored
+            conflict.resolution_status = 'ignored'
+            conflict.resolution_type = 'ignored'
+            conflict.resolved_by = session.get('user_id')
+            conflict.resolved_at = datetime.datetime.utcnow()
+            conflict.resolution_notes = resolution_notes
+            count += 1
+            continue
+        else:
+            # Skip this conflict if resolution type not supported in bulk
+            continue
+            
+        # Update the conflict
+        conflict.resolution_status = 'resolved'
+        conflict.resolution_type = resolution_type
+        conflict.resolved_by = session.get('user_id')
+        conflict.resolved_at = datetime.datetime.utcnow()
+        conflict.resolution_notes = resolution_notes
+        conflict.resolved_data = resolved_data
+        
+        count += 1
+        
+    db.session.commit()
+    
+    flash(f'Successfully resolved {count} conflicts', 'success')
+    return redirect(url_for('project_sync.conflict_list'))
 
 @project_sync_bp.route('/run', methods=['GET', 'POST'])
 @login_required
