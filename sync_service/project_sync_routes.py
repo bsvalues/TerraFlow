@@ -1032,5 +1032,35 @@ def api_tables():
 
 def register_project_sync_blueprint(app):
     """Register the project sync blueprint with the Flask app."""
+    # Import built-in modules
+    import threading
+    import logging
+    
+    # Create logger
+    logger = logging.getLogger(__name__)
+    
+    # Register routes
     app.register_blueprint(project_sync_bp)
+    
+    # Initialize the project sync scheduler in a delayed thread
+    # to ensure the database is fully initialized
+    def init_project_sync_scheduler():
+        try:
+            # Import our scheduler module
+            from .scheduler import initialize_scheduler
+            
+            # Only initialize scheduler in production/development, not in testing
+            if not app.config.get('TESTING', False):
+                initialize_scheduler(app)
+                logger.info("Project sync scheduler initialized")
+        except Exception as e:
+            logger.error(f"Error initializing project sync scheduler: {str(e)}")
+    
+    # Start initialization in a separate thread after a short delay
+    # to ensure the database is fully initialized
+    thread = threading.Timer(5.0, init_project_sync_scheduler)
+    thread.daemon = True
+    thread.start()
+    
+    logger.info("Project sync blueprint registered")
     return True
