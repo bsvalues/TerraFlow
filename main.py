@@ -89,6 +89,27 @@ try:
 except ImportError as e:
     logger.warning(f"Could not initialize Data Stability Framework: {str(e)}")
 
+# Initialize Sync Services (both legacy and TerraFusion)
+try:
+    logger.info("Initializing Sync Services")
+    from sync_service.integration import initialize_sync_services
+    
+    # Initialize and register all sync services
+    sync_results = initialize_sync_services(app)
+    
+    # Log initialization results
+    for service_name, result in sync_results.items():
+        if result['status'] == 'success':
+            logger.info(f"{service_name} sync service: {result['message']}")
+        else:
+            logger.warning(f"{service_name} sync service: {result['message']}")
+            
+    # Make sync results available through the app
+    app.sync_services = sync_results
+    logger.info("Sync Services initialized successfully")
+except ImportError as e:
+    logger.warning(f"Could not initialize Sync Services: {str(e)}")
+
 # Add a test endpoint to check API functionality
 @app.route('/api/v1/status', methods=['GET'])
 def api_status():
@@ -132,6 +153,20 @@ def api_status():
         db_version = str(e)
         db_status = "error"
     
+    # Get sync services status
+    sync_services_status = {}
+    try:
+        if hasattr(app, 'sync_services'):
+            sync_services_status = {
+                service_name: {
+                    "status": result['status'],
+                    "message": result['message']
+                }
+                for service_name, result in app.sync_services.items()
+            }
+    except Exception as e:
+        sync_services_status = {"error": str(e)}
+    
     # Return status information
     from flask import jsonify
     return jsonify({
@@ -147,7 +182,8 @@ def api_status():
         "database": {
             "status": db_status,
             "version": db_version
-        }
+        },
+        "sync_services": sync_services_status
     })
 
 if __name__ == "__main__":

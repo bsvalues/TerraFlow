@@ -1,107 +1,160 @@
-# CountyDataSync ETL Process
+# Database Synchronization Services
+
+This module provides database synchronization services for the GeoAssessmentPro application, including the original DatabaseProjectSyncService and the enhanced TerraFusion Sync Service.
 
 ## Overview
 
-CountyDataSync is a comprehensive data synchronization and ETL (Extract, Transform, Load) solution designed for the Benton County GIS and Assessment systems. It provides robust capabilities for extracting data from various sources, transforming it as needed, and loading it into multiple output formats.
+The sync services allow synchronization of project data between different database environments, such as development, training, and production. They handle schema validation, data transformation, and conflict resolution.
 
-## Recent Enhancements
+## Services
 
-### Multi-Format Export System
+### Original DatabaseProjectSyncService
 
-The ETL process has been enhanced with a new multi-format export system that allows exporting data to multiple formats simultaneously:
+The original sync service provides basic functionality for synchronizing project data. It is accessible through the following routes:
 
-- **SQLite databases**: Relational database files for complex data with query capabilities
-- **CSV files**: Simple, universal tabular format compatible with Excel and other tools
-- **JSON files**: Web-friendly format for structured data
-- **GeoJSON files**: Specialized format for geospatial data
+- `/sync/dashboard` - Sync dashboard
+- `/sync/jobs` - Sync jobs list
+- `/sync/job/<job_id>` - Job details
+- `/sync/conflicts` - View conflicts
 
-This enhancement provides greater flexibility and interoperability with various systems and applications.
+### Enhanced TerraFusion Sync Service
 
-### Key Features
+The TerraFusion Sync Service is an enhanced implementation that aligns with the TerraFusion Platform architecture. It provides improved reliability, performance, and features:
 
-1. **Simultaneous Export to Multiple Formats**:
-   - Export datasets to any combination of supported formats in a single ETL run
-   - Each format is optimized for its intended use case
+#### API Endpoints
 
-2. **Incremental Updates**:
-   - All formats support incremental updates for efficient processing
-   - Reduces processing time and resource usage for large datasets
+- `/api/sync/full` - Start a full synchronization
+- `/api/sync/incremental` - Start an incremental synchronization
+- `/api/sync/status/<job_id>` - Get job status
+- `/api/sync/stop/<job_id>` - Stop a sync job
+- `/api/sync/resume/<job_id>` - Resume a stopped/failed job
+- `/api/sync/conflicts/<job_id>` - Get conflicts for a job
+- `/api/sync/conflicts/<job_id>/<conflict_id>/resolve` - Resolve a specific conflict
+- `/api/sync/conflicts/<job_id>/resolve-all` - Resolve all conflicts
+- `/api/sync/audit/<job_id>` - Get audit events for a job
+- `/api/sync/audit/<job_id>/report` - Generate audit report
+- `/api/sync/validate/<job_id>/<table_name>` - Validate schema
+- `/api/sync/health` - Check service health
 
-3. **Proper Timestamp Handling**:
-   - Export files include timestamps in filenames
-   - Symlinks to latest versions for easy access
+#### Web UI
 
-4. **Enhanced Logging**:
-   - Detailed logging of export operations
-   - Better error reporting and troubleshooting
+- `/sync/terra_fusion` or `/sync/terra_fusion/dashboard` - TerraFusion dashboard
+- `/sync/terra_fusion/job/<job_id>` - Job details
+- `/sync/terra_fusion/conflicts/<job_id>` - View and resolve conflicts
 
-5. **Structured Results**:
-   - Comprehensive results dictionary with paths to all exported files
-   - Detailed statistics on processed records
+## Key Features
 
-### Architectural Components
+The TerraFusion Sync Service provides several enhancements over the original service:
 
-1. **MultiFormatExporter**: Core class for handling exports to various formats
-2. **SQLiteExporter**: Specialized class for SQLite databases (maintained for backward compatibility)
-3. **IncrementalSyncManager**: Manages sync state and incremental updates
-4. **CountyDataSyncETL**: Main ETL engine, enhanced with multi-format support
+1. **Change Detection**: Multiple strategies for detecting changes:
+   - Primary key comparison
+   - Timestamp-based
+   - Content-based
+   - CDC (Change Data Capture)
+   - Hash-based
+
+2. **Transformation**: Transform data between schemas:
+   - Schema mapping
+   - Type conversion
+   - Custom transformations
+   - AI-assisted transformations
+
+3. **Validation**: Validate data integrity:
+   - Schema validation
+   - Data validation rules
+   - Custom validation rules
+
+4. **Orchestration**: Manage the sync process:
+   - Parallel processing
+   - Error recovery
+   - Checkpointing
+   - Resumable operations
+
+5. **Conflict Resolution**: Resolve conflicts between sources:
+   - Multiple strategies (source wins, target wins, newer wins)
+   - Field-level conflict resolution
+   - Manual resolution UI
+
+6. **Audit**: Track all operations:
+   - Comprehensive event logging
+   - Filtering and search
+   - Reports and statistics
+
+## Architecture
+
+The TerraFusion Sync Service follows a modular, component-based architecture:
+
+```
+┌─────────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│   Change Detector   │────▶│   Transformer    │────▶│    Validator    │
+└─────────────────────┘     └──────────────────┘     └─────────────────┘
+           │                         │                        │
+           │                         │                        │
+           ▼                         ▼                        ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                    Self-Healing Orchestrator                         │
+└─────────────────────────────────────────────────────────────────────┘
+           │                         │                        │
+           │                         │                        │
+           ▼                         ▼                        ▼
+┌─────────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│  Conflict Resolver  │     │   Audit System   │     │ Data Type       │
+│                     │     │                  │     │ Handlers        │
+└─────────────────────┘     └──────────────────┘     └─────────────────┘
+```
 
 ## Usage
 
-### Basic Export
+### Starting a Sync Job
+
+To start a sync job using the TerraFusion Sync Service API:
 
 ```python
-from sync_service.sync import CountyDataSyncETL
+import requests
+import json
 
-etl = CountyDataSyncETL(export_dir='exports')
-results = etl.run_etl_workflow(
-    source_connection=db_connection,
-    stats_query="SELECT * FROM statistics",
-    working_query="SELECT * FROM operational_data",
-    export_formats=['sqlite', 'csv', 'json']
+# Start a full sync
+response = requests.post(
+    "http://localhost:5000/api/sync/full",
+    json={
+        "source_connection": "postgresql://user:password@source_host:5432/source_db",
+        "target_connection": "postgresql://user:password@target_host:5432/target_db",
+        "config": {
+            "batch_size": 1000,
+            "detection_strategy": "hash",
+            "conflict_strategy": "source_wins"
+        }
+    }
 )
+
+# Get the job ID
+job_id = response.json()["job_id"]
+
+# Check status
+status = requests.get(f"http://localhost:5000/api/sync/status/{job_id}").json()
 ```
 
-### Using Exported Data
+### Web UI
 
-The ETL process returns a detailed results dictionary containing paths to all exported files:
+The TerraFusion Sync Service provides a comprehensive web UI for managing sync jobs:
 
-```python
-# Access SQLite database for complex queries
-sqlite_path = results['stats_export_paths']['sqlite']
-conn = sqlite3.connect(sqlite_path)
-cursor = conn.cursor()
-cursor.execute("SELECT * FROM stats_data WHERE stat_value > 100")
+1. Go to `/sync/terra_fusion` to access the dashboard
+2. Start a new sync job using the form
+3. Monitor job progress and status
+4. View and resolve conflicts as needed
+5. Check audit logs for detailed information
 
-# Process CSV data with pandas
-csv_path = results['stats_export_paths']['csv']
-df = pd.read_csv(csv_path)
-avg_value = df['stat_value'].mean()
+## Configuration
 
-# Use JSON data in web applications
-json_path = results['stats_export_paths']['json']
-with open(json_path, 'r') as f:
-    data = json.load(f)
-```
+The TerraFusion Sync Service can be configured with various options:
 
-## Documentation
+- `batch_size`: Number of records to process in a batch (default: 1000)
+- `detection_strategy`: Strategy for change detection (default: "hash")
+- `conflict_strategy`: Strategy for conflict resolution (default: "source_wins")
+- `max_parallel_tables`: Maximum number of tables to process in parallel (default: 1)
+- `max_parallel_operations`: Maximum operations per table in parallel (default: 5)
+- `audit_level`: Level of auditing detail (default: "standard")
 
-For detailed information, see the following resources:
+## Integration
 
-- [Multi-Format Export Guide](./docs/multi_format_export_guide.md): Comprehensive guide to the export system
-- [Examples](./examples/): Sample code demonstrating various use cases
-- [Unit Tests](./tests/): Test cases showing expected behavior
-
-## Getting Started
-
-1. **Installation**: Ensure all required dependencies are installed
-2. **Configuration**: Set up export directories and metadata paths
-3. **Usage**: Import and use the CountyDataSyncETL class as shown in examples
-4. **Testing**: Run unit tests to verify functionality
-
-## Dependencies
-
-- pandas: Data manipulation and analysis
-- SQLite: Embedded database for data storage
-- geopandas (optional): For working with geospatial data
-- shapely (optional): For geometry operations
+Both sync services are automatically registered with the Flask application at startup through the `sync_service/integration.py` module. Status information is available through the `/api/v1/status` endpoint.
