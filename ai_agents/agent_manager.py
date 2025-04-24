@@ -12,7 +12,7 @@ import datetime
 import uuid
 import threading
 import time
-from typing import Dict, List, Any, Optional, Union, Tuple, Type
+from typing import Dict, List, Any, Optional, Union, Tuple, Type, Callable
 
 from ai_agents.base_agent import AIAgent, AIAgentPool
 

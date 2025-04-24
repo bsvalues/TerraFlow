@@ -9,9 +9,221 @@ import logging
 import json
 import re
 import datetime
+import os
 from typing import Dict, List, Any, Optional, Union, Set, Tuple, Callable
 
 logger = logging.getLogger(__name__)
+
+class ValidationManager:
+    """
+    Manages and orchestrates validation agents for data conversion processes.
+    """
+    def __init__(self):
+        """Initialize the validation manager"""
+        self.validation_agents = {}
+        self.validation_rules = {}
+        
+        # Create folder for validation reports
+        self.reports_dir = os.environ.get('VALIDATION_REPORTS_DIR', 'validation_reports')
+        os.makedirs(self.reports_dir, exist_ok=True)
+        
+        logger.info("ValidationManager initialized")
+    
+    def register_agent(self, agent_id: str, agent: 'ValidationAgent') -> None:
+        """
+        Register a validation agent.
+        
+        Args:
+            agent_id: Unique identifier for the agent
+            agent: ValidationAgent instance
+        """
+        self.validation_agents[agent_id] = agent
+        logger.info(f"Registered validation agent: {agent_id}")
+    
+    def register_rule(self, rule_id: str, rule_config: Dict[str, Any]) -> None:
+        """
+        Register a validation rule.
+        
+        Args:
+            rule_id: Unique identifier for the rule
+            rule_config: Rule configuration
+        """
+        self.validation_rules[rule_id] = rule_config
+        logger.info(f"Registered validation rule: {rule_id}")
+    
+    def validate_data(self, data: Any, agents: List[str] = None, 
+                    rules: List[str] = None) -> Dict[str, Any]:
+        """
+        Validate data using registered agents and rules.
+        
+        Args:
+            data: Data to validate
+            agents: List of agent IDs to use (if None, use all)
+            rules: List of rule IDs to apply (if None, use all)
+            
+        Returns:
+            Combined validation results
+        """
+        results = {
+            'overall_passed': True,
+            'agent_results': {},
+            'rule_results': {},
+            'timestamp': datetime.datetime.utcnow().isoformat(),
+            'summary': {
+                'total_checks': 0,
+                'passed': 0,
+                'failed': 0,
+                'warnings': 0
+            }
+        }
+        
+        # Run agent validations
+        agent_ids = agents if agents is not None else self.validation_agents.keys()
+        for agent_id in agent_ids:
+            if agent_id in self.validation_agents:
+                agent = self.validation_agents[agent_id]
+                agent_result = agent.validate(data)
+                results['agent_results'][agent_id] = agent_result
+                
+                # Update summary
+                results['summary']['total_checks'] += agent_result.get('passed', 0) + agent_result.get('failed', 0)
+                results['summary']['passed'] += agent_result.get('passed', 0)
+                results['summary']['failed'] += agent_result.get('failed', 0)
+                results['summary']['warnings'] += agent_result.get('warnings', 0)
+                
+                # Update overall result
+                if agent_result.get('failed', 0) > 0:
+                    results['overall_passed'] = False
+            else:
+                logger.warning(f"Validation agent not found: {agent_id}")
+        
+        # Apply validation rules
+        rule_ids = rules if rules is not None else self.validation_rules.keys()
+        for rule_id in rule_ids:
+            if rule_id in self.validation_rules:
+                rule_config = self.validation_rules[rule_id]
+                rule_result = self._apply_rule(data, rule_config)
+                results['rule_results'][rule_id] = rule_result
+                
+                # Update summary
+                results['summary']['total_checks'] += 1
+                if rule_result['passed']:
+                    results['summary']['passed'] += 1
+                else:
+                    results['summary']['failed'] += 1
+                
+                # Update overall result
+                if not rule_result['passed'] and rule_result.get('severity') == 'error':
+                    results['overall_passed'] = False
+            else:
+                logger.warning(f"Validation rule not found: {rule_id}")
+        
+        return results
+    
+    def _apply_rule(self, data: Any, rule_config: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Apply a validation rule to data.
+        
+        Args:
+            data: Data to validate
+            rule_config: Rule configuration
+            
+        Returns:
+            Rule validation result
+        """
+        rule_type = rule_config.get('type')
+        result = {
+            'passed': True,
+            'rule_type': rule_type,
+            'description': rule_config.get('description', ''),
+            'severity': rule_config.get('severity', 'error')
+        }
+        
+        if rule_type == 'required_fields':
+            # Check if required fields are present
+            fields = rule_config.get('fields', [])
+            missing_fields = []
+            
+            if isinstance(data, dict):
+                for field in fields:
+                    if field not in data:
+                        missing_fields.append(field)
+            elif isinstance(data, list) and all(isinstance(item, dict) for item in data):
+                # Check all records for required fields
+                for i, record in enumerate(data):
+                    for field in fields:
+                        if field not in record:
+                            missing_fields.append(f"{field} (record {i})")
+            
+            if missing_fields:
+                result['passed'] = False
+                result['missing_fields'] = missing_fields
+        
+        elif rule_type == 'field_pattern':
+            # Check if field matches pattern
+            field = rule_config.get('field')
+            pattern = rule_config.get('pattern')
+            
+            if pattern and field:
+                regex = re.compile(pattern)
+                matches = []
+                
+                if isinstance(data, dict):
+                    if field in data and not regex.match(str(data[field])):
+                        matches.append(field)
+                elif isinstance(data, list) and all(isinstance(item, dict) for item in data):
+                    # Check all records for pattern
+                    for i, record in enumerate(data):
+                        if field in record and not regex.match(str(record[field])):
+                            matches.append(f"{field} (record {i})")
+                
+                if matches:
+                    result['passed'] = False
+                    result['pattern_violations'] = matches
+        
+        elif rule_type == 'custom':
+            # Execute custom validation function
+            # In a real implementation, this would be more sophisticated
+            # For now, just log that it's not implemented
+            result['passed'] = True
+            result['notes'] = "Custom validation not implemented"
+            logger.warning("Custom validation rule not implemented")
+        
+        return result
+    
+    def save_validation_report(self, report_id: str, validation_results: Dict[str, Any]) -> str:
+        """
+        Save validation results to a report file.
+        
+        Args:
+            report_id: Unique identifier for the report
+            validation_results: Validation results to save
+            
+        Returns:
+            Path to the saved report file
+        """
+        # Generate filename
+        timestamp = datetime.datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        filename = f"validation_report_{report_id}_{timestamp}.json"
+        file_path = os.path.join(self.reports_dir, filename)
+        
+        # Add report metadata
+        report = {
+            'report_id': report_id,
+            'timestamp': timestamp,
+            'results': validation_results
+        }
+        
+        # Save to file
+        with open(file_path, 'w') as f:
+            json.dump(report, f, indent=2)
+        
+        logger.info(f"Saved validation report to {file_path}")
+        return file_path
+
+
+# Create a singleton instance
+validation_manager = ValidationManager()
 
 class ValidationAgent:
     """
