@@ -1566,11 +1566,22 @@ class IntegrationAgent(BaseAgent):
             event_type = webhook_data.get("event", "push")
             repository = webhook_data.get("repository", {}).get("full_name", "unknown")
             
+            # Initialize GitHub integrator if needed
+            try:
+                # Import here to avoid circular imports
+                from ..integrators.github_integrator import GitHubIntegrator
+                github_integrator = GitHubIntegrator()
+            except ImportError as e:
+                self.logger.warning(f"Could not load GitHub integrator: {str(e)}")
+                github_integrator = None
+            
             # Handle different event types
             if event_type == "push":
                 # Process push event
                 commits = webhook_data.get("commits", [])
                 branch = webhook_data.get("ref", "").replace("refs/heads/", "")
+                
+                # TODO: Use GitHub integrator for enhanced push processing
                 
                 return {
                     "status": "success",
@@ -1587,15 +1598,39 @@ class IntegrationAgent(BaseAgent):
                 action = webhook_data.get("action", "")
                 pr_number = webhook_data.get("number", 0)
                 
-                return {
-                    "status": "success",
-                    "message": f"Processed GitHub pull_request webhook for {repository}",
-                    "details": {
-                        "repository": repository,
-                        "action": action,
-                        "pr_number": pr_number
+                # Use GitHub integrator for advanced PR processing if available
+                if github_integrator:
+                    self.logger.info(f"Using GitHub integrator to process PR #{pr_number}")
+                    result = github_integrator.process_pull_request(webhook_data)
+                    
+                    # Combine integrator result with our basic info
+                    if "error" not in result:
+                        result["status"] = "success"
+                        result["message"] = f"Processed GitHub pull_request webhook for {repository} using integrator"
+                        
+                        # Ensure we have the basic info in the details
+                        if "details" not in result:
+                            result["details"] = {}
+                        
+                        result["details"].update({
+                            "repository": repository,
+                            "action": action,
+                            "pr_number": pr_number
+                        })
+                    
+                    return result
+                else:
+                    # Fallback to basic processing
+                    self.logger.warning("GitHub integrator not available, using basic PR processing")
+                    return {
+                        "status": "success",
+                        "message": f"Processed GitHub pull_request webhook for {repository}",
+                        "details": {
+                            "repository": repository,
+                            "action": action,
+                            "pr_number": pr_number
+                        }
                     }
-                }
                 
             else:
                 return {
