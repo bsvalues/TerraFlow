@@ -1,485 +1,176 @@
-{% extends "base.html" %}
+{% extends 'base.html' %}
 
-{% block title %}TerraFusion Sync Dashboard{% endblock %}
+{% block title %}{{ title }}{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-  <div class="row">
-    <div class="col-12">
-      <div class="card shadow mb-4">
-        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-          <h6 class="m-0 font-weight-bold text-primary">TerraFusion Sync Dashboard</h6>
-          <div class="dropdown no-arrow">
-            <a class="dropdown-toggle" href="#" role="button" id="dropdownMenuLink"
-               data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-              <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="terrafusion-title">TerraFusion Sync Dashboard</h1>
+            <p class="lead">Manage your database synchronization jobs</p>
+        </div>
+        <div class="col-auto">
+            <a href="{{ url_for('terra_fusion_ui.new_job') }}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> New Sync Job
             </a>
-            <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in"
-                 aria-labelledby="dropdownMenuLink">
-              <div class="dropdown-header">Sync Actions:</div>
-              <a class="dropdown-item" href="#" data-toggle="modal" data-target="#newSyncModal">
-                <i class="fas fa-sync fa-sm fa-fw mr-2 text-gray-400"></i>
-                New Sync Job
-              </a>
-              <a class="dropdown-item" href="{{ url_for('terra_fusion.dashboard') }}">
-                <i class="fas fa-redo fa-sm fa-fw mr-2 text-gray-400"></i>
-                Refresh Dashboard
-              </a>
-              <div class="dropdown-divider"></div>
-              <a class="dropdown-item" href="#" data-toggle="modal" data-target="#healthModal">
-                <i class="fas fa-heartbeat fa-sm fa-fw mr-2 text-gray-400"></i>
-                Health Status
-              </a>
-            </div>
-          </div>
         </div>
-        <div class="card-body">
-          <div class="row mb-4">
-            <div class="col-xl-3 col-md-6 mb-4">
-              <div class="card border-left-primary shadow h-100 py-2">
+    </div>
+
+    <!-- Dashboard Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
                 <div class="card-body">
-                  <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                      <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Active Jobs</div>
-                      <div class="h5 mb-0 font-weight-bold text-gray-800" id="activeJobsCount">{{ active_jobs|length }}</div>
-                    </div>
-                    <div class="col-auto">
-                      <i class="fas fa-sync fa-2x text-gray-300"></i>
-                    </div>
-                  </div>
+                    <h5 class="card-title">Active Jobs</h5>
+                    <h2 class="display-4">{{ active_count }}</h2>
                 </div>
-              </div>
             </div>
-            <div class="col-xl-3 col-md-6 mb-4">
-              <div class="card border-left-warning shadow h-100 py-2">
-                <div class="card-body">
-                  <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                      <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Pending Conflicts</div>
-                      <div class="h5 mb-0 font-weight-bold text-gray-800" id="pendingConflictsCount">{{ pending_conflicts }}</div>
-                    </div>
-                    <div class="col-auto">
-                      <i class="fas fa-exclamation-triangle fa-2x text-gray-300"></i>
-                    </div>
-                  </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-title">
+                    <h5 class="card-title p-3">Completed</h5>
+                    <h2 class="display-4 px-3 pb-3">{{ jobs|selectattr('status', 'equalto', 'completed')|list|length }}</h2>
                 </div>
-              </div>
             </div>
-            <div class="col-xl-3 col-md-6 mb-4">
-              <div class="card border-left-success shadow h-100 py-2">
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
                 <div class="card-body">
-                  <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                      <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Total Synced Records</div>
-                      <div class="h5 mb-0 font-weight-bold text-gray-800" id="syncedRecordsCount">{{ total_synced_records }}</div>
-                    </div>
-                    <div class="col-auto">
-                      <i class="fas fa-database fa-2x text-gray-300"></i>
-                    </div>
-                  </div>
+                    <h5 class="card-title">Running</h5>
+                    <h2 class="display-4">{{ jobs|selectattr('status', 'equalto', 'running')|list|length }}</h2>
                 </div>
-              </div>
             </div>
-            <div class="col-xl-3 col-md-6 mb-4">
-              <div class="card border-left-info shadow h-100 py-2">
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
                 <div class="card-body">
-                  <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                      <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Overall Health</div>
-                      <div class="h5 mb-0 font-weight-bold text-gray-800" id="healthStatus">
-                        {% if service_health.status == 'healthy' %}
-                          <span class="text-success">Healthy</span>
-                        {% elif service_health.status == 'degraded' %}
-                          <span class="text-warning">Degraded</span>
+                    <h5 class="card-title">Failed</h5>
+                    <h2 class="display-4">{{ jobs|selectattr('status', 'equalto', 'failed')|list|length }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Job List -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-light">
+            <h5 class="mb-0">Sync Jobs</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Type</th>
+                            <th>Status</th>
+                            <th>Progress</th>
+                            <th>Created</th>
+                            <th>Updated</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if jobs %}
+                            {% for job in jobs %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ url_for('terra_fusion_ui.job_details', job_id=job.id) }}">
+                                            {{ job.id[:8] }}...
+                                        </a>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-{% if job.type == 'full' %}primary{% else %}info{% endif %}">
+                                            {{ job.type }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-
+                                            {% if job.status == 'completed' %}success
+                                            {% elif job.status == 'running' %}warning
+                                            {% elif job.status == 'failed' %}danger
+                                            {% elif job.status == 'stopped' %}secondary
+                                            {% else %}info{% endif %}">
+                                            {{ job.status }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="progress">
+                                            <div class="progress-bar progress-bar-striped
+                                                {% if job.status == 'running' %}progress-bar-animated{% endif %}"
+                                                role="progressbar"
+                                                style="width: {{ job.progress or 0 }}%">
+                                                {{ job.progress or 0 }}%
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>{{ job.created_at|default('N/A') }}</td>
+                                    <td>{{ job.updated_at|default('N/A') }}</td>
+                                    <td>
+                                        <div class="btn-group">
+                                            <a href="{{ url_for('terra_fusion_ui.job_details', job_id=job.id) }}"
+                                               class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-info-circle"></i>
+                                            </a>
+                                            
+                                            {% if job.status == 'running' %}
+                                                <form method="POST" action="{{ url_for('terra_fusion_ui.control_job', job_id=job.id, action='stop') }}">
+                                                    <button type="submit" class="btn btn-sm btn-outline-warning">
+                                                        <i class="fas fa-pause"></i>
+                                                    </button>
+                                                </form>
+                                            {% elif job.status in ['stopped', 'failed'] %}
+                                                <form method="POST" action="{{ url_for('terra_fusion_ui.control_job', job_id=job.id, action='resume') }}">
+                                                    <button type="submit" class="btn btn-sm btn-outline-success">
+                                                        <i class="fas fa-play"></i>
+                                                    </button>
+                                                </form>
+                                            {% endif %}
+                                            
+                                            <form method="POST" action="{{ url_for('terra_fusion_ui.control_job', job_id=job.id, action='delete') }}">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger"
+                                                        onclick="return confirm('Are you sure you want to delete this job?')">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
                         {% else %}
-                          <span class="text-danger">Unhealthy</span>
+                            <tr>
+                                <td colspan="7" class="text-center py-4">
+                                    <div class="alert alert-info mb-0">
+                                        No sync jobs found. <a href="{{ url_for('terra_fusion_ui.new_job') }}">Create a new job</a>
+                                    </div>
+                                </td>
+                            </tr>
                         {% endif %}
-                      </div>
-                    </div>
-                    <div class="col-auto">
-                      <i class="fas fa-heartbeat fa-2x text-gray-300"></i>
-                    </div>
-                  </div>
-                </div>
-              </div>
+                    </tbody>
+                </table>
             </div>
-          </div>
-          
-          <div class="row">
-            <div class="col-12">
-              <div class="card shadow mb-4">
-                <div class="card-header py-3">
-                  <h6 class="m-0 font-weight-bold text-primary">Active Sync Jobs</h6>
-                </div>
-                <div class="card-body">
-                  <div class="table-responsive">
-                    <table class="table table-bordered" id="activeJobsTable" width="100%" cellspacing="0">
-                      <thead>
-                        <tr>
-                          <th>Job ID</th>
-                          <th>Status</th>
-                          <th>Source</th>
-                          <th>Target</th>
-                          <th>Start Time</th>
-                          <th>Progress</th>
-                          <th>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {% for job in active_jobs %}
-                        <tr>
-                          <td><a href="{{ url_for('terra_fusion.job_details', job_id=job.job_id) }}">{{ job.job_id[:8] }}...</a></td>
-                          <td>
-                            {% if job.status == 'running' %}
-                              <span class="badge badge-primary">Running</span>
-                            {% elif job.status == 'completed' %}
-                              <span class="badge badge-success">Completed</span>
-                            {% elif job.status == 'failed' %}
-                              <span class="badge badge-danger">Failed</span>
-                            {% elif job.status == 'pending' %}
-                              <span class="badge badge-secondary">Pending</span>
-                            {% else %}
-                              <span class="badge badge-info">{{ job.status }}</span>
-                            {% endif %}
-                          </td>
-                          <td>{{ job.source_db }}</td>
-                          <td>{{ job.target_db }}</td>
-                          <td>{{ job.start_time }}</td>
-                          <td>
-                            <div class="progress">
-                              <div class="progress-bar" role="progressbar" style="width: {{ job.stats.processed_records / job.stats.total_records * 100 if job.stats.total_records > 0 else 0 }}%">
-                                {{ job.stats.processed_records }}/{{ job.stats.total_records }}
-                              </div>
-                            </div>
-                          </td>
-                          <td>
-                            <div class="btn-group">
-                              <a href="{{ url_for('terra_fusion.job_details', job_id=job.job_id) }}" class="btn btn-sm btn-primary">
-                                <i class="fas fa-eye"></i> View
-                              </a>
-                              {% if job.status == 'running' %}
-                              <button type="button" class="btn btn-sm btn-warning stop-job" data-job-id="{{ job.job_id }}">
-                                <i class="fas fa-stop"></i> Stop
-                              </button>
-                              {% elif job.status in ['failed', 'stopped', 'interrupted'] %}
-                              <button type="button" class="btn btn-sm btn-info resume-job" data-job-id="{{ job.job_id }}">
-                                <i class="fas fa-play"></i> Resume
-                              </button>
-                              {% endif %}
-                            </div>
-                          </td>
-                        </tr>
-                        {% endfor %}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
-      </div>
     </div>
-  </div>
-</div>
-
-<!-- New Sync Modal -->
-<div class="modal fade" id="newSyncModal" tabindex="-1" role="dialog" aria-labelledby="newSyncModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg" role="document">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="newSyncModalLabel">Start New Sync Job</h5>
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-          <span aria-hidden="true">&times;</span>
-        </button>
-      </div>
-      <div class="modal-body">
-        <form id="newSyncForm">
-          <ul class="nav nav-tabs" id="syncTypeTabs" role="tablist">
-            <li class="nav-item" role="presentation">
-              <a class="nav-link active" id="full-tab" data-toggle="tab" href="#full" role="tab" aria-controls="full" aria-selected="true">Full Sync</a>
-            </li>
-            <li class="nav-item" role="presentation">
-              <a class="nav-link" id="incremental-tab" data-toggle="tab" href="#incremental" role="tab" aria-controls="incremental" aria-selected="false">Incremental Sync</a>
-            </li>
-          </ul>
-          <div class="tab-content mt-3" id="syncTypeContent">
-            <div class="tab-pane fade show active" id="full" role="tabpanel" aria-labelledby="full-tab">
-              <div class="alert alert-info">
-                A full sync will synchronize all tables between source and target databases.
-              </div>
-            </div>
-            <div class="tab-pane fade" id="incremental" role="tabpanel" aria-labelledby="incremental-tab">
-              <div class="alert alert-info">
-                An incremental sync will only synchronize selected tables or changes since the last sync.
-              </div>
-              <div class="form-group">
-                <label for="tables">Tables to Sync</label>
-                <select multiple class="form-control" id="tables" name="tables">
-                  {% for table in available_tables %}
-                  <option value="{{ table }}">{{ table }}</option>
-                  {% endfor %}
-                </select>
-                <small class="form-text text-muted">Hold Ctrl/Cmd to select multiple tables</small>
-              </div>
-            </div>
-          </div>
-          
-          <div class="form-group">
-            <label for="sourceConnection">Source Connection</label>
-            <input type="text" class="form-control" id="sourceConnection" name="sourceConnection" placeholder="postgres://user:password@host:port/database" required>
-          </div>
-          <div class="form-group">
-            <label for="targetConnection">Target Connection</label>
-            <input type="text" class="form-control" id="targetConnection" name="targetConnection" placeholder="postgres://user:password@host:port/database" required>
-          </div>
-          
-          <h5 class="mt-4">Advanced Options</h5>
-          <div class="form-check mb-3">
-            <input type="checkbox" class="form-check-input" id="showAdvanced">
-            <label class="form-check-label" for="showAdvanced">Show Advanced Options</label>
-          </div>
-          
-          <div id="advancedOptions" style="display: none;">
-            <div class="form-group">
-              <label for="batchSize">Batch Size</label>
-              <input type="number" class="form-control" id="batchSize" name="config[batch_size]" value="1000">
-              <small class="form-text text-muted">Number of records to process in a batch</small>
-            </div>
-            <div class="form-group">
-              <label for="detectionStrategy">Change Detection Strategy</label>
-              <select class="form-control" id="detectionStrategy" name="config[detection_strategy]">
-                <option value="hash">Hash-based (balanced)</option>
-                <option value="timestamp">Timestamp-based (fast)</option>
-                <option value="content">Content-based (thorough)</option>
-                <option value="cdc">CDC-based (requires CDC setup)</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="conflictStrategy">Conflict Resolution Strategy</label>
-              <select class="form-control" id="conflictStrategy" name="config[conflict_strategy]">
-                <option value="source_wins">Source Wins</option>
-                <option value="target_wins">Target Wins</option>
-                <option value="newer_wins">Newer Wins</option>
-                <option value="manual">Manual Resolution</option>
-              </select>
-            </div>
-          </div>
-        </form>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary" id="startSyncBtn">Start Sync</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Health Status Modal -->
-<div class="modal fade" id="healthModal" tabindex="-1" role="dialog" aria-labelledby="healthModalLabel" aria-hidden="true">
-  <div class="modal-dialog" role="document">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="healthModalLabel">System Health Status</h5>
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-          <span aria-hidden="true">&times;</span>
-        </button>
-      </div>
-      <div class="modal-body">
-        <h6>Overall Status: 
-          {% if service_health.status == 'healthy' %}
-            <span class="badge badge-success">Healthy</span>
-          {% elif service_health.status == 'degraded' %}
-            <span class="badge badge-warning">Degraded</span>
-          {% else %}
-            <span class="badge badge-danger">Unhealthy</span>
-          {% endif %}
-        </h6>
-        
-        <h6 class="mt-4">Database Connections</h6>
-        <table class="table table-sm">
-          <tbody>
-            <tr>
-              <th scope="row">Source Database</th>
-              <td>
-                {% if service_health.source_db == 'available' %}
-                  <span class="text-success"><i class="fas fa-check-circle"></i> Available</span>
-                {% else %}
-                  <span class="text-danger"><i class="fas fa-times-circle"></i> {{ service_health.source_db }}</span>
-                {% endif %}
-              </td>
-            </tr>
-            <tr>
-              <th scope="row">Target Database</th>
-              <td>
-                {% if service_health.target_db == 'available' %}
-                  <span class="text-success"><i class="fas fa-check-circle"></i> Available</span>
-                {% else %}
-                  <span class="text-danger"><i class="fas fa-times-circle"></i> {{ service_health.target_db }}</span>
-                {% endif %}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        
-        <h6 class="mt-4">Components</h6>
-        <table class="table table-sm">
-          <tbody>
-            {% for component, status in service_health.components.items() %}
-            <tr>
-              <th scope="row">{{ component|capitalize }}</th>
-              <td>
-                {% if status == 'available' %}
-                  <span class="text-success"><i class="fas fa-check-circle"></i> Available</span>
-                {% else %}
-                  <span class="text-danger"><i class="fas fa-times-circle"></i> {{ status }}</span>
-                {% endif %}
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-        
-        <div class="text-muted mt-3">
-          <small>Last checked: {{ service_health.timestamp }}</small>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-        <button type="button" class="btn btn-primary" id="refreshHealthBtn">Refresh</button>
-      </div>
-    </div>
-  </div>
 </div>
 {% endblock %}
 
-{% block scripts %}
-<script>
-  $(document).ready(function() {
-    // Data tables initialization
-    $('#activeJobsTable').DataTable();
-    
-    // Advanced options toggle
-    $('#showAdvanced').change(function() {
-      if(this.checked) {
-        $('#advancedOptions').slideDown();
-      } else {
-        $('#advancedOptions').slideUp();
-      }
-    });
-    
-    // Start sync button
-    $('#startSyncBtn').click(function() {
-      const isFullSync = $('#full-tab').hasClass('active');
-      const endpoint = isFullSync ? '/api/sync/full' : '/api/sync/incremental';
-      
-      // Gather form data
-      const formData = {
-        source_connection: $('#sourceConnection').val(),
-        target_connection: $('#targetConnection').val()
-      };
-      
-      // Add tables for incremental sync
-      if (!isFullSync) {
-        formData.tables = $('#tables').val();
-      }
-      
-      // Add advanced config if shown
-      if ($('#showAdvanced').is(':checked')) {
-        formData.config = {
-          batch_size: parseInt($('#batchSize').val()),
-          detection_strategy: $('#detectionStrategy').val(),
-          conflict_strategy: $('#conflictStrategy').val()
-        };
-      }
-      
-      // Submit the form
-      $.ajax({
-        url: endpoint,
-        type: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify(formData),
-        success: function(response) {
-          $('#newSyncModal').modal('hide');
-          showAlert('success', `Sync job started with ID: ${response.job_id}`);
-          setTimeout(function() {
-            window.location.href = `/api/sync/ui/job/${response.job_id}`;
-          }, 1500);
-        },
-        error: function(xhr) {
-          showAlert('danger', `Error starting sync: ${xhr.responseJSON?.error || xhr.statusText}`);
-        }
-      });
-    });
-    
-    // Stop job button
-    $('.stop-job').click(function() {
-      const jobId = $(this).data('job-id');
-      if (confirm(`Are you sure you want to stop job ${jobId}?`)) {
-        $.ajax({
-          url: `/api/sync/stop/${jobId}`,
-          type: 'POST',
-          success: function(response) {
-            showAlert('success', response.message);
-            setTimeout(function() {
-              location.reload();
-            }, 1500);
-          },
-          error: function(xhr) {
-            showAlert('danger', `Error stopping job: ${xhr.responseJSON?.error || xhr.statusText}`);
-          }
-        });
-      }
-    });
-    
-    // Resume job button
-    $('.resume-job').click(function() {
-      const jobId = $(this).data('job-id');
-      $.ajax({
-        url: `/api/sync/resume/${jobId}`,
-        type: 'POST',
-        success: function(response) {
-          showAlert('success', response.message);
-          setTimeout(function() {
-            location.reload();
-          }, 1500);
-        },
-        error: function(xhr) {
-          showAlert('danger', `Error resuming job: ${xhr.responseJSON?.error || xhr.statusText}`);
-        }
-      });
-    });
-    
-    // Refresh health status
-    $('#refreshHealthBtn').click(function() {
-      $.ajax({
-        url: '/api/sync/health',
-        type: 'GET',
-        success: function(health) {
-          // Update modal content with new health data
-          const statusClass = health.status === 'healthy' ? 'success' : (health.status === 'degraded' ? 'warning' : 'danger');
-          $('#healthStatus').html(`<span class="text-${statusClass}">${health.status.charAt(0).toUpperCase() + health.status.slice(1)}</span>`);
-          // Update other health information
-          location.reload();
-        },
-        error: function(xhr) {
-          showAlert('danger', `Error checking health: ${xhr.responseJSON?.error || xhr.statusText}`);
-        }
-      });
-    });
-    
-    // Helper function for alerts
-    function showAlert(type, message) {
-      const alertHtml = `
-        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
-          ${message}
-          <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-            <span aria-hidden="true">&times;</span>
-          </button>
-        </div>
-      `;
-      $('.container-fluid').prepend(alertHtml);
+{% block styles %}
+{{ super() }}
+<style>
+    .terrafusion-title {
+        color: #3f51b5;
+        border-bottom: 2px solid #3f51b5;
+        padding-bottom: 8px;
     }
-  });
-</script>
+    
+    .card {
+        transition: all 0.3s ease;
+    }
+    
+    .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    }
+</style>
 {% endblock %}
