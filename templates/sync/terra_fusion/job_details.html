@@ -1,0 +1,728 @@
+{% extends "base.html" %}
+
+{% block title %}Sync Job Details - {{ job_id }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="d-sm-flex align-items-center justify-content-between mb-4">
+    <h1 class="h3 mb-0 text-gray-800">Sync Job Details</h1>
+    <div>
+      <a href="{{ url_for('terra_fusion.dashboard') }}" class="btn btn-sm btn-secondary">
+        <i class="fas fa-arrow-left fa-sm"></i> Back to Dashboard
+      </a>
+      <a href="{{ url_for('terra_fusion.job_details', job_id=job_id) }}" class="btn btn-sm btn-primary">
+        <i class="fas fa-sync fa-sm"></i> Refresh
+      </a>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-xl-4 col-md-6 mb-4">
+      <div class="card border-left-primary shadow h-100 py-2">
+        <div class="card-body">
+          <div class="row no-gutters align-items-center">
+            <div class="col mr-2">
+              <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Job ID</div>
+              <div class="h5 mb-0 font-weight-bold text-gray-800">{{ job_id }}</div>
+            </div>
+            <div class="col-auto">
+              <i class="fas fa-fingerprint fa-2x text-gray-300"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-xl-4 col-md-6 mb-4">
+      <div class="card border-left-{{ status_color }} shadow h-100 py-2">
+        <div class="card-body">
+          <div class="row no-gutters align-items-center">
+            <div class="col mr-2">
+              <div class="text-xs font-weight-bold text-{{ status_color }} text-uppercase mb-1">Status</div>
+              <div class="h5 mb-0 font-weight-bold text-gray-800">{{ status.status }}</div>
+            </div>
+            <div class="col-auto">
+              <i class="fas fa-{{ status_icon }} fa-2x text-gray-300"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-xl-4 col-md-6 mb-4">
+      <div class="card border-left-info shadow h-100 py-2">
+        <div class="card-body">
+          <div class="row no-gutters align-items-center">
+            <div class="col mr-2">
+              <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Progress</div>
+              <div class="row no-gutters align-items-center">
+                <div class="col-auto">
+                  <div class="h5 mb-0 mr-3 font-weight-bold text-gray-800">{{ progress_percentage }}%</div>
+                </div>
+                <div class="col">
+                  <div class="progress progress-sm mr-2">
+                    <div class="progress-bar bg-info" role="progressbar"
+                         style="width: {{ progress_percentage }}%"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-auto">
+              <i class="fas fa-clipboard-list fa-2x text-gray-300"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-lg-6">
+      <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+          <h6 class="m-0 font-weight-bold text-primary">Job Information</h6>
+          <div class="dropdown no-arrow">
+            <a class="dropdown-toggle" href="#" role="button" id="jobInfoDropdown"
+               data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+              <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
+            </a>
+            <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in"
+                 aria-labelledby="jobInfoDropdown">
+              <div class="dropdown-header">Job Actions:</div>
+              {% if status.status == 'running' %}
+                <a class="dropdown-item stop-job" href="#" data-job-id="{{ job_id }}">
+                  <i class="fas fa-stop fa-sm fa-fw mr-2 text-gray-400"></i>
+                  Stop Job
+                </a>
+              {% elif status.status in ['failed', 'stopped', 'interrupted'] %}
+                <a class="dropdown-item resume-job" href="#" data-job-id="{{ job_id }}">
+                  <i class="fas fa-play fa-sm fa-fw mr-2 text-gray-400"></i>
+                  Resume Job
+                </a>
+              {% endif %}
+              <a class="dropdown-item" href="{{ url_for('terra_fusion.get_audit_events', job_id=job_id) }}">
+                <i class="fas fa-history fa-sm fa-fw mr-2 text-gray-400"></i>
+                View Audit Trail
+              </a>
+            </div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-bordered">
+              <tbody>
+                <tr>
+                  <th>Source Database</th>
+                  <td>{{ status.source_connection }}</td>
+                </tr>
+                <tr>
+                  <th>Target Database</th>
+                  <td>{{ status.target_connection }}</td>
+                </tr>
+                <tr>
+                  <th>Start Time</th>
+                  <td>{{ status.start_time }}</td>
+                </tr>
+                <tr>
+                  <th>End Time</th>
+                  <td>{{ status.end_time or 'In Progress' }}</td>
+                </tr>
+                <tr>
+                  <th>Duration</th>
+                  <td>
+                    {% if status.duration_seconds %}
+                      {{ status.duration_seconds // 3600 }}h {{ (status.duration_seconds % 3600) // 60 }}m {{ status.duration_seconds % 60 }}s
+                    {% elif status.start_time %}
+                      In Progress
+                    {% else %}
+                      Not Started
+                    {% endif %}
+                  </td>
+                </tr>
+                <tr>
+                  <th>Tables</th>
+                  <td>{{ status.tables|length }}</td>
+                </tr>
+                <tr>
+                  <th>User</th>
+                  <td>{{ status.initiated_by or 'System' }}</td>
+                </tr>
+                {% if status.error_details %}
+                <tr>
+                  <th>Error</th>
+                  <td class="text-danger">{{ status.error_details.message }}</td>
+                </tr>
+                {% endif %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="card shadow mb-4">
+        <div class="card-header py-3">
+          <h6 class="m-0 font-weight-bold text-primary">Sync Statistics</h6>
+        </div>
+        <div class="card-body">
+          <div class="chart-pie pt-4 pb-2">
+            <canvas id="syncStatsChart"></canvas>
+          </div>
+          <div class="mt-4 text-center small">
+            <span class="mr-2">
+              <i class="fas fa-circle text-success"></i> Inserted
+            </span>
+            <span class="mr-2">
+              <i class="fas fa-circle text-info"></i> Updated
+            </span>
+            <span class="mr-2">
+              <i class="fas fa-circle text-warning"></i> Conflicts
+            </span>
+            <span class="mr-2">
+              <i class="fas fa-circle text-danger"></i> Errors
+            </span>
+          </div>
+          <div class="table-responsive mt-3">
+            <table class="table table-bordered">
+              <tbody>
+                <tr>
+                  <th>Total Records</th>
+                  <td>{{ status.stats.total_records }}</td>
+                </tr>
+                <tr>
+                  <th>Processed Records</th>
+                  <td>{{ status.stats.processed_records }}</td>
+                </tr>
+                <tr>
+                  <th>Inserted Records</th>
+                  <td>{{ status.stats.inserted_records }}</td>
+                </tr>
+                <tr>
+                  <th>Updated Records</th>
+                  <td>{{ status.stats.updated_records }}</td>
+                </tr>
+                <tr>
+                  <th>Deleted Records</th>
+                  <td>{{ status.stats.deleted_records }}</td>
+                </tr>
+                <tr>
+                  <th>Conflict Records</th>
+                  <td>{{ status.stats.conflict_records }}</td>
+                </tr>
+                <tr>
+                  <th>Error Records</th>
+                  <td>{{ status.stats.error_records }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-12">
+      <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+          <h6 class="m-0 font-weight-bold text-primary">Table Progress</h6>
+          <div class="dropdown no-arrow">
+            <a class="dropdown-toggle" href="#" role="button" id="tableProgressDropdown"
+               data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+              <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
+            </a>
+            <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in"
+                 aria-labelledby="tableProgressDropdown">
+              <div class="dropdown-header">View Options:</div>
+              <a class="dropdown-item" href="#" id="showAllTables">
+                <i class="fas fa-table fa-sm fa-fw mr-2 text-gray-400"></i>
+                Show All Tables
+              </a>
+              <a class="dropdown-item" href="#" id="showInProgressTables">
+                <i class="fas fa-spinner fa-sm fa-fw mr-2 text-gray-400"></i>
+                Show In-Progress Tables
+              </a>
+              <a class="dropdown-item" href="#" id="showErrorTables">
+                <i class="fas fa-exclamation-triangle fa-sm fa-fw mr-2 text-gray-400"></i>
+                Show Tables with Errors
+              </a>
+            </div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-bordered" id="tableProgressTable" width="100%" cellspacing="0">
+              <thead>
+                <tr>
+                  <th>Table Name</th>
+                  <th>Status</th>
+                  <th>Records</th>
+                  <th>Progress</th>
+                  <th>Conflicts</th>
+                  <th>Errors</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for table in table_progress %}
+                <tr class="table-row {{ 'table-danger' if table.error_count > 0 }} {{ 'table-warning' if table.conflict_count > 0 }}">
+                  <td>{{ table.name }}</td>
+                  <td>
+                    {% if table.status == 'completed' %}
+                      <span class="badge badge-success">Completed</span>
+                    {% elif table.status == 'in_progress' %}
+                      <span class="badge badge-primary">In Progress</span>
+                    {% elif table.status == 'pending' %}
+                      <span class="badge badge-secondary">Pending</span>
+                    {% elif table.status == 'error' %}
+                      <span class="badge badge-danger">Error</span>
+                    {% else %}
+                      <span class="badge badge-info">{{ table.status }}</span>
+                    {% endif %}
+                  </td>
+                  <td>{{ table.processed_records }}/{{ table.total_records }}</td>
+                  <td>
+                    <div class="progress">
+                      <div class="progress-bar" role="progressbar" style="width: {{ table.progress_percentage }}%">
+                        {{ table.progress_percentage }}%
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    {% if table.conflict_count > 0 %}
+                      <a href="{{ url_for('terra_fusion.conflicts_page', job_id=job_id) }}?table_name={{ table.name }}" class="badge badge-warning">
+                        {{ table.conflict_count }}
+                      </a>
+                    {% else %}
+                      0
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if table.error_count > 0 %}
+                      <a href="#" class="badge badge-danger view-errors" data-table="{{ table.name }}">
+                        {{ table.error_count }}
+                      </a>
+                    {% else %}
+                      0
+                    {% endif %}
+                  </td>
+                  <td>
+                    <a href="{{ url_for('terra_fusion.validate_schema', job_id=job_id, table_name=table.name) }}" class="btn btn-sm btn-info">
+                      <i class="fas fa-check-circle"></i> Validate Schema
+                    </a>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if conflicts|length > 0 %}
+  <div class="row">
+    <div class="col-12">
+      <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+          <h6 class="m-0 font-weight-bold text-warning">Pending Conflicts ({{ conflicts|length }})</h6>
+          <div>
+            <a href="{{ url_for('terra_fusion.conflicts_page', job_id=job_id) }}" class="btn btn-sm btn-warning">
+              <i class="fas fa-external-link-alt"></i> View All Conflicts
+            </a>
+            <button type="button" class="btn btn-sm btn-success resolve-all-conflicts" data-job-id="{{ job_id }}">
+              <i class="fas fa-check"></i> Resolve All with Default Strategy
+            </button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-bordered" id="conflictsTable" width="100%" cellspacing="0">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Table</th>
+                  <th>Fields</th>
+                  <th>Created</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for conflict in conflicts[:5] %}
+                <tr>
+                  <td>{{ conflict.conflict_id[:8] }}...</td>
+                  <td>{{ conflict.table_name }}</td>
+                  <td>{{ conflict.differences|length }} fields</td>
+                  <td>{{ conflict.created_at }}</td>
+                  <td>
+                    <div class="btn-group">
+                      <button type="button" class="btn btn-sm btn-info view-conflict" data-conflict-id="{{ conflict.conflict_id }}">
+                        <i class="fas fa-eye"></i> View
+                      </button>
+                      <button type="button" class="btn btn-sm btn-success resolve-conflict" data-conflict-id="{{ conflict.conflict_id }}">
+                        <i class="fas fa-check"></i> Resolve
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% if conflicts|length > 5 %}
+          <div class="text-center mt-3">
+            <a href="{{ url_for('terra_fusion.conflicts_page', job_id=job_id) }}" class="btn btn-light">
+              View All {{ conflicts|length }} Conflicts
+            </a>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- View Conflict Modal -->
+<div class="modal fade" id="viewConflictModal" tabindex="-1" role="dialog" aria-labelledby="viewConflictModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="viewConflictModalLabel">Conflict Details</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div id="conflictDetails"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        <div class="dropdown d-inline">
+          <button class="btn btn-success dropdown-toggle" type="button" id="resolveDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            Resolve
+          </button>
+          <div class="dropdown-menu" aria-labelledby="resolveDropdown">
+            <a class="dropdown-item resolve-with-strategy" href="#" data-strategy="source_wins">Source Wins</a>
+            <a class="dropdown-item resolve-with-strategy" href="#" data-strategy="target_wins">Target Wins</a>
+            <a class="dropdown-item resolve-with-strategy" href="#" data-strategy="newer_wins">Newer Wins</a>
+            <a class="dropdown-item resolve-with-strategy" href="#" data-strategy="merge">Merge</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Error Modal -->
+<div class="modal fade" id="errorModal" tabindex="-1" role="dialog" aria-labelledby="errorModalLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="errorModalLabel">Table Errors</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div id="errorDetails"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.4/dist/Chart.min.js"></script>
+<script>
+  $(document).ready(function() {
+    // Initialize DataTables
+    $('#tableProgressTable').DataTable();
+    $('#conflictsTable').DataTable({
+      "order": [[ 3, "desc" ]] // Sort by creation date
+    });
+    
+    // Initialize chart
+    const ctx = document.getElementById('syncStatsChart').getContext('2d');
+    const syncStatsChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Inserted', 'Updated', 'Deleted', 'Conflicts', 'Errors'],
+        datasets: [{
+          data: [
+            {{ status.stats.inserted_records }},
+            {{ status.stats.updated_records }},
+            {{ status.stats.deleted_records }},
+            {{ status.stats.conflict_records }},
+            {{ status.stats.error_records }}
+          ],
+          backgroundColor: [
+            '#1cc88a', // success
+            '#36b9cc', // info
+            '#858796', // secondary
+            '#f6c23e', // warning
+            '#e74a3b'  // danger
+          ],
+          hoverBackgroundColor: [
+            '#17a673',
+            '#2c9faf',
+            '#757575',
+            '#dda20a',
+            '#be2617'
+          ],
+          hoverBorderColor: "rgba(234, 236, 244, 1)",
+        }],
+      },
+      options: {
+        maintainAspectRatio: false,
+        tooltips: {
+          backgroundColor: "rgb(255,255,255)",
+          bodyFontColor: "#858796",
+          borderColor: '#dddfeb',
+          borderWidth: 1,
+          xPadding: 15,
+          yPadding: 15,
+          displayColors: false,
+          caretPadding: 10,
+        },
+        legend: {
+          display: false
+        },
+        cutoutPercentage: 70,
+      },
+    });
+    
+    // Table filtering
+    $('#showAllTables').click(function(e) {
+      e.preventDefault();
+      $('.table-row').show();
+    });
+    
+    $('#showInProgressTables').click(function(e) {
+      e.preventDefault();
+      $('.table-row').hide();
+      $('.table-row:contains("In Progress")').show();
+    });
+    
+    $('#showErrorTables').click(function(e) {
+      e.preventDefault();
+      $('.table-row').hide();
+      $('.table-row.table-danger').show();
+    });
+    
+    // View conflict details
+    let currentConflictId = null;
+    $('.view-conflict').click(function() {
+      const conflictId = $(this).data('conflict-id');
+      currentConflictId = conflictId;
+      
+      // Fetch conflict details
+      $.ajax({
+        url: `/api/sync/conflicts/${jobId}/${conflictId}`,
+        type: 'GET',
+        success: function(conflict) {
+          // Create conflict details HTML
+          let html = `
+            <h6>Conflict Details</h6>
+            <table class="table table-sm">
+              <tr><th>ID</th><td>${conflict.conflict_id}</td></tr>
+              <tr><th>Table</th><td>${conflict.table_name}</td></tr>
+              <tr><th>Status</th><td>${conflict.status}</td></tr>
+              <tr><th>Created</th><td>${conflict.created_at}</td></tr>
+            </table>
+            
+            <h6 class="mt-4">Differences</h6>
+            <table class="table table-bordered">
+              <thead>
+                <tr>
+                  <th>Field</th>
+                  <th>Source Value</th>
+                  <th>Target Value</th>
+                </tr>
+              </thead>
+              <tbody>
+          `;
+          
+          // Add differences
+          for (const [field, values] of Object.entries(conflict.differences)) {
+            html += `
+              <tr>
+                <td>${field}</td>
+                <td>${values.source}</td>
+                <td>${values.target}</td>
+              </tr>
+            `;
+          }
+          
+          html += `
+              </tbody>
+            </table>
+          `;
+          
+          // Show in modal
+          $('#conflictDetails').html(html);
+          $('#viewConflictModal').modal('show');
+        },
+        error: function(xhr) {
+          showAlert('danger', `Error fetching conflict: ${xhr.responseJSON?.error || xhr.statusText}`);
+        }
+      });
+    });
+    
+    // Resolve conflict with strategy
+    $('.resolve-with-strategy').click(function() {
+      if (!currentConflictId) return;
+      
+      const strategy = $(this).data('strategy');
+      
+      $.ajax({
+        url: `/api/sync/conflicts/${jobId}/${currentConflictId}/resolve`,
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ strategy: strategy }),
+        success: function(response) {
+          $('#viewConflictModal').modal('hide');
+          showAlert('success', response.message);
+          setTimeout(function() {
+            location.reload();
+          }, 1500);
+        },
+        error: function(xhr) {
+          showAlert('danger', `Error resolving conflict: ${xhr.responseJSON?.error || xhr.statusText}`);
+        }
+      });
+    });
+    
+    // Resolve conflict directly
+    $('.resolve-conflict').click(function() {
+      const conflictId = $(this).data('conflict-id');
+      
+      $.ajax({
+        url: `/api/sync/conflicts/${jobId}/${conflictId}/resolve`,
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({}),
+        success: function(response) {
+          showAlert('success', response.message);
+          setTimeout(function() {
+            location.reload();
+          }, 1500);
+        },
+        error: function(xhr) {
+          showAlert('danger', `Error resolving conflict: ${xhr.responseJSON?.error || xhr.statusText}`);
+        }
+      });
+    });
+    
+    // Resolve all conflicts
+    $('.resolve-all-conflicts').click(function() {
+      const jobId = $(this).data('job-id');
+      
+      if (confirm('Are you sure you want to resolve all conflicts with the default strategy?')) {
+        $.ajax({
+          url: `/api/sync/conflicts/${jobId}/resolve-all`,
+          type: 'POST',
+          contentType: 'application/json',
+          data: JSON.stringify({}),
+          success: function(response) {
+            showAlert('success', response.message);
+            setTimeout(function() {
+              location.reload();
+            }, 1500);
+          },
+          error: function(xhr) {
+            showAlert('danger', `Error resolving conflicts: ${xhr.responseJSON?.error || xhr.statusText}`);
+          }
+        });
+      }
+    });
+    
+    // View table errors
+    $('.view-errors').click(function(e) {
+      e.preventDefault();
+      
+      const tableName = $(this).data('table');
+      
+      // Get errors for this table from job details
+      let errors = {{ status.error_details.tables|tojson if status.error_details and status.error_details.tables else '{}'|safe }};
+      let errorHtml = '';
+      
+      if (errors && errors[tableName]) {
+        errorHtml = `
+          <div class="alert alert-danger">
+            ${errors[tableName]}
+          </div>
+        `;
+      } else {
+        errorHtml = `
+          <div class="alert alert-warning">
+            No detailed error information available for table ${tableName}.
+          </div>
+        `;
+      }
+      
+      // Show in modal
+      $('#errorModalLabel').text(`Errors for Table: ${tableName}`);
+      $('#errorDetails').html(errorHtml);
+      $('#errorModal').modal('show');
+    });
+    
+    // Stop job button
+    $('.stop-job').click(function() {
+      const jobId = $(this).data('job-id');
+      if (confirm(`Are you sure you want to stop job ${jobId}?`)) {
+        $.ajax({
+          url: `/api/sync/stop/${jobId}`,
+          type: 'POST',
+          success: function(response) {
+            showAlert('success', response.message);
+            setTimeout(function() {
+              location.reload();
+            }, 1500);
+          },
+          error: function(xhr) {
+            showAlert('danger', `Error stopping job: ${xhr.responseJSON?.error || xhr.statusText}`);
+          }
+        });
+      }
+    });
+    
+    // Resume job button
+    $('.resume-job').click(function() {
+      const jobId = $(this).data('job-id');
+      $.ajax({
+        url: `/api/sync/resume/${jobId}`,
+        type: 'POST',
+        success: function(response) {
+          showAlert('success', response.message);
+          setTimeout(function() {
+            location.reload();
+          }, 1500);
+        },
+        error: function(xhr) {
+          showAlert('danger', `Error resuming job: ${xhr.responseJSON?.error || xhr.statusText}`);
+        }
+      });
+    });
+    
+    // Helper function for alerts
+    function showAlert(type, message) {
+      const alertHtml = `
+        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+          ${message}
+          <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+      `;
+      $('.container-fluid').prepend(alertHtml);
+    }
+    
+    // Set job ID for use in scripts
+    const jobId = '{{ job_id }}';
+  });
+</script>
+{% endblock %}

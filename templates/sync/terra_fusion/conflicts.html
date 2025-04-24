@@ -1,0 +1,658 @@
+{% extends "base.html" %}
+
+{% block title %}Sync Conflicts - {{ job_id }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="d-sm-flex align-items-center justify-content-between mb-4">
+    <h1 class="h3 mb-0 text-gray-800">Sync Conflicts</h1>
+    <div>
+      <a href="{{ url_for('terra_fusion.job_details', job_id=job_id) }}" class="btn btn-sm btn-secondary">
+        <i class="fas fa-arrow-left fa-sm"></i> Back to Job Details
+      </a>
+      <a href="{{ url_for('terra_fusion.conflicts_page', job_id=job_id) }}" class="btn btn-sm btn-primary">
+        <i class="fas fa-sync fa-sm"></i> Refresh
+      </a>
+      <button type="button" class="btn btn-sm btn-success resolve-all-conflicts" data-job-id="{{ job_id }}">
+        <i class="fas fa-check"></i> Resolve All Conflicts
+      </button>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-xl-4 col-md-6 mb-4">
+      <div class="card border-left-primary shadow h-100 py-2">
+        <div class="card-body">
+          <div class="row no-gutters align-items-center">
+            <div class="col mr-2">
+              <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Job ID</div>
+              <div class="h5 mb-0 font-weight-bold text-gray-800">{{ job_id }}</div>
+            </div>
+            <div class="col-auto">
+              <i class="fas fa-fingerprint fa-2x text-gray-300"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-xl-4 col-md-6 mb-4">
+      <div class="card border-left-warning shadow h-100 py-2">
+        <div class="card-body">
+          <div class="row no-gutters align-items-center">
+            <div class="col mr-2">
+              <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Pending Conflicts</div>
+              <div class="h5 mb-0 font-weight-bold text-gray-800">{{ pending_conflicts }}</div>
+            </div>
+            <div class="col-auto">
+              <i class="fas fa-exclamation-triangle fa-2x text-gray-300"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-xl-4 col-md-6 mb-4">
+      <div class="card border-left-success shadow h-100 py-2">
+        <div class="card-body">
+          <div class="row no-gutters align-items-center">
+            <div class="col mr-2">
+              <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Resolved Conflicts</div>
+              <div class="h5 mb-0 font-weight-bold text-gray-800">{{ resolved_conflicts }}</div>
+            </div>
+            <div class="col-auto">
+              <i class="fas fa-check-circle fa-2x text-gray-300"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow mb-4">
+    <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+      <h6 class="m-0 font-weight-bold text-primary">Conflicts</h6>
+      <div class="dropdown no-arrow">
+        <a class="dropdown-toggle" href="#" role="button" id="conflictsDropdown"
+           data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+          <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
+        </a>
+        <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in"
+             aria-labelledby="conflictsDropdown">
+          <div class="dropdown-header">Filter Options:</div>
+          <a class="dropdown-item" href="{{ url_for('terra_fusion.conflicts_page', job_id=job_id) }}">
+            <i class="fas fa-list fa-sm fa-fw mr-2 text-gray-400"></i>
+            Show All Conflicts
+          </a>
+          <a class="dropdown-item" href="{{ url_for('terra_fusion.conflicts_page', job_id=job_id, status='pending') }}">
+            <i class="fas fa-exclamation-triangle fa-sm fa-fw mr-2 text-gray-400"></i>
+            Show Pending Conflicts
+          </a>
+          <a class="dropdown-item" href="{{ url_for('terra_fusion.conflicts_page', job_id=job_id, status='resolved') }}">
+            <i class="fas fa-check-circle fa-sm fa-fw mr-2 text-gray-400"></i>
+            Show Resolved Conflicts
+          </a>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-header">Resolution Strategies:</div>
+          <a class="dropdown-item batch-resolve" href="#" data-strategy="source_wins">
+            <i class="fas fa-arrow-right fa-sm fa-fw mr-2 text-gray-400"></i>
+            Resolve All with Source Wins
+          </a>
+          <a class="dropdown-item batch-resolve" href="#" data-strategy="target_wins">
+            <i class="fas fa-arrow-left fa-sm fa-fw mr-2 text-gray-400"></i>
+            Resolve All with Target Wins
+          </a>
+          <a class="dropdown-item batch-resolve" href="#" data-strategy="newer_wins">
+            <i class="fas fa-clock fa-sm fa-fw mr-2 text-gray-400"></i>
+            Resolve All with Newer Wins
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-bordered" id="conflictsTable" width="100%" cellspacing="0">
+          <thead>
+            <tr>
+              <th>
+                <div class="custom-control custom-checkbox">
+                  <input type="checkbox" class="custom-control-input" id="selectAllConflicts">
+                  <label class="custom-control-label" for="selectAllConflicts"></label>
+                </div>
+              </th>
+              <th>ID</th>
+              <th>Table</th>
+              <th>Primary Key</th>
+              <th>Fields</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for conflict in conflicts %}
+            <tr>
+              <td>
+                <div class="custom-control custom-checkbox">
+                  <input type="checkbox" class="custom-control-input conflict-checkbox" id="conflict-{{ loop.index }}" data-conflict-id="{{ conflict.conflict_id }}">
+                  <label class="custom-control-label" for="conflict-{{ loop.index }}"></label>
+                </div>
+              </td>
+              <td>{{ conflict.conflict_id[:8] }}...</td>
+              <td>{{ conflict.table_name }}</td>
+              <td>
+                {% for key, value in conflict.primary_key_values.items() %}
+                  {{ key }}={{ value }}<br>
+                {% endfor %}
+              </td>
+              <td>{{ conflict.differences|length }} fields</td>
+              <td>
+                {% if conflict.status == 'pending' %}
+                  <span class="badge badge-warning">Pending</span>
+                {% elif conflict.status == 'resolved' %}
+                  <span class="badge badge-success">Resolved</span>
+                {% else %}
+                  <span class="badge badge-info">{{ conflict.status }}</span>
+                {% endif %}
+              </td>
+              <td>{{ conflict.created_at }}</td>
+              <td>
+                <div class="btn-group">
+                  <button type="button" class="btn btn-sm btn-info view-conflict" data-conflict-id="{{ conflict.conflict_id }}">
+                    <i class="fas fa-eye"></i> View
+                  </button>
+                  {% if conflict.status == 'pending' %}
+                  <div class="btn-group">
+                    <button type="button" class="btn btn-sm btn-success dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                      <i class="fas fa-check"></i> Resolve
+                    </button>
+                    <div class="dropdown-menu">
+                      <a class="dropdown-item resolve-with-strategy" href="#" data-conflict-id="{{ conflict.conflict_id }}" data-strategy="source_wins">Source Wins</a>
+                      <a class="dropdown-item resolve-with-strategy" href="#" data-conflict-id="{{ conflict.conflict_id }}" data-strategy="target_wins">Target Wins</a>
+                      <a class="dropdown-item resolve-with-strategy" href="#" data-conflict-id="{{ conflict.conflict_id }}" data-strategy="newer_wins">Newer Wins</a>
+                      <a class="dropdown-item resolve-with-strategy" href="#" data-conflict-id="{{ conflict.conflict_id }}" data-strategy="merge">Merge</a>
+                      <div class="dropdown-divider"></div>
+                      <a class="dropdown-item resolve-with-strategy" href="#" data-conflict-id="{{ conflict.conflict_id }}">Default Strategy</a>
+                    </div>
+                  </div>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-lg-6">
+      <div class="card shadow mb-4">
+        <div class="card-header py-3">
+          <h6 class="m-0 font-weight-bold text-primary">Conflicts by Table</h6>
+        </div>
+        <div class="card-body">
+          <div class="chart-bar">
+            <canvas id="conflictsByTableChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card shadow mb-4">
+        <div class="card-header py-3">
+          <h6 class="m-0 font-weight-bold text-primary">Conflict Resolution Status</h6>
+        </div>
+        <div class="card-body">
+          <div class="chart-pie">
+            <canvas id="conflictStatusChart"></canvas>
+          </div>
+          <div class="mt-4 text-center small">
+            <span class="mr-2">
+              <i class="fas fa-circle text-warning"></i> Pending
+            </span>
+            <span class="mr-2">
+              <i class="fas fa-circle text-success"></i> Resolved
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- View Conflict Modal -->
+<div class="modal fade" id="viewConflictModal" tabindex="-1" role="dialog" aria-labelledby="viewConflictModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="viewConflictModalLabel">Conflict Details</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div id="conflictDetails"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        <div class="dropdown d-inline-block" id="resolveDropdownContainer">
+          <button class="btn btn-success dropdown-toggle" type="button" id="resolveDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            Resolve
+          </button>
+          <div class="dropdown-menu" aria-labelledby="resolveDropdown">
+            <a class="dropdown-item modal-resolve-with-strategy" href="#" data-strategy="source_wins">Source Wins</a>
+            <a class="dropdown-item modal-resolve-with-strategy" href="#" data-strategy="target_wins">Target Wins</a>
+            <a class="dropdown-item modal-resolve-with-strategy" href="#" data-strategy="newer_wins">Newer Wins</a>
+            <a class="dropdown-item modal-resolve-with-strategy" href="#" data-strategy="merge">Merge</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Batch Resolve Modal -->
+<div class="modal fade" id="batchResolveModal" tabindex="-1" role="dialog" aria-labelledby="batchResolveModalLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="batchResolveModalLabel">Resolve Multiple Conflicts</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p>You are about to resolve <span id="batchResolveCount">0</span> conflicts using the <span id="batchResolveStrategy"></span> strategy.</p>
+        <p>This action cannot be undone. Are you sure you want to continue?</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-success" id="confirmBatchResolve">Resolve Conflicts</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.4/dist/Chart.min.js"></script>
+<script>
+  $(document).ready(function() {
+    // Initialize DataTables
+    $('#conflictsTable').DataTable({
+      "order": [[ 6, "desc" ]] // Sort by creation date
+    });
+    
+    // Initialize charts
+    initCharts();
+    
+    // Set job ID for use in scripts
+    const jobId = '{{ job_id }}';
+    let currentConflictId = null;
+    
+    // Select all conflicts checkbox
+    $('#selectAllConflicts').change(function() {
+      $('.conflict-checkbox').prop('checked', $(this).prop('checked'));
+    });
+    
+    // Reset currentConflictId when modal is hidden
+    $('#viewConflictModal').on('hidden.bs.modal', function() {
+      currentConflictId = null;
+    });
+    
+    // View conflict details
+    $('.view-conflict').click(function() {
+      const conflictId = $(this).data('conflict-id');
+      currentConflictId = conflictId;
+      
+      // Fetch conflict details
+      $.ajax({
+        url: `/api/sync/conflicts/${jobId}/${conflictId}`,
+        type: 'GET',
+        success: function(conflict) {
+          // Create conflict details HTML
+          let html = `
+            <div class="row">
+              <div class="col-md-6">
+                <h6>Conflict Information</h6>
+                <table class="table table-sm">
+                  <tr><th>ID</th><td>${conflict.conflict_id}</td></tr>
+                  <tr><th>Table</th><td>${conflict.table_name}</td></tr>
+                  <tr><th>Status</th><td>${conflict.status}</td></tr>
+                  <tr><th>Created</th><td>${conflict.created_at}</td></tr>
+                  ${conflict.resolved_at ? `<tr><th>Resolved</th><td>${conflict.resolved_at}</td></tr>` : ''}
+                  ${conflict.resolution_strategy ? `<tr><th>Resolution</th><td>${conflict.resolution_strategy}</td></tr>` : ''}
+                </table>
+              </div>
+              <div class="col-md-6">
+                <h6>Primary Keys</h6>
+                <table class="table table-sm">
+          `;
+          
+          // Add primary keys
+          for (const [key, value] of Object.entries(conflict.primary_key_values)) {
+            html += `
+              <tr>
+                <th>${key}</th>
+                <td>${value}</td>
+              </tr>
+            `;
+          }
+          
+          html += `
+                </table>
+              </div>
+            </div>
+            
+            <h6 class="mt-4">Differences</h6>
+            <table class="table table-bordered">
+              <thead>
+                <tr>
+                  <th>Field</th>
+                  <th>Source Value</th>
+                  <th>Target Value</th>
+                </tr>
+              </thead>
+              <tbody>
+          `;
+          
+          // Add differences
+          for (const [field, values] of Object.entries(conflict.differences)) {
+            html += `
+              <tr>
+                <td>${field}</td>
+                <td>${formatValue(values.source)}</td>
+                <td>${formatValue(values.target)}</td>
+              </tr>
+            `;
+          }
+          
+          html += `
+              </tbody>
+            </table>
+          `;
+          
+          // If conflict is already resolved, show resolution info
+          if (conflict.status === 'resolved' && conflict.resolved_record) {
+            html += `
+              <h6 class="mt-4">Resolution</h6>
+              <div class="alert alert-success">
+                <strong>Resolved using strategy:</strong> ${conflict.resolution_strategy || 'Default'}
+              </div>
+              
+              <h6>Resolved Record</h6>
+              <table class="table table-bordered">
+                <thead>
+                  <tr>
+                    <th>Field</th>
+                    <th>Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+            `;
+            
+            // Add resolved values
+            for (const [field, value] of Object.entries(conflict.resolved_record)) {
+              if (field in conflict.differences) {
+                html += `
+                  <tr class="table-success">
+                    <td>${field}</td>
+                    <td>${formatValue(value)}</td>
+                  </tr>
+                `;
+              }
+            }
+            
+            html += `
+                </tbody>
+              </table>
+            `;
+          }
+          
+          // Show in modal
+          $('#conflictDetails').html(html);
+          
+          // Show/hide resolve button based on status
+          if (conflict.status === 'resolved') {
+            $('#resolveDropdownContainer').hide();
+          } else {
+            $('#resolveDropdownContainer').show();
+          }
+          
+          $('#viewConflictModal').modal('show');
+        },
+        error: function(xhr) {
+          showAlert('danger', `Error fetching conflict: ${xhr.responseJSON?.error || xhr.statusText}`);
+        }
+      });
+    });
+    
+    // Resolve conflict with strategy
+    $('.resolve-with-strategy').click(function(e) {
+      e.preventDefault();
+      
+      const conflictId = $(this).data('conflict-id');
+      const strategy = $(this).data('strategy') || null;
+      
+      $.ajax({
+        url: `/api/sync/conflicts/${jobId}/${conflictId}/resolve`,
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ strategy: strategy }),
+        success: function(response) {
+          showAlert('success', response.message);
+          setTimeout(function() {
+            location.reload();
+          }, 1500);
+        },
+        error: function(xhr) {
+          showAlert('danger', `Error resolving conflict: ${xhr.responseJSON?.error || xhr.statusText}`);
+        }
+      });
+    });
+    
+    // Resolve conflict from modal
+    $('.modal-resolve-with-strategy').click(function(e) {
+      e.preventDefault();
+      
+      if (!currentConflictId) return;
+      
+      const strategy = $(this).data('strategy');
+      
+      $.ajax({
+        url: `/api/sync/conflicts/${jobId}/${currentConflictId}/resolve`,
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ strategy: strategy }),
+        success: function(response) {
+          $('#viewConflictModal').modal('hide');
+          showAlert('success', response.message);
+          setTimeout(function() {
+            location.reload();
+          }, 1500);
+        },
+        error: function(xhr) {
+          showAlert('danger', `Error resolving conflict: ${xhr.responseJSON?.error || xhr.statusText}`);
+        }
+      });
+    });
+    
+    // Resolve all conflicts
+    $('.resolve-all-conflicts').click(function() {
+      const jobId = $(this).data('job-id');
+      
+      if (confirm('Are you sure you want to resolve all conflicts with the default strategy?')) {
+        $.ajax({
+          url: `/api/sync/conflicts/${jobId}/resolve-all`,
+          type: 'POST',
+          contentType: 'application/json',
+          data: JSON.stringify({}),
+          success: function(response) {
+            showAlert('success', response.message);
+            setTimeout(function() {
+              location.reload();
+            }, 1500);
+          },
+          error: function(xhr) {
+            showAlert('danger', `Error resolving conflicts: ${xhr.responseJSON?.error || xhr.statusText}`);
+          }
+        });
+      }
+    });
+    
+    // Batch resolve with strategy
+    $('.batch-resolve').click(function(e) {
+      e.preventDefault();
+      
+      const strategy = $(this).data('strategy');
+      const strategyName = $(this).text().trim();
+      const selectedConflicts = $('.conflict-checkbox:checked');
+      
+      if (selectedConflicts.length === 0) {
+        showAlert('warning', 'Please select at least one conflict to resolve');
+        return;
+      }
+      
+      // Update batch resolve modal
+      $('#batchResolveCount').text(selectedConflicts.length);
+      $('#batchResolveStrategy').text(strategyName);
+      $('#batchResolveModal').data('strategy', strategy);
+      $('#batchResolveModal').modal('show');
+    });
+    
+    // Confirm batch resolve
+    $('#confirmBatchResolve').click(function() {
+      const strategy = $('#batchResolveModal').data('strategy');
+      const selectedConflicts = $('.conflict-checkbox:checked');
+      const conflictIds = [];
+      
+      selectedConflicts.each(function() {
+        conflictIds.push($(this).data('conflict-id'));
+      });
+      
+      // Close modal
+      $('#batchResolveModal').modal('hide');
+      
+      // Process each conflict
+      let processed = 0;
+      let successful = 0;
+      
+      conflictIds.forEach(function(conflictId) {
+        $.ajax({
+          url: `/api/sync/conflicts/${jobId}/${conflictId}/resolve`,
+          type: 'POST',
+          contentType: 'application/json',
+          data: JSON.stringify({ strategy: strategy }),
+          success: function() {
+            successful++;
+            processed++;
+            checkCompletion();
+          },
+          error: function() {
+            processed++;
+            checkCompletion();
+          }
+        });
+      });
+      
+      function checkCompletion() {
+        if (processed === conflictIds.length) {
+          showAlert('success', `Resolved ${successful} of ${conflictIds.length} conflicts`);
+          setTimeout(function() {
+            location.reload();
+          }, 1500);
+        }
+      }
+    });
+    
+    // Initialize charts
+    function initCharts() {
+      // Conflicts by table chart
+      const tableCtx = document.getElementById('conflictsByTableChart').getContext('2d');
+      const conflictsByTableChart = new Chart(tableCtx, {
+        type: 'bar',
+        data: {
+          labels: {{ table_names|tojson|safe }},
+          datasets: [{
+            label: 'Conflicts',
+            data: {{ conflicts_by_table|tojson|safe }},
+            backgroundColor: 'rgba(246, 194, 62, 0.2)',
+            borderColor: 'rgba(246, 194, 62, 1)',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          maintainAspectRatio: false,
+          scales: {
+            yAxes: [{
+              ticks: {
+                beginAtZero: true,
+                precision: 0
+              }
+            }]
+          }
+        }
+      });
+      
+      // Conflict status chart
+      const statusCtx = document.getElementById('conflictStatusChart').getContext('2d');
+      const conflictStatusChart = new Chart(statusCtx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Pending', 'Resolved'],
+          datasets: [{
+            data: [{{ pending_conflicts }}, {{ resolved_conflicts }}],
+            backgroundColor: [
+              '#f6c23e', // warning
+              '#1cc88a'  // success
+            ],
+            hoverBackgroundColor: [
+              '#dda20a',
+              '#17a673'
+            ],
+            hoverBorderColor: "rgba(234, 236, 244, 1)",
+          }],
+        },
+        options: {
+          maintainAspectRatio: false,
+          tooltips: {
+            backgroundColor: "rgb(255,255,255)",
+            bodyFontColor: "#858796",
+            borderColor: '#dddfeb',
+            borderWidth: 1,
+            xPadding: 15,
+            yPadding: 15,
+            displayColors: false,
+            caretPadding: 10,
+          },
+          legend: {
+            display: false
+          },
+          cutoutPercentage: 70,
+        },
+      });
+    }
+    
+    // Helper function for alerts
+    function showAlert(type, message) {
+      const alertHtml = `
+        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+          ${message}
+          <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+      `;
+      $('.container-fluid').prepend(alertHtml);
+    }
+    
+    // Helper function to format values for display
+    function formatValue(value) {
+      if (value === null) return '<em>NULL</em>';
+      if (value === undefined) return '<em>undefined</em>';
+      if (typeof value === 'object') return JSON.stringify(value);
+      return value.toString();
+    }
+  });
+</script>
+{% endblock %}
