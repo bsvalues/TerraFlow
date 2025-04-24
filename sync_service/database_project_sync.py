@@ -554,7 +554,13 @@ class DatabaseProjectSyncService:
             raise
             
     def _sync_table(self, table: Dict[str, Any]):
-        """Synchronize a single table between source and target."""
+        """
+        Synchronize a single table between source and target, 
+        using data type handlers for proper data conversion.
+        
+        Args:
+            table: Dictionary containing table name, primary keys, and fields
+        """
         table_name = table['name']
         primary_keys = table['primary_keys']
         fields = table['fields']
@@ -568,6 +574,14 @@ class DatabaseProjectSyncService:
         start_time = time.time()
         
         try:
+            # Store the current table name in the job for reference in other methods
+            if self.job and hasattr(self.job, "__dict__"):
+                # Use setattr to avoid attribute error if current_table doesn't exist
+                setattr(self.job, 'current_table', table_name)
+            
+            # Get the table schema for proper data type handling
+            source_schema = self._get_table_schema(table_name, self.source_engine)
+            
             # 1. Get all records from source
             source_data = self._extract_data(table_name, primary_keys, fields)
             batch_count = 0
@@ -606,22 +620,86 @@ class DatabaseProjectSyncService:
             raise
             
     def _extract_data(self, table_name: str, pk_columns: List[str], field_names: List[str]) -> List[Dict[str, Any]]:
-        """Extract data from the source database."""
+        """
+        Extract data from the source database, processing special data types with data type handlers.
+        
+        Args:
+            table_name: Name of the table to extract data from
+            pk_columns: List of primary key column names
+            field_names: List of field names to extract
+            
+        Returns:
+            List of records with processed values
+        """
         try:
+            # First, get the table schema to identify column data types
+            table_schema = self._get_table_schema(table_name, self.source_engine)
+            
             with self.source_engine.connect() as conn:
                 columns = ", ".join(field_names)
                 query = f"SELECT {columns} FROM {table_name}"
                 result = conn.execute(text(query))
-                data = [dict(row) for row in result]
                 
-                self.log(f"Extracted {len(data)} records from {table_name}", 
-                        component="Extract", table_name=table_name, record_count=len(data))
-                return data
+                # Process raw data with data type handlers
+                processed_data = []
+                for row in result:
+                    # Convert row to dictionary
+                    record = dict(row)
+                    
+                    # Process each field with appropriate data type handler if available
+                    for column_name, value in record.items():
+                        if column_name in table_schema:
+                            column_type = table_schema[column_name]
+                            handler = get_handler_for_column(column_type)
+                            
+                            if handler:
+                                # Use the handler to extract/process the value
+                                record[column_name] = handler.extract_value(column_name, value)
+                    
+                    processed_data.append(record)
+                
+                self.log(f"Extracted {len(processed_data)} records from {table_name}", 
+                        component="Extract", table_name=table_name, record_count=len(processed_data))
+                return processed_data
                 
         except Exception as e:
             self.log(f"Error extracting data from {table_name}: {str(e)}", 
                     level="ERROR", component="Extract", table_name=table_name)
             raise
+            
+    def _get_table_schema(self, table_name: str, engine: Engine) -> Dict[str, str]:
+        """
+        Get the schema (column names and data types) for a table.
+        
+        Args:
+            table_name: Name of the table
+            engine: SQLAlchemy engine connected to the database
+            
+        Returns:
+            Dictionary mapping column names to their data types
+        """
+        schema = {}
+        try:
+            with engine.connect() as conn:
+                query = text("""
+                SELECT column_name, data_type, udt_name
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                AND table_name = :table_name
+                """)
+                
+                result = conn.execute(query, {"table_name": table_name})
+                
+                for row in result:
+                    # Use udt_name for custom types (like geometry), otherwise use data_type
+                    data_type = row['udt_name'] if row['udt_name'] else row['data_type']
+                    schema[row['column_name']] = data_type
+                
+            return schema
+        except Exception as e:
+            self.log(f"Error retrieving schema for table {table_name}: {str(e)}", 
+                    level="ERROR", component="SchemaValidation", table_name=table_name)
+            return {}
             
     def _get_pk_value(self, record: Dict[str, Any], pk_columns: List[str]) -> str:
         """Get a string representation of a record's primary key value."""
@@ -637,13 +715,28 @@ class DatabaseProjectSyncService:
         
     def _get_target_records(self, table_name: str, pk_columns: List[str], 
                           field_names: List[str], pk_values: List[str]) -> Dict[str, Dict[str, Any]]:
-        """Get records from the target database that match the provided primary keys."""
+        """
+        Get records from the target database that match the provided primary keys,
+        processing special data types with data type handlers.
+        
+        Args:
+            table_name: Name of the table to query
+            pk_columns: List of primary key column names
+            field_names: List of field names to retrieve
+            pk_values: List of primary key values to match
+            
+        Returns:
+            Dictionary mapping primary key values to records
+        """
         result = {}
         
         if not pk_values:
             return result
             
         try:
+            # Get the table schema for data type handling
+            table_schema = self._get_table_schema(table_name, self.target_engine)
+            
             with self.target_engine.connect() as conn:
                 # Build a query with OR conditions for each primary key set
                 pk_conditions = []
@@ -674,8 +767,22 @@ class DatabaseProjectSyncService:
                 
                 result_set = conn.execute(text(query))
                 
+                # Process the results with data type handlers
                 for row in result_set:
+                    # Convert row to dictionary
                     record = dict(row)
+                    
+                    # Process each field with appropriate data type handler if available
+                    for column_name, value in list(record.items()):  # Use list() to allow dict modification during iteration
+                        if column_name in table_schema:
+                            column_type = table_schema[column_name]
+                            handler = get_handler_for_column(column_type)
+                            
+                            if handler:
+                                # Use the handler to extract/process the value
+                                record[column_name] = handler.extract_value(column_name, value)
+                    
+                    # Get the primary key and add to results
                     pk_value = self._get_pk_value(record, pk_columns)
                     result[pk_value] = record
                 
@@ -689,12 +796,33 @@ class DatabaseProjectSyncService:
     def _classify_operations(self, source_records: List[Dict[str, Any]], 
                            target_records: Dict[str, Dict[str, Any]], 
                            pk_columns: List[str]) -> Dict[str, List[Dict[str, Any]]]:
-        """Classify records into inserts, updates, or conflicts."""
+        """
+        Classify records into inserts, updates, or conflicts,
+        using data type handlers for proper comparison.
+        
+        Args:
+            source_records: Records from the source database
+            target_records: Records from the target database, keyed by primary key
+            pk_columns: List of primary key column names
+            
+        Returns:
+            Dictionary with lists of records classified as insert, update, or conflict
+        """
         operations = {
             'insert': [],
             'update': [],
             'conflict': []
         }
+        
+        # Get the table schema for the first record if available
+        table_name = None
+        table_schema = None
+        
+        if source_records and len(source_records) > 0:
+            # Try to determine the table name from the job information
+            if self.job and hasattr(self.job, 'current_table') and self.job.current_table:
+                table_name = self.job.current_table
+                table_schema = self._get_table_schema(table_name, self.source_engine)
         
         for record in source_records:
             pk_value = self._get_pk_value(record, pk_columns)
@@ -704,8 +832,8 @@ class DatabaseProjectSyncService:
                 operations['insert'].append(record)
             else:
                 target_record = target_records[pk_value]
-                # Check if records differ
-                if self._records_differ(record, target_record):
+                # Check if records differ, using data type handlers if available
+                if self._records_differ(record, target_record, table_schema):
                     # Determine if this is a conflict or a simple update
                     if self._is_conflict(record, target_record):
                         operations['conflict'].append({
@@ -833,13 +961,44 @@ class DatabaseProjectSyncService:
             raise
             
     def _batch_insert(self, conn: Connection, table_name: str, records: List[Dict[str, Any]]):
-        """Insert multiple records into the target database in a batch."""
+        """
+        Insert multiple records into the target database in a batch, 
+        processing special data types with data type handlers.
+        
+        Args:
+            conn: SQLAlchemy connection
+            table_name: Name of the table to insert into
+            records: List of records to insert
+        """
         if not records:
             return
             
         try:
+            # Get the table schema for data type handling
+            table_schema = self._get_table_schema(table_name, self.target_engine)
+            
             # Get column names from the first record
             columns = list(records[0].keys())
+            
+            # Prepare records using data type handlers
+            processed_records = []
+            for record in records:
+                processed_record = {}
+                
+                for column_name, value in record.items():
+                    if column_name in table_schema:
+                        column_type = table_schema[column_name]
+                        handler = get_handler_for_column(column_type)
+                        
+                        if handler:
+                            # Use the handler to prepare the value for database insertion
+                            processed_record[column_name] = handler.prepare_value(column_name, value)
+                        else:
+                            processed_record[column_name] = value
+                    else:
+                        processed_record[column_name] = value
+                        
+                processed_records.append(processed_record)
             
             # Prepare batch insert
             column_str = ", ".join(columns)
@@ -847,7 +1006,7 @@ class DatabaseProjectSyncService:
             
             # Insert records
             query = f"INSERT INTO {table_name} ({column_str}) VALUES ({placeholders})"
-            conn.execute(text(query), [record for record in records])
+            conn.execute(text(query), [record for record in processed_records])
             
             self.log(f"Inserted {len(records)} records into {table_name}", 
                     component="Load", table_name=table_name, record_count=len(records))
@@ -858,24 +1017,50 @@ class DatabaseProjectSyncService:
             raise
             
     def _update_record(self, conn: Connection, table_name: str, record: Dict[str, Any]):
-        """Update a single record in the target database."""
+        """
+        Update a single record in the target database,
+        processing special data types with data type handlers.
+        
+        Args:
+            conn: SQLAlchemy connection
+            table_name: Name of the table to update
+            record: Record to update
+        """
         try:
+            # Get the table schema for data type handling
+            table_schema = self._get_table_schema(table_name, self.target_engine)
+            
             # Determine primary key columns
             pk_columns = [col for col in record if col.lower().endswith('id') or col.lower() == 'id']
             if not pk_columns:
                 self.log(f"Cannot update record in {table_name}: No primary key determined", 
                         level="ERROR", component="Load", table_name=table_name)
                 return
+            
+            # Prepare record using data type handlers
+            processed_record = {}
+            for column_name, value in record.items():
+                if column_name in table_schema:
+                    column_type = table_schema[column_name]
+                    handler = get_handler_for_column(column_type)
+                    
+                    if handler:
+                        # Use the handler to prepare the value for database insertion
+                        processed_record[column_name] = handler.prepare_value(column_name, value)
+                    else:
+                        processed_record[column_name] = value
+                else:
+                    processed_record[column_name] = value
                 
-            # Build SET clause
-            set_clause = ", ".join([f"{col} = :{col}" for col in record if col not in pk_columns])
+            # Build SET clause - only for non-PK columns
+            set_clause = ", ".join([f"{col} = :{col}" for col in processed_record if col not in pk_columns])
             
             # Build WHERE clause for primary keys
             where_clause = " AND ".join([f"{col} = :{col}" for col in pk_columns])
             
             # Update record
             query = f"UPDATE {table_name} SET {set_clause} WHERE {where_clause}"
-            conn.execute(text(query), record)
+            conn.execute(text(query), processed_record)
             
         except Exception as e:
             self.log(f"Error updating record in {table_name}: {str(e)}", 
@@ -883,7 +1068,17 @@ class DatabaseProjectSyncService:
             raise
             
     def _handle_conflicts(self, table_name: str, conflicts: List[Dict[str, Any]]):
-        """Handle conflicts based on the configured conflict resolution strategy."""
+        """
+        Handle conflicts based on the configured conflict resolution strategy,
+        properly processing specialized data types with data type handlers.
+        
+        Args:
+            table_name: Name of the table containing conflicts
+            conflicts: List of conflict records with source, target, and pk_value
+        """
+        # Get the table schema for data type handling
+        table_schema = self._get_table_schema(table_name, self.target_engine)
+        
         for conflict in conflicts:
             source = conflict['source']
             target = conflict['target']
@@ -918,15 +1113,75 @@ class DatabaseProjectSyncService:
                         # Default to source wins if no timestamp fields
                         with self.target_engine.connect() as conn:
                             self._update_record(conn, table_name, source)
+                
+                elif self.conflict_strategy == 'field_level_merge':
+                    # Advanced strategy - merge records at the field level
+                    # For specialized types, use the appropriate data handler
+                    merged_record = {}
+                    
+                    # Start by cloning the target record as the base
+                    for key, value in target.items():
+                        merged_record[key] = value
+                    
+                    # Override with source values for modified fields
+                    for key, value in source.items():
+                        # Check if field has specialized handler
+                        if table_schema and key in table_schema:
+                            column_type = table_schema[key]
+                            handler = get_handler_for_column(column_type)
+                            
+                            if handler:
+                                # If field is complex type, use handler's merge strategy
+                                # This might involve combining geometries, merging JSON, etc.
+                                merged_record[key] = handler.prepare_value(key, value)
+                            else:
+                                merged_record[key] = value
+                        else:
+                            merged_record[key] = value
+                    
+                    # Apply the merged record
+                    with self.target_engine.connect() as conn:
+                        self._update_record(conn, table_name, merged_record)
                             
                 elif self.conflict_strategy == 'manual':
                     # Create a conflict record for manual resolution
+                    # Process the data with handlers before storing for proper display
+                    processed_source = {}
+                    processed_target = {}
+                    
+                    # Process source record fields with handlers
+                    for key, value in source.items():
+                        if table_schema and key in table_schema:
+                            column_type = table_schema[key]
+                            handler = get_handler_for_column(column_type)
+                            
+                            if handler:
+                                processed_source[key] = handler.extract_value(key, value)
+                            else:
+                                processed_source[key] = value
+                        else:
+                            processed_source[key] = value
+                    
+                    # Process target record fields with handlers
+                    for key, value in target.items():
+                        if table_schema and key in table_schema:
+                            column_type = table_schema[key]
+                            handler = get_handler_for_column(column_type)
+                            
+                            if handler:
+                                processed_target[key] = handler.extract_value(key, value)
+                            else:
+                                processed_target[key] = value
+                        else:
+                            processed_target[key] = value
+                    
+                    # Create the conflict record with processed data
                     conflict_record = SyncConflict(
                         job_id=self.job_id,
                         table_name=table_name,
                         record_id=pk_value,
-                        source_data=source,
-                        target_data=target,
+                        source_data=processed_source,
+                        target_data=processed_target,
                         resolution_status='pending',
                         created_at=datetime.datetime.utcnow()
                     )
