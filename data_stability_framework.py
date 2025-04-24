@@ -52,15 +52,15 @@ class DataStabilityFramework:
         self.config = self._load_config(config_path)
         
         # Initialize core managers
-        self.classification = DataClassificationManager(self.config.get("classification", {}))
-        self.sovereignty = DataSovereigntyManager(self.config.get("sovereignty", {}))
-        self.encryption = EncryptionManager(self.config.get("encryption", {}))
-        self.access_control = AccessControlManager(self.config.get("access_control", {}))
-        self.security_monitoring = SecurityMonitoringManager(self.config.get("security_monitoring", {}))
-        self.audit = AuditLogger(self.config.get("audit_logging", {}))
-        self.conversion = ConversionManager(self.config.get("conversion", {}))
-        self.validation = ValidationManager(self.config.get("validation", {}))
-        self.recovery = RecoveryManager(self.config.get("recovery", {}))
+        self.classification = DataClassificationManager()
+        self.sovereignty = DataSovereigntyManager()
+        self.encryption = EncryptionManager()
+        self.access_control = AccessControlManager()
+        self.security_monitoring = SecurityMonitoringManager()
+        self.audit = AuditLogger()
+        self.conversion = ConversionManager()
+        self.validation = ValidationManager()
+        self.recovery = RecoveryManager()
         
         # Initialize AI agent manager
         self.agent_manager = agent_manager
