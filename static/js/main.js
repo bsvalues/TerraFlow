@@ -201,8 +201,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const toastContainer = document.getElementById('toast-container');
         
         // Create toast container if it doesn't exist
-        if (!toastContainer) {
-            const container = document.createElement('div');
+        let container = toastContainer;
+        if (!container) {
+            container = document.createElement('div');
             container.id = 'toast-container';
             container.className = 'toast-container position-fixed bottom-0 end-0 p-3';
             container.style.zIndex = '1090';
@@ -227,8 +228,12 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
         `;
         
-        // Add toast to container
-        document.getElementById('toast-container').appendChild(toastEl);
+        // Add toast to container - use the container we created above
+        if (container) {
+            container.appendChild(toastEl);
+        } else {
+            console.error('Toast container not found');
+        }
         
         // Initialize and show toast
         const toast = new bootstrap.Toast(toastEl, { autohide: true, delay: 5000 });
