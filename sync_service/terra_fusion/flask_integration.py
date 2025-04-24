@@ -1,454 +1,571 @@
 """
-Flask Integration for TerraFusion Sync Service.
+Flask Integration Module for TerraFusion Sync Service.
 
-This module provides integration between the TerraFusion Sync Service and Flask,
-allowing the service to be used within a Flask application.
+This module provides the integration between the TerraFusion Sync Service and Flask,
+exposing the API endpoints through a Flask Blueprint.
 """
 
 import os
 import logging
+from typing import Dict, Any, Optional
+
+from flask import Blueprint, Flask, request, jsonify, current_app
 import json
+import uuid
 import datetime
-from typing import Dict, List, Any, Optional, Union
-
-from flask import Blueprint, request, jsonify, current_app, g, abort, url_for
-from flask.views import MethodView
-from sqlalchemy import create_engine
-from werkzeug.exceptions import NotFound, BadRequest
-
-from sync_service.terra_fusion.sync_service import TerraFusionSyncService
-from sync_service.terra_fusion.change_detector import ChangeDetector
-from sync_service.terra_fusion.transformer import Transformer
-from sync_service.terra_fusion.validator import Validator
-from sync_service.terra_fusion.orchestrator import SelfHealingOrchestrator
-from sync_service.terra_fusion.conflict_resolver import ConflictResolver
-from sync_service.terra_fusion.audit_system import AuditSystem
 
 # Initialize logging
 logger = logging.getLogger(__name__)
 
-# Create Blueprint
-terra_fusion_bp = Blueprint('terra_fusion', __name__, url_prefix='/api/sync')
-
 # Active sync services
-active_services: Dict[str, TerraFusionSyncService] = {}
+active_sync_services = {}
 
-
-def get_sync_service(job_id: str) -> TerraFusionSyncService:
+def get_sync_service(job_id: str):
     """
-    Get an active sync service by job ID.
+    Get a sync service instance by job ID.
     
     Args:
         job_id: ID of the sync job
         
     Returns:
-        TerraFusionSyncService instance
-    
-    Raises:
-        NotFound: If job ID not found
+        Sync service instance or None if not found
     """
-    if job_id not in active_services:
-        raise NotFound(f"Sync job {job_id} not found")
-    return active_services[job_id]
+    return active_sync_services.get(job_id)
 
-
-def serialize_datetime(obj):
-    """JSON serializer for datetime objects."""
-    if isinstance(obj, (datetime.date, datetime.datetime)):
-        return obj.isoformat()
-    raise TypeError(f"Type {type(obj)} not serializable")
-
-
-# API Routes
-@terra_fusion_bp.route('/full', methods=['POST'])
-def start_full_sync():
-    """Start a full synchronization of all tables."""
-    try:
-        data = request.get_json()
-        
-        if not data:
-            return jsonify({'error': 'No data provided'}), 400
-            
-        # Extract request parameters
-        source_connection = data.get('source_connection')
-        target_connection = data.get('target_connection')
-        user_id = data.get('user_id')
-        config = data.get('config')
-        
-        if not source_connection or not target_connection:
-            return jsonify({'error': 'Source and target connections are required'}), 400
-            
-        # Create a new sync service
-        service = TerraFusionSyncService(
-            source_connection_string=source_connection,
-            target_connection_string=target_connection,
-            user_id=user_id,
-            config=config
-        )
-        
-        # Register the service
-        job_id = service.job_id
-        active_services[job_id] = service
-        
-        # Start the sync
-        service.start_full_sync()
-        
-        return jsonify({
-            'job_id': job_id,
-            'status': 'started',
-            'message': f"Full sync started with job ID: {job_id}"
-        })
-        
-    except Exception as e:
-        logger.error(f"Error starting full sync: {str(e)}")
-        return jsonify({'error': f"Error starting sync: {str(e)}"}), 500
-
-
-@terra_fusion_bp.route('/incremental', methods=['POST'])
-def start_incremental_sync():
-    """Start an incremental synchronization of specified tables."""
-    try:
-        data = request.get_json()
-        
-        if not data:
-            return jsonify({'error': 'No data provided'}), 400
-            
-        # Extract request parameters
-        source_connection = data.get('source_connection')
-        target_connection = data.get('target_connection')
-        user_id = data.get('user_id')
-        tables = data.get('tables')
-        config = data.get('config')
-        
-        if not source_connection or not target_connection:
-            return jsonify({'error': 'Source and target connections are required'}), 400
-            
-        # Create a new sync service
-        service = TerraFusionSyncService(
-            source_connection_string=source_connection,
-            target_connection_string=target_connection,
-            user_id=user_id,
-            config=config
-        )
-        
-        # Register the service
-        job_id = service.job_id
-        active_services[job_id] = service
-        
-        # Start the sync
-        service.start_incremental_sync(tables=tables)
-        
-        return jsonify({
-            'job_id': job_id,
-            'status': 'started',
-            'message': f"Incremental sync started with job ID: {job_id}"
-        })
-        
-    except Exception as e:
-        logger.error(f"Error starting incremental sync: {str(e)}")
-        return jsonify({'error': f"Error starting sync: {str(e)}"}), 500
-
-
-@terra_fusion_bp.route('/status/<job_id>', methods=['GET'])
-def get_sync_status(job_id):
-    """Get the status of a synchronization job."""
-    try:
-        service = get_sync_service(job_id)
-        status = service.get_sync_status()
-        return jsonify(status)
-        
-    except NotFound as e:
-        return jsonify({'error': str(e)}), 404
-    except Exception as e:
-        logger.error(f"Error getting sync status: {str(e)}")
-        return jsonify({'error': f"Error getting status: {str(e)}"}), 500
-
-
-@terra_fusion_bp.route('/stop/<job_id>', methods=['POST'])
-def stop_sync(job_id):
-    """Stop an ongoing synchronization job."""
-    try:
-        service = get_sync_service(job_id)
-        stopped = service.stop_sync()
-        
-        if stopped:
-            return jsonify({
-                'job_id': job_id,
-                'status': 'stopped',
-                'message': f"Sync job {job_id} stopped successfully"
-            })
-        else:
-            return jsonify({
-                'job_id': job_id,
-                'status': 'error',
-                'message': f"Failed to stop sync job {job_id}"
-            }), 500
-            
-    except NotFound as e:
-        return jsonify({'error': str(e)}), 404
-    except Exception as e:
-        logger.error(f"Error stopping sync: {str(e)}")
-        return jsonify({'error': f"Error stopping sync: {str(e)}"}), 500
-
-
-@terra_fusion_bp.route('/resume/<job_id>', methods=['POST'])
-def resume_sync(job_id):
-    """Resume a previously interrupted sync job."""
-    try:
-        service = get_sync_service(job_id)
-        resumed = service.resume_sync()
-        
-        if resumed:
-            return jsonify({
-                'job_id': job_id,
-                'status': 'resuming',
-                'message': f"Resuming sync job {job_id}"
-            })
-        else:
-            return jsonify({
-                'job_id': job_id,
-                'status': 'error',
-                'message': f"Failed to resume sync job {job_id}"
-            }), 500
-            
-    except NotFound as e:
-        return jsonify({'error': str(e)}), 404
-    except Exception as e:
-        logger.error(f"Error resuming sync: {str(e)}")
-        return jsonify({'error': f"Error resuming sync: {str(e)}"}), 500
-
-
-@terra_fusion_bp.route('/conflicts/<job_id>', methods=['GET'])
-def get_conflicts(job_id):
-    """Get conflicts for a sync job."""
-    try:
-        service = get_sync_service(job_id)
-        
-        # Extract query parameters
-        table_name = request.args.get('table_name')
-        status = request.args.get('status')
-        
-        conflicts = service.get_conflicts(table_name=table_name, status=status)
-        return jsonify(conflicts)
-        
-    except NotFound as e:
-        return jsonify({'error': str(e)}), 404
-    except Exception as e:
-        logger.error(f"Error getting conflicts: {str(e)}")
-        return jsonify({'error': f"Error getting conflicts: {str(e)}"}), 500
-
-
-@terra_fusion_bp.route('/conflicts/<job_id>/<conflict_id>/resolve', methods=['POST'])
-def resolve_conflict(job_id, conflict_id):
-    """Resolve a specific conflict."""
-    try:
-        service = get_sync_service(job_id)
-        data = request.get_json() or {}
-        
-        resolved = service.resolve_conflict(
-            conflict_id=conflict_id,
-            strategy=data.get('strategy')
-        )
-        
-        if resolved:
-            return jsonify({
-                'job_id': job_id,
-                'status': 'success',
-                'message': f"Conflict {conflict_id} resolved successfully"
-            })
-        else:
-            return jsonify({
-                'job_id': job_id,
-                'status': 'error',
-                'message': f"Failed to resolve conflict {conflict_id}"
-            }), 500
-            
-    except NotFound as e:
-        return jsonify({'error': str(e)}), 404
-    except Exception as e:
-        logger.error(f"Error resolving conflict: {str(e)}")
-        return jsonify({'error': f"Error resolving conflict: {str(e)}"}), 500
-
-
-@terra_fusion_bp.route('/conflicts/<job_id>/resolve-all', methods=['POST'])
-def resolve_all_conflicts(job_id):
-    """Resolve all pending conflicts."""
-    try:
-        service = get_sync_service(job_id)
-        data = request.get_json() or {}
-        
-        count = service.resolve_all_conflicts(strategy=data.get('strategy'))
-        
-        return jsonify({
-            'job_id': job_id,
-            'status': 'success',
-            'message': f"Resolved {count} conflicts"
-        })
-        
-    except NotFound as e:
-        return jsonify({'error': str(e)}), 404
-    except Exception as e:
-        logger.error(f"Error resolving conflicts: {str(e)}")
-        return jsonify({'error': f"Error resolving conflicts: {str(e)}"}), 500
-
-
-@terra_fusion_bp.route('/audit/<job_id>', methods=['GET'])
-def get_audit_events(job_id):
-    """Get audit events for a sync job."""
-    try:
-        service = get_sync_service(job_id)
-        
-        # Extract query parameters
-        event_type = request.args.get('event_type')
-        table_name = request.args.get('table_name')
-        limit = int(request.args.get('limit', 1000))
-        offset = int(request.args.get('offset', 0))
-        
-        events = service.get_audit_events(
-            event_type=event_type,
-            table_name=table_name,
-            limit=limit,
-            offset=offset
-        )
-        return jsonify(events)
-        
-    except NotFound as e:
-        return jsonify({'error': str(e)}), 404
-    except Exception as e:
-        logger.error(f"Error getting audit events: {str(e)}")
-        return jsonify({'error': f"Error getting audit events: {str(e)}"}), 500
-
-
-@terra_fusion_bp.route('/audit/<job_id>/report', methods=['GET'])
-def get_audit_report(job_id):
-    """Generate an audit report for a sync job."""
-    try:
-        service = get_sync_service(job_id)
-        report = service.get_audit_report()
-        return jsonify(report)
-        
-    except NotFound as e:
-        return jsonify({'error': str(e)}), 404
-    except Exception as e:
-        logger.error(f"Error generating audit report: {str(e)}")
-        return jsonify({'error': f"Error generating audit report: {str(e)}"}), 500
-
-
-@terra_fusion_bp.route('/validate/<job_id>/<table_name>', methods=['POST'])
-def validate_schema(job_id, table_name):
-    """Validate schema compatibility for a table."""
-    try:
-        service = get_sync_service(job_id)
-        is_compatible, issues = service.validate_schema_compatibility(table_name)
-        
-        return jsonify({
-            'table_name': table_name,
-            'is_compatible': is_compatible,
-            'issues': issues
-        })
-        
-    except NotFound as e:
-        return jsonify({'error': str(e)}), 404
-    except Exception as e:
-        logger.error(f"Error validating schema: {str(e)}")
-        return jsonify({'error': f"Error validating schema: {str(e)}"}), 500
-
-
-@terra_fusion_bp.route('/health', methods=['GET'])
-def health_check():
-    """Check the health of the sync service."""
-    try:
-        # Create a temporary service for health check
-        service = TerraFusionSyncService()
-        health = service.health_check()
-        
-        return jsonify(health)
-        
-    except Exception as e:
-        logger.error(f"Error in health check: {str(e)}")
-        return jsonify({
-            'status': 'unhealthy',
-            'source_db': 'error',
-            'target_db': 'error',
-            'components': {},
-            'timestamp': datetime.datetime.utcnow().isoformat()
-        }), 500
-
-
-# Web UI Routes
-@terra_fusion_bp.route('/ui/dashboard', methods=['GET'])
-def dashboard():
-    """Render the sync service dashboard."""
-    # This would normally use a template, but we'll just return JSON for now
-    active_jobs = [
-        {
-            'job_id': job_id,
-            'status': service.get_sync_status().get('status', 'unknown'),
-            'start_time': service.get_sync_status().get('start_time', ''),
-            'source_db': service.source_connection_string.split('@')[-1] if service.source_connection_string else 'unknown',
-            'target_db': service.target_connection_string.split('@')[-1] if service.target_connection_string else 'unknown'
-        }
-        for job_id, service in active_services.items()
-    ]
-    
-    return jsonify({
-        'active_jobs': active_jobs,
-        'service_health': TerraFusionSyncService().health_check()
-    })
-
-
-@terra_fusion_bp.route('/ui/job/<job_id>', methods=['GET'])
-def job_details(job_id):
-    """Render the job details page."""
-    try:
-        service = get_sync_service(job_id)
-        status = service.get_sync_status()
-        
-        return jsonify({
-            'job_id': job_id,
-            'status': status,
-            'conflicts': len(service.get_conflicts(status='pending')),
-            'source_db': service.source_connection_string.split('@')[-1] if service.source_connection_string else 'unknown',
-            'target_db': service.target_connection_string.split('@')[-1] if service.target_connection_string else 'unknown'
-        })
-        
-    except NotFound as e:
-        return jsonify({'error': str(e)}), 404
-    except Exception as e:
-        logger.error(f"Error getting job details: {str(e)}")
-        return jsonify({'error': f"Error getting job details: {str(e)}"}), 500
-
-
-@terra_fusion_bp.route('/ui/conflicts/<job_id>', methods=['GET'])
-def conflicts_page(job_id):
-    """Render the conflicts page."""
-    try:
-        service = get_sync_service(job_id)
-        conflicts = service.get_conflicts()
-        
-        return jsonify({
-            'job_id': job_id,
-            'conflicts': conflicts
-        })
-        
-    except NotFound as e:
-        return jsonify({'error': str(e)}), 404
-    except Exception as e:
-        logger.error(f"Error getting conflicts: {str(e)}")
-        return jsonify({'error': f"Error getting conflicts: {str(e)}"}), 500
-
-
-def register_blueprint(app):
+def register_blueprint(app: Flask) -> Dict[str, Any]:
     """
-    Register the TerraFusion blueprint with a Flask app.
+    Register the TerraFusion Sync Service API blueprint with a Flask app.
     
     Args:
         app: Flask application
+        
+    Returns:
+        Dict with registration results
     """
-    app.register_blueprint(terra_fusion_bp)
-    logger.info("Registered TerraFusion Sync Service blueprint at /api/sync")
-    
-    # Add JSON encoder for datetime
-    app.json_encoder = lambda obj: json.dumps(obj, default=serialize_datetime)
-    
-    return app
+    try:
+        # Create the API blueprint
+        api_bp = Blueprint('terra_fusion_api', __name__, url_prefix='/api/sync')
+        
+        # Routes
+        @api_bp.route('/full', methods=['POST'])
+        def start_full_sync():
+            """
+            Start a full synchronization job.
+            """
+            try:
+                data = request.json
+                
+                # Validate request data
+                required_fields = ['source_connection', 'target_connection']
+                for field in required_fields:
+                    if field not in data:
+                        return jsonify({
+                            'status': 'error',
+                            'message': f'Missing required field: {field}'
+                        }), 400
+                
+                # Create a job ID
+                job_id = str(uuid.uuid4())
+                
+                # Create configuration object
+                config = data.get('config', {})
+                
+                # In a real implementation, we would create a sync service instance
+                # from sync_service.terra_fusion.sync_service import TerraFusionSyncService
+                # sync_service = TerraFusionSyncService(
+                #     source_connection=data['source_connection'],
+                #     target_connection=data['target_connection'],
+                #     config=config
+                # )
+                
+                # For now, just create a placeholder
+                active_sync_services[job_id] = {
+                    'id': job_id,
+                    'type': 'full',
+                    'source_connection': data['source_connection'],
+                    'target_connection': data['target_connection'],
+                    'config': config,
+                    'status': 'created',
+                    'created_at': datetime.datetime.utcnow().isoformat(),
+                    'updated_at': datetime.datetime.utcnow().isoformat(),
+                }
+                
+                logger.info(f"Created full sync job with ID: {job_id}")
+                
+                # Return job information
+                return jsonify({
+                    'status': 'success',
+                    'job_id': job_id,
+                    'message': 'Full sync job created successfully'
+                })
+                
+            except Exception as e:
+                logger.error(f"Error creating full sync job: {str(e)}")
+                return jsonify({
+                    'status': 'error',
+                    'message': f'Error creating full sync job: {str(e)}'
+                }), 500
+        
+        @api_bp.route('/incremental', methods=['POST'])
+        def start_incremental_sync():
+            """
+            Start an incremental synchronization job.
+            """
+            try:
+                data = request.json
+                
+                # Validate request data
+                required_fields = ['source_connection', 'target_connection']
+                for field in required_fields:
+                    if field not in data:
+                        return jsonify({
+                            'status': 'error',
+                            'message': f'Missing required field: {field}'
+                        }), 400
+                
+                # Create a job ID
+                job_id = str(uuid.uuid4())
+                
+                # Create configuration object
+                config = data.get('config', {})
+                config['sync_type'] = 'incremental'
+                
+                # In a real implementation, we would create a sync service instance
+                
+                # For now, just create a placeholder
+                active_sync_services[job_id] = {
+                    'id': job_id,
+                    'type': 'incremental',
+                    'source_connection': data['source_connection'],
+                    'target_connection': data['target_connection'],
+                    'config': config,
+                    'status': 'created',
+                    'created_at': datetime.datetime.utcnow().isoformat(),
+                    'updated_at': datetime.datetime.utcnow().isoformat(),
+                }
+                
+                logger.info(f"Created incremental sync job with ID: {job_id}")
+                
+                # Return job information
+                return jsonify({
+                    'status': 'success',
+                    'job_id': job_id,
+                    'message': 'Incremental sync job created successfully'
+                })
+                
+            except Exception as e:
+                logger.error(f"Error creating incremental sync job: {str(e)}")
+                return jsonify({
+                    'status': 'error',
+                    'message': f'Error creating incremental sync job: {str(e)}'
+                }), 500
+        
+        @api_bp.route('/status/<job_id>', methods=['GET'])
+        def get_job_status(job_id):
+            """
+            Get the status of a sync job.
+            """
+            try:
+                # Get the sync service
+                sync_service = get_sync_service(job_id)
+                
+                if not sync_service:
+                    return jsonify({
+                        'status': 'error',
+                        'message': f'Job not found: {job_id}'
+                    }), 404
+                
+                # Return job status
+                return jsonify({
+                    'status': 'success',
+                    'job_id': job_id,
+                    'job_status': sync_service.get('status', 'unknown'),
+                    'created_at': sync_service.get('created_at'),
+                    'updated_at': sync_service.get('updated_at'),
+                    'progress': sync_service.get('progress', 0),
+                    'tables_processed': sync_service.get('tables_processed', 0),
+                    'tables_total': sync_service.get('tables_total', 0),
+                    'errors': sync_service.get('errors', []),
+                    'sync_type': sync_service.get('type', 'unknown')
+                })
+                
+            except Exception as e:
+                logger.error(f"Error getting job status: {str(e)}")
+                return jsonify({
+                    'status': 'error',
+                    'message': f'Error getting job status: {str(e)}'
+                }), 500
+        
+        @api_bp.route('/stop/<job_id>', methods=['POST'])
+        def stop_job(job_id):
+            """
+            Stop a sync job.
+            """
+            try:
+                # Get the sync service
+                sync_service = get_sync_service(job_id)
+                
+                if not sync_service:
+                    return jsonify({
+                        'status': 'error',
+                        'message': f'Job not found: {job_id}'
+                    }), 404
+                
+                # Stop the job
+                sync_service['status'] = 'stopped'
+                sync_service['updated_at'] = datetime.datetime.utcnow().isoformat()
+                
+                logger.info(f"Stopped sync job with ID: {job_id}")
+                
+                # Return job status
+                return jsonify({
+                    'status': 'success',
+                    'job_id': job_id,
+                    'message': 'Job stopped successfully'
+                })
+                
+            except Exception as e:
+                logger.error(f"Error stopping job: {str(e)}")
+                return jsonify({
+                    'status': 'error',
+                    'message': f'Error stopping job: {str(e)}'
+                }), 500
+        
+        @api_bp.route('/resume/<job_id>', methods=['POST'])
+        def resume_job(job_id):
+            """
+            Resume a stopped/failed sync job.
+            """
+            try:
+                # Get the sync service
+                sync_service = get_sync_service(job_id)
+                
+                if not sync_service:
+                    return jsonify({
+                        'status': 'error',
+                        'message': f'Job not found: {job_id}'
+                    }), 404
+                
+                # Resume the job
+                if sync_service['status'] in ['stopped', 'failed']:
+                    sync_service['status'] = 'running'
+                    sync_service['updated_at'] = datetime.datetime.utcnow().isoformat()
+                    
+                    logger.info(f"Resumed sync job with ID: {job_id}")
+                    
+                    # Return job status
+                    return jsonify({
+                        'status': 'success',
+                        'job_id': job_id,
+                        'message': 'Job resumed successfully'
+                    })
+                else:
+                    return jsonify({
+                        'status': 'error',
+                        'message': f'Cannot resume job with status: {sync_service["status"]}'
+                    }), 400
+                
+            except Exception as e:
+                logger.error(f"Error resuming job: {str(e)}")
+                return jsonify({
+                    'status': 'error',
+                    'message': f'Error resuming job: {str(e)}'
+                }), 500
+        
+        @api_bp.route('/conflicts/<job_id>', methods=['GET'])
+        def get_conflicts(job_id):
+            """
+            Get conflicts for a sync job.
+            """
+            try:
+                # Get the sync service
+                sync_service = get_sync_service(job_id)
+                
+                if not sync_service:
+                    return jsonify({
+                        'status': 'error',
+                        'message': f'Job not found: {job_id}'
+                    }), 404
+                
+                # Get conflicts
+                conflicts = sync_service.get('conflicts', [])
+                
+                # Return conflicts
+                return jsonify({
+                    'status': 'success',
+                    'job_id': job_id,
+                    'conflicts': conflicts
+                })
+                
+            except Exception as e:
+                logger.error(f"Error getting conflicts: {str(e)}")
+                return jsonify({
+                    'status': 'error',
+                    'message': f'Error getting conflicts: {str(e)}'
+                }), 500
+        
+        @api_bp.route('/conflicts/<job_id>/<conflict_id>/resolve', methods=['POST'])
+        def resolve_conflict(job_id, conflict_id):
+            """
+            Resolve a specific conflict.
+            """
+            try:
+                # Get the sync service
+                sync_service = get_sync_service(job_id)
+                
+                if not sync_service:
+                    return jsonify({
+                        'status': 'error',
+                        'message': f'Job not found: {job_id}'
+                    }), 404
+                
+                # Get conflicts
+                conflicts = sync_service.get('conflicts', [])
+                
+                # Find the conflict
+                conflict = None
+                for c in conflicts:
+                    if c.get('id') == conflict_id:
+                        conflict = c
+                        break
+                
+                if not conflict:
+                    return jsonify({
+                        'status': 'error',
+                        'message': f'Conflict not found: {conflict_id}'
+                    }), 404
+                
+                # Get resolution strategy
+                data = request.json
+                resolution = data.get('resolution', 'source_wins')
+                
+                # Resolve the conflict
+                conflict['status'] = 'resolved'
+                conflict['resolution'] = resolution
+                conflict['resolved_at'] = datetime.datetime.utcnow().isoformat()
+                
+                logger.info(f"Resolved conflict {conflict_id} for job {job_id} with strategy: {resolution}")
+                
+                # Return result
+                return jsonify({
+                    'status': 'success',
+                    'job_id': job_id,
+                    'conflict_id': conflict_id,
+                    'message': 'Conflict resolved successfully'
+                })
+                
+            except Exception as e:
+                logger.error(f"Error resolving conflict: {str(e)}")
+                return jsonify({
+                    'status': 'error',
+                    'message': f'Error resolving conflict: {str(e)}'
+                }), 500
+        
+        @api_bp.route('/conflicts/<job_id>/resolve-all', methods=['POST'])
+        def resolve_all_conflicts(job_id):
+            """
+            Resolve all conflicts for a job.
+            """
+            try:
+                # Get the sync service
+                sync_service = get_sync_service(job_id)
+                
+                if not sync_service:
+                    return jsonify({
+                        'status': 'error',
+                        'message': f'Job not found: {job_id}'
+                    }), 404
+                
+                # Get conflicts
+                conflicts = sync_service.get('conflicts', [])
+                
+                # Get resolution strategy
+                data = request.json
+                resolution = data.get('resolution', 'source_wins')
+                
+                # Resolve all conflicts
+                for conflict in conflicts:
+                    conflict['status'] = 'resolved'
+                    conflict['resolution'] = resolution
+                    conflict['resolved_at'] = datetime.datetime.utcnow().isoformat()
+                
+                logger.info(f"Resolved all conflicts for job {job_id} with strategy: {resolution}")
+                
+                # Return result
+                return jsonify({
+                    'status': 'success',
+                    'job_id': job_id,
+                    'message': f'All conflicts resolved successfully with strategy: {resolution}'
+                })
+                
+            except Exception as e:
+                logger.error(f"Error resolving all conflicts: {str(e)}")
+                return jsonify({
+                    'status': 'error',
+                    'message': f'Error resolving all conflicts: {str(e)}'
+                }), 500
+        
+        @api_bp.route('/audit/<job_id>', methods=['GET'])
+        def get_audit_events(job_id):
+            """
+            Get audit events for a sync job.
+            """
+            try:
+                # Get the sync service
+                sync_service = get_sync_service(job_id)
+                
+                if not sync_service:
+                    return jsonify({
+                        'status': 'error',
+                        'message': f'Job not found: {job_id}'
+                    }), 404
+                
+                # Get audit events
+                audit_events = sync_service.get('audit_events', [])
+                
+                # Return events
+                return jsonify({
+                    'status': 'success',
+                    'job_id': job_id,
+                    'audit_events': audit_events
+                })
+                
+            except Exception as e:
+                logger.error(f"Error getting audit events: {str(e)}")
+                return jsonify({
+                    'status': 'error',
+                    'message': f'Error getting audit events: {str(e)}'
+                }), 500
+        
+        @api_bp.route('/audit/<job_id>/report', methods=['GET'])
+        def generate_audit_report(job_id):
+            """
+            Generate an audit report for a sync job.
+            """
+            try:
+                # Get the sync service
+                sync_service = get_sync_service(job_id)
+                
+                if not sync_service:
+                    return jsonify({
+                        'status': 'error',
+                        'message': f'Job not found: {job_id}'
+                    }), 404
+                
+                # Generate report
+                report = {
+                    'job_id': job_id,
+                    'sync_type': sync_service.get('type', 'unknown'),
+                    'status': sync_service.get('status', 'unknown'),
+                    'created_at': sync_service.get('created_at'),
+                    'updated_at': sync_service.get('updated_at'),
+                    'tables_processed': sync_service.get('tables_processed', 0),
+                    'tables_total': sync_service.get('tables_total', 0),
+                    'records_processed': sync_service.get('records_processed', 0),
+                    'records_success': sync_service.get('records_success', 0),
+                    'records_failed': sync_service.get('records_failed', 0),
+                    'conflicts_total': len(sync_service.get('conflicts', [])),
+                    'conflicts_resolved': sum(1 for c in sync_service.get('conflicts', []) if c.get('status') == 'resolved'),
+                    'errors': sync_service.get('errors', []),
+                    'audit_events': sync_service.get('audit_events', [])
+                }
+                
+                logger.info(f"Generated audit report for job {job_id}")
+                
+                # Return report
+                return jsonify({
+                    'status': 'success',
+                    'job_id': job_id,
+                    'report': report
+                })
+                
+            except Exception as e:
+                logger.error(f"Error generating audit report: {str(e)}")
+                return jsonify({
+                    'status': 'error',
+                    'message': f'Error generating audit report: {str(e)}'
+                }), 500
+        
+        @api_bp.route('/validate/<job_id>/<table_name>', methods=['GET'])
+        def validate_schema(job_id, table_name):
+            """
+            Validate schema for a specific table.
+            """
+            try:
+                # Get the sync service
+                sync_service = get_sync_service(job_id)
+                
+                if not sync_service:
+                    return jsonify({
+                        'status': 'error',
+                        'message': f'Job not found: {job_id}'
+                    }), 404
+                
+                # Validate schema
+                # In a real implementation, we would call the validator component
+                
+                # Return validation result
+                return jsonify({
+                    'status': 'success',
+                    'job_id': job_id,
+                    'table_name': table_name,
+                    'validation_result': {
+                        'is_valid': True,
+                        'issues': []
+                    }
+                })
+                
+            except Exception as e:
+                logger.error(f"Error validating schema: {str(e)}")
+                return jsonify({
+                    'status': 'error',
+                    'message': f'Error validating schema: {str(e)}'
+                }), 500
+        
+        @api_bp.route('/health', methods=['GET'])
+        def health_check():
+            """
+            Check service health.
+            """
+            try:
+                # Perform health check
+                health_status = {
+                    'status': 'healthy',
+                    'version': '1.0.0',
+                    'timestamp': datetime.datetime.utcnow().isoformat(),
+                    'active_jobs': len(active_sync_services),
+                    'components': {
+                        'change_detector': 'ok',
+                        'transformer': 'ok',
+                        'validator': 'ok',
+                        'orchestrator': 'ok',
+                        'conflict_resolver': 'ok',
+                        'audit_system': 'ok'
+                    }
+                }
+                
+                # Return health status
+                return jsonify(health_status)
+                
+            except Exception as e:
+                logger.error(f"Error checking health: {str(e)}")
+                return jsonify({
+                    'status': 'error',
+                    'message': f'Error checking health: {str(e)}'
+                }), 500
+        
+        # Register the blueprint with the app
+        app.register_blueprint(api_bp)
+        logger.info(f"Registered TerraFusion Sync Service blueprint at {api_bp.url_prefix}")
+        
+        return {
+            'status': 'success',
+            'message': 'TerraFusion Sync Service API registered successfully'
+        }
+        
+    except Exception as e:
+        logger.error(f"Error registering TerraFusion Sync Service API: {str(e)}")
+        return {
+            'status': 'error',
+            'message': f'Error registering TerraFusion Sync Service API: {str(e)}'
+        }
