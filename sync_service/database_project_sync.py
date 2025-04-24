@@ -1245,3 +1245,83 @@ class DatabaseProjectSyncService:
                 return False
                 
         return self.job.status == 'completed'
+        
+    def resolve_manual_conflict(self, conflict_id: int, resolution: str, custom_values: Optional[Dict[str, Any]] = None) -> bool:
+        """
+        Resolve a manually flagged conflict, applying data type handlers as needed.
+        
+        Args:
+            conflict_id: ID of the conflict record to resolve
+            resolution: Resolution strategy ('source', 'target', or 'custom')
+            custom_values: Custom field values for field-level resolution
+            
+        Returns:
+            True if resolved successfully, False otherwise
+        """
+        try:
+            # Fetch the conflict record
+            conflict = SyncConflict.query.get(conflict_id)
+            if not conflict or conflict.resolution_status != 'pending':
+                self.log(f"Cannot resolve conflict {conflict_id}: Not found or already resolved",
+                       level="ERROR", component="ConflictResolution")
+                return False
+                
+            table_name = conflict.table_name
+            
+            # Get the table schema for data type handling
+            table_schema = self._get_table_schema(table_name, self.target_engine)
+            
+            # Determine which record to use based on resolution strategy
+            if resolution == 'source':
+                # Use source record
+                record_to_apply = conflict.source_data
+            elif resolution == 'target':
+                # Keep target record (no action needed)
+                conflict.resolution_status = 'resolved'
+                conflict.resolved_at = datetime.datetime.utcnow()
+                conflict.resolution_strategy = 'target_wins'
+                db.session.commit()
+                return True
+            elif resolution == 'custom' and custom_values:
+                # Create a custom record based on provided values
+                record_to_apply = custom_values
+            else:
+                self.log(f"Invalid resolution strategy for conflict {conflict_id}: {resolution}",
+                       level="ERROR", component="ConflictResolution")
+                return False
+                
+            # Use data type handlers to prepare the record for database update
+            processed_record = {}
+            
+            for column_name, value in record_to_apply.items():
+                if table_schema and column_name in table_schema:
+                    column_type = table_schema[column_name]
+                    handler = get_handler_for_column(column_type)
+                    
+                    if handler:
+                        # Use handler to prepare the value for database insertion
+                        processed_record[column_name] = handler.prepare_value(column_name, value)
+                    else:
+                        processed_record[column_name] = value
+                else:
+                    processed_record[column_name] = value
+            
+            # Apply the resolved record to the database
+            with self.target_engine.connect() as conn:
+                # Update the record in the database
+                self._update_record(conn, table_name, processed_record)
+                
+                # Update the conflict record
+                conflict.resolution_status = 'resolved'
+                conflict.resolved_at = datetime.datetime.utcnow()
+                conflict.resolution_strategy = resolution
+                db.session.commit()
+                
+                self.log(f"Resolved conflict {conflict_id} for table {table_name} using strategy: {resolution}",
+                       component="ConflictResolution", table_name=table_name)
+                return True
+                
+        except Exception as e:
+            self.log(f"Error resolving conflict {conflict_id}: {str(e)}",
+                   level="ERROR", component="ConflictResolution")
+            return False

@@ -638,63 +638,39 @@ def resolve_conflict(conflict_id):
                     if target_conn_name and global_settings.connection_strings and target_conn_name in global_settings.connection_strings:
                         target_conn_string = global_settings.connection_strings[target_conn_name]
                         
-                        # Create a connection and apply the changes
-                        engine = sa.create_engine(target_conn_string)
-                        table_name = conflict.table_name
+                        # Use the sync service to apply the changes with proper data type handling
+                        job_id = None
                         
-                        # Determine the primary key columns
-                        # This is a simplified approach, assuming we can parse from record_id
-                        pk_parts = conflict.record_id.split('|')
-                        pk_values = []
-                        
-                        # Get table structure to find the primary keys
-                        with engine.connect() as conn:
-                            # Check if we have primary key info
-                            pk_query = text("""
-                            SELECT a.attname
-                            FROM pg_index i
-                            JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
-                            WHERE i.indrelid = :table_name::regclass
-                            AND i.indisprimary;
-                            """)
+                        # Check if this conflict is part of a job
+                        if conflict.job_id:
+                            job_id = conflict.job_id
                             
-                            try:
-                                pk_result = conn.execute(pk_query, {'table_name': table_name})
-                                pk_columns = [row[0] for row in pk_result]
-                                
-                                # Build WHERE clause for primary keys
-                                where_conditions = []
-                                for i, col in enumerate(pk_columns):
-                                    if i < len(pk_parts):
-                                        if pk_parts[i] == "NULL":
-                                            where_conditions.append(f"{col} IS NULL")
-                                        else:
-                                            where_conditions.append(f"{col} = '{pk_parts[i]}'")
-                                
-                                # Remove any primary key fields from the update data
-                                update_data = {k: v for k, v in resolved_data.items() if k not in pk_columns}
-                                
-                                # Build SET clause
-                                set_clauses = []
-                                for col, val in update_data.items():
-                                    if val is None:
-                                        set_clauses.append(f"{col} = NULL")
-                                    elif isinstance(val, (int, float)):
-                                        set_clauses.append(f"{col} = {val}")
-                                    else:
-                                        set_clauses.append(f"{col} = '{val}'")
-                                
-                                # Build and execute the UPDATE query
-                                if set_clauses and where_conditions:
-                                    update_query = f"""
-                                    UPDATE {table_name}
-                                    SET {', '.join(set_clauses)}
-                                    WHERE {' AND '.join(where_conditions)}
-                                    """
-                                    conn.execute(text(update_query))
-                                    
-                            except Exception as e:
-                                logger.error(f"Error applying resolution to database: {str(e)}")
+                        # Create a sync service with the target connection
+                        sync_service = DatabaseProjectSyncService(
+                            source_connection_string=target_conn_string,  # Source doesn't matter for conflict resolution
+                            target_connection_string=target_conn_string,
+                            job_id=job_id
+                        )
+                        
+                        # Map the resolution type to the expected format
+                        if resolution_type == 'source_select':
+                            resolution_strategy = 'source'
+                        elif resolution_type == 'target_select':
+                            resolution_strategy = 'target'
+                        elif resolution_type == 'manual':
+                            resolution_strategy = 'custom'
+                        else:
+                            resolution_strategy = resolution_type
+                            
+                        # Use the new method to handle conflict resolution with data type awareness
+                        success = sync_service.resolve_manual_conflict(
+                            conflict_id=conflict.id,
+                            resolution=resolution_strategy,
+                            custom_values=resolved_data if resolution_strategy == 'custom' else None
+                        )
+                        
+                        if not success:
+                            logger.warning(f"Conflict {conflict.id} marked as resolved but database update failed")
                 
             except Exception as e:
                 logger.error(f"Error in database update after conflict resolution: {str(e)}")
@@ -713,7 +689,7 @@ def resolve_conflict(conflict_id):
 @login_required
 @role_required('administrator')
 def bulk_resolve_conflicts():
-    """Resolve multiple conflicts in bulk."""
+    """Resolve multiple conflicts in bulk, using data type handlers for proper data processing."""
     resolution_type = request.form.get('resolution_type')
     resolution_notes = request.form.get('resolution_notes')
     
@@ -727,12 +703,32 @@ def bulk_resolve_conflicts():
     if not conflicts:
         flash('No pending conflicts found', 'info')
         return redirect(url_for('project_sync.conflict_list'))
+    
+    # Get the global settings to find the database connections
+    global_settings = GlobalSetting.query.first()
+    target_conn_string = None
+    
+    if global_settings and global_settings.settings and 'project_sync' in global_settings.settings:
+        settings = global_settings.settings['project_sync']
+        target_conn_name = settings.get('default_target_connection')
+        
+        if target_conn_name and global_settings.connection_strings and target_conn_name in global_settings.connection_strings:
+            target_conn_string = global_settings.connection_strings[target_conn_name]
+    
+    # If we can't get connection string, just update the conflict records without applying to DB
+    if not target_conn_string:
+        logger.warning("No target connection string found, conflicts will be marked as resolved but not applied to database")
         
     count = 0
+    
+    # Process each conflict
     for conflict in conflicts:
+        # Determine appropriate resolution strategy
         if resolution_type == 'source_wins':
+            db_resolution_strategy = 'source'
             resolved_data = conflict.source_data
         elif resolution_type == 'target_wins':
+            db_resolution_strategy = 'target'
             resolved_data = conflict.target_data
         elif resolution_type == 'newer_wins':
             # Compare timestamps if available
@@ -747,11 +743,14 @@ def bulk_resolve_conflicts():
                     
             if source_time and target_time:
                 if source_time > target_time:
+                    db_resolution_strategy = 'source'
                     resolved_data = conflict.source_data
                 else:
+                    db_resolution_strategy = 'target'
                     resolved_data = conflict.target_data
             else:
                 # Default to source if no timestamps
+                db_resolution_strategy = 'source'
                 resolved_data = conflict.source_data
         elif resolution_type == 'ignore':
             # Just mark as ignored
@@ -766,7 +765,7 @@ def bulk_resolve_conflicts():
             # Skip this conflict if resolution type not supported in bulk
             continue
             
-        # Update the conflict
+        # Update the conflict record in our database
         conflict.resolution_status = 'resolved'
         conflict.resolution_type = resolution_type
         conflict.resolved_by = session.get('user_id')
@@ -774,8 +773,29 @@ def bulk_resolve_conflicts():
         conflict.resolution_notes = resolution_notes
         conflict.resolved_data = resolved_data
         
+        # Try to apply the resolution to the target database if we have connection
+        if target_conn_string:
+            try:
+                # Create sync service
+                sync_service = DatabaseProjectSyncService(
+                    source_connection_string=target_conn_string,  # Source doesn't matter for conflict resolution
+                    target_connection_string=target_conn_string,
+                    job_id=conflict.job_id  # Use the original job ID if available
+                )
+                
+                # Use the data type-aware conflict resolution method
+                sync_service.resolve_manual_conflict(
+                    conflict_id=conflict.id,
+                    resolution=db_resolution_strategy,
+                    custom_values=None  # We don't support custom values in bulk resolution
+                )
+            except Exception as e:
+                logger.error(f"Error applying bulk resolution for conflict {conflict.id}: {str(e)}")
+                # We continue processing other conflicts even if one fails
+        
         count += 1
         
+    # Commit all conflict record updates
     db.session.commit()
     
     flash(f'Successfully resolved {count} conflicts', 'success')
