@@ -1,0 +1,402 @@
+{% extends 'mobile_layout.html' %}
+
+{% block title %}GeoAssessmentPro | Anomalies{% endblock %}
+
+{% block content %}
+<div class="mobile-container">
+    <div class="mobile-section-title">Anomalies</div>
+
+    <!-- Search Bar -->
+    <div class="mobile-search-bar mb-3">
+        <i class="fas fa-search mobile-search-icon"></i>
+        <input type="text" class="mobile-search-input" id="anomalySearchInput" placeholder="Search anomalies...">
+    </div>
+
+    <!-- Anomaly Filters -->
+    <div class="mobile-card mb-3">
+        <div class="p-3">
+            <div class="row">
+                <div class="col-6">
+                    <select class="form-select form-select-sm" id="anomalyTypeFilter">
+                        <option value="all">All Types</option>
+                        <option value="data">Data</option>
+                        <option value="spatial">Spatial</option>
+                        <option value="valuation">Valuation</option>
+                        <option value="temporal">Temporal</option>
+                    </select>
+                </div>
+                <div class="col-6">
+                    <select class="form-select form-select-sm" id="anomalySeverityFilter">
+                        <option value="all">All Severities</option>
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row g-2 mb-3">
+        <div class="col-6">
+            <div class="mobile-stat-card bg-danger text-white">
+                <div class="mobile-stat-value" id="highSeverityCount">0</div>
+                <div class="mobile-stat-label">High Severity</div>
+            </div>
+        </div>
+        <div class="col-6">
+            <div class="mobile-stat-card bg-warning">
+                <div class="mobile-stat-value" id="mediumSeverityCount">0</div>
+                <div class="mobile-stat-label">Medium Severity</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Anomalies List -->
+    <div id="anomaliesList">
+        <!-- Will be populated with anomaly cards -->
+        <div class="text-center py-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading anomalies...</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block action_button %}
+<a href="#" class="action-button" onclick="showBottomSheet()">
+    <i class="fas fa-filter"></i>
+</a>
+{% endblock %}
+
+{% block sheet_title %}Advanced Filters{% endblock %}
+
+{% block sheet_content %}
+<div class="mb-3">
+    <label class="mobile-form-label">Detection Date Range</label>
+    <div class="row">
+        <div class="col-6">
+            <input type="date" class="mobile-form-control" id="startDateFilter">
+        </div>
+        <div class="col-6">
+            <input type="date" class="mobile-form-control" id="endDateFilter">
+        </div>
+    </div>
+</div>
+
+<div class="mb-3">
+    <label class="mobile-form-label">Anomaly Score Range</label>
+    <div class="row">
+        <div class="col-6">
+            <input type="number" class="mobile-form-control" id="minScoreFilter" min="0" max="1" step="0.1" placeholder="Min Score">
+        </div>
+        <div class="col-6">
+            <input type="number" class="mobile-form-control" id="maxScoreFilter" min="0" max="1" step="0.1" placeholder="Max Score">
+        </div>
+    </div>
+</div>
+
+<div class="mb-3">
+    <label class="mobile-form-label">Anomaly Types</label>
+    <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="dataTypeFilter" checked>
+        <label class="form-check-label" for="dataTypeFilter">
+            Data Anomalies
+        </label>
+    </div>
+    <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="spatialTypeFilter" checked>
+        <label class="form-check-label" for="spatialTypeFilter">
+            Spatial Anomalies
+        </label>
+    </div>
+    <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="valuationTypeFilter" checked>
+        <label class="form-check-label" for="valuationTypeFilter">
+            Valuation Anomalies
+        </label>
+    </div>
+    <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="temporalTypeFilter" checked>
+        <label class="form-check-label" for="temporalTypeFilter">
+            Temporal Anomalies
+        </label>
+    </div>
+</div>
+
+<div class="d-grid gap-2">
+    <button class="btn btn-primary" id="applyFiltersBtn">Apply Filters</button>
+    <button class="btn btn-outline-secondary" id="resetFiltersBtn">Reset Filters</button>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Fetch anomalies from API
+        fetchAnomalies();
+        
+        // Set up event listeners
+        document.getElementById('anomalySearchInput').addEventListener('input', debounce(function() {
+            filterAnomalies();
+        }, 300));
+        
+        document.getElementById('anomalyTypeFilter').addEventListener('change', filterAnomalies);
+        document.getElementById('anomalySeverityFilter').addEventListener('change', filterAnomalies);
+        
+        document.getElementById('applyFiltersBtn').addEventListener('click', function() {
+            filterAnomalies();
+            hideBottomSheet();
+        });
+        
+        document.getElementById('resetFiltersBtn').addEventListener('click', function() {
+            // Reset all filters
+            document.getElementById('startDateFilter').value = '';
+            document.getElementById('endDateFilter').value = '';
+            document.getElementById('minScoreFilter').value = '';
+            document.getElementById('maxScoreFilter').value = '';
+            document.getElementById('dataTypeFilter').checked = true;
+            document.getElementById('spatialTypeFilter').checked = true;
+            document.getElementById('valuationTypeFilter').checked = true;
+            document.getElementById('temporalTypeFilter').checked = true;
+            
+            // Apply the reset
+            filterAnomalies();
+            hideBottomSheet();
+        });
+    });
+    
+    // Fetch anomalies from API
+    function fetchAnomalies() {
+        fetch('/mobile/api/anomalies')
+            .then(response => response.json())
+            .then(data => {
+                // Store the original data for filtering
+                window.allAnomalies = data.anomalies;
+                
+                // Update counts
+                updateCounts(data.anomalies);
+                
+                // Display the anomalies
+                renderAnomalies(data.anomalies);
+            })
+            .catch(error => {
+                console.error('Error fetching anomalies:', error);
+                document.getElementById('anomaliesList').innerHTML = `
+                    <div class="alert alert-danger">
+                        Error loading anomalies. Please try again.
+                    </div>
+                `;
+            });
+    }
+    
+    // Update severity counts
+    function updateCounts(anomalies) {
+        const highCount = anomalies.filter(a => a.severity === 'high').length;
+        const mediumCount = anomalies.filter(a => a.severity === 'medium').length;
+        
+        document.getElementById('highSeverityCount').textContent = highCount;
+        document.getElementById('mediumSeverityCount').textContent = mediumCount;
+    }
+    
+    // Render anomalies list
+    function renderAnomalies(anomalies) {
+        const anomaliesList = document.getElementById('anomaliesList');
+        
+        if (anomalies.length === 0) {
+            anomaliesList.innerHTML = `
+                <div class="text-center py-4">
+                    <i class="fas fa-check-circle fa-2x mb-3 text-success"></i>
+                    <p>No anomalies match your search criteria.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        let html = '';
+        
+        anomalies.forEach(anomaly => {
+            const severityClass = getSeverityClass(anomaly.severity);
+            const typeClass = getTypeClass(anomaly.type);
+            const typeLabel = getTypeLabel(anomaly.type);
+            
+            html += `
+                <div class="mobile-card mb-3">
+                    <div class="p-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <h5 class="mb-0">${anomaly.address}</h5>
+                                <div class="text-muted small">Property ID: ${anomaly.property_id}</div>
+                            </div>
+                            <div class="d-flex">
+                                <span class="badge ${severityClass} me-1">${anomaly.severity.toUpperCase()}</span>
+                                <span class="badge ${typeClass}">${typeLabel}</span>
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <p>${anomaly.description}</p>
+                            <div class="text-muted small">Detected: ${formatDate(anomaly.detected_at)}</div>
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <div class="fw-bold me-2">Score:</div>
+                            <div class="progress flex-grow-1" style="height: 8px;">
+                                <div class="progress-bar ${severityClass}" role="progressbar" 
+                                     style="width: ${anomaly.score * 100}%;" 
+                                     aria-valuenow="${anomaly.score * 100}" 
+                                     aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                            <div class="ms-2">${(anomaly.score * 100).toFixed(0)}%</div>
+                        </div>
+                        <div class="d-grid">
+                            <a href="/mobile/anomaly/${anomaly.id}" class="btn btn-sm btn-outline-primary">View Details</a>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        anomaliesList.innerHTML = html;
+    }
+    
+    // Filter anomalies based on search and filters
+    function filterAnomalies() {
+        if (!window.allAnomalies) return;
+        
+        const searchTerm = document.getElementById('anomalySearchInput').value.toLowerCase();
+        const anomalyType = document.getElementById('anomalyTypeFilter').value;
+        const anomalySeverity = document.getElementById('anomalySeverityFilter').value;
+        
+        const startDate = document.getElementById('startDateFilter').value;
+        const endDate = document.getElementById('endDateFilter').value;
+        const minScore = document.getElementById('minScoreFilter').value;
+        const maxScore = document.getElementById('maxScoreFilter').value;
+        
+        const showDataType = document.getElementById('dataTypeFilter').checked;
+        const showSpatialType = document.getElementById('spatialTypeFilter').checked;
+        const showValuationType = document.getElementById('valuationTypeFilter').checked;
+        const showTemporalType = document.getElementById('temporalTypeFilter').checked;
+        
+        // Filter the anomalies
+        let filteredAnomalies = window.allAnomalies.filter(anomaly => {
+            // Search term filter
+            if (searchTerm && !anomaly.address.toLowerCase().includes(searchTerm) && 
+                !anomaly.property_id.toLowerCase().includes(searchTerm) &&
+                !anomaly.description.toLowerCase().includes(searchTerm)) {
+                return false;
+            }
+            
+            // Anomaly type filter from dropdown
+            if (anomalyType !== 'all' && anomaly.type !== anomalyType) {
+                return false;
+            }
+            
+            // Anomaly severity filter from dropdown
+            if (anomalySeverity !== 'all' && anomaly.severity !== anomalySeverity) {
+                return false;
+            }
+            
+            // Date range filter
+            if (startDate) {
+                const anomalyDate = new Date(anomaly.detected_at);
+                const startFilterDate = new Date(startDate);
+                if (anomalyDate < startFilterDate) return false;
+            }
+            
+            if (endDate) {
+                const anomalyDate = new Date(anomaly.detected_at);
+                const endFilterDate = new Date(endDate);
+                endFilterDate.setHours(23, 59, 59);
+                if (anomalyDate > endFilterDate) return false;
+            }
+            
+            // Score range filter
+            if (minScore && anomaly.score < parseFloat(minScore)) return false;
+            if (maxScore && anomaly.score > parseFloat(maxScore)) return false;
+            
+            // Anomaly type filters from checkboxes
+            if (anomaly.type === 'data' && !showDataType) return false;
+            if (anomaly.type === 'spatial' && !showSpatialType) return false;
+            if (anomaly.type === 'valuation' && !showValuationType) return false;
+            if (anomaly.type === 'temporal' && !showTemporalType) return false;
+            
+            return true;
+        });
+        
+        // Sort by severity (high to low) and then by score (high to low)
+        filteredAnomalies.sort((a, b) => {
+            const severityOrder = { 'high': 0, 'medium': 1, 'low': 2 };
+            const severityDiff = severityOrder[a.severity] - severityOrder[b.severity];
+            
+            if (severityDiff !== 0) return severityDiff;
+            
+            return b.score - a.score;
+        });
+        
+        // Update counts and render
+        updateCounts(filteredAnomalies);
+        renderAnomalies(filteredAnomalies);
+    }
+    
+    // Helper functions
+    function getSeverityClass(severity) {
+        switch (severity) {
+            case 'high': return 'bg-danger';
+            case 'medium': return 'bg-warning';
+            case 'low': return 'bg-success';
+            default: return 'bg-secondary';
+        }
+    }
+    
+    function getTypeClass(type) {
+        switch (type) {
+            case 'data': return 'bg-primary';
+            case 'spatial': return 'bg-info';
+            case 'valuation': return 'bg-violet';
+            case 'temporal': return 'bg-teal';
+            default: return 'bg-secondary';
+        }
+    }
+    
+    function getTypeLabel(type) {
+        switch (type) {
+            case 'data': return 'Data';
+            case 'spatial': return 'Spatial';
+            case 'valuation': return 'Valuation';
+            case 'temporal': return 'Temporal';
+            default: return type.charAt(0).toUpperCase() + type.slice(1);
+        }
+    }
+    
+    function formatDate(dateString) {
+        const date = new Date(dateString);
+        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    }
+    
+    // Debounce function to prevent too many filter operations
+    function debounce(func, wait) {
+        let timeout;
+        return function() {
+            const context = this;
+            const args = arguments;
+            clearTimeout(timeout);
+            timeout = setTimeout(() => {
+                func.apply(context, args);
+            }, wait);
+        };
+    }
+</script>
+
+<style>
+    /* Custom badge colors */
+    .bg-violet {
+        background-color: #6f42c1;
+    }
+    
+    .bg-teal {
+        background-color: #20c997;
+    }
+</style>
+{% endblock %}

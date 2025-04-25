@@ -1,0 +1,544 @@
+{% extends 'mobile_layout.html' %}
+
+{% block title %}GeoAssessmentPro | Search{% endblock %}
+
+{% block content %}
+<div class="mobile-container">
+    <div class="mobile-section-title">Search</div>
+
+    <!-- Search Form -->
+    <div class="mobile-card p-3 mb-3">
+        <form id="searchForm" action="/mobile/search" method="get">
+            <div class="mb-3">
+                <div class="input-group">
+                    <input type="text" class="form-control" id="searchInput" name="q" placeholder="Search properties, anomalies, or addresses..." value="{{ query }}">
+                    <button class="btn btn-primary" type="submit">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="d-flex">
+                <div class="form-check me-3">
+                    <input class="form-check-input" type="checkbox" value="" id="propertyCheck" checked>
+                    <label class="form-check-label" for="propertyCheck">
+                        Properties
+                    </label>
+                </div>
+                <div class="form-check me-3">
+                    <input class="form-check-input" type="checkbox" value="" id="anomalyCheck" checked>
+                    <label class="form-check-label" for="anomalyCheck">
+                        Anomalies
+                    </label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" value="" id="addressCheck" checked>
+                    <label class="form-check-label" for="addressCheck">
+                        Addresses
+                    </label>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    {% if query %}
+    <!-- Search Results -->
+    <div id="searchResults">
+        <!-- Results will be loaded here -->
+        <div class="text-center py-4" id="loadingIndicator">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Searching...</p>
+        </div>
+    </div>
+    {% else %}
+    <!-- Quick Search Suggestions -->
+    <div class="mobile-section-title">Quick Searches</div>
+    
+    <div class="mobile-card p-3 mb-3">
+        <div class="list-group">
+            <a href="/mobile/search?q=anomaly" class="list-group-item list-group-item-action d-flex align-items-center">
+                <i class="fas fa-exclamation-triangle me-3 text-danger"></i>
+                <div>
+                    <div class="fw-bold">Recent Anomalies</div>
+                    <div class="text-muted small">Search for detected anomalies</div>
+                </div>
+            </a>
+            <a href="/mobile/search?q=residential" class="list-group-item list-group-item-action d-flex align-items-center">
+                <i class="fas fa-home me-3 text-primary"></i>
+                <div>
+                    <div class="fw-bold">Residential Properties</div>
+                    <div class="text-muted small">Search for residential properties</div>
+                </div>
+            </a>
+            <a href="/mobile/search?q=commercial" class="list-group-item list-group-item-action d-flex align-items-center">
+                <i class="fas fa-building me-3 text-secondary"></i>
+                <div>
+                    <div class="fw-bold">Commercial Properties</div>
+                    <div class="text-muted small">Search for commercial properties</div>
+                </div>
+            </a>
+            <a href="/mobile/search?q=kennewick" class="list-group-item list-group-item-action d-flex align-items-center">
+                <i class="fas fa-map-marker-alt me-3 text-success"></i>
+                <div>
+                    <div class="fw-bold">Kennewick Area</div>
+                    <div class="text-muted small">Search for properties in Kennewick</div>
+                </div>
+            </a>
+            <a href="/mobile/search?q=richland" class="list-group-item list-group-item-action d-flex align-items-center">
+                <i class="fas fa-map-marker-alt me-3 text-success"></i>
+                <div>
+                    <div class="fw-bold">Richland Area</div>
+                    <div class="text-muted small">Search for properties in Richland</div>
+                </div>
+            </a>
+        </div>
+    </div>
+    
+    <div class="mobile-section-title">Recent Searches</div>
+    
+    <div class="mobile-card p-3 mb-3">
+        <div class="list-group">
+            <a href="/mobile/search?q=main street" class="list-group-item list-group-item-action">
+                <div class="d-flex w-100 justify-content-between">
+                    <span>Main Street</span>
+                    <small class="text-muted">1 day ago</small>
+                </div>
+            </a>
+            <a href="/mobile/search?q=high value properties" class="list-group-item list-group-item-action">
+                <div class="d-flex w-100 justify-content-between">
+                    <span>High value properties</span>
+                    <small class="text-muted">2 days ago</small>
+                </div>
+            </a>
+            <a href="/mobile/search?q=spatial anomalies" class="list-group-item list-group-item-action">
+                <div class="d-flex w-100 justify-content-between">
+                    <span>Spatial anomalies</span>
+                    <small class="text-muted">3 days ago</small>
+                </div>
+            </a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block action_button %}
+<a href="#" class="action-button" onclick="showBottomSheet()">
+    <i class="fas fa-sliders-h"></i>
+</a>
+{% endblock %}
+
+{% block sheet_title %}Advanced Search{% endblock %}
+
+{% block sheet_content %}
+<form id="advancedSearchForm">
+    <div class="mb-3">
+        <label class="mobile-form-label">Property Type</label>
+        <select class="mobile-form-control" id="propertyTypeFilter">
+            <option value="all">All Types</option>
+            <option value="residential">Residential</option>
+            <option value="commercial">Commercial</option>
+            <option value="agricultural">Agricultural</option>
+            <option value="industrial">Industrial</option>
+        </select>
+    </div>
+    
+    <div class="mb-3">
+        <label class="mobile-form-label">Value Range</label>
+        <div class="row">
+            <div class="col-6">
+                <input type="number" class="mobile-form-control" id="minValueFilter" placeholder="Min Value">
+            </div>
+            <div class="col-6">
+                <input type="number" class="mobile-form-control" id="maxValueFilter" placeholder="Max Value">
+            </div>
+        </div>
+    </div>
+    
+    <div class="mb-3">
+        <label class="mobile-form-label">Assessment Date</label>
+        <div class="row">
+            <div class="col-6">
+                <input type="date" class="mobile-form-control" id="minDateFilter">
+            </div>
+            <div class="col-6">
+                <input type="date" class="mobile-form-control" id="maxDateFilter">
+            </div>
+        </div>
+    </div>
+    
+    <div class="mb-3">
+        <label class="mobile-form-label">Anomaly Type</label>
+        <select class="mobile-form-control" id="anomalyTypeFilter">
+            <option value="all">All Types</option>
+            <option value="data">Data</option>
+            <option value="spatial">Spatial</option>
+            <option value="valuation">Valuation</option>
+            <option value="temporal">Temporal</option>
+        </select>
+    </div>
+    
+    <div class="mb-3">
+        <label class="mobile-form-label">Anomaly Severity</label>
+        <select class="mobile-form-control" id="anomalySeverityFilter">
+            <option value="all">All Severities</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+        </select>
+    </div>
+    
+    <div class="d-grid gap-2">
+        <button class="btn btn-primary" id="applyAdvancedSearchBtn" type="button">Apply Filters</button>
+        <button class="btn btn-outline-secondary" id="resetAdvancedSearchBtn" type="button">Reset Filters</button>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const query = "{{ query }}";
+        
+        if (query) {
+            // Simulate search
+            simulateSearch(query);
+        }
+        
+        // Handle search form submission
+        document.getElementById('searchForm').addEventListener('submit', function(e) {
+            const searchInput = document.getElementById('searchInput').value.trim();
+            if (!searchInput) {
+                e.preventDefault();
+                alert('Please enter a search term');
+            }
+        });
+        
+        // Handle advanced search
+        document.getElementById('applyAdvancedSearchBtn').addEventListener('click', function() {
+            const searchInput = document.getElementById('searchInput').value.trim();
+            
+            if (!searchInput) {
+                alert('Please enter a search term');
+                return;
+            }
+            
+            // Get filter values
+            const propertyType = document.getElementById('propertyTypeFilter').value;
+            const minValue = document.getElementById('minValueFilter').value;
+            const maxValue = document.getElementById('maxValueFilter').value;
+            const minDate = document.getElementById('minDateFilter').value;
+            const maxDate = document.getElementById('maxDateFilter').value;
+            const anomalyType = document.getElementById('anomalyTypeFilter').value;
+            const anomalySeverity = document.getElementById('anomalySeverityFilter').value;
+            
+            // Build query string
+            let queryString = `q=${encodeURIComponent(searchInput)}`;
+            
+            if (propertyType !== 'all') {
+                queryString += `&property_type=${encodeURIComponent(propertyType)}`;
+            }
+            
+            if (minValue) {
+                queryString += `&min_value=${encodeURIComponent(minValue)}`;
+            }
+            
+            if (maxValue) {
+                queryString += `&max_value=${encodeURIComponent(maxValue)}`;
+            }
+            
+            if (minDate) {
+                queryString += `&min_date=${encodeURIComponent(minDate)}`;
+            }
+            
+            if (maxDate) {
+                queryString += `&max_date=${encodeURIComponent(maxDate)}`;
+            }
+            
+            if (anomalyType !== 'all') {
+                queryString += `&anomaly_type=${encodeURIComponent(anomalyType)}`;
+            }
+            
+            if (anomalySeverity !== 'all') {
+                queryString += `&anomaly_severity=${encodeURIComponent(anomalySeverity)}`;
+            }
+            
+            // Redirect to search results
+            window.location.href = `/mobile/search?${queryString}`;
+            
+            // Hide bottom sheet
+            hideBottomSheet();
+        });
+        
+        // Reset advanced search
+        document.getElementById('resetAdvancedSearchBtn').addEventListener('click', function() {
+            document.getElementById('propertyTypeFilter').value = 'all';
+            document.getElementById('minValueFilter').value = '';
+            document.getElementById('maxValueFilter').value = '';
+            document.getElementById('minDateFilter').value = '';
+            document.getElementById('maxDateFilter').value = '';
+            document.getElementById('anomalyTypeFilter').value = 'all';
+            document.getElementById('anomalySeverityFilter').value = 'all';
+        });
+    });
+    
+    // Simulate search results (in a real app, would call API)
+    function simulateSearch(query) {
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const searchResults = document.getElementById('searchResults');
+        
+        // Simulate API delay
+        setTimeout(function() {
+            // Generate mock search results based on query
+            const results = generateSearchResults(query);
+            
+            // Remove loading indicator
+            loadingIndicator.style.display = 'none';
+            
+            // Display results
+            if (results.length === 0) {
+                searchResults.innerHTML = `
+                    <div class="text-center py-4">
+                        <i class="fas fa-search fa-2x mb-3 text-muted"></i>
+                        <p>No results found for "<strong>${query}</strong>".</p>
+                        <p class="text-muted">Try a different search term or use the advanced search.</p>
+                    </div>
+                `;
+            } else {
+                // Display results count
+                searchResults.innerHTML = `
+                    <div class="mb-3">
+                        <p class="text-muted">Found ${results.length} results for "<strong>${query}</strong>"</p>
+                    </div>
+                `;
+                
+                // Add result cards
+                results.forEach(result => {
+                    searchResults.innerHTML += createResultCard(result);
+                });
+            }
+        }, 1000);
+    }
+    
+    // Generate mock search results based on query
+    function generateSearchResults(query) {
+        query = query.toLowerCase();
+        let results = [];
+        
+        // Check if property type
+        if (query.includes('residential')) {
+            results.push(
+                { 
+                    type: 'property',
+                    propertyType: 'Residential',
+                    id: 'P10001',
+                    address: '123 Main Street, Kennewick',
+                    value: '$325,000'
+                },
+                { 
+                    type: 'property',
+                    propertyType: 'Residential',
+                    id: 'P10003',
+                    address: '789 Pine Boulevard, Richland',
+                    value: '$425,000'
+                }
+            );
+        }
+        
+        if (query.includes('commercial')) {
+            results.push(
+                { 
+                    type: 'property',
+                    propertyType: 'Commercial',
+                    id: 'P10002',
+                    address: '456 Oak Avenue, Richland',
+                    value: '$750,000'
+                }
+            );
+        }
+        
+        // Check if locations
+        if (query.includes('kennewick')) {
+            if (!results.some(r => r.id === 'P10001')) {
+                results.push(
+                    { 
+                        type: 'property',
+                        propertyType: 'Residential',
+                        id: 'P10001',
+                        address: '123 Main Street, Kennewick',
+                        value: '$325,000'
+                    }
+                );
+            }
+        }
+        
+        if (query.includes('richland')) {
+            if (!results.some(r => r.id === 'P10002')) {
+                results.push(
+                    { 
+                        type: 'property',
+                        propertyType: 'Commercial',
+                        id: 'P10002',
+                        address: '456 Oak Avenue, Richland',
+                        value: '$750,000'
+                    }
+                );
+            }
+            
+            if (!results.some(r => r.id === 'P10003')) {
+                results.push(
+                    { 
+                        type: 'property',
+                        propertyType: 'Residential',
+                        id: 'P10003',
+                        address: '789 Pine Boulevard, Richland',
+                        value: '$425,000'
+                    }
+                );
+            }
+        }
+        
+        // Check if anomaly related
+        if (query.includes('anomaly') || query.includes('spatial')) {
+            results.push(
+                {
+                    type: 'anomaly',
+                    anomalyType: 'Spatial',
+                    severity: 'medium',
+                    id: '1002',
+                    propertyId: 'P10002',
+                    address: '456 Oak Avenue, Richland',
+                    description: 'Property boundaries inconsistent with aerial imagery'
+                }
+            );
+        }
+        
+        if (query.includes('anomaly') || query.includes('valuation')) {
+            results.push(
+                {
+                    type: 'anomaly',
+                    anomalyType: 'Valuation',
+                    severity: 'high',
+                    id: '1003',
+                    propertyId: 'P10003',
+                    address: '789 Pine Boulevard, Richland',
+                    description: 'Unusual 40% value decrease over 30 days'
+                }
+            );
+        }
+        
+        // Check street names
+        if (query.includes('main')) {
+            if (!results.some(r => r.id === 'P10001' || r.propertyId === 'P10001')) {
+                results.push(
+                    { 
+                        type: 'property',
+                        propertyType: 'Residential',
+                        id: 'P10001',
+                        address: '123 Main Street, Kennewick',
+                        value: '$325,000'
+                    }
+                );
+            }
+        }
+        
+        if (query.includes('oak')) {
+            if (!results.some(r => r.id === 'P10002' || r.propertyId === 'P10002')) {
+                results.push(
+                    { 
+                        type: 'property',
+                        propertyType: 'Commercial',
+                        id: 'P10002',
+                        address: '456 Oak Avenue, Richland',
+                        value: '$750,000'
+                    }
+                );
+            }
+        }
+        
+        if (query.includes('pine')) {
+            if (!results.some(r => r.id === 'P10003' || r.propertyId === 'P10003')) {
+                results.push(
+                    { 
+                        type: 'property',
+                        propertyType: 'Residential',
+                        id: 'P10003',
+                        address: '789 Pine Boulevard, Richland',
+                        value: '$425,000'
+                    }
+                );
+            }
+        }
+        
+        return results;
+    }
+    
+    // Create result card HTML
+    function createResultCard(result) {
+        if (result.type === 'property') {
+            return `
+                <div class="mobile-card mb-3">
+                    <div class="p-3">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <h5 class="mb-0">${result.address}</h5>
+                                <div class="text-muted small">ID: ${result.id}</div>
+                            </div>
+                            <div>
+                                <span class="badge bg-secondary">${result.propertyType}</span>
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <div><strong>Value:</strong> ${result.value}</div>
+                        </div>
+                        <div class="d-grid">
+                            <a href="/mobile/property/${result.id}" class="btn btn-sm btn-outline-primary">View Details</a>
+                        </div>
+                    </div>
+                </div>
+            `;
+        } else if (result.type === 'anomaly') {
+            const severityClass = result.severity === 'high' ? 'bg-danger' : (result.severity === 'medium' ? 'bg-warning' : 'bg-success');
+            const anomalyTypeClass = result.anomalyType === 'Spatial' ? 'bg-info' : 
+                                      (result.anomalyType === 'Valuation' ? 'bg-violet' : 
+                                      (result.anomalyType === 'Temporal' ? 'bg-teal' : 'bg-primary'));
+            
+            return `
+                <div class="mobile-card mb-3">
+                    <div class="p-3">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <h5 class="mb-0">${result.anomalyType} Anomaly</h5>
+                                <div class="text-muted small">Property: ${result.propertyId}</div>
+                            </div>
+                            <div class="d-flex">
+                                <span class="badge ${severityClass} me-1">${result.severity.toUpperCase()}</span>
+                                <span class="badge ${anomalyTypeClass}">${result.anomalyType}</span>
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <p>${result.description}</p>
+                            <div class="text-muted small">Address: ${result.address}</div>
+                        </div>
+                        <div class="d-grid">
+                            <a href="/mobile/anomaly/${result.id}" class="btn btn-sm btn-outline-danger">View Anomaly</a>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    }
+</script>
+
+<style>
+    /* Custom badge colors */
+    .bg-violet {
+        background-color: #6f42c1;
+    }
+    
+    .bg-teal {
+        background-color: #20c997;
+    }
+</style>
+{% endblock %}

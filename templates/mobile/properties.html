@@ -1,0 +1,302 @@
+{% extends 'mobile_layout.html' %}
+
+{% block title %}GeoAssessmentPro | Properties{% endblock %}
+
+{% block content %}
+<div class="mobile-container">
+    <div class="mobile-section-title">Properties</div>
+
+    <!-- Search Bar -->
+    <div class="mobile-search-bar mb-3">
+        <i class="fas fa-search mobile-search-icon"></i>
+        <input type="text" class="mobile-search-input" id="propertySearchInput" placeholder="Search properties...">
+    </div>
+
+    <!-- Properties Filters -->
+    <div class="mobile-card mb-3">
+        <div class="p-3">
+            <div class="row">
+                <div class="col-6">
+                    <select class="form-select form-select-sm" id="propertyTypeFilter">
+                        <option value="all">All Types</option>
+                        <option value="residential">Residential</option>
+                        <option value="commercial">Commercial</option>
+                        <option value="agricultural">Agricultural</option>
+                        <option value="industrial">Industrial</option>
+                    </select>
+                </div>
+                <div class="col-6">
+                    <select class="form-select form-select-sm" id="propertySortOrder">
+                        <option value="address_asc">Address A-Z</option>
+                        <option value="address_desc">Address Z-A</option>
+                        <option value="value_asc">Value (Low-High)</option>
+                        <option value="value_desc">Value (High-Low)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Properties List -->
+    <div id="propertiesList">
+        <!-- Will be populated with property cards -->
+        <div class="text-center py-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading properties...</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block action_button %}
+<a href="#" class="action-button" onclick="showBottomSheet()">
+    <i class="fas fa-filter"></i>
+</a>
+{% endblock %}
+
+{% block sheet_title %}Advanced Filters{% endblock %}
+
+{% block sheet_content %}
+<div class="mb-3">
+    <label class="mobile-form-label">Value Range</label>
+    <div class="row">
+        <div class="col-6">
+            <input type="number" class="mobile-form-control" id="minValueFilter" placeholder="Min Value">
+        </div>
+        <div class="col-6">
+            <input type="number" class="mobile-form-control" id="maxValueFilter" placeholder="Max Value">
+        </div>
+    </div>
+</div>
+
+<div class="mb-3">
+    <label class="mobile-form-label">Assessment Date</label>
+    <div class="row">
+        <div class="col-6">
+            <input type="date" class="mobile-form-control" id="minDateFilter">
+        </div>
+        <div class="col-6">
+            <input type="date" class="mobile-form-control" id="maxDateFilter">
+        </div>
+    </div>
+</div>
+
+<div class="mb-3">
+    <label class="mobile-form-label">Square Footage</label>
+    <div class="row">
+        <div class="col-6">
+            <input type="number" class="mobile-form-control" id="minSqftFilter" placeholder="Min sqft">
+        </div>
+        <div class="col-6">
+            <input type="number" class="mobile-form-control" id="maxSqftFilter" placeholder="Max sqft">
+        </div>
+    </div>
+</div>
+
+<div class="mb-3">
+    <label class="mobile-form-label">Status</label>
+    <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="normalStatusFilter" checked>
+        <label class="form-check-label" for="normalStatusFilter">
+            Normal
+        </label>
+    </div>
+    <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="anomalyStatusFilter" checked>
+        <label class="form-check-label" for="anomalyStatusFilter">
+            Has Anomalies
+        </label>
+    </div>
+</div>
+
+<div class="d-grid gap-2">
+    <button class="btn btn-primary" id="applyFiltersBtn">Apply Filters</button>
+    <button class="btn btn-outline-secondary" id="resetFiltersBtn">Reset Filters</button>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Fetch properties from API
+        fetchProperties();
+        
+        // Set up event listeners
+        document.getElementById('propertySearchInput').addEventListener('input', debounce(function() {
+            filterProperties();
+        }, 300));
+        
+        document.getElementById('propertyTypeFilter').addEventListener('change', filterProperties);
+        document.getElementById('propertySortOrder').addEventListener('change', filterProperties);
+        
+        document.getElementById('applyFiltersBtn').addEventListener('click', function() {
+            filterProperties();
+            hideBottomSheet();
+        });
+        
+        document.getElementById('resetFiltersBtn').addEventListener('click', function() {
+            // Reset all filters
+            document.getElementById('minValueFilter').value = '';
+            document.getElementById('maxValueFilter').value = '';
+            document.getElementById('minDateFilter').value = '';
+            document.getElementById('maxDateFilter').value = '';
+            document.getElementById('minSqftFilter').value = '';
+            document.getElementById('maxSqftFilter').value = '';
+            document.getElementById('normalStatusFilter').checked = true;
+            document.getElementById('anomalyStatusFilter').checked = true;
+            
+            // Apply the reset
+            filterProperties();
+            hideBottomSheet();
+        });
+    });
+    
+    // Fetch properties from API
+    function fetchProperties() {
+        fetch('/mobile/api/properties')
+            .then(response => response.json())
+            .then(data => {
+                // Store the original data for filtering
+                window.allProperties = data.properties;
+                
+                // Display the properties
+                renderProperties(data.properties);
+            })
+            .catch(error => {
+                console.error('Error fetching properties:', error);
+                document.getElementById('propertiesList').innerHTML = `
+                    <div class="alert alert-danger">
+                        Error loading properties. Please try again.
+                    </div>
+                `;
+            });
+    }
+    
+    // Render properties list
+    function renderProperties(properties) {
+        const propertiesList = document.getElementById('propertiesList');
+        
+        if (properties.length === 0) {
+            propertiesList.innerHTML = `
+                <div class="text-center py-4">
+                    <i class="fas fa-search fa-2x mb-3 text-muted"></i>
+                    <p>No properties match your search criteria.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        let html = '';
+        
+        properties.forEach(property => {
+            const statusBadge = property.status === 'normal' 
+                ? '<span class="badge bg-success">Normal</span>' 
+                : '<span class="badge bg-danger">Anomaly</span>';
+                
+            html += `
+                <div class="mobile-card mb-3">
+                    <div class="p-3">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <h5 class="mb-0">${property.address}</h5>
+                                <div class="text-muted small">ID: ${property.id}</div>
+                            </div>
+                            <div>
+                                ${statusBadge}
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <div><strong>Type:</strong> ${property.type}</div>
+                            <div><strong>Value:</strong> ${property.value}</div>
+                        </div>
+                        <div class="d-grid">
+                            <a href="/mobile/property/${property.id}" class="btn btn-sm btn-outline-primary">View Details</a>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        propertiesList.innerHTML = html;
+    }
+    
+    // Filter properties based on search and filters
+    function filterProperties() {
+        if (!window.allProperties) return;
+        
+        const searchTerm = document.getElementById('propertySearchInput').value.toLowerCase();
+        const propertyType = document.getElementById('propertyTypeFilter').value;
+        const sortOrder = document.getElementById('propertySortOrder').value;
+        
+        const minValue = document.getElementById('minValueFilter').value;
+        const maxValue = document.getElementById('maxValueFilter').value;
+        const showNormal = document.getElementById('normalStatusFilter').checked;
+        const showAnomalies = document.getElementById('anomalyStatusFilter').checked;
+        
+        // Filter the properties
+        let filteredProperties = window.allProperties.filter(property => {
+            // Search term filter
+            if (searchTerm && !property.address.toLowerCase().includes(searchTerm) && 
+                !property.id.toLowerCase().includes(searchTerm)) {
+                return false;
+            }
+            
+            // Property type filter
+            if (propertyType !== 'all' && property.type.toLowerCase() !== propertyType.toLowerCase()) {
+                return false;
+            }
+            
+            // Value range filter
+            if (minValue) {
+                const propertyValue = parseInt(property.value.replace(/[$,]/g, ''));
+                if (propertyValue < parseInt(minValue)) return false;
+            }
+            
+            if (maxValue) {
+                const propertyValue = parseInt(property.value.replace(/[$,]/g, ''));
+                if (propertyValue > parseInt(maxValue)) return false;
+            }
+            
+            // Status filter
+            if (property.status === 'normal' && !showNormal) return false;
+            if (property.status === 'anomaly' && !showAnomalies) return false;
+            
+            return true;
+        });
+        
+        // Sort the properties
+        filteredProperties.sort((a, b) => {
+            switch (sortOrder) {
+                case 'address_asc':
+                    return a.address.localeCompare(b.address);
+                case 'address_desc':
+                    return b.address.localeCompare(a.address);
+                case 'value_asc':
+                    return parseInt(a.value.replace(/[$,]/g, '')) - parseInt(b.value.replace(/[$,]/g, ''));
+                case 'value_desc':
+                    return parseInt(b.value.replace(/[$,]/g, '')) - parseInt(a.value.replace(/[$,]/g, ''));
+                default:
+                    return 0;
+            }
+        });
+        
+        // Render the filtered properties
+        renderProperties(filteredProperties);
+    }
+    
+    // Debounce function to prevent too many filter operations
+    function debounce(func, wait) {
+        let timeout;
+        return function() {
+            const context = this;
+            const args = arguments;
+            clearTimeout(timeout);
+            timeout = setTimeout(() => {
+                func.apply(context, args);
+            }, wait);
+        };
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,289 @@
+{% extends 'mobile_layout.html' %}
+
+{% block title %}GeoAssessmentPro | Settings{% endblock %}
+
+{% block content %}
+<div class="mobile-container">
+    <div class="mobile-section-title">Settings</div>
+
+    <!-- User Profile -->
+    <div class="mobile-card p-3 mb-3">
+        <div class="d-flex align-items-center mb-3">
+            <div class="me-3">
+                <div style="width: 64px; height: 64px; background-color: #e9ecef; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-user fa-2x text-secondary"></i>
+                </div>
+            </div>
+            <div>
+                <h5 class="mb-1">{{ session.user.username }}</h5>
+                <p class="text-muted mb-0">{{ session.user.email }}</p>
+            </div>
+        </div>
+        <div class="d-grid gap-2">
+            <button class="btn btn-outline-primary btn-sm" id="editProfileBtn">
+                <i class="fas fa-user-edit me-2"></i> Edit Profile
+            </button>
+        </div>
+    </div>
+
+    <!-- App Settings -->
+    <div class="mobile-card mb-3">
+        <div class="list-group list-group-flush">
+            <div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="fw-bold">Dark Mode</div>
+                        <div class="text-muted small">Toggle dark mode appearance</div>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="darkModeToggle">
+                    </div>
+                </div>
+            </div>
+            <div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="fw-bold">Notifications</div>
+                        <div class="text-muted small">Enable push notifications</div>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="notificationsToggle" checked>
+                    </div>
+                </div>
+            </div>
+            <div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="fw-bold">Auto-Refresh Data</div>
+                        <div class="text-muted small">Keep data updated automatically</div>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="autoRefreshToggle" checked>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Map Settings -->
+    <div class="mobile-section-title">Map Settings</div>
+    <div class="mobile-card mb-3">
+        <div class="list-group list-group-flush">
+            <div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="fw-bold">Default Map Type</div>
+                    </div>
+                    <select class="form-select form-select-sm" style="width: auto" id="defaultMapType">
+                        <option value="streets">Streets</option>
+                        <option value="satellite">Satellite</option>
+                        <option value="hybrid">Hybrid</option>
+                    </select>
+                </div>
+            </div>
+            <div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="fw-bold">Show Property Labels</div>
+                        <div class="text-muted small">Display property IDs on map</div>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="propertyLabelsToggle" checked>
+                    </div>
+                </div>
+            </div>
+            <div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="fw-bold">Cluster Markers</div>
+                        <div class="text-muted small">Group nearby properties</div>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="clusterMarkersToggle" checked>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Settings -->
+    <div class="mobile-section-title">Data Settings</div>
+    <div class="mobile-card mb-3">
+        <div class="list-group list-group-flush">
+            <div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="fw-bold">Show Anomalies</div>
+                        <div class="text-muted small">Display detected anomalies</div>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="showAnomaliesToggle" checked>
+                    </div>
+                </div>
+            </div>
+            <div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="fw-bold">Anomaly Minimum Severity</div>
+                    </div>
+                    <select class="form-select form-select-sm" style="width: auto" id="minAnomalySeverity">
+                        <option value="low">Low</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="high">High</option>
+                    </select>
+                </div>
+            </div>
+            <div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="fw-bold">Use AI Valuation</div>
+                        <div class="text-muted small">Enable AI for property valuation</div>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="aiValuationToggle" checked>
+                    </div>
+                </div>
+            </div>
+            <div class="list-group-item">
+                <div class="mb-2">
+                    <div class="fw-bold">Refresh Interval</div>
+                    <div class="text-muted small">How often to check for updates</div>
+                </div>
+                <select class="form-select" id="refreshInterval">
+                    <option value="0">Manual only</option>
+                    <option value="30">Every 30 seconds</option>
+                    <option value="60" selected>Every minute</option>
+                    <option value="300">Every 5 minutes</option>
+                    <option value="600">Every 10 minutes</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Account Settings -->
+    <div class="mobile-section-title">Account Settings</div>
+    <div class="mobile-card mb-3">
+        <div class="list-group list-group-flush">
+            <div class="list-group-item">
+                <a href="#" class="d-flex justify-content-between align-items-center text-decoration-none text-reset">
+                    <div>
+                        <div class="fw-bold">Change Password</div>
+                        <div class="text-muted small">Update your account password</div>
+                    </div>
+                    <i class="fas fa-chevron-right text-muted"></i>
+                </a>
+            </div>
+            <div class="list-group-item">
+                <a href="#" class="d-flex justify-content-between align-items-center text-decoration-none text-reset">
+                    <div>
+                        <div class="fw-bold">Privacy Settings</div>
+                        <div class="text-muted small">Manage your data privacy</div>
+                    </div>
+                    <i class="fas fa-chevron-right text-muted"></i>
+                </a>
+            </div>
+            <div class="list-group-item">
+                <a href="#" class="d-flex justify-content-between align-items-center text-decoration-none text-reset">
+                    <div>
+                        <div class="fw-bold text-danger">Sign Out</div>
+                        <div class="text-muted small">Log out of your account</div>
+                    </div>
+                    <i class="fas fa-sign-out-alt text-danger"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- App Information -->
+    <div class="mobile-card p-3 mb-4">
+        <div class="text-center">
+            <div class="mb-2">
+                <i class="fas fa-wave-square fa-2x" style="color: var(--tf-flow-aqua);"></i>
+            </div>
+            <h5>GeoAssessmentPro</h5>
+            <p class="text-muted mb-1">Version 2.1.0</p>
+            <p class="small text-muted mb-0">© 2025 TerraFusion Technologies</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Handle dark mode toggle
+        const darkModeToggle = document.getElementById('darkModeToggle');
+        
+        // Check if dark mode was previously enabled
+        if (localStorage.getItem('darkMode') === 'enabled') {
+            darkModeToggle.checked = true;
+            document.body.classList.add('dark-mode');
+        }
+        
+        darkModeToggle.addEventListener('change', function() {
+            if (this.checked) {
+                document.body.classList.add('dark-mode');
+                localStorage.setItem('darkMode', 'enabled');
+            } else {
+                document.body.classList.remove('dark-mode');
+                localStorage.setItem('darkMode', 'disabled');
+            }
+        });
+        
+        // Handle edit profile button
+        document.getElementById('editProfileBtn').addEventListener('click', function() {
+            alert('Profile editing will be available in the next update.');
+        });
+        
+        // Save settings changes
+        const settingControls = document.querySelectorAll('.form-check-input, .form-select');
+        settingControls.forEach(control => {
+            control.addEventListener('change', function() {
+                // In a real app, we would save these settings to the user's profile
+                // For now, just show a toast notification
+                showToast('Settings updated');
+            });
+        });
+        
+        // Sign out link
+        document.querySelector('.text-danger').closest('a').addEventListener('click', function(e) {
+            e.preventDefault();
+            if (confirm('Are you sure you want to sign out?')) {
+                window.location.href = '/logout';
+            }
+        });
+    });
+    
+    // Show toast notification
+    function showToast(message) {
+        const toastContainer = document.createElement('div');
+        toastContainer.style.position = 'fixed';
+        toastContainer.style.bottom = '80px';
+        toastContainer.style.left = '50%';
+        toastContainer.style.transform = 'translateX(-50%)';
+        toastContainer.style.zIndex = '9999';
+        
+        const toast = document.createElement('div');
+        toast.className = 'toast show';
+        toast.style.minWidth = '200px';
+        
+        toast.innerHTML = `
+            <div class="toast-header">
+                <strong class="me-auto">GeoAssessmentPro</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body">
+                ${message}
+            </div>
+        `;
+        
+        toastContainer.appendChild(toast);
+        document.body.appendChild(toastContainer);
+        
+        // Remove toast after 3 seconds
+        setTimeout(() => {
+            document.body.removeChild(toastContainer);
+        }, 3000);
+    }
+</script>
+{% endblock %}

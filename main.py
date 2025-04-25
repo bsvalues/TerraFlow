@@ -50,6 +50,10 @@ except Exception as e:
 
 # Import and initialize the Flask app
 from app import app  # noqa: F401
+from mobile_routes import register_mobile_routes
+
+# Register mobile routes
+register_mobile_routes(app)
 
 # Register API endpoints
 try:
