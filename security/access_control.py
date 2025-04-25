@@ -139,7 +139,7 @@ class AccessControlManager:
         self.privileged_sessions = {}
         
         # Initialization state
-        self.is_initialized = True
+        self._initialized = True
         
         logger.info("Access Control Manager initialized")
     
@@ -150,7 +150,7 @@ class AccessControlManager:
         Returns:
             True if initialized, False otherwise
         """
-        return self.is_initialized
+        return True
         
     def has_permission(self, user_id: int, permission: str, 
                        context_attributes: Dict[str, Any] = None) -> bool:

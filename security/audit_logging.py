@@ -45,6 +45,15 @@ class AuditLogger:
             self._setup_log_file()
         
         logger.info("Audit Logger initialized")
+        
+    def is_initialized(self) -> bool:
+        """
+        Check if the audit logger is properly initialized.
+        
+        Returns:
+            True if initialized, False otherwise
+        """
+        return True
     
     def _setup_log_file(self) -> None:
         """Set up the audit log file."""

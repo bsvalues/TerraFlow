@@ -28,8 +28,17 @@ class SecurityMonitoringManager:
         self.active = True
         self.last_scan_time = None
         self.scan_interval = 3600  # Default scan interval (1 hour)
-        self.is_running = True
+        self._is_running = True
         logger.info("Security Monitoring Manager initialized")
+        
+    def is_running(self) -> bool:
+        """
+        Check if security monitoring is running.
+        
+        Returns:
+            True if running, False otherwise
+        """
+        return self._is_running
     
     def register_monitor(self, name: str, monitor: Any) -> None:
         """
