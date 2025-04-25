@@ -27,3 +27,5 @@ werkzeug
 anthropic
 trafilatura
 openai
+matplotlib
+seaborn

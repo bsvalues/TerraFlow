@@ -1,0 +1,430 @@
+{% extends "base.html" %}
+
+{% block title %}{{ template.name }} - Template Details{% endblock %}
+
+{% block head %}
+<style>
+    .actions-bar {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+    }
+    .template-meta {
+        display: flex;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+    }
+    .meta-item {
+        margin-right: 20px;
+        margin-bottom: 10px;
+    }
+    .meta-label {
+        font-size: 0.85rem;
+        color: #6c757d;
+        margin-bottom: 3px;
+    }
+    .meta-value {
+        font-weight: 500;
+    }
+    .template-type-badge {
+        padding: 5px 10px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+    }
+    .type-property {
+        background-color: #e3f7ea;
+        color: #1d8348;
+    }
+    .type-geospatial {
+        background-color: #e3f2fd;
+        color: #0d6efd;
+    }
+    .type-anomaly {
+        background-color: #feebef;
+        color: #d9534f;
+    }
+    .type-custom {
+        background-color: #f5f5f5;
+        color: #6c757d;
+    }
+    .section-card {
+        margin-bottom: 15px;
+        border: 1px solid #f1f1f1;
+        border-radius: 5px;
+        overflow: hidden;
+    }
+    .section-header {
+        background-color: #f8f9fa;
+        padding: 10px 15px;
+        border-bottom: 1px solid #f1f1f1;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .section-body {
+        padding: 15px;
+        background-color: white;
+    }
+    .section-type-icon {
+        width: 20px;
+        text-align: center;
+        margin-right: 8px;
+        color: #6c757d;
+    }
+    .section-content {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 5px;
+        font-family: monospace;
+        font-size: 0.85rem;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+    .export-options {
+        margin-top: 30px;
+        background-color: #f8f9fa;
+        padding: 20px;
+        border-radius: 5px;
+    }
+    .export-title {
+        margin-bottom: 15px;
+        font-weight: 500;
+    }
+    .format-options {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+    .format-option {
+        flex: 1;
+        min-width: 100px;
+        text-align: center;
+        padding: 15px;
+        border: 1px solid #dee2e6;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .format-option:hover {
+        background-color: #f1f9ff;
+        border-color: #b8daff;
+    }
+    .format-option.selected {
+        background-color: #e3f2fd;
+        border-color: #90caf9;
+    }
+    .format-icon {
+        font-size: 2rem;
+        margin-bottom: 10px;
+    }
+    .format-pdf .format-icon {
+        color: #e74c3c;
+    }
+    .format-html .format-icon {
+        color: #3498db;
+    }
+    .format-csv .format-icon {
+        color: #2ecc71;
+    }
+    .format-json .format-icon {
+        color: #f39c12;
+    }
+    .format-excel .format-icon {
+        color: #27ae60;
+    }
+    .toggle-btn {
+        background: none;
+        border: none;
+        color: #6c757d;
+        cursor: pointer;
+    }
+    .toggle-btn:hover {
+        color: #0d6efd;
+    }
+    .section-description {
+        margin-bottom: 10px;
+        font-style: italic;
+        color: #6c757d;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1>{{ template.name }}</h1>
+            <div class="text-muted">{{ template.description }}</div>
+        </div>
+        <div>
+            <a href="{{ url_for('reports.list_templates') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Templates
+            </a>
+        </div>
+    </div>
+    
+    <!-- Actions Bar -->
+    <div class="actions-bar d-flex justify-content-between">
+        <div>
+            <span class="template-type-badge 
+                {% if template.template_type == 'property_assessment' %}type-property
+                {% elif template.template_type == 'geospatial_analysis' %}type-geospatial
+                {% elif template.template_type == 'anomaly_report' %}type-anomaly
+                {% else %}type-custom{% endif %}">
+                {{ template.template_type | replace('_', ' ') | title }}
+            </span>
+        </div>
+        <div>
+            <a href="{{ url_for('reports.edit_template', template_id=template.template_id) }}" class="btn btn-outline-primary">
+                <i class="fas fa-edit"></i> Edit Template
+            </a>
+            <a href="{{ url_for('reports.generate_report') }}?template_id={{ template.template_id }}" class="btn btn-success">
+                <i class="fas fa-file-export"></i> Generate Report
+            </a>
+            <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#cloneTemplateModal">
+                <i class="fas fa-copy"></i> Clone
+            </button>
+            <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteTemplateModal">
+                <i class="fas fa-trash"></i> Delete
+            </button>
+        </div>
+    </div>
+    
+    <!-- Template Metadata -->
+    <div class="template-meta">
+        <div class="meta-item">
+            <div class="meta-label">Created</div>
+            <div class="meta-value">{{ template.metadata.created_at.split('T')[0] if template.metadata.created_at else 'N/A' }}</div>
+        </div>
+        <div class="meta-item">
+            <div class="meta-label">Last Modified</div>
+            <div class="meta-value">{{ template.metadata.modified_at.split('T')[0] if template.metadata.modified_at else 'N/A' }}</div>
+        </div>
+        <div class="meta-item">
+            <div class="meta-label">Version</div>
+            <div class="meta-value">{{ template.metadata.version or '1.0' }}</div>
+        </div>
+        <div class="meta-item">
+            <div class="meta-label">Created By</div>
+            <div class="meta-value">{{ template.metadata.created_by or 'System' }}</div>
+        </div>
+        <div class="meta-item">
+            <div class="meta-label">Sections</div>
+            <div class="meta-value">{{ template.sections | length }}</div>
+        </div>
+    </div>
+    
+    <!-- Sections -->
+    <h4 class="mb-3">Template Sections</h4>
+    
+    {% if template.sections %}
+        {% for section in template.sections %}
+        <div class="section-card">
+            <div class="section-header">
+                <div class="d-flex align-items-center">
+                    <div class="section-type-icon">
+                        {% if section.section_type == 'header' %}
+                            <i class="fas fa-heading"></i>
+                        {% elif section.section_type == 'text' %}
+                            <i class="fas fa-font"></i>
+                        {% elif section.section_type == 'property_info' %}
+                            <i class="fas fa-info-circle"></i>
+                        {% elif section.section_type == 'valuation' %}
+                            <i class="fas fa-chart-line"></i>
+                        {% elif section.section_type == 'map' %}
+                            <i class="fas fa-map-marked-alt"></i>
+                        {% elif section.section_type == 'table' %}
+                            <i class="fas fa-table"></i>
+                        {% elif section.section_type == 'chart' %}
+                            <i class="fas fa-chart-bar"></i>
+                        {% elif section.section_type == 'comparable_properties' %}
+                            <i class="fas fa-building"></i>
+                        {% elif section.section_type == 'footer' %}
+                            <i class="fas fa-shoe-prints"></i>
+                        {% else %}
+                            <i class="fas fa-file-alt"></i>
+                        {% endif %}
+                    </div>
+                    <span>{{ section.title }}</span>
+                </div>
+                <div>
+                    <span class="badge bg-light text-dark">{{ section.section_type | replace('_', ' ') | title }}</span>
+                    <button class="toggle-btn section-toggle" data-section="{{ loop.index }}">
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="section-body" id="section-body-{{ loop.index }}" style="display: none;">
+                {% if section.section_type == 'text' and section.content.text %}
+                <div class="section-description">Text Content Section</div>
+                <div class="section-content">{{ section.content.text }}</div>
+                {% else %}
+                <div class="section-description">Section Content (JSON Format)</div>
+                <div class="section-content">{{ section.content | tojson(indent=2) }}</div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i> This template has no sections. Edit the template to add sections.
+        </div>
+    {% endif %}
+    
+    <!-- Export Options -->
+    <div class="export-options">
+        <h5 class="export-title">Generate Report from this Template</h5>
+        
+        <form action="{{ url_for('reports.generate_report') }}" method="post">
+            <input type="hidden" name="template_id" value="{{ template.template_id }}">
+            
+            {% if template.template_type == 'property_assessment' %}
+            <div class="mb-3">
+                <label for="property-id" class="form-label">Property ID</label>
+                <input type="text" class="form-control" id="property-id" name="property_id" required placeholder="Enter property ID">
+            </div>
+            {% elif template.template_type == 'geospatial_analysis' %}
+            <div class="mb-3">
+                <label for="data-layer" class="form-label">Data Layer</label>
+                <select class="form-control" id="data-layer" name="data_layer">
+                    <option value="assessed_value">Assessed Value</option>
+                    <option value="market_value">Market Value</option>
+                    <option value="land_value">Land Value</option>
+                    <option value="property_type">Property Type</option>
+                    <option value="year_built">Year Built</option>
+                    <option value="anomalies">Anomaly Detection</option>
+                </select>
+            </div>
+            {% endif %}
+            
+            <div class="mb-3">
+                <label for="report-title" class="form-label">Report Title</label>
+                <input type="text" class="form-control" id="report-title" name="report_title" placeholder="Enter report title (optional)">
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label">Export Format</label>
+                <div class="format-options">
+                    <div class="format-option format-pdf selected" data-format="pdf">
+                        <div class="format-icon"><i class="far fa-file-pdf"></i></div>
+                        <div>PDF</div>
+                    </div>
+                    <div class="format-option format-html" data-format="html">
+                        <div class="format-icon"><i class="far fa-file-code"></i></div>
+                        <div>HTML</div>
+                    </div>
+                    <div class="format-option format-csv" data-format="csv">
+                        <div class="format-icon"><i class="far fa-file-alt"></i></div>
+                        <div>CSV</div>
+                    </div>
+                    <div class="format-option format-json" data-format="json">
+                        <div class="format-icon"><i class="far fa-file-code"></i></div>
+                        <div>JSON</div>
+                    </div>
+                    <div class="format-option format-excel" data-format="xlsx">
+                        <div class="format-icon"><i class="far fa-file-excel"></i></div>
+                        <div>Excel</div>
+                    </div>
+                </div>
+                <input type="hidden" id="export-format" name="export_format" value="pdf">
+            </div>
+            
+            <button type="submit" class="btn btn-primary btn-lg">
+                <i class="fas fa-file-export"></i> Generate Report
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Clone Template Modal -->
+<div class="modal fade" id="cloneTemplateModal" tabindex="-1" aria-labelledby="cloneTemplateModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="cloneTemplateModalLabel">Clone Template</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('reports.clone_template', template_id=template.template_id) }}" method="post">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="new-template-name" class="form-label">New Template Name</label>
+                        <input type="text" class="form-control" id="new-template-name" name="new_name" value="Copy of {{ template.name }}" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Clone Template</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Template Modal -->
+<div class="modal fade" id="deleteTemplateModal" tabindex="-1" aria-labelledby="deleteTemplateModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteTemplateModalLabel">Confirm Deletion</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete this template?</p>
+                <p class="text-danger">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form action="{{ url_for('reports.delete_template', template_id=template.template_id) }}" method="post">
+                    <button type="submit" class="btn btn-danger">Delete Template</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Toggle section content
+        const toggleButtons = document.querySelectorAll('.section-toggle');
+        toggleButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const sectionIndex = this.getAttribute('data-section');
+                const sectionBody = document.getElementById(`section-body-${sectionIndex}`);
+                const icon = this.querySelector('i');
+                
+                if (sectionBody.style.display === 'none') {
+                    sectionBody.style.display = 'block';
+                    icon.classList.remove('fa-chevron-down');
+                    icon.classList.add('fa-chevron-up');
+                } else {
+                    sectionBody.style.display = 'none';
+                    icon.classList.remove('fa-chevron-up');
+                    icon.classList.add('fa-chevron-down');
+                }
+            });
+        });
+        
+        // Format selection
+        const formatOptions = document.querySelectorAll('.format-option');
+        const formatInput = document.getElementById('export-format');
+        
+        formatOptions.forEach(option => {
+            option.addEventListener('click', function() {
+                // Remove selected class from all options
+                formatOptions.forEach(opt => opt.classList.remove('selected'));
+                
+                // Add selected class to clicked option
+                this.classList.add('selected');
+                
+                // Update hidden input
+                formatInput.value = this.getAttribute('data-format');
+            });
+        });
+    });
+</script>
+{% endblock %}

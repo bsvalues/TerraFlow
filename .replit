@@ -2,7 +2,7 @@ modules = ["python-3.11", "postgresql-16"]
 
 [nix]
 channel = "stable-24_05"
-packages = ["bash", "cargo", "cyrus_sasl", "fontconfig", "geckodriver", "geos", "ghostscript", "glib", "glibcLocales", "harfbuzz", "libiconv", "libxcrypt", "openldap", "openssl", "pango", "pkg-config", "rustc", "unixODBC"]
+packages = ["bash", "cairo", "cargo", "cyrus_sasl", "ffmpeg-full", "fontconfig", "freetype", "geckodriver", "geos", "ghostscript", "glib", "glibcLocales", "gobject-introspection", "gtk3", "harfbuzz", "libiconv", "libxcrypt", "openldap", "openssl", "pango", "pkg-config", "qhull", "rustc", "tcl", "tk", "unixODBC"]
 
 [deployment]
 deploymentTarget = "autoscale"

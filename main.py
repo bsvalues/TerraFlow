@@ -114,6 +114,15 @@ try:
 except ImportError as e:
     logger.warning(f"Could not initialize Sync Services: {str(e)}")
 
+# Register Report Routes
+try:
+    logger.info("Registering Report Routes")
+    from reports.report_routes import reports_bp
+    app.register_blueprint(reports_bp)
+    logger.info("Report Routes registered successfully")
+except ImportError as e:
+    logger.warning(f"Could not register Report Routes: {str(e)}")
+
 # Add a test endpoint to check API functionality
 @app.route('/api/v1/status', methods=['GET'])
 def api_status():
