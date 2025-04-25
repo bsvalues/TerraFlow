@@ -290,6 +290,80 @@
             document.body.classList.contains('high-contrast-mode')
           );
         });
+        
+        // Initialize accessibility panel toggle
+        const a11yPanel = document.querySelector('.a11y-panel');
+        const a11yToggle = document.getElementById('toggle-a11y-panel');
+        
+        if (a11yPanel && a11yToggle) {
+          a11yToggle.addEventListener('click', function() {
+            a11yPanel.classList.toggle('active');
+            a11yToggle.setAttribute('aria-expanded', 
+              a11yPanel.classList.contains('active')
+            );
+          });
+          
+          // Close panel when clicking outside
+          document.addEventListener('click', function(e) {
+            if (a11yPanel.classList.contains('active') && 
+                !a11yPanel.contains(e.target) && 
+                e.target !== a11yToggle) {
+              a11yPanel.classList.remove('active');
+              a11yToggle.setAttribute('aria-expanded', 'false');
+            }
+          });
+          
+          // Toggle accessibility options
+          const highContrastBtn = document.getElementById('toggle-high-contrast');
+          const largeTextBtn = document.getElementById('toggle-large-text');
+          const reduceMotionBtn = document.getElementById('toggle-reduce-motion');
+          
+          if (highContrastBtn) {
+            highContrastBtn.addEventListener('click', function() {
+              document.body.classList.toggle('high-contrast-mode');
+              highContrastBtn.classList.toggle('active');
+              localStorage.setItem(
+                'high-contrast-mode', 
+                document.body.classList.contains('high-contrast-mode')
+              );
+            });
+          }
+          
+          if (largeTextBtn) {
+            largeTextBtn.addEventListener('click', function() {
+              document.body.classList.toggle('large-text-mode');
+              largeTextBtn.classList.toggle('active');
+              localStorage.setItem(
+                'large-text-mode', 
+                document.body.classList.contains('large-text-mode')
+              );
+            });
+            
+            // Apply saved preference
+            if (localStorage.getItem('large-text-mode') === 'true') {
+              document.body.classList.add('large-text-mode');
+              largeTextBtn.classList.add('active');
+            }
+          }
+          
+          if (reduceMotionBtn) {
+            reduceMotionBtn.addEventListener('click', function() {
+              document.body.classList.toggle('reduced-motion-mode');
+              reduceMotionBtn.classList.toggle('active');
+              localStorage.setItem(
+                'reduced-motion-mode', 
+                document.body.classList.contains('reduced-motion-mode')
+              );
+            });
+            
+            // Apply saved preference
+            if (localStorage.getItem('reduced-motion-mode') === 'true' || 
+                window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+              document.body.classList.add('reduced-motion-mode');
+              reduceMotionBtn.classList.add('active');
+            }
+          }
+        }
       });
     </script>
     
