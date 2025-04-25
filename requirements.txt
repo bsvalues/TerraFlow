@@ -26,3 +26,4 @@ requests
 werkzeug
 anthropic
 trafilatura
+openai

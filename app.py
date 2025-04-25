@@ -157,10 +157,10 @@ def inject_now():
 
 # Import views and models after app is created to avoid circular imports
 with app.app_context():
-    from models import User, File, GISProject, QueryLog
+    from models import User, File, GISProject, QueryLog, Anomaly, AnomalyType
     from auth import login_required, is_authenticated, authenticate_user, logout_user
     from file_handlers import allowed_file, process_file_upload, get_user_files, delete_file
-    from rag import process_query, index_document
+    from rag_functions import process_query, index_document
     from gis_utils import validate_geojson, get_shapefile_info, extract_gis_metadata
     from mcp_api import mcp_api
     

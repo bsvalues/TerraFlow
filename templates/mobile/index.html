@@ -1,180 +1,278 @@
 {% extends 'mobile_layout.html' %}
 
-{% block title %}GeoAssessmentPro | Mobile Dashboard{% endblock %}
+{% block title %}GeoAssessmentPro | Dashboard{% endblock %}
 
 {% block content %}
 <div class="mobile-container">
-    <!-- Welcome Card -->
-    <div class="mobile-card mb-4">
-        <div class="p-3">
-            <h1 class="h4 fw-bold mb-2" style="color: var(--tf-flow-aqua);">Welcome to GeoAssessmentPro</h1>
-            <p class="mb-0">Advanced property assessment with real-time anomaly detection.</p>
+    <!-- Stats Row -->
+    <div class="mobile-stats-row">
+        <div class="mobile-stat-item">
+            <div class="stat-icon text-primary">
+                <i class="fas fa-building"></i>
+            </div>
+            <div class="stat-value">{{ property_count }}</div>
+            <div class="stat-label">Properties</div>
+        </div>
+        
+        <div class="mobile-stat-item">
+            <div class="stat-icon text-danger">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <div class="stat-value">{{ anomaly_count }}</div>
+            <div class="stat-label">Anomalies</div>
+        </div>
+        
+        <div class="mobile-stat-item">
+            <div class="stat-icon text-success">
+                <i class="fas fa-users"></i>
+            </div>
+            <div class="stat-value">{{ user_count }}</div>
+            <div class="stat-label">Users</div>
         </div>
     </div>
     
-    <!-- Stats Overview -->
-    <div class="row g-2 mb-4">
-        <div class="col-6">
-            <div class="mobile-stat-card">
-                <div class="mobile-stat-value">{{ property_count|default('478') }}</div>
-                <div class="mobile-stat-label">Properties</div>
+    <!-- Anomaly Map Section -->
+    <div class="mobile-section-title">Anomaly Map</div>
+    <div class="mobile-card mb-3">
+        <div class="mobile-map-container">
+            <div id="anomalyMap" style="width: 100%; height: 100%;"></div>
+            <div class="mobile-map-overlay">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="badge bg-danger me-1">High</span>
+                        <span class="badge bg-warning me-1">Medium</span>
+                        <span class="badge bg-success">Low</span>
+                    </div>
+                    <button class="btn btn-sm btn-primary">View All</button>
+                </div>
+            </div>
+            <div class="mobile-map-controls">
+                <button class="mobile-map-control-btn">
+                    <i class="fas fa-layer-group"></i>
+                </button>
+                <button class="mobile-map-control-btn">
+                    <i class="fas fa-filter"></i>
+                </button>
             </div>
         </div>
-        <div class="col-6">
-            <div class="mobile-stat-card">
-                <div class="mobile-stat-value text-danger">{{ anomaly_count|default('12') }}</div>
-                <div class="mobile-stat-label">Anomalies</div>
-            </div>
-        </div>
     </div>
     
-    <!-- Quick Actions -->
-    <div class="mobile-section-title">Quick Actions</div>
-    <div class="row g-2 mb-4">
-        <div class="col-6">
-            <a href="{{ url_for('map_viewer') }}" class="text-decoration-none">
-                <div class="mobile-card p-3 h-100 text-center">
-                    <i class="fas fa-map fa-2x mb-2" style="color: var(--tf-map-green);"></i>
-                    <div class="fw-bold">View Map</div>
-                </div>
-            </a>
-        </div>
-        <div class="col-6">
-            <a href="{{ url_for('search_page') }}" class="text-decoration-none">
-                <div class="mobile-card p-3 h-100 text-center">
-                    <i class="fas fa-search fa-2x mb-2" style="color: var(--tf-insight-violet);"></i>
-                    <div class="fw-bold">Search</div>
-                </div>
-            </a>
-        </div>
-        <div class="col-6">
-            <a href="{{ url_for('assessment_map') }}" class="text-decoration-none">
-                <div class="mobile-card p-3 h-100 text-center">
-                    <i class="fas fa-home fa-2x mb-2" style="color: var(--tf-map-green);"></i>
-                    <div class="fw-bold">Properties</div>
-                </div>
-            </a>
-        </div>
-        <div class="col-6">
-            <a href="/visualizations/anomaly-map" class="text-decoration-none">
-                <div class="mobile-card p-3 h-100 text-center">
-                    <i class="fas fa-exclamation-triangle fa-2x mb-2" style="color: #dc3545;"></i>
-                    <div class="fw-bold">Anomalies</div>
-                </div>
-            </a>
-        </div>
-    </div>
-    
-    <!-- Recent Activity -->
+    <!-- Recent Anomalies Section -->
     <div class="mobile-section-title">Recent Anomalies</div>
-    <div class="mobile-card mb-4">
-        <ul class="mobile-list">
-            {% for i in range(1, 4) %}
-                <li class="mobile-list-item">
-                    <div class="mobile-list-icon">
-                        <i class="fas fa-exclamation-circle text-danger"></i>
-                    </div>
-                    <div class="mobile-list-content">
-                        <div class="mobile-list-title">{{ anomaly_titles[i-1]|default('Property Value Anomaly') }}</div>
-                        <div class="mobile-list-subtitle">
-                            {{ anomaly_descriptions[i-1]|default('Unusual change detected in property ID #' ~ 10000+i) }}
+    <div class="mobile-card">
+        <div class="list-group list-group-flush">
+            {% for anomaly in recent_anomalies %}
+            <div class="list-group-item p-3">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div>
+                        <h6 class="mb-0">{{ anomaly.description|truncate(60) }}</h6>
+                        <div class="text-muted small">
+                            {% if anomaly.property_id %}
+                            Property ID: {{ anomaly.property_id }}
+                            {% else %}
+                            System-wide anomaly
+                            {% endif %}
                         </div>
                     </div>
-                    <div class="mobile-list-action">
-                        <a href="#" class="btn btn-sm btn-outline-primary">View</a>
+                    <div>
+                        {% if anomaly.severity == 'high' %}
+                        <span class="badge bg-danger">HIGH</span>
+                        {% elif anomaly.severity == 'medium' %}
+                        <span class="badge bg-warning">MEDIUM</span>
+                        {% else %}
+                        <span class="badge bg-success">LOW</span>
+                        {% endif %}
                     </div>
-                </li>
+                </div>
+                <div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="text-muted small">
+                            {% if anomaly.type %}
+                            <span class="mobile-badge mobile-badge-purple">{{ anomaly.type.name }}</span>
+                            {% endif %}
+                            <span class="mobile-badge mobile-badge-gray">{{ anomaly.detected_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                        </div>
+                        <a href="/mobile/anomaly/{{ anomaly.id }}" class="btn btn-sm btn-outline-primary">View</a>
+                    </div>
+                </div>
+            </div>
             {% endfor %}
-        </ul>
-        <div class="p-3 text-center">
-            <a href="/visualizations/anomaly-map" class="btn btn-sm btn-primary">View All Anomalies</a>
         </div>
     </div>
     
-    <!-- Recent Properties -->
-    <div class="mobile-section-title">Recent Properties</div>
-    <div class="mobile-card mb-4">
-        <ul class="mobile-list">
-            {% for i in range(1, 4) %}
-                <li class="mobile-list-item">
-                    <div class="mobile-list-icon">
-                        <i class="fas fa-home" style="color: var(--tf-map-green);"></i>
-                    </div>
-                    <div class="mobile-list-content">
-                        <div class="mobile-list-title">{{ property_titles[i-1]|default('123' ~ i ~ ' Main Street') }}</div>
-                        <div class="mobile-list-subtitle">
-                            {{ property_descriptions[i-1]|default('Residential - $' ~ (300000 + i * 25000)) }}
-                        </div>
-                    </div>
-                    <div class="mobile-list-action">
-                        <a href="#" class="btn btn-sm btn-outline-primary">View</a>
-                    </div>
-                </li>
-            {% endfor %}
-        </ul>
-        <div class="p-3 text-center">
-            <a href="{{ url_for('assessment_map') }}" class="btn btn-sm btn-primary">View All Properties</a>
+    <!-- Anomaly Types Section -->
+    <div class="mobile-section-title">Anomaly Types</div>
+    <div class="mobile-card p-3 mb-3">
+        <div class="mobile-chart-container">
+            <canvas id="anomalyTypeChart"></canvas>
         </div>
     </div>
-</div>
-{% endblock %}
-
-{% block action_button %}
-<a href="#" class="action-button" onclick="showBottomSheet()">
-    <i class="fas fa-plus"></i>
-</a>
-{% endblock %}
-
-{% block sheet_title %}Quick Actions{% endblock %}
-
-{% block sheet_content %}
-<div class="row g-2">
-    <div class="col-6">
-        <a href="{{ url_for('file_manager') }}" class="btn btn-outline-primary w-100 p-3 d-flex flex-column align-items-center">
-            <i class="fas fa-file mb-2"></i>
-            <span>Upload File</span>
-        </a>
+    
+    <!-- Value Trend Section -->
+    <div class="mobile-section-title">Property Value Trend</div>
+    <div class="mobile-card p-3 mb-3">
+        <div class="mobile-chart-container">
+            <canvas id="valueTrendChart"></canvas>
+        </div>
     </div>
-    <div class="col-6">
-        <a href="{{ url_for('search_page') }}" class="btn btn-outline-primary w-100 p-3 d-flex flex-column align-items-center">
-            <i class="fas fa-search mb-2"></i>
-            <span>Search Property</span>
-        </a>
-    </div>
-    <div class="col-6 mt-3">
-        <a href="{{ url_for('map_viewer') }}" class="btn btn-outline-primary w-100 p-3 d-flex flex-column align-items-center">
-            <i class="fas fa-map mb-2"></i>
-            <span>View Map</span>
-        </a>
-    </div>
-    <div class="col-6 mt-3">
-        <a href="/visualizations/anomaly-map" class="btn btn-outline-danger w-100 p-3 d-flex flex-column align-items-center">
-            <i class="fas fa-exclamation-triangle mb-2"></i>
-            <span>Check Anomalies</span>
-        </a>
+    
+    <!-- Quick Actions Section -->
+    <div class="mobile-section-title">Quick Actions</div>
+    <div class="mobile-card mb-3">
+        <div class="list-group list-group-flush">
+            <a href="/mobile/properties" class="list-group-item list-group-item-action d-flex align-items-center">
+                <div class="me-3">
+                    <i class="fas fa-search text-primary fa-lg"></i>
+                </div>
+                <div>
+                    Browse Properties
+                </div>
+            </a>
+            <a href="/mobile/anomalies" class="list-group-item list-group-item-action d-flex align-items-center">
+                <div class="me-3">
+                    <i class="fas fa-exclamation-triangle text-danger fa-lg"></i>
+                </div>
+                <div>
+                    Review Anomalies
+                </div>
+            </a>
+            <a href="/mobile/search" class="list-group-item list-group-item-action d-flex align-items-center">
+                <div class="me-3">
+                    <i class="fas fa-filter text-success fa-lg"></i>
+                </div>
+                <div>
+                    Advanced Search
+                </div>
+            </a>
+        </div>
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    // Sample script to handle dynamic content loading
     document.addEventListener('DOMContentLoaded', function() {
-        // This is where we could add code to fetch real-time data
-        console.log('Mobile dashboard initialized');
+        // Property Value Trend Chart
+        const valueTrendCtx = document.getElementById('valueTrendChart').getContext('2d');
+        const valueTrendChart = new Chart(valueTrendCtx, {
+            type: 'line',
+            data: {
+                labels: {{ value_trend.labels|tojson }},
+                datasets: [{
+                    label: 'Average Property Value',
+                    data: {{ value_trend.values|tojson }},
+                    borderColor: '#5b77f1',
+                    backgroundColor: 'rgba(91, 119, 241, 0.1)',
+                    borderWidth: 2,
+                    tension: 0.3,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return '$' + context.raw.toLocaleString();
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        ticks: {
+                            callback: function(value) {
+                                return '$' + value.toLocaleString();
+                            }
+                        }
+                    }
+                }
+            }
+        });
         
-        // Example of how we might fetch real anomalies
-        /*
-        fetch('/api/anomalies/recent')
-            .then(response => response.json())
-            .then(data => {
-                // Update UI with real anomaly data
-                console.log('Fetched anomaly data:', data);
-            })
-            .catch(error => {
-                console.error('Error fetching anomalies:', error);
-            });
-        */
+        // Anomaly Types Chart
+        const anomalyTypeCtx = document.getElementById('anomalyTypeChart').getContext('2d');
+        
+        // Prepare data for chart
+        const anomalyTypes = {{ anomaly_type_counts|tojson }};
+        const labels = Object.keys(anomalyTypes);
+        const data = Object.values(anomalyTypes);
+        
+        // Define colors for each type
+        const typeColors = {
+            'Spatial': '#17a2b8',
+            'Valuation': '#6f42c1',
+            'Data': '#007bff',
+            'Temporal': '#20c997',
+            'Security': '#dc3545',
+            'Ownership': '#fd7e14'
+        };
+        
+        // Get colors based on type names
+        const colors = labels.map(type => typeColors[type] || '#6c757d');
+        
+        const anomalyTypeChart = new Chart(anomalyTypeCtx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: colors,
+                    borderColor: 'transparent'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            boxWidth: 15,
+                            padding: 15
+                        }
+                    }
+                },
+                cutout: '60%'
+            }
+        });
+        
+        // Initialize map (requires Leaflet.js which would be included in a real implementation)
+        // This is a placeholder to demonstrate how it would be structured
+        try {
+            if (typeof L !== 'undefined') {
+                const map = L.map('anomalyMap').setView([46.2087, -119.1360], 11); // Benton County coordinates
+                
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; OpenStreetMap contributors'
+                }).addTo(map);
+                
+                // In a real implementation, we would fetch and display anomaly points here
+                // Example:
+                // fetch('/mobile/api/map/anomalies')
+                //     .then(response => response.json())
+                //     .then(data => {
+                //         L.geoJSON(data).addTo(map);
+                //     });
+            }
+        } catch (e) {
+            console.log('Leaflet map could not be initialized. This is expected if Leaflet is not loaded.');
+            // Display placeholder image instead
+            document.getElementById('anomalyMap').innerHTML = `
+                <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background-color:#f8f9fa;color:#6c757d;">
+                    <div class="text-center">
+                        <i class="fas fa-map-marked-alt fa-3x mb-3"></i>
+                        <p>Map visualization</p>
+                    </div>
+                </div>
+            `;
+        }
     });
 </script>
 {% endblock %}

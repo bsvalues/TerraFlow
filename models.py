@@ -42,6 +42,23 @@ user_roles = db.Table('user_roles',
     db.Column('role_id', db.Integer, db.ForeignKey('roles.id'), primary_key=True)
 )
 
+class UserRole(db.Model):
+    """Model for user-role associations with metadata."""
+    __tablename__ = 'user_role_assoc'
+    
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), primary_key=True)
+    role_id = db.Column(db.Integer, db.ForeignKey('roles.id'), primary_key=True)
+    assigned_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    assigned_by = db.Column(db.String(64))  # Username or system ID that assigned the role
+    expires_at = db.Column(db.DateTime, nullable=True)  # Optional expiration date for temporary roles
+    
+    # Relationships
+    user = db.relationship('User', backref=db.backref('user_roles'))
+    role = db.relationship('Role', backref=db.backref('role_users'))
+    
+    def __repr__(self):
+        return f'<UserRole user_id={self.user_id} role_id={self.role_id}>'
+
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
     
@@ -365,6 +382,56 @@ class Inspection(db.Model):
     
     def __repr__(self):
         return f'<Inspection for {self.property_id} on {self.inspection_date}>'
+
+class AnomalyType(db.Model):
+    """Type of anomaly that can be detected in property data."""
+    __tablename__ = 'anomaly_types'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(64), unique=True, nullable=False)
+    description = db.Column(db.Text)
+    category = db.Column(db.String(32))  # e.g., spatial, valuation, data
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    
+    # Relationships
+    anomalies = db.relationship('Anomaly', backref='type', lazy='dynamic')
+    
+    def __repr__(self):
+        return f'<AnomalyType {self.name}>'
+
+class Anomaly(db.Model):
+    """Detected anomaly in property assessment data."""
+    __tablename__ = 'anomalies'
+    
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    description = db.Column(db.Text, nullable=False)
+    type_id = db.Column(db.Integer, db.ForeignKey('anomaly_types.id'))
+    property_id = db.Column(UUID(as_uuid=True), db.ForeignKey('properties.id'), nullable=True)
+    detected_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    detected_by = db.Column(db.String(64))  # Can be agent name or user_id
+    
+    # Anomaly details
+    severity = db.Column(db.String(16), default='medium')  # high, medium, low
+    status = db.Column(db.String(16), default='active')  # active, reviewing, resolved, ignored
+    confidence = db.Column(db.Float)  # AI confidence score if applicable
+    
+    # Related data
+    data_snapshot = db.Column(JSONB)  # Snapshot of relevant data when anomaly was detected
+    related_entities = db.Column(JSONB)  # IDs of related entities (properties, assessments)
+    
+    # Resolution tracking
+    resolution = db.Column(db.Text)
+    resolved_at = db.Column(db.DateTime)
+    resolved_by = db.Column(db.String(64))
+    
+    # Timestamps
+    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    
+    # Relationships
+    property = db.relationship('Property', backref=db.backref('anomalies', lazy='dynamic'))
+    
+    def __repr__(self):
+        return f'<Anomaly {self.id}: {self.description[:30]}>'
 
 class ComparableSale(db.Model):
     """Comparable property sale record for market analysis."""

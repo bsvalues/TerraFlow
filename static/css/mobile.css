@@ -1,377 +1,538 @@
-/* Mobile CSS Styles for GeoAssessmentPro */
+/* 
+ * GeoAssessmentPro Mobile CSS
+ * Additional styles for the mobile interface
+ */
 
-/* Base Mobile Styles */
-.mobile-container {
-    padding: 10px;
-    margin-bottom: 70px; /* Space for bottom navigation */
-}
-
-/* Card Styles */
-.mobile-card {
-    border-radius: 10px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    background-color: #fff;
-    margin-bottom: 15px;
+/* Custom card styles */
+.mobile-property-card {
+    position: relative;
     overflow: hidden;
 }
 
-.mobile-card-header {
-    padding: 15px;
-    background-color: #f8f9fa;
-    border-bottom: 1px solid #eee;
+.mobile-property-card .property-badge {
+    position: absolute;
+    top: 0;
+    right: 0;
+    padding: 5px 10px;
+    border-radius: 0 0 0 8px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.mobile-property-card .property-image {
+    height: 150px;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+.mobile-property-card .property-value {
+    font-size: 1.25rem;
     font-weight: 600;
+    color: var(--tf-flow-blue);
 }
 
-.mobile-card-body {
-    padding: 15px;
+.mobile-property-card .property-type {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    margin-right: 5px;
 }
 
-.mobile-card-footer {
-    padding: 10px 15px;
-    background-color: #f8f9fa;
-    border-top: 1px solid #eee;
+/* Anomaly card styles */
+.mobile-anomaly-card {
+    position: relative;
+    border-left: 4px solid;
 }
 
-/* List Styles */
-.mobile-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
+.mobile-anomaly-card.severity-high {
+    border-left-color: var(--tf-red);
 }
 
-.mobile-list-item {
-    padding: 12px 15px;
-    border-bottom: 1px solid #eee;
+.mobile-anomaly-card.severity-medium {
+    border-left-color: var(--tf-yellow);
+}
+
+.mobile-anomaly-card.severity-low {
+    border-left-color: var(--tf-green);
+}
+
+.mobile-anomaly-card .anomaly-type {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    margin-right: 5px;
+}
+
+.mobile-anomaly-card .anomaly-type.type-data {
+    background-color: rgba(0, 123, 255, 0.1);
+    color: var(--tf-blue);
+}
+
+.mobile-anomaly-card .anomaly-type.type-spatial {
+    background-color: rgba(23, 162, 184, 0.1);
+    color: var(--tf-cyan);
+}
+
+.mobile-anomaly-card .anomaly-type.type-valuation {
+    background-color: rgba(111, 66, 193, 0.1);
+    color: var(--tf-purple);
+}
+
+.mobile-anomaly-card .anomaly-type.type-temporal {
+    background-color: rgba(32, 201, 151, 0.1);
+    color: var(--tf-teal);
+}
+
+.mobile-anomaly-card .anomaly-severity {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+}
+
+.mobile-anomaly-card .anomaly-severity.severity-high {
+    background-color: rgba(220, 53, 69, 0.1);
+    color: var(--tf-red);
+}
+
+.mobile-anomaly-card .anomaly-severity.severity-medium {
+    background-color: rgba(255, 193, 7, 0.1);
+    color: var(--tf-yellow);
+}
+
+.mobile-anomaly-card .anomaly-severity.severity-low {
+    background-color: rgba(40, 167, 69, 0.1);
+    color: var(--tf-green);
+}
+
+/* Dashboard styles */
+.mobile-stats-row {
     display: flex;
-    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 15px;
 }
 
-.mobile-list-item:last-child {
-    border-bottom: none;
-}
-
-.mobile-list-icon {
-    margin-right: 12px;
-    font-size: 1.2rem;
-    width: 24px;
-    text-align: center;
-}
-
-.mobile-list-content {
+.mobile-stat-item {
     flex: 1;
-}
-
-.mobile-list-title {
-    font-weight: 600;
-    margin-bottom: 4px;
-}
-
-.mobile-list-subtitle {
-    font-size: 0.85rem;
-    color: #666;
-}
-
-.mobile-list-action {
-    margin-left: 10px;
-}
-
-/* Form Styles */
-.mobile-form-group {
-    margin-bottom: 16px;
-}
-
-.mobile-form-label {
-    font-weight: 600;
-    margin-bottom: 6px;
-    display: block;
-}
-
-.mobile-form-control {
-    width: 100%;
-    padding: 12px;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    font-size: 1rem;
-}
-
-.mobile-form-control:focus {
-    border-color: var(--tf-flow-aqua);
-    box-shadow: 0 0 0 2px rgba(0, 149, 255, 0.25);
-    outline: none;
-}
-
-/* Button Styles */
-.mobile-btn {
-    display: block;
-    width: 100%;
-    padding: 12px;
-    border-radius: 8px;
-    border: none;
-    font-weight: 600;
     text-align: center;
-    cursor: pointer;
+    padding: 15px 5px;
+    border-radius: 8px;
+    background-color: var(--tf-mobile-card-bg);
+    margin: 0 5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
-.mobile-btn-primary {
-    background-color: var(--tf-flow-aqua);
+.mobile-stat-item .stat-icon {
+    font-size: 1.5rem;
+    margin-bottom: 5px;
+}
+
+.mobile-stat-item .stat-value {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+.mobile-stat-item .stat-label {
+    font-size: 0.8rem;
+    color: var(--tf-mobile-text-muted);
+}
+
+/* Property detail styles */
+.property-detail-header {
+    position: relative;
+    height: 200px;
+    background-size: cover;
+    background-position: center;
+    margin: -15px -15px 15px -15px;
+}
+
+.property-detail-header .overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 15px;
+    background: linear-gradient(to top, rgba(0,0,0,0.7), rgba(0,0,0,0));
     color: white;
 }
 
-.mobile-btn-secondary {
-    background-color: #eee;
-    color: #333;
+.property-detail-header .property-address {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 5px;
 }
 
-.mobile-btn-sm {
-    padding: 8px 12px;
+.property-detail-header .property-id {
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+.property-attribute {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.property-attribute .icon {
+    width: 24px;
+    margin-right: 10px;
+    text-align: center;
+    color: var(--tf-mobile-text-muted);
+}
+
+.property-attribute .label {
+    font-size: 0.9rem;
+    color: var(--tf-mobile-text-muted);
+    margin-right: 5px;
+}
+
+.property-attribute .value {
+    font-weight: 500;
+}
+
+/* Chart styles */
+.mobile-chart-container {
+    position: relative;
+    height: 250px;
+    margin-bottom: 20px;
+}
+
+/* Anomaly detail styles */
+.anomaly-detail-header {
+    padding: 15px;
+    margin: -15px -15px 15px -15px;
+    border-bottom: 1px solid var(--tf-mobile-border);
+}
+
+.anomaly-detail-header.severity-high {
+    background-color: rgba(220, 53, 69, 0.1);
+}
+
+.anomaly-detail-header.severity-medium {
+    background-color: rgba(255, 193, 7, 0.1);
+}
+
+.anomaly-detail-header.severity-low {
+    background-color: rgba(40, 167, 69, 0.1);
+}
+
+.anomaly-detail-header .anomaly-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+.anomaly-detail-header .anomaly-id {
+    font-size: 0.9rem;
+    color: var(--tf-mobile-text-muted);
+}
+
+.anomaly-detail-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    margin-right: 5px;
+    margin-bottom: 5px;
+}
+
+.anomaly-timeline {
+    position: relative;
+    padding-left: 30px;
+    margin-bottom: 20px;
+}
+
+.anomaly-timeline-item {
+    position: relative;
+    padding-bottom: 15px;
+}
+
+.anomaly-timeline-item:before {
+    content: '';
+    position: absolute;
+    left: -30px;
+    top: 0;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: var(--tf-flow-blue);
+    z-index: 1;
+}
+
+.anomaly-timeline-item:after {
+    content: '';
+    position: absolute;
+    left: -24px;
+    top: 12px;
+    width: 1px;
+    height: calc(100% - 12px);
+    background-color: var(--tf-mobile-border);
+}
+
+.anomaly-timeline-item:last-child:after {
+    display: none;
+}
+
+.anomaly-timeline-item .time {
+    font-size: 0.8rem;
+    color: var(--tf-mobile-text-muted);
+    margin-bottom: 2px;
+}
+
+.anomaly-timeline-item .title {
+    font-weight: 500;
+    margin-bottom: 2px;
+}
+
+.anomaly-timeline-item .description {
     font-size: 0.9rem;
 }
 
-.mobile-btn-rounded {
-    border-radius: 50px;
+/* Search styles */
+.search-result-item {
+    padding: 15px;
+    border-bottom: 1px solid var(--tf-mobile-border);
 }
 
-/* Flash Messages */
-.mobile-flash-container {
-    position: fixed;
-    top: 70px;
-    left: 10px;
-    right: 10px;
-    z-index: 1010;
+.search-result-item:last-child {
+    border-bottom: none;
 }
 
-.mobile-flash {
-    margin-bottom: 10px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    border-radius: 8px;
+.search-result-item .result-title {
+    font-weight: 500;
+    margin-bottom: 5px;
 }
 
-/* Map Styles */
-.mobile-map-wrapper {
+.search-result-item .result-subtitle {
+    font-size: 0.9rem;
+    color: var(--tf-mobile-text-muted);
+    margin-bottom: 5px;
+}
+
+.search-result-item .result-badges {
+    display: flex;
+    flex-wrap: wrap;
+    margin-bottom: 5px;
+}
+
+.search-result-item .result-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    margin-right: 5px;
+    margin-bottom: 5px;
+}
+
+/* Settings styles */
+.settings-section {
+    margin-bottom: 20px;
+}
+
+.settings-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 15px;
+    border-bottom: 1px solid var(--tf-mobile-border);
+}
+
+.settings-item:last-child {
+    border-bottom: none;
+}
+
+.settings-item .settings-label {
+    font-weight: 500;
+}
+
+.settings-item .settings-description {
+    font-size: 0.9rem;
+    color: var(--tf-mobile-text-muted);
+    margin-top: 2px;
+}
+
+/* Map styles */
+.mobile-map-container {
     position: relative;
-    height: calc(100vh - 130px);
-    width: 100%;
-    margin-bottom: 15px;
-    border-radius: 10px;
-    overflow: hidden;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    height: 300px;
+    margin: -15px -15px 15px -15px;
+    z-index: 1;
 }
 
-.mobile-map {
-    height: 100%;
-    width: 100%;
+.mobile-map-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 15px;
+    background: linear-gradient(to top, rgba(255,255,255,0.9), rgba(255,255,255,0));
+    z-index: 2;
+}
+
+body.dark-mode .mobile-map-overlay {
+    background: linear-gradient(to top, rgba(30,30,30,0.9), rgba(30,30,30,0));
 }
 
 .mobile-map-controls {
     position: absolute;
-    bottom: 10px;
-    right: 10px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    z-index: 1000;
+    top: 15px;
+    right: 15px;
+    z-index: 3;
 }
 
 .mobile-map-control-btn {
     width: 40px;
     height: 40px;
-    border-radius: 50%;
+    border-radius: 20px;
     background-color: white;
-    border: none;
+    color: var(--tf-mobile-text);
+    border: 1px solid var(--tf-mobile-border);
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 10px;
 }
 
-/* Property Card for Map */
-.mobile-property-card {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background-color: white;
-    border-top-left-radius: 16px;
-    border-top-right-radius: 16px;
-    padding: 15px;
-    box-shadow: 0 -4px 10px rgba(0,0,0,0.1);
-    z-index: 1001;
-    transform: translateY(100%);
-    transition: transform 0.3s ease-out;
-    max-height: 50vh;
-    overflow-y: auto;
+body.dark-mode .mobile-map-control-btn {
+    background-color: var(--tf-mobile-nav-bg);
+    color: var(--tf-mobile-text);
+    border-color: var(--tf-mobile-border);
 }
 
-.mobile-property-card.show {
-    transform: translateY(0);
+/* Animations */
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    100% {
+        transform: scale(1);
+    }
 }
 
-/* Search Bar */
-.mobile-search-bar {
-    position: relative;
-    margin-bottom: 15px;
+.pulse-animation {
+    animation: pulse 2s infinite;
 }
 
-.mobile-search-input {
-    width: 100%;
-    padding: 12px 15px 12px 40px;
-    border: 1px solid #ddd;
-    border-radius: 50px;
-    font-size: 1rem;
-}
-
-.mobile-search-icon {
-    position: absolute;
-    left: 15px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: #888;
-}
-
-/* Tab Navigation */
-.mobile-tabs {
-    display: flex;
-    margin-bottom: 15px;
-    border-bottom: 1px solid #eee;
-    overflow-x: auto;
-    white-space: nowrap;
-    -webkit-overflow-scrolling: touch;
-}
-
-.mobile-tab {
-    padding: 10px 15px;
-    font-weight: 600;
-    color: #666;
-    border-bottom: 3px solid transparent;
-    cursor: pointer;
-}
-
-.mobile-tab.active {
-    color: var(--tf-flow-aqua);
-    border-bottom-color: var(--tf-flow-aqua);
-}
-
-/* Data Visualization Components */
-.mobile-stat-card {
-    border-radius: 10px;
-    padding: 15px;
-    margin-bottom: 15px;
-    background-color: #f8f9fa;
+/* Loading indicator */
+.mobile-loading {
     display: flex;
     flex-direction: column;
     align-items: center;
-    text-align: center;
+    justify-content: center;
+    padding: 30px 0;
 }
 
-.mobile-stat-value {
-    font-size: 2rem;
-    font-weight: 700;
-    color: var(--tf-flow-aqua);
-    margin-bottom: 5px;
-}
-
-.mobile-stat-label {
-    font-size: 0.9rem;
-    color: #666;
-    font-weight: 600;
-}
-
-.mobile-chart-container {
-    height: 200px;
+.mobile-loading .spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid rgba(0, 0, 0, 0.1);
+    border-radius: 50%;
+    border-top-color: var(--tf-flow-blue);
+    animation: spin 1s ease-in-out infinite;
     margin-bottom: 15px;
 }
 
-/* Utility Classes */
-.mobile-divider {
-    height: 1px;
-    background-color: #eee;
-    margin: 15px 0;
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
-.mobile-section-title {
-    font-size: 1.2rem;
-    font-weight: 700;
-    margin-bottom: 15px;
-    color: #333;
+body.dark-mode .mobile-loading .spinner {
+    border-color: rgba(255, 255, 255, 0.1);
+    border-top-color: var(--tf-flow-blue);
 }
 
+/* Toast notifications */
+.mobile-toast-container {
+    position: fixed;
+    bottom: 70px;
+    left: 0;
+    right: 0;
+    z-index: 1050;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.mobile-toast {
+    background-color: var(--tf-mobile-card-bg);
+    color: var(--tf-mobile-text);
+    border-radius: 8px;
+    padding: 12px 20px;
+    margin-bottom: 10px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    max-width: 90%;
+    animation: slideUp 0.3s forwards, fadeOut 0.3s 2.7s forwards;
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+/* Utility classes */
 .mobile-badge {
     display: inline-block;
-    padding: 4px 8px;
-    border-radius: 50px;
-    font-size: 0.8rem;
-    font-weight: 600;
+    padding: 0.25em 0.6em;
+    font-size: 0.75em;
+    font-weight: 700;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: baseline;
+    border-radius: 0.375rem;
 }
 
-.mobile-badge-primary {
-    background-color: var(--tf-flow-aqua);
-    color: white;
+.mobile-badge-blue {
+    background-color: rgba(0, 123, 255, 0.1);
+    color: var(--tf-blue);
 }
 
-.mobile-badge-secondary {
-    background-color: #eee;
-    color: #666;
+.mobile-badge-green {
+    background-color: rgba(40, 167, 69, 0.1);
+    color: var(--tf-green);
 }
 
-/* Responsive Typography */
-@media (max-width: 320px) {
-    .mobile-section-title {
-        font-size: 1.1rem;
-    }
-    
-    .mobile-list-title {
-        font-size: 0.9rem;
-    }
-    
-    .mobile-list-subtitle {
-        font-size: 0.8rem;
-    }
-    
-    .mobile-stat-value {
-        font-size: 1.8rem;
-    }
+.mobile-badge-red {
+    background-color: rgba(220, 53, 69, 0.1);
+    color: var(--tf-red);
 }
 
-/* Dark Mode (if needed) */
-@media (prefers-color-scheme: dark) {
-    body.dark-mode {
-        background-color: #121212;
-        color: #eee;
-    }
-    
-    .dark-mode .mobile-card,
-    .dark-mode .mobile-card-header,
-    .dark-mode .mobile-card-footer,
-    .dark-mode .mobile-property-card {
-        background-color: #1e1e1e;
-        border-color: #333;
-    }
-    
-    .dark-mode .mobile-list-item {
-        border-color: #333;
-    }
-    
-    .dark-mode .mobile-form-control {
-        background-color: #1e1e1e;
-        border-color: #333;
-        color: #eee;
-    }
-    
-    .dark-mode .mobile-btn-secondary {
-        background-color: #333;
-        color: #eee;
-    }
-    
-    .dark-mode .mobile-tab {
-        color: #aaa;
-    }
-    
-    .dark-mode .mobile-divider {
-        background-color: #333;
-    }
-    
-    .dark-mode .mobile-badge-secondary {
-        background-color: #333;
-        color: #eee;
-    }
+.mobile-badge-yellow {
+    background-color: rgba(255, 193, 7, 0.1);
+    color: var(--tf-yellow);
+}
+
+.mobile-badge-purple {
+    background-color: rgba(111, 66, 193, 0.1);
+    color: var(--tf-purple);
+}
+
+.mobile-badge-teal {
+    background-color: rgba(32, 201, 151, 0.1);
+    color: var(--tf-teal);
+}
+
+.mobile-badge-cyan {
+    background-color: rgba(23, 162, 184, 0.1);
+    color: var(--tf-cyan);
+}
+
+.mobile-badge-orange {
+    background-color: rgba(253, 126, 20, 0.1);
+    color: var(--tf-orange);
+}
+
+.mobile-badge-gray {
+    background-color: rgba(108, 117, 125, 0.1);
+    color: var(--tf-gray);
 }
