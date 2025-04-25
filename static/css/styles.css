@@ -386,4 +386,84 @@ a:hover {
     .feedback-button {
         padding: 8px 16px;
     }
+    
+    /* Mobile navigation */
+    .navbar {
+        transition: transform 0.3s ease;
+    }
+    
+    .navbar-hidden {
+        transform: translateY(-100%);
+    }
+    
+    .navbar-brand {
+        font-size: 1.1rem;
+    }
+    
+    .navbar-nav .nav-link {
+        padding: 0.5rem 0.75rem;
+    }
+    
+    .dropdown-menu {
+        border-radius: 0.5rem;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* Mobile containers and spacing */
+    .container, .container-fluid {
+        padding-left: 12px;
+        padding-right: 12px;
+    }
+    
+    .card {
+        margin-bottom: 1rem;
+    }
+    
+    .row {
+        margin-left: -6px;
+        margin-right: -6px;
+    }
+    
+    .col, [class*="col-"] {
+        padding-left: 6px;
+        padding-right: 6px;
+    }
+    
+    /* Typography adjustments */
+    h1 {
+        font-size: 1.75rem;
+    }
+    
+    h2 {
+        font-size: 1.5rem;
+    }
+    
+    h3 {
+        font-size: 1.25rem;
+    }
+    
+    /* Form controls */
+    .form-control, .form-select, .input-group {
+        font-size: 0.95rem;
+    }
+    
+    .btn {
+        font-size: 0.95rem;
+    }
+    
+    /* Table responsiveness */
+    .table-responsive {
+        max-height: 400px;
+    }
+    
+    /* Property detail mobile adjustments */
+    .property-detail-section {
+        padding: 15px;
+        margin-bottom: 15px;
+    }
+    
+    /* Modal adjustments */
+    .modal-dialog {
+        margin: 0.5rem;
+    }
 }

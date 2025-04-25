@@ -111,16 +111,21 @@
 <div class="container-fluid mt-3">
     <div class="row">
         <div class="col-12">
-            <h2>Benton County Property Assessment Map</h2>
-            <p class="text-muted">
+            <h2 class="d-none d-md-block">Benton County Property Assessment Map</h2>
+            <h4 class="d-md-none">Property Assessment Map</h4>
+            <p class="text-muted d-none d-md-block">
                 Explore property assessments throughout Benton County. Use the filters and tools to analyze property data.
                 <span class="badge bg-info">{{ property_count }} properties</span>
+            </p>
+            <p class="text-muted d-md-none small mb-2">
+                <span class="badge bg-info">{{ property_count }} properties</span> in Benton County
             </p>
         </div>
     </div>
     
     <div class="row mb-3">
-        <div class="col-md-3">
+        <!-- Desktop filter sidebar -->
+        <div class="col-md-3 d-none d-md-block">
             <div class="card">
                 <div class="card-header">
                     <h5 class="mb-0">Property Filters</h5>
@@ -192,8 +197,85 @@
             </div>
         </div>
         
-        <div class="col-md-9">
-            <div class="map-container">
+        <!-- Mobile filter panel -->
+        <div class="assessment-filters-panel d-md-none">
+            <div class="filter-panel-handle"></div>
+            <h5 class="mb-3">Property Filters</h5>
+            <form id="mobile-filter-form">
+                <div class="mb-3">
+                    <label for="mobile-property-type" class="form-label">Property Type</label>
+                    <select id="mobile-property-type" class="form-select">
+                        <option value="">All Types</option>
+                        <option value="residential">Residential</option>
+                        <option value="commercial">Commercial</option>
+                        <option value="industrial">Industrial</option>
+                        <option value="agricultural">Agricultural</option>
+                        <option value="vacant">Vacant Land</option>
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="mobile-assessment-year" class="form-label">Assessment Year</label>
+                    <select id="mobile-assessment-year" class="form-select">
+                        <option value="2025">2025</option>
+                        <option value="2024">2024</option>
+                        <option value="2023">2023</option>
+                        <option value="2022">2022</option>
+                        <option value="2021">2021</option>
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="mobile-value-range-slider" class="form-label">Assessed Value Range</label>
+                    <div id="mobile-value-range-slider"></div>
+                    <div class="d-flex justify-content-between">
+                        <div id="mobile-min-value">$0</div>
+                        <div id="mobile-max-value">$2,000,000+</div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-6">
+                        <div class="mb-3">
+                            <label for="mobile-year-built-min" class="form-label">Year Built (From)</label>
+                            <input type="number" id="mobile-year-built-min" class="form-control" placeholder="Min Year" min="1800" max="2025">
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="mb-3">
+                            <label for="mobile-year-built-max" class="form-label">Year Built (To)</label>
+                            <input type="number" id="mobile-year-built-max" class="form-control" placeholder="Max Year" min="1800" max="2025">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <button type="button" id="mobile-apply-filters" class="btn btn-primary">Apply Filters</button>
+                    <button type="button" id="mobile-reset-filters" class="btn btn-secondary">Reset Filters</button>
+                </div>
+                
+                <div class="mt-4">
+                    <h5 class="mb-3">Analysis Tools</h5>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <button id="mobile-toggle-heatmap" class="btn btn-sm btn-outline-primary w-100">Value Heatmap</button>
+                        </div>
+                        <div class="col-6">
+                            <button id="mobile-toggle-zoning" class="btn btn-sm btn-outline-primary w-100">Zoning Overlay</button>
+                        </div>
+                        <div class="col-6">
+                            <button id="mobile-generate-report" class="btn btn-sm btn-outline-success w-100">Generate Report</button>
+                        </div>
+                        <div class="col-6">
+                            <button id="mobile-export-data" class="btn btn-sm btn-outline-secondary w-100">Export Data</button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+        
+        <div class="col-md-9 col-12">
+            <div class="map-container assessment-map-container">
                 <div id="assessment-map"></div>
                 
                 <div class="coordinates-display" id="coordinates">Latitude: 0.0000, Longitude: 0.0000</div>
@@ -202,7 +284,8 @@
                     <div class="btn-group" role="group">
                         <button id="measure-tool" class="btn btn-sm btn-outline-secondary">Measure</button>
                         <button id="draw-tool" class="btn btn-sm btn-outline-secondary">Draw</button>
-                        <button id="print-map" class="btn btn-sm btn-outline-secondary">Print</button>
+                        <button id="print-map" class="btn btn-sm btn-outline-secondary d-none d-md-inline-block">Print</button>
+                        <button id="mobile-filters-toggle" class="btn btn-sm btn-outline-primary d-md-none">Filters</button>
                     </div>
                 </div>
                 

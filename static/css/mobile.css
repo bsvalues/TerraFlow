@@ -405,6 +405,121 @@ body.dark-mode .mobile-map-control-btn {
     border-color: var(--tf-mobile-border);
 }
 
+/* Assessment Map Mobile Styles */
+@media (max-width: 767.98px) {
+    .assessment-map-container {
+        height: calc(100vh - 120px) !important;
+        min-height: 350px !important;
+    }
+    
+    .assessment-filters-panel {
+        position: fixed;
+        left: 0;
+        bottom: 0;
+        width: 100%;
+        z-index: 1000;
+        background: white;
+        border-radius: 15px 15px 0 0;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        padding: 15px;
+        transform: translateY(calc(100% - 50px));
+        transition: transform 0.3s ease;
+        max-height: 80vh;
+        overflow-y: auto;
+    }
+    
+    .assessment-filters-panel.expanded {
+        transform: translateY(0);
+    }
+    
+    .filter-panel-handle {
+        width: 40px;
+        height: 5px;
+        background: #ddd;
+        border-radius: 3px;
+        margin: 0 auto 15px;
+    }
+    
+    .map-overlay {
+        max-width: 90% !important;
+        right: 5% !important;
+        left: 5% !important;
+    }
+    
+    .map-tools {
+        bottom: 60px !important;
+    }
+    
+    .layer-control {
+        display: none;
+    }
+    
+    .coordinates-display {
+        bottom: 60px !important;
+        font-size: 10px !important;
+        padding: 3px 8px !important;
+    }
+    
+    .legend {
+        bottom: 60px !important;
+        right: 10px !important;
+        left: auto !important;
+        max-width: 130px !important;
+        font-size: 10px !important;
+    }
+    
+    .legend-item {
+        margin-bottom: 3px !important;
+    }
+    
+    .legend-color {
+        width: 12px !important;
+        height: 12px !important;
+    }
+    
+    .property-popup {
+        max-width: 220px !important;
+    }
+    
+    /* Property detail modal adjustments */
+    #property-modal .modal-dialog {
+        margin: 0;
+        width: 100%;
+        max-width: none;
+        height: 100%;
+    }
+    
+    #property-modal .modal-content {
+        border-radius: 0;
+        border: none;
+        height: 100%;
+    }
+    
+    #property-modal .modal-body {
+        padding: 10px;
+        overflow-y: auto;
+    }
+    
+    #detail-map {
+        height: 200px !important;
+        margin-top: 15px;
+    }
+    
+    /* Report modal adjustments */
+    #report-modal .modal-dialog {
+        margin: 0;
+        width: 100%;
+        max-width: none;
+        height: 100%;
+    }
+    
+    #report-modal .modal-content {
+        border-radius: 0;
+        border: none;
+        height: 100%;
+    }
+}
+
 /* Animations */
 @keyframes pulse {
     0% {
