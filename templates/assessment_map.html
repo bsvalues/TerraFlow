@@ -359,7 +359,7 @@
         
         <!-- Mobile filter panel -->
         <div class="assessment-filters-panel d-md-none">
-            <div class="filter-panel-handle"></div>
+            <div class="panel-handle"></div>
             <h5 class="mb-3">Property Filters</h5>
             <form id="mobile-filter-form">
                 <div class="mb-3">
@@ -440,12 +440,33 @@
                 
                 <div class="coordinates-display" id="coordinates">Latitude: 0.0000, Longitude: 0.0000</div>
                 
+                <!-- Mobile-only Floating Action Button -->
+                <button id="mobile-filters-toggle" class="mobile-map-fab d-md-none" aria-label="Filter options">
+                    <i class="fas fa-sliders-h"></i>
+                </button>
+                
+                <!-- Mobile Actions Menu -->
+                <div class="mobile-map-action-menu d-md-none">
+                    <button class="mobile-map-action" id="mobile-toggle-heatmap-fab">
+                        <i class="fas fa-fire"></i> Value Heatmap
+                    </button>
+                    <button class="mobile-map-action" id="mobile-toggle-zoning-fab">
+                        <i class="fas fa-layer-group"></i> Zoning Overlay
+                    </button>
+                    <button class="mobile-map-action" id="mobile-generate-report-fab">
+                        <i class="fas fa-file-alt"></i> Generate Report
+                    </button>
+                    <button class="mobile-map-action" id="mobile-export-data-fab">
+                        <i class="fas fa-download"></i> Export Data
+                    </button>
+                </div>
+                
                 <div class="map-tools">
                     <div class="btn-group" role="group">
                         <button id="measure-tool" class="btn btn-sm btn-outline-secondary">Measure</button>
                         <button id="draw-tool" class="btn btn-sm btn-outline-secondary">Draw</button>
                         <button id="print-map" class="btn btn-sm btn-outline-secondary d-none d-md-inline-block">Print</button>
-                        <button id="mobile-filters-toggle" class="btn btn-sm btn-outline-primary d-md-none">Filters</button>
+                        <button id="mobile-filters-button" class="btn btn-sm btn-outline-primary d-md-none">Filters</button>
                     </div>
                 </div>
                 
@@ -667,6 +688,151 @@
             document.getElementById('coordinates').textContent = 
                 `Latitude: ${e.latlng.lat.toFixed(6)}, Longitude: ${e.latlng.lng.toFixed(6)}`;
         });
+        
+        // Mobile-specific UI setup
+        if (isMobile) {
+            setupMobileUI();
+        }
+        
+        // Set up mobile-specific UI components
+        function setupMobileUI() {
+            console.log('Setting up mobile UI components for map');
+            
+            // Handle mobile FAB clicks
+            const fab = document.getElementById('mobile-filters-toggle');
+            const actionMenu = document.querySelector('.mobile-map-action-menu');
+            
+            if (fab && actionMenu) {
+                // Toggle action menu visibility
+                fab.addEventListener('click', function() {
+                    actionMenu.classList.toggle('visible');
+                });
+                
+                // Handle clicks outside to close menu
+                document.addEventListener('click', function(e) {
+                    if (!fab.contains(e.target) && !actionMenu.contains(e.target) && actionMenu.classList.contains('visible')) {
+                        actionMenu.classList.remove('visible');
+                    }
+                });
+            }
+            
+            // Handle filter panel button clicks
+            const filtersPanel = document.querySelector('.assessment-filters-panel');
+            const filtersPanelToggle = document.getElementById('mobile-filters-button');
+            
+            if (filtersPanel && filtersPanelToggle) {
+                filtersPanelToggle.addEventListener('click', function() {
+                    filtersPanel.classList.toggle('expanded');
+                });
+            }
+            
+            // Connect mobile action buttons to their desktop counterparts
+            connectMobileButton('mobile-toggle-heatmap-fab', 'toggle-heatmap');
+            connectMobileButton('mobile-toggle-zoning-fab', 'toggle-zoning');
+            connectMobileButton('mobile-generate-report-fab', 'generate-report');
+            connectMobileButton('mobile-export-data-fab', 'export-data');
+            
+            // Connect form equivalents
+            connectFormElements('mobile-property-type', 'property-type');
+            connectFormElements('mobile-assessment-year', 'assessment-year');
+            connectFormElements('mobile-year-built-min', 'year-built-min');
+            connectFormElements('mobile-year-built-max', 'year-built-max');
+            
+            // Initialize mobile value slider if it exists
+            const mobileValueSlider = document.getElementById('mobile-value-range-slider');
+            if (mobileValueSlider) {
+                noUiSlider.create(mobileValueSlider, {
+                    start: [0, 2000000],
+                    connect: true,
+                    range: {
+                        'min': 0,
+                        'max': 2000000
+                    },
+                    step: 10000,
+                    format: {
+                        to: function (value) {
+                            return parseInt(value);
+                        },
+                        from: function (value) {
+                            return parseInt(value);
+                        }
+                    }
+                });
+                
+                mobileValueSlider.noUiSlider.on('update', function (values, handle) {
+                    document.getElementById('mobile-min-value').textContent = '$' + values[0].toLocaleString();
+                    document.getElementById('mobile-max-value').textContent = '$' + values[1].toLocaleString();
+                });
+            }
+            
+            // Add swipe-down to dismiss for panels
+            if (filtersPanel) {
+                setupSwipeToDismiss(filtersPanel);
+            }
+        }
+        
+        // Helper to connect mobile button to desktop button
+        function connectMobileButton(mobileId, desktopId) {
+            const mobileButton = document.getElementById(mobileId);
+            const desktopButton = document.getElementById(desktopId);
+            
+            if (mobileButton && desktopButton) {
+                mobileButton.addEventListener('click', function() {
+                    desktopButton.click();
+                    document.querySelector('.mobile-map-action-menu').classList.remove('visible');
+                });
+            }
+        }
+        
+        // Helper to keep form elements in sync
+        function connectFormElements(mobileId, desktopId) {
+            const mobileElement = document.getElementById(mobileId);
+            const desktopElement = document.getElementById(desktopId);
+            
+            if (mobileElement && desktopElement) {
+                // Sync desktop to mobile
+                mobileElement.addEventListener('change', function() {
+                    desktopElement.value = mobileElement.value;
+                });
+                
+                // Sync mobile to desktop
+                desktopElement.addEventListener('change', function() {
+                    mobileElement.value = desktopElement.value;
+                });
+                
+                // Initialize with desktop value
+                mobileElement.value = desktopElement.value;
+            }
+        }
+        
+        // Setup swipe-to-dismiss functionality for bottom sheets
+        function setupSwipeToDismiss(element) {
+            let startY, startTime;
+            const MIN_SWIPE_DISTANCE = 100;
+            const MAX_SWIPE_TIME = 300;
+            
+            element.addEventListener('touchstart', function(e) {
+                startY = e.touches[0].clientY;
+                startTime = Date.now();
+            });
+            
+            element.addEventListener('touchend', function(e) {
+                if (!startY) return;
+                
+                const endY = e.changedTouches[0].clientY;
+                const endTime = Date.now();
+                const distanceY = endY - startY;
+                const timeElapsed = endTime - startTime;
+                
+                // Check if it's a swipe down
+                if (distanceY > MIN_SWIPE_DISTANCE && timeElapsed < MAX_SWIPE_TIME) {
+                    element.classList.remove('expanded');
+                }
+                
+                startY = null;
+                startTime = null;
+            });
+        }
         
         // Initialize property markers
         function loadProperties() {
