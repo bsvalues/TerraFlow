@@ -138,8 +138,20 @@ class AccessControlManager:
         # Privileged session tracking
         self.privileged_sessions = {}
         
+        # Initialization state
+        self.is_initialized = True
+        
         logger.info("Access Control Manager initialized")
     
+    def is_initialized(self) -> bool:
+        """
+        Check if the access control manager is properly initialized.
+        
+        Returns:
+            True if initialized, False otherwise
+        """
+        return self.is_initialized
+        
     def has_permission(self, user_id: int, permission: str, 
                        context_attributes: Dict[str, Any] = None) -> bool:
         """
@@ -166,7 +178,7 @@ class AccessControlManager:
             return False
         
         # If no context attributes provided, use default empty dict
-        ctx_attrs = context_attributes or {}
+        ctx_attrs = {} if context_attributes is None else context_attributes
         
         # Add current time if not provided
         if 'current_hour' not in ctx_attrs:

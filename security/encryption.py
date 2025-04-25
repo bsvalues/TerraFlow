@@ -72,10 +72,19 @@ class EncryptionManager:
             'field_keys': 90      # Quarterly rotation
         }
         
-        # Initialization state
-        self.is_initialized = True
+        # Initialization state flag
+        self._is_initialized = True
         
         logger.info("Encryption Manager initialized")
+    
+    def is_initialized(self) -> bool:
+        """
+        Check if the encryption manager is properly initialized.
+        
+        Returns:
+            True if initialized, False otherwise
+        """
+        return self._is_initialized
     
     def generate_symmetric_key(self, algorithm: str = None) -> bytes:
         """
