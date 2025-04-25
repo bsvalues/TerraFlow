@@ -60,6 +60,9 @@ class PropertyValuationAgent(BaseAgent):
     def __init__(self, agent_id=None, name=None, description=None, market_update_interval=None, capabilities=None):
         """Initialize the PropertyValuationAgent"""
         super().__init__()
+        
+        # Set agent_id
+        self.agent_id = agent_id or f"property_valuation_{int(time.time())}"
         # Set the agent's capabilities
         self.capabilities = {
             "estimate_property_value": self._estimate_property_value,
