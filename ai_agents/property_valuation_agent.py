@@ -46,7 +46,7 @@ except ImportError:
     HAS_OPENAI = False
 
 # Import base agent class from MCP
-from ai_agents.mcp_core import BaseAgent, TaskPriority, TaskStatus, AgentStatus
+from ai_agents.mcp_core import BaseAgent, TaskPriority, TaskStatus
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -63,8 +63,25 @@ class PropertyValuationAgent(BaseAgent):
         
         # Set agent_id
         self.agent_id = agent_id or f"property_valuation_{int(time.time())}"
+        self.name = name or "Property Valuation Agent"
+        self.description = description or "AI-powered property valuation and assessment engine"
+        self.status = "ready"  # Use string instead of enum for compatibility
+        
         # Set the agent's capabilities
-        self.capabilities = {
+        self.capability_list = [
+            "estimate_property_value",
+            "train_valuation_model",
+            "value_trend_analysis",
+            "characteristic_importance",
+            "batch_valuation",
+            "comp_based_valuation",
+            "valuation_explainability",
+            "valuation_adjustments",
+            "ai_valuation_insight"
+        ]
+        
+        # Function mapping for capabilities
+        self.capability_functions = {
             "estimate_property_value": self._estimate_property_value,
             "train_valuation_model": self._train_valuation_model,
             "value_trend_analysis": self._value_trend_analysis,
@@ -126,6 +143,16 @@ class PropertyValuationAgent(BaseAgent):
             logger.warning(f"Could not initialize database connection: {str(e)}")
             self.conn = None
     
+    def get_agent_info(self):
+        """Get information about this agent for MCP"""
+        return {
+            "id": self.agent_id,
+            "name": self.name,
+            "description": self.description,
+            "status": self.status,
+            "capabilities": self.capability_list
+        }
+    
     def process_task(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Process a property valuation task.
@@ -146,16 +173,19 @@ class PropertyValuationAgent(BaseAgent):
         
         operation = task_data["operation"]
         
-        if operation not in self.capabilities:
+        if operation not in self.capability_functions:
             return {
                 "status": "error",
                 "error": f"Unsupported operation: {operation}",
-                "supported_operations": list(self.capabilities.keys())
+                "supported_operations": list(self.capability_functions.keys())
             }
         
         try:
+            # Update status
+            self.status = "processing"
+            
             # Call the appropriate handler function
-            result = self.capabilities[operation](task_data)
+            result = self.capability_functions[operation](task_data)
             
             # Add execution time
             execution_time = time.time() - start_time
@@ -164,10 +194,16 @@ class PropertyValuationAgent(BaseAgent):
             # Add operation name
             result["operation"] = operation
             
+            # Reset status to ready
+            self.status = "ready"
+            
             return result
             
         except Exception as e:
             logger.error(f"Error processing {operation} task: {str(e)}")
+            
+            # Reset status to ready
+            self.status = "ready"
             
             return {
                 "status": "error",
