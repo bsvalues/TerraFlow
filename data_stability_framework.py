@@ -21,8 +21,8 @@ from security.access_control import AccessControlManager
 from security.security_monitoring import SecurityMonitoringManager
 from security.audit_logging import AuditLogger
 from data_conversion.conversion_manager import ConversionManager
-from data_conversion.validation_agents import ValidationManager
-from disaster_recovery.recovery_manager import RecoveryManager
+from validation.validation import ValidationManager
+from recovery.recovery import RecoveryManager
 
 # Import AI agents
 from ai_agents.agent_manager import AIAgentManager, agent_manager
