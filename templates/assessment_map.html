@@ -446,6 +446,8 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // Check if mobile or desktop view
+        const isMobile = window.innerWidth < 768;
         // Initialize map
         const map = L.map('assessment-map').setView([46.2324, -119.2292], 12);
         
@@ -1447,7 +1449,7 @@
             }, 5000);
         }
         
-        // Event listeners
+        // Event listeners for desktop
         document.getElementById('apply-filters').addEventListener('click', loadProperties);
         document.getElementById('reset-filters').addEventListener('click', function() {
             // Reset form values
@@ -1456,9 +1458,89 @@
             // Reset value slider
             valueSlider.noUiSlider.set([0, 2000000]);
             
+            // Also reset mobile form if it exists
+            if (isMobile) {
+                if (document.getElementById('mobile-filter-form')) {
+                    document.getElementById('mobile-filter-form').reset();
+                }
+                
+                if (document.getElementById('mobile-value-range-slider') && 
+                    document.getElementById('mobile-value-range-slider').noUiSlider) {
+                    document.getElementById('mobile-value-range-slider').noUiSlider.set([0, 2000000]);
+                }
+            }
+            
             // Reload properties
             loadProperties();
         });
+        
+        // Mobile specific event listeners
+        if (isMobile) {
+            // Initialize mobile filter panel
+            const filterPanel = document.querySelector('.assessment-filters-panel');
+            const filterPanelToggleBtn = document.getElementById('mobile-filters-toggle');
+            
+            if (filterPanel && filterPanelToggleBtn) {
+                // Toggle filter panel when button is clicked
+                filterPanelToggleBtn.addEventListener('click', function() {
+                    filterPanel.classList.toggle('expanded');
+                });
+                
+                // Setup mobile filter buttons
+                if (document.getElementById('mobile-apply-filters')) {
+                    document.getElementById('mobile-apply-filters').addEventListener('click', function() {
+                        // Apply filters
+                        loadProperties();
+                        
+                        // Close the panel
+                        filterPanel.classList.remove('expanded');
+                    });
+                }
+                
+                if (document.getElementById('mobile-reset-filters')) {
+                    document.getElementById('mobile-reset-filters').addEventListener('click', function() {
+                        // Trigger the desktop reset button
+                        document.getElementById('reset-filters').click();
+                    });
+                }
+            }
+            
+            // Mobile button for zoning overlay
+            if (document.getElementById('mobile-toggle-zoning')) {
+                document.getElementById('mobile-toggle-zoning').addEventListener('click', function() {
+                    document.getElementById('toggle-zoning').click();
+                    // Close the panel
+                    filterPanel.classList.remove('expanded');
+                });
+            }
+            
+            // Mobile button for heatmap
+            if (document.getElementById('mobile-toggle-heatmap')) {
+                document.getElementById('mobile-toggle-heatmap').addEventListener('click', function() {
+                    document.getElementById('toggle-heatmap').click();
+                    // Close the panel
+                    filterPanel.classList.remove('expanded');
+                });
+            }
+            
+            // Mobile button for report generation
+            if (document.getElementById('mobile-generate-report')) {
+                document.getElementById('mobile-generate-report').addEventListener('click', function() {
+                    document.getElementById('generate-report').click();
+                    // Close the panel
+                    filterPanel.classList.remove('expanded');
+                });
+            }
+            
+            // Mobile button for export data
+            if (document.getElementById('mobile-export-data')) {
+                document.getElementById('mobile-export-data').addEventListener('click', function() {
+                    document.getElementById('export-data').click();
+                    // Close the panel
+                    filterPanel.classList.remove('expanded');
+                });
+            }
+        }
         
         // Initialize zoning layer variable
         let zoningLayer = null;
