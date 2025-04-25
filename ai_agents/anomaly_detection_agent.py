@@ -1,701 +1,1260 @@
 """
-Anomaly Detection Agent
+Anomaly Detection Agent Module
 
-This agent monitors property assessment data for anomalies and outliers,
-using statistical and machine learning techniques to identify potential issues.
+This module provides an AI agent for detecting and classifying anomalies
+in property assessment data.
 """
 
 import os
-import logging
-import time
 import json
+import logging
 import datetime
-import numpy as np
+import time
 import uuid
-import threading
-from typing import Dict, List, Any, Optional, Union, Tuple
+from typing import Dict, List, Any, Optional, Tuple, Union
 
-from sqlalchemy import text
-from ai_agents.base_agent import AIAgent
+# Placeholder imports until all scientific libraries are installed
+pd = None
+np = None
+sm = None
+IsolationForest = None
+LocalOutlierFactor = None
+DBSCAN = None
+StandardScaler = None
+joblib = None
+text = None
+    
+# Import common MCP agent base
+from mcp.agents.base_agent import BaseAgent
+# Safely import models
+try:
+    from models import Anomaly, AnomalyType, Property, Assessment
+except ImportError:
+    # Create placeholder classes for development/testing
+    class Anomaly:
+        pass
+    class AnomalyType:
+        pass
+    class Property:
+        pass
+    class Assessment:
+        pass
 
+from app import db
+from rag_functions import analyze_anomaly, suggest_anomaly_action
+
+# Configure logging
 logger = logging.getLogger(__name__)
 
-class AnomalyDetectionAgent(AIAgent):
+class AnomalyDetectionAgent(BaseAgent):
     """
-    Agent responsible for detecting anomalies in property assessment data.
-    Supports multiple detection algorithms and continuous monitoring.
+    Agent responsible for detecting anomalies in property data.
+    This agent uses statistical methods and machine learning to identify
+    potential data quality issues or unusual patterns in property assessment data.
     """
     
-    def __init__(self, agent_id: str = None, name: str = "AnomalyDetectionAgent", 
-                description: str = "Detects data anomalies in property assessment data", 
-                capabilities: List[str] = None, **kwargs):
+    def __init__(self, agent_id: Optional[str] = None, config: Optional[Dict[str, Any]] = None):
         """
         Initialize the anomaly detection agent.
         
         Args:
-            agent_id: Unique identifier for the agent
-            name: Name of the agent
-            description: Description of the agent
-            capabilities: Agent capabilities
-            **kwargs: Additional configuration
+            agent_id: Optional unique identifier for this agent instance
+            config: Optional configuration parameters
         """
-        # Default capabilities
-        default_capabilities = [
+        super().__init__()
+        
+        self.agent_id = agent_id or str(uuid.uuid4())[:8]
+        self.config = config or {}
+        self.name = "AnomalyDetectionAgent"
+        self.description = "Detects and classifies anomalies in property assessment data"
+        self.capabilities = [
+            "anomaly_detection",
             "outlier_detection",
-            "pattern_detection",
+            "data_validation",
             "trend_analysis",
-            "rule_based_anomaly_detection",
-            "statistical_anomaly_detection",
-            "machine_learning_anomaly_detection"
+            "pattern_recognition",
+            "anomaly_classification"
         ]
         
-        capabilities = capabilities or default_capabilities
-        
-        # Initialize base agent
-        super().__init__(agent_id, name, description, capabilities)
-        
-        # Agent configuration
-        self.config = {
-            "scan_interval": kwargs.get("scan_interval", 60),  # seconds
-            "detection_methods": kwargs.get("detection_methods", ["statistical", "rule_based"]),
-            "sensitivity": kwargs.get("sensitivity", "medium"),
-            "tables_to_monitor": kwargs.get("tables_to_monitor", ["properties", "parcels", "assessments"]),
-            "notify_on_detection": kwargs.get("notify_on_detection", True),
-            "auto_classify": kwargs.get("auto_classify", True),
-            "learning_enabled": kwargs.get("learning_enabled", True)
+        # Models and configuration
+        self.models = {}
+        self.detection_thresholds = {
+            "zscore": 3.0,                   # Z-score threshold for statistical outliers
+            "isolation_forest": 0.1,         # Contamination parameter for IsolationForest
+            "lof": 0.1,                      # Contamination parameter for LocalOutlierFactor
+            "dbscan_eps": 0.5,               # DBSCAN epsilon parameter
+            "dbscan_min_samples": 5,         # DBSCAN minimum samples parameter
+            "value_change_percent": 20.0     # Percent change threshold for value changes
         }
         
-        # Anomaly tracking
-        self.detected_anomalies = []
-        self.last_scan_time = None
+        # Load custom thresholds from config if provided
+        if "detection_thresholds" in self.config:
+            self.detection_thresholds.update(self.config["detection_thresholds"])
         
-        # Detection models and baselines
-        self.statistical_baselines = {}
-        self.detection_rules = self._initialize_detection_rules()
+        # Tracking and performance metrics
+        self.last_detection_run = None
+        self.detection_stats = {
+            "total_anomalies_detected": 0,
+            "false_positives": 0,
+            "true_positives": 0,
+            "detection_runs": 0
+        }
         
-        # Background scan task
-        self.scan_thread = None
-        self.scan_running = False
-        
-        logger.info(f"Anomaly Detection Agent '{self.name}' initialized")
+        # Status tracking
+        self.status = "initialized"
+        self.last_activity = time.time()
     
-    def _setup_agent(self):
-        """Set up the agent and initialize baselines"""
-        # Initialize statistical baselines for monitored tables
-        self._initialize_statistical_baselines()
+    def get_agent_info(self) -> Dict[str, Any]:
+        """
+        Get information about this agent.
         
-    def _initialize_statistical_baselines(self):
-        """Initialize statistical baselines for monitored tables"""
-        # This would typically load historical data and compute baseline statistics
-        # For demonstration, using empty placeholders
-        for table in self.config["tables_to_monitor"]:
-            self.statistical_baselines[table] = {
-                "last_updated": time.time(),
-                "field_stats": {},  # Will be populated with field-level statistics
-                "correlation_matrix": None,  # Will track correlation patterns
-                "value_distributions": {}  # Will track distributions of values
-            }
-    
-    def _initialize_detection_rules(self):
-        """Initialize rule-based detection logic"""
-        # These rules would be customized based on domain knowledge
-        # and specific requirements for the Benton County data
+        Returns:
+            Dict containing agent metadata
+        """
         return {
-            "properties": [
-                {
-                    "name": "assessed_value_outlier",
-                    "description": "Detect outliers in property assessed values",
-                    "condition": "value > mean + (3 * std_dev) OR value < mean - (3 * std_dev)",
-                    "fields": ["assessed_value", "land_value", "improvement_value"],
-                    "severity": "medium"
-                },
-                {
-                    "name": "suspicious_value_change",
-                    "description": "Detect suspiciously large changes in property values",
-                    "condition": "percent_change > 50%",
-                    "fields": ["assessed_value", "land_value"],
-                    "severity": "high"
-                }
-            ],
-            "parcels": [
-                {
-                    "name": "invalid_geometry",
-                    "description": "Detect invalid parcel geometries",
-                    "condition": "NOT ST_IsValid(geometry)",
-                    "fields": ["geometry"],
-                    "severity": "high"
-                },
-                {
-                    "name": "unordered_vertices",
-                    "description": "Detect unordered geometry vertices",
-                    "condition": "NOT ST_OrderingEquals(geometry, ST_MakeValid(geometry))",
-                    "fields": ["geometry"],
-                    "severity": "medium"
-                }
-            ],
-            "assessments": [
-                {
-                    "name": "missing_required_fields",
-                    "description": "Detect missing required assessment fields",
-                    "condition": "field IS NULL",
-                    "fields": ["assessment_date", "assessor_id", "property_id"],
-                    "severity": "high"
-                },
-                {
-                    "name": "future_dated_assessment",
-                    "description": "Detect assessments dated in the future",
-                    "condition": "assessment_date > CURRENT_DATE",
-                    "fields": ["assessment_date"],
-                    "severity": "medium"
-                }
-            ]
+            "id": self.agent_id,
+            "name": self.name,
+            "description": self.description,
+            "capabilities": self.capabilities,
+            "status": self.status,
+            "last_activity": self.last_activity,
+            "last_detection_run": self.last_detection_run,
+            "detection_stats": self.detection_stats
         }
-    
-    def start(self):
-        """Start the agent and the background scan thread"""
-        super().start()
-        
-        # Start background scanning
-        self.scan_running = True
-        self.scan_thread = threading.Thread(target=self._background_scan_loop)
-        self.scan_thread.daemon = True
-        self.scan_thread.start()
-        
-        logger.info(f"Anomaly Detection Agent '{self.name}' scanning started")
-    
-    def stop(self):
-        """Stop the agent and the background scan thread"""
-        # Stop background scanning
-        self.scan_running = False
-        if self.scan_thread:
-            self.scan_thread.join(timeout=2.0)
-        
-        super().stop()
-        logger.info(f"Anomaly Detection Agent '{self.name}' stopped")
-    
-    def _background_tasks(self):
-        """Perform background tasks"""
-        # Update baselines periodically (every 24 hours)
-        current_time = time.time()
-        for table, baseline in self.statistical_baselines.items():
-            if current_time - baseline["last_updated"] > 86400:  # 24 hours
-                try:
-                    self._update_statistical_baseline(table)
-                except Exception as e:
-                    logger.error(f"Error updating baseline for {table}: {str(e)}")
-    
-    def _background_scan_loop(self):
-        """Background loop for periodic data scanning"""
-        while self.scan_running:
-            try:
-                # Skip if agent is paused
-                if self.status != "running":
-                    time.sleep(1)
-                    continue
-                
-                # Perform scan
-                self._perform_data_scan()
-                
-                # Update last scan time
-                self.last_scan_time = time.time()
-                
-                # Sleep until next scan
-                time.sleep(self.config["scan_interval"])
-            except Exception as e:
-                logger.error(f"Error in anomaly scan loop: {str(e)}")
-                time.sleep(5)  # Sleep briefly after error
-    
-    def _perform_data_scan(self):
-        """Perform a scan for anomalies across monitored tables"""
-        from app import db
-        
-        try:
-            # Scan each monitored table
-            for table in self.config["tables_to_monitor"]:
-                # Determine which detection methods to use
-                for method in self.config["detection_methods"]:
-                    if method == "statistical":
-                        anomalies = self._statistical_anomaly_scan(table)
-                    elif method == "rule_based":
-                        anomalies = self._rule_based_anomaly_scan(table)
-                    else:
-                        logger.warning(f"Unknown detection method: {method}")
-                        continue
-                    
-                    # Process detected anomalies
-                    self._process_detected_anomalies(table, method, anomalies)
-        except Exception as e:
-            logger.error(f"Error performing data scan: {str(e)}")
-    
-    def _statistical_anomaly_scan(self, table):
-        """
-        Perform statistical anomaly detection on a table.
-        
-        Args:
-            table: Name of the table to scan
-            
-        Returns:
-            List of detected anomalies
-        """
-        from app import db
-        anomalies = []
-        
-        try:
-            # Get baseline stats for the table
-            baseline = self.statistical_baselines.get(table, {})
-            if not baseline or not baseline.get("field_stats"):
-                # No baseline yet, so create one
-                self._update_statistical_baseline(table)
-                return []
-            
-            # Get recent records for analysis
-            query = f"""
-                SELECT * FROM {table}
-                ORDER BY created_at DESC LIMIT 1000
-            """
-            
-            # Execute query safely
-            result = db.session.execute(text(query))
-            rows = result.fetchall()
-            
-            if not rows:
-                return []
-            
-            # Convert to dictionaries
-            columns = result.keys()
-            records = [dict(zip(columns, row)) for row in rows]
-            
-            # Check each record for statistical anomalies
-            for record in records:
-                # Check numeric fields for outliers
-                for field, stats in baseline["field_stats"].items():
-                    if field not in record or record[field] is None:
-                        continue
-                    
-                    try:
-                        value = float(record[field])
-                        
-                        # Skip if no statistics available
-                        if "mean" not in stats or "std_dev" not in stats:
-                            continue
-                        
-                        # Calculate Z-score
-                        z_score = (value - stats["mean"]) / max(stats["std_dev"], 0.0001)
-                        
-                        # Adjust threshold based on sensitivity
-                        threshold = 3.0  # Default (medium)
-                        if self.config["sensitivity"] == "high":
-                            threshold = 2.5
-                        elif self.config["sensitivity"] == "low":
-                            threshold = 3.5
-                        
-                        # Check if outlier
-                        if abs(z_score) > threshold:
-                            anomalies.append({
-                                "id": str(uuid.uuid4()),
-                                "table": table,
-                                "record_id": record.get("id"),
-                                "field": field,
-                                "value": value,
-                                "expected_range": [
-                                    stats["mean"] - (threshold * stats["std_dev"]),
-                                    stats["mean"] + (threshold * stats["std_dev"])
-                                ],
-                                "z_score": z_score,
-                                "anomaly_type": "statistical_outlier",
-                                "detection_method": "statistical",
-                                "severity": "medium" if abs(z_score) > threshold + 1 else "low",
-                                "detected_at": datetime.datetime.now().isoformat()
-                            })
-                    except (ValueError, TypeError):
-                        # Skip non-numeric values
-                        pass
-            
-            return anomalies
-        except Exception as e:
-            logger.error(f"Error in statistical anomaly scan for {table}: {str(e)}")
-            return []
-    
-    def _rule_based_anomaly_scan(self, table):
-        """
-        Perform rule-based anomaly detection on a table.
-        
-        Args:
-            table: Name of the table to scan
-            
-        Returns:
-            List of detected anomalies
-        """
-        from app import db
-        anomalies = []
-        
-        try:
-            # Get rules for this table
-            rules = self.detection_rules.get(table, [])
-            if not rules:
-                return []
-            
-            # Process each rule
-            for rule in rules:
-                # Construct query based on the rule
-                fields_str = ", ".join(["id"] + rule["fields"])
-                
-                # Translate rule condition to SQL
-                condition = rule["condition"]
-                # This is a simplified example - in production code, would use proper
-                # SQL parameter binding and safe string formatting
-                
-                query = f"""
-                    SELECT {fields_str} FROM {table}
-                    WHERE {condition}
-                    LIMIT 100
-                """
-                
-                try:
-                    # Execute query safely
-                    result = db.session.execute(text(query))
-                    rule_violations = result.fetchall()
-                    
-                    # Process violations
-                    if rule_violations:
-                        columns = result.keys()
-                        for violation in rule_violations:
-                            record = dict(zip(columns, violation))
-                            
-                            anomalies.append({
-                                "id": str(uuid.uuid4()),
-                                "table": table,
-                                "record_id": record.get("id"),
-                                "rule_name": rule["name"],
-                                "rule_description": rule["description"],
-                                "fields": rule["fields"],
-                                "anomaly_type": "rule_violation",
-                                "detection_method": "rule_based",
-                                "severity": rule["severity"],
-                                "detected_at": datetime.datetime.now().isoformat()
-                            })
-                except Exception as e:
-                    logger.error(f"Error executing rule '{rule['name']}': {str(e)}")
-            
-            return anomalies
-        except Exception as e:
-            logger.error(f"Error in rule-based anomaly scan for {table}: {str(e)}")
-            return []
-    
-    def _update_statistical_baseline(self, table):
-        """
-        Update statistical baseline for a table.
-        
-        Args:
-            table: Name of the table to update
-        """
-        from app import db
-        
-        try:
-            # Query to get column names and types
-            metadata_query = f"""
-                SELECT column_name, data_type
-                FROM information_schema.columns
-                WHERE table_name = '{table}'
-            """
-            
-            # Execute query safely
-            result = db.session.execute(text(metadata_query))
-            columns = result.fetchall()
-            
-            # Identify numeric columns
-            numeric_columns = [col[0] for col in columns 
-                              if col[1] in ('integer', 'numeric', 'real', 'double precision')]
-            
-            # Skip tables with no numeric columns
-            if not numeric_columns:
-                logger.info(f"No numeric columns in {table}, skipping baseline update")
-                return
-            
-            # Query to get data for baseline calculation
-            columns_str = ", ".join(numeric_columns)
-            data_query = f"""
-                SELECT {columns_str} FROM {table}
-                LIMIT 10000
-            """
-            
-            # Execute query safely
-            result = db.session.execute(text(data_query))
-            rows = result.fetchall()
-            
-            if not rows:
-                logger.info(f"No data in {table}, skipping baseline update")
-                return
-            
-            # Calculate statistics for each numeric column
-            field_stats = {}
-            for i, column in enumerate(numeric_columns):
-                values = [row[i] for row in rows if row[i] is not None]
-                
-                if values:
-                    # Calculate basic statistics
-                    mean = sum(values) / len(values)
-                    
-                    # Calculate standard deviation
-                    squared_diffs = [(value - mean) ** 2 for value in values]
-                    variance = sum(squared_diffs) / len(values)
-                    std_dev = variance ** 0.5
-                    
-                    # Calculate additional statistics
-                    values.sort()
-                    median = values[len(values) // 2]
-                    min_value = min(values)
-                    max_value = max(values)
-                    
-                    # Store statistics
-                    field_stats[column] = {
-                        "mean": mean,
-                        "median": median,
-                        "std_dev": std_dev,
-                        "min": min_value,
-                        "max": max_value,
-                        "count": len(values)
-                    }
-            
-            # Update the baseline
-            self.statistical_baselines[table] = {
-                "last_updated": time.time(),
-                "field_stats": field_stats
-            }
-            
-            logger.info(f"Updated statistical baseline for {table}")
-        except Exception as e:
-            logger.error(f"Error updating statistical baseline for {table}: {str(e)}")
-    
-    def _process_detected_anomalies(self, table, method, anomalies):
-        """
-        Process detected anomalies.
-        
-        Args:
-            table: Table where anomalies were detected
-            method: Detection method used
-            anomalies: List of detected anomalies
-        """
-        if not anomalies:
-            return
-        
-        # Store the anomalies
-        self.detected_anomalies.extend(anomalies)
-        
-        # Limit the stored anomalies to prevent memory issues
-        if len(self.detected_anomalies) > 1000:
-            self.detected_anomalies = self.detected_anomalies[-1000:]
-        
-        # Log the anomalies
-        logger.info(f"Detected {len(anomalies)} anomalies in {table} using {method} method")
-        
-        # Send notifications if enabled
-        if self.config["notify_on_detection"]:
-            self._send_anomaly_notifications(anomalies)
-        
-        # Store anomalies in the database
-        self._store_anomalies(anomalies)
-    
-    def _send_anomaly_notifications(self, anomalies):
-        """
-        Send notifications for detected anomalies.
-        
-        Args:
-            anomalies: List of detected anomalies
-        """
-        try:
-            from data_governance.notification_manager import send_data_quality_notification
-            
-            # Group anomalies by severity
-            anomalies_by_severity = {}
-            for anomaly in anomalies:
-                severity = anomaly.get("severity", "low")
-                if severity not in anomalies_by_severity:
-                    anomalies_by_severity[severity] = []
-                anomalies_by_severity[severity].append(anomaly)
-            
-            # Send notifications for each severity level
-            for severity, severity_anomalies in anomalies_by_severity.items():
-                if not severity_anomalies:
-                    continue
-                
-                # Determine recipients based on severity
-                recipients = ["data_quality_team"]
-                if severity in ("high", "critical"):
-                    recipients.append("data_governance_team")
-                if severity == "critical":
-                    recipients.append("security_team")
-                
-                # Create notification
-                notification = {
-                    "title": f"{len(severity_anomalies)} {severity} anomalies detected",
-                    "message": f"Detected {len(severity_anomalies)} {severity} anomalies in {severity_anomalies[0]['table']}",
-                    "severity": severity,
-                    "anomalies": severity_anomalies,
-                    "detection_time": datetime.datetime.now().isoformat()
-                }
-                
-                # Send notification
-                send_data_quality_notification(
-                    recipients=recipients,
-                    notification_data=notification
-                )
-                
-                logger.info(f"Sent notification for {len(severity_anomalies)} {severity} anomalies")
-        except Exception as e:
-            logger.error(f"Error sending anomaly notifications: {str(e)}")
-    
-    def _store_anomalies(self, anomalies):
-        """
-        Store detected anomalies in the database.
-        
-        Args:
-            anomalies: List of detected anomalies
-        """
-        try:
-            from app import db
-            from data_quality.models import DataAnomaly
-            
-            # Insert each anomaly
-            for anomaly in anomalies:
-                # Create database record
-                db_anomaly = DataAnomaly(
-                    table_name=anomaly.get("table"),
-                    field_name=anomaly.get("field"),
-                    record_id=anomaly.get("record_id"),
-                    anomaly_type=anomaly.get("anomaly_type"),
-                    anomaly_details=json.dumps(anomaly),
-                    anomaly_score=anomaly.get("z_score", 0.0),
-                    severity=anomaly.get("severity", "low"),
-                    status="open",
-                    detected_at=datetime.datetime.now()
-                )
-                
-                # Add to database
-                db.session.add(db_anomaly)
-            
-            # Commit transaction
-            db.session.commit()
-            
-            logger.info(f"Stored {len(anomalies)} anomalies in the database")
-        except Exception as e:
-            logger.error(f"Error storing anomalies in database: {str(e)}")
     
     def process_task(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Process a task.
+        Process an anomaly detection task.
         
         Args:
-            task_data: Task data
+            task_data: Dictionary containing task parameters
             
         Returns:
-            Task result
+            Dict with task results
         """
-        task_type = task_data.get("type")
+        self.last_activity = time.time()
         
-        if task_type == "update_baselines":
-            # Update statistical baselines
-            tables = task_data.get("tables", self.config["tables_to_monitor"])
-            for table in tables:
-                try:
-                    self._update_statistical_baseline(table)
-                except Exception as e:
-                    return {
-                        "status": "error",
-                        "error": f"Error updating baseline for {table}: {str(e)}"
-                    }
+        if not task_data or "task_type" not in task_data:
+            return {"error": "Invalid task data, missing task_type"}
+            
+        task_type = task_data.get("task_type")
+        
+        try:
+            if task_type == "detect_anomalies":
+                return self.detect_anomalies(task_data)
+            elif task_type == "train_models":
+                return self.train_detection_models(task_data)
+            elif task_type == "classify_anomaly":
+                return self.classify_anomaly(task_data)
+            elif task_type == "suggest_action":
+                return self.suggest_action(task_data)
+            elif task_type == "validate_property_data":
+                return self.validate_property_data(task_data)
+            elif task_type == "analyze_trends":
+                return self.analyze_trends(task_data)
+            elif task_type == "agent_status":
+                return self.get_agent_info()
+            else:
+                return {"error": f"Unsupported task type: {task_type}"}
+        except Exception as e:
+            logger.error(f"Error processing task: {str(e)}")
+            return {"error": f"Error processing task: {str(e)}"}
+    
+    def detect_anomalies(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Detect anomalies in property assessment data.
+        
+        Args:
+            task_data: Dictionary with detection parameters including:
+                - method: Detection method to use
+                - property_type: Optional filter for property type
+                - area: Optional geographical area filter
+                - max_anomalies: Maximum number of anomalies to return
+                
+        Returns:
+            Dict with detected anomalies
+        """
+        self.status = "detecting_anomalies"
+        start_time = time.time()
+        
+        # Extract parameters
+        method = task_data.get("method", "combined")
+        property_type = task_data.get("property_type")
+        area = task_data.get("area")
+        max_anomalies = task_data.get("max_anomalies", 100)
+        
+        detection_methods = {
+            "statistical": self._detect_statistical_anomalies,
+            "isolation_forest": self._detect_isolation_forest_anomalies,
+            "lof": self._detect_lof_anomalies,
+            "dbscan": self._detect_dbscan_anomalies,
+            "value_change": self._detect_value_change_anomalies,
+            "combined": self._detect_combined_anomalies
+        }
+        
+        if method not in detection_methods:
+            return {"error": f"Unknown detection method: {method}"}
+        
+        # Get the data from database
+        try:
+            # Use raw SQL for more complex queries
+            data = self._fetch_property_data(property_type, area)
+            
+            if not data or len(data) == 0:
+                return {"error": "No property data available for anomaly detection"}
+            
+            # Call the appropriate detection method
+            detection_func = detection_methods[method]
+            anomalies = detection_func(data)
+            
+            # Limit the number of anomalies returned
+            anomalies = anomalies[:max_anomalies]
+            
+            # Save detected anomalies to database
+            saved_anomalies = self._save_anomalies(anomalies)
+            
+            # Update statistics
+            self.detection_stats["detection_runs"] += 1
+            self.detection_stats["total_anomalies_detected"] += len(saved_anomalies)
+            self.last_detection_run = datetime.datetime.utcnow().isoformat()
+            
+            processing_time = time.time() - start_time
+            self.status = "idle"
             
             return {
                 "status": "success",
-                "message": f"Updated baselines for {len(tables)} tables"
+                "method": method,
+                "anomalies_detected": len(saved_anomalies),
+                "anomalies": saved_anomalies,
+                "processing_time": processing_time
             }
-        
-        elif task_type == "scan_for_anomalies":
-            # Perform an immediate scan
-            tables = task_data.get("tables", self.config["tables_to_monitor"])
-            methods = task_data.get("methods", self.config["detection_methods"])
             
-            all_anomalies = []
-            for table in tables:
-                for method in methods:
-                    try:
-                        if method == "statistical":
-                            anomalies = self._statistical_anomaly_scan(table)
-                        elif method == "rule_based":
-                            anomalies = self._rule_based_anomaly_scan(table)
-                        else:
+        except Exception as e:
+            self.status = "error"
+            logger.error(f"Error detecting anomalies: {str(e)}")
+            return {"error": f"Error detecting anomalies: {str(e)}"}
+    
+    def _fetch_property_data(self, property_type=None, area=None):
+        """
+        Fetch property and assessment data from the database.
+        
+        Args:
+            property_type: Optional property type filter
+            area: Optional geographical area filter
+            
+        Returns:
+            DataFrame with property data
+        """
+        if pd is None:
+            raise ImportError("pandas is required for anomaly detection")
+        
+        # Build query conditions
+        conditions = []
+        params = {}
+        
+        if property_type:
+            conditions.append("p.property_type = :property_type")
+            params["property_type"] = property_type
+            
+        if area:
+            # Assuming 'area' is a GeoJSON polygon for spatial filtering
+            conditions.append("ST_Contains(ST_GeomFromGeoJSON(:area), p.location)")
+            params["area"] = json.dumps(area)
+        
+        # Construct the WHERE clause
+        where_clause = " AND ".join(conditions)
+        if where_clause:
+            where_clause = "WHERE " + where_clause
+        
+        # SQL query joining properties and their latest assessments
+        query = f"""
+        SELECT 
+            p.id, p.parcel_id, p.address, p.city, p.state, p.zip_code, p.property_type,
+            p.lot_size, p.year_built, p.bedrooms, p.bathrooms, p.total_area,
+            p.owner_name, p.purchase_date, p.purchase_price,
+            a.assessment_date, a.land_value, a.improvement_value, a.total_value,
+            a.assessment_year, a.status as assessment_status
+        FROM 
+            properties p
+        LEFT JOIN (
+            SELECT 
+                a1.*
+            FROM 
+                assessments a1
+            INNER JOIN (
+                SELECT 
+                    property_id, MAX(assessment_date) as max_date
+                FROM 
+                    assessments
+                GROUP BY 
+                    property_id
+            ) a2 ON a1.property_id = a2.property_id AND a1.assessment_date = a2.max_date
+        ) a ON p.id = a.property_id
+        {where_clause}
+        ORDER BY p.id
+        """
+        
+        try:
+            # Use pandas to read SQL directly
+            with db.engine.connect() as connection:
+                data = pd.read_sql(query, connection, params=params)
+            return data
+        except Exception as e:
+            logger.error(f"Error fetching property data: {str(e)}")
+            raise
+    
+    def _detect_statistical_anomalies(self, data) -> List[Dict[str, Any]]:
+        """
+        Detect anomalies using statistical methods (z-score).
+        
+        Args:
+            data: DataFrame with property data
+            
+        Returns:
+            List of detected anomalies
+        """
+        if np is None or pd is None:
+            raise ImportError("numpy and pandas are required for statistical anomaly detection")
+        
+        anomalies = []
+        z_threshold = self.detection_thresholds["zscore"]
+        
+        # Analyze numerical columns for outliers
+        numerical_cols = [
+            'lot_size', 'year_built', 'bedrooms', 'bathrooms', 'total_area',
+            'purchase_price', 'land_value', 'improvement_value', 'total_value'
+        ]
+        
+        # Only use columns that exist in the data
+        numerical_cols = [col for col in numerical_cols if col in data.columns]
+        
+        # Filter to only rows with values in key columns
+        data_filtered = data.dropna(subset=['total_value', 'property_type'])
+        
+        # Process each property type separately to find contextual anomalies
+        for prop_type in data_filtered['property_type'].unique():
+            type_data = data_filtered[data_filtered['property_type'] == prop_type]
+            
+            if len(type_data) < 10:  # Skip if we don't have enough data
+                continue
+                
+            for col in numerical_cols:
+                try:
+                    # Skip columns with too many missing values
+                    if type_data[col].isna().sum() > 0.5 * len(type_data):
+                        continue
+                        
+                    # Create a copy to avoid warning
+                    type_subset = type_data.copy()
+                    
+                    # Calculate z-scores (ignoring nulls)
+                    mean_val = type_subset[col].mean()
+                    std_val = type_subset[col].std()
+                    
+                    if std_val == 0:  # Skip if standard deviation is zero
+                        continue
+                        
+                    type_subset['z_score'] = (type_subset[col] - mean_val) / std_val
+                    
+                    # Find outliers
+                    outliers = type_subset[np.abs(type_subset['z_score']) > z_threshold]
+                    
+                    # Create anomaly records
+                    for _, row in outliers.iterrows():
+                        anomaly = {
+                            'property_id': str(row['id']),
+                            'anomaly_type': 'statistical_outlier',
+                            'description': f"{col} is {row['z_score']:.2f} standard deviations from the mean for {prop_type} properties",
+                            'severity': 'medium' if abs(row['z_score']) < z_threshold * 1.5 else 'high',
+                            'detection_method': 'z_score',
+                            'detection_date': datetime.datetime.utcnow().isoformat(),
+                            'affected_value': float(row[col]),
+                            'expected_range': {
+                                'min': float(mean_val - z_threshold * std_val),
+                                'max': float(mean_val + z_threshold * std_val)
+                            },
+                            'z_score': float(row['z_score']),
+                            'metadata': {
+                                'property_type': prop_type,
+                                'attribute': col,
+                                'mean': float(mean_val),
+                                'std_dev': float(std_val)
+                            }
+                        }
+                        anomalies.append(anomaly)
+                except Exception as e:
+                    logger.warning(f"Error calculating z-scores for {col}: {str(e)}")
+        
+        return anomalies
+    
+    def _detect_isolation_forest_anomalies(self, data) -> List[Dict[str, Any]]:
+        """
+        Detect anomalies using Isolation Forest algorithm.
+        
+        Args:
+            data: DataFrame with property data
+            
+        Returns:
+            List of detected anomalies
+        """
+        if np is None or pd is None:
+            raise ImportError("numpy, pandas, and sklearn are required for isolation forest")
+        
+        anomalies = []
+        contamination = self.detection_thresholds["isolation_forest"]
+        
+        # Features to use for anomaly detection
+        feature_cols = [
+            'lot_size', 'year_built', 'bedrooms', 'bathrooms', 'total_area',
+            'land_value', 'improvement_value', 'total_value'
+        ]
+        
+        # Only use columns that exist in the data
+        feature_cols = [col for col in feature_cols if col in data.columns]
+        
+        if not feature_cols:
+            return []  # No usable features
+            
+        # Process each property type separately
+        for prop_type in data['property_type'].unique():
+            try:
+                type_data = data[data['property_type'] == prop_type].copy()
+                
+                if len(type_data) < 20:  # Skip if we don't have enough data
+                    continue
+                
+                # Prepare features, dropping rows with missing values
+                X = type_data[feature_cols].dropna()
+                if len(X) < 20:
+                    continue
+                    
+                # Save index mapping to recover property information later
+                index_map = X.index
+                
+                # Scale the features
+                scaler = StandardScaler()
+                X_scaled = scaler.fit_transform(X)
+                
+                # Train Isolation Forest
+                clf = IsolationForest(
+                    contamination=contamination,
+                    n_estimators=100,
+                    random_state=42
+                )
+                
+                # Fit and predict
+                y_pred = clf.fit_predict(X_scaled)
+                
+                # Find anomalies (where prediction is -1)
+                anomaly_indices = np.where(y_pred == -1)[0]
+                
+                # Get anomaly scores (negative of decision function)
+                scores = -clf.decision_function(X_scaled)
+                
+                # Create anomaly records
+                for idx in anomaly_indices:
+                    orig_idx = index_map[idx]
+                    row = type_data.loc[orig_idx]
+                    
+                    # Calculate which features contributed most to the anomaly
+                    feature_contribs = {}
+                    for i, col in enumerate(feature_cols):
+                        if pd.isna(row[col]):
                             continue
                         
-                        self._process_detected_anomalies(table, method, anomalies)
-                        all_anomalies.extend(anomalies)
-                    except Exception as e:
-                        return {
-                            "status": "error",
-                            "error": f"Error scanning {table} with {method}: {str(e)}"
+                        # Calculate z-score of this feature to estimate contribution
+                        mean_val = type_data[col].mean()
+                        std_val = type_data[col].std()
+                        
+                        if std_val > 0:
+                            z = abs((row[col] - mean_val) / std_val)
+                            feature_contribs[col] = float(z)
+                    
+                    # Sort features by contribution
+                    sorted_contribs = sorted(
+                        feature_contribs.items(), 
+                        key=lambda x: x[1], 
+                        reverse=True
+                    )
+                    
+                    # Describe the top contributors
+                    if sorted_contribs:
+                        top_features = sorted_contribs[:3]
+                        feature_desc = ", ".join(
+                            [f"{col} ({val:.2f} std)" for col, val in top_features]
+                        )
+                        description = f"Unusual combination of values detected for {prop_type} property. Unusual features: {feature_desc}"
+                    else:
+                        description = f"Unusual combination of values detected for {prop_type} property"
+                    
+                    anomaly = {
+                        'property_id': str(row['id']),
+                        'anomaly_type': 'multivariate_outlier',
+                        'description': description,
+                        'severity': 'high' if scores[idx] > 0.8 else 'medium',
+                        'detection_method': 'isolation_forest',
+                        'detection_date': datetime.datetime.utcnow().isoformat(),
+                        'anomaly_score': float(scores[idx]),
+                        'metadata': {
+                            'property_type': prop_type,
+                            'feature_contributions': dict(sorted_contribs),
+                            'model_config': {
+                                'contamination': contamination,
+                                'n_estimators': 100
+                            }
                         }
+                    }
+                    anomalies.append(anomaly)
             
-            return {
-                "status": "success",
-                "message": f"Detected {len(all_anomalies)} anomalies",
-                "anomalies": all_anomalies
-            }
+            except Exception as e:
+                logger.warning(f"Error in isolation forest for {prop_type}: {str(e)}")
         
-        elif task_type == "get_anomalies":
-            # Get detected anomalies
-            filters = task_data.get("filters", {})
+        return anomalies
+    
+    def _detect_lof_anomalies(self, data) -> List[Dict[str, Any]]:
+        """
+        Detect anomalies using Local Outlier Factor algorithm.
+        
+        Args:
+            data: DataFrame with property data
             
-            # Apply filters
-            filtered_anomalies = self.detected_anomalies
+        Returns:
+            List of detected anomalies
+        """
+        # Implementation similar to isolation forest but using LOF
+        # Would be implemented similarly to _detect_isolation_forest_anomalies
+        return []  # Placeholder for actual implementation
+    
+    def _detect_dbscan_anomalies(self, data) -> List[Dict[str, Any]]:
+        """
+        Detect anomalies using DBSCAN clustering.
+        
+        Args:
+            data: DataFrame with property data
             
-            if "table" in filters:
-                filtered_anomalies = [a for a in filtered_anomalies if a.get("table") == filters["table"]]
+        Returns:
+            List of detected anomalies
+        """
+        # Implementation using DBSCAN to find outliers
+        # Would be implemented similarly to isolation forest but using DBSCAN
+        return []  # Placeholder for actual implementation
+    
+    def _detect_value_change_anomalies(self, data) -> List[Dict[str, Any]]:
+        """
+        Detect anomalies based on significant changes in property values.
+        
+        Args:
+            data: DataFrame with property data
             
-            if "severity" in filters:
-                filtered_anomalies = [a for a in filtered_anomalies if a.get("severity") == filters["severity"]]
+        Returns:
+            List of detected anomalies
+        """
+        if pd is None:
+            raise ImportError("pandas is required for value change detection")
+        
+        anomalies = []
+        change_threshold = self.detection_thresholds["value_change_percent"]
+        
+        try:
+            # This requires assessment history data, so we need a different query
+            # For each property, we need to get the current and previous assessment
+            with db.engine.connect() as connection:
+                query = """
+                WITH RankedAssessments AS (
+                    SELECT 
+                        a.*,
+                        p.property_type,
+                        ROW_NUMBER() OVER (PARTITION BY a.property_id ORDER BY a.assessment_date DESC) as row_num
+                    FROM 
+                        assessments a
+                    JOIN 
+                        properties p ON a.property_id = p.id
+                )
+                SELECT 
+                    r1.property_id, 
+                    r1.assessment_date as current_date,
+                    r1.total_value as current_value,
+                    r2.assessment_date as previous_date,
+                    r2.total_value as previous_value,
+                    r1.property_type
+                FROM 
+                    RankedAssessments r1
+                LEFT JOIN 
+                    RankedAssessments r2 ON r1.property_id = r2.property_id AND r2.row_num = 2
+                WHERE 
+                    r1.row_num = 1
+                AND 
+                    r2.assessment_date IS NOT NULL  -- Ensure there is a previous assessment
+                """
+                
+                assessment_changes = pd.read_sql(query, connection)
             
-            if "type" in filters:
-                filtered_anomalies = [a for a in filtered_anomalies if a.get("anomaly_type") == filters["type"]]
-            
-            if "since" in filters:
-                since = datetime.datetime.fromisoformat(filters["since"])
-                filtered_anomalies = [
-                    a for a in filtered_anomalies 
-                    if datetime.datetime.fromisoformat(a.get("detected_at", "2000-01-01T00:00:00")) >= since
-                ]
-            
-            # Sort by detection time
-            filtered_anomalies.sort(
-                key=lambda a: a.get("detected_at", "2000-01-01T00:00:00"),
-                reverse=True
+            if len(assessment_changes) == 0:
+                return []
+                
+            # Calculate percent change
+            assessment_changes['percent_change'] = (
+                (assessment_changes['current_value'] - assessment_changes['previous_value']) / 
+                assessment_changes['previous_value'] * 100
             )
             
-            # Limit results
-            limit = task_data.get("limit", 100)
-            filtered_anomalies = filtered_anomalies[:limit]
+            # Find significant changes
+            significant_increases = assessment_changes[assessment_changes['percent_change'] > change_threshold]
+            significant_decreases = assessment_changes[assessment_changes['percent_change'] < -change_threshold]
+            
+            # Process increases
+            for _, row in significant_increases.iterrows():
+                anomaly = {
+                    'property_id': str(row['property_id']),
+                    'anomaly_type': 'value_change',
+                    'description': f"Property value increased by {row['percent_change']:.1f}% (from ${float(row['previous_value']):,.2f} to ${float(row['current_value']):,.2f})",
+                    'severity': 'high' if row['percent_change'] > 2 * change_threshold else 'medium',
+                    'detection_method': 'value_change_detection',
+                    'detection_date': datetime.datetime.utcnow().isoformat(),
+                    'metadata': {
+                        'property_type': row['property_type'],
+                        'current_value': float(row['current_value']),
+                        'previous_value': float(row['previous_value']),
+                        'percent_change': float(row['percent_change']),
+                        'current_date': row['current_date'].strftime('%Y-%m-%d') if not pd.isna(row['current_date']) else None,
+                        'previous_date': row['previous_date'].strftime('%Y-%m-%d') if not pd.isna(row['previous_date']) else None
+                    }
+                }
+                anomalies.append(anomaly)
+                
+            # Process decreases  
+            for _, row in significant_decreases.iterrows():
+                anomaly = {
+                    'property_id': str(row['property_id']),
+                    'anomaly_type': 'value_change',
+                    'description': f"Property value decreased by {abs(row['percent_change']):.1f}% (from ${float(row['previous_value']):,.2f} to ${float(row['current_value']):,.2f})",
+                    'severity': 'high' if abs(row['percent_change']) > 2 * change_threshold else 'medium',
+                    'detection_method': 'value_change_detection',
+                    'detection_date': datetime.datetime.utcnow().isoformat(),
+                    'metadata': {
+                        'property_type': row['property_type'],
+                        'current_value': float(row['current_value']),
+                        'previous_value': float(row['previous_value']),
+                        'percent_change': float(row['percent_change']),
+                        'current_date': row['current_date'].strftime('%Y-%m-%d') if not pd.isna(row['current_date']) else None,
+                        'previous_date': row['previous_date'].strftime('%Y-%m-%d') if not pd.isna(row['previous_date']) else None
+                    }
+                }
+                anomalies.append(anomaly)
+                
+        except Exception as e:
+            logger.warning(f"Error detecting value changes: {str(e)}")
+            
+        return anomalies
+    
+    def _detect_combined_anomalies(self, data) -> List[Dict[str, Any]]:
+        """
+        Detect anomalies using a combination of methods.
+        
+        Args:
+            data: DataFrame with property data
+            
+        Returns:
+            List of detected anomalies
+        """
+        # Combine results from multiple methods
+        all_anomalies = []
+        
+        methods = [
+            self._detect_statistical_anomalies,
+            self._detect_isolation_forest_anomalies,
+            self._detect_value_change_anomalies
+        ]
+        
+        for method in methods:
+            try:
+                anomalies = method(data)
+                all_anomalies.extend(anomalies)
+            except Exception as e:
+                logger.warning(f"Error in detection method {method.__name__}: {str(e)}")
+        
+        return all_anomalies
+    
+    def _save_anomalies(self, anomalies: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Save detected anomalies to the database.
+        
+        Args:
+            anomalies: List of anomaly dictionaries
+            
+        Returns:
+            List of saved anomaly data
+        """
+        saved_anomalies = []
+        
+        for anomaly_data in anomalies:
+            try:
+                # Check if property exists
+                property_id = anomaly_data.get('property_id')
+                if not property_id:
+                    continue
+                
+                # Get or create the anomaly type
+                anomaly_type_name = anomaly_data.get('anomaly_type', 'unknown')
+                anomaly_type = AnomalyType.query.filter_by(name=anomaly_type_name).first()
+                
+                if not anomaly_type:
+                    # Create a new anomaly type if it doesn't exist
+                    anomaly_type = AnomalyType(
+                        name=anomaly_type_name,
+                        description=f"Anomalies detected via {anomaly_data.get('detection_method', 'unknown')}"
+                    )
+                    db.session.add(anomaly_type)
+                    db.session.flush()  # Get the ID without committing
+                
+                # Check if similar anomaly already exists for this property
+                existing_anomaly = Anomaly.query.filter_by(
+                    property_id=property_id,
+                    anomaly_type_id=anomaly_type.id,
+                    status='active'
+                ).first()
+                
+                if existing_anomaly:
+                    # Update existing anomaly
+                    existing_anomaly.description = anomaly_data.get('description', '')
+                    existing_anomaly.severity = anomaly_data.get('severity', 'medium')
+                    existing_anomaly.detection_date = datetime.datetime.utcnow()
+                    existing_anomaly.metadata = anomaly_data.get('metadata', {})
+                    db.session.add(existing_anomaly)
+                    
+                    saved_anomaly = existing_anomaly
+                else:
+                    # Create new anomaly
+                    new_anomaly = Anomaly(
+                        property_id=property_id,
+                        anomaly_type_id=anomaly_type.id,
+                        description=anomaly_data.get('description', ''),
+                        severity=anomaly_data.get('severity', 'medium'),
+                        status='active',
+                        detection_date=datetime.datetime.utcnow(),
+                        detection_method=anomaly_data.get('detection_method', 'unknown'),
+                        metadata=anomaly_data.get('metadata', {})
+                    )
+                    db.session.add(new_anomaly)
+                    db.session.flush()  # Get the ID without committing
+                    
+                    saved_anomaly = new_anomaly
+                
+                # Convert to dictionary for return
+                saved_anomalies.append({
+                    'id': str(saved_anomaly.id),
+                    'property_id': str(saved_anomaly.property_id),
+                    'anomaly_type': anomaly_type.name,
+                    'description': saved_anomaly.description,
+                    'severity': saved_anomaly.severity,
+                    'status': saved_anomaly.status,
+                    'detection_date': saved_anomaly.detection_date.isoformat() if saved_anomaly.detection_date else None,
+                    'detection_method': saved_anomaly.detection_method,
+                    'metadata': saved_anomaly.metadata
+                })
+                
+            except Exception as e:
+                logger.error(f"Error saving anomaly: {str(e)}")
+        
+        # Commit all changes
+        try:
+            db.session.commit()
+        except Exception as e:
+            logger.error(f"Error committing anomalies to database: {str(e)}")
+            db.session.rollback()
+        
+        return saved_anomalies
+    
+    def train_detection_models(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Train anomaly detection models with current data.
+        
+        Args:
+            task_data: Dictionary with training parameters
+            
+        Returns:
+            Dict with training results
+        """
+        self.status = "training_models"
+        
+        # Extract parameters
+        property_type = task_data.get("property_type")
+        model_type = task_data.get("model_type", "isolation_forest")
+        
+        try:
+            # Get data for training
+            data = self._fetch_property_data(property_type)
+            
+            if len(data) < 50:  # Not enough data for reliable training
+                return {
+                    "status": "error",
+                    "message": f"Not enough data to train model (got {len(data)} records, need at least 50)"
+                }
+            
+            # Training logic would depend on the model type
+            if model_type == "isolation_forest":
+                feature_cols = [
+                    'lot_size', 'year_built', 'bedrooms', 'bathrooms', 'total_area',
+                    'land_value', 'improvement_value', 'total_value'
+                ]
+                
+                # Only use columns that exist in the data
+                feature_cols = [col for col in feature_cols if col in data.columns]
+                
+                # Train for each property type
+                models = {}
+                for prop_type in data['property_type'].unique():
+                    type_data = data[data['property_type'] == prop_type].copy()
+                    
+                    if len(type_data) < 30:  # Skip if we don't have enough data
+                        continue
+                    
+                    # Prepare features, dropping rows with missing values
+                    X = type_data[feature_cols].dropna()
+                    if len(X) < 30:
+                        continue
+                    
+                    # Scale the features
+                    scaler = StandardScaler()
+                    X_scaled = scaler.fit_transform(X)
+                    
+                    # Train Isolation Forest
+                    clf = IsolationForest(
+                        contamination=self.detection_thresholds["isolation_forest"],
+                        n_estimators=100,
+                        random_state=42
+                    )
+                    
+                    # Fit model
+                    clf.fit(X_scaled)
+                    
+                    # Save model
+                    models[prop_type] = {
+                        "model": clf,
+                        "scaler": scaler,
+                        "feature_cols": feature_cols
+                    }
+                
+                # Store trained models
+                self.models[model_type] = models
+                
+                return {
+                    "status": "success",
+                    "model_type": model_type,
+                    "property_types_trained": list(models.keys()),
+                    "training_data_size": len(data)
+                }
+            
+            else:
+                return {
+                    "status": "error",
+                    "message": f"Unsupported model type: {model_type}"
+                }
+                
+        except Exception as e:
+            self.status = "error"
+            logger.error(f"Error training models: {str(e)}")
+            return {"error": f"Error training models: {str(e)}"}
+        finally:
+            self.status = "idle"
+    
+    def classify_anomaly(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Classify an existing anomaly using AI.
+        
+        Args:
+            task_data: Dictionary with anomaly data
+            
+        Returns:
+            Dict with classification results
+        """
+        self.status = "classifying_anomaly"
+        
+        try:
+            anomaly_id = task_data.get("anomaly_id")
+            if not anomaly_id:
+                return {"error": "Missing anomaly_id"}
+                
+            # Get the anomaly from database
+            anomaly = Anomaly.query.get(anomaly_id)
+            if not anomaly:
+                return {"error": f"Anomaly with ID {anomaly_id} not found"}
+                
+            # Get related property data if available
+            property_data = None
+            if anomaly.property_id:
+                property_obj = Property.query.get(anomaly.property_id)
+                if property_obj:
+                    # Convert property object to dictionary
+                    property_data = {
+                        "id": str(property_obj.id),
+                        "parcel_id": property_obj.parcel_id,
+                        "address": property_obj.address,
+                        "property_type": property_obj.property_type,
+                        "year_built": property_obj.year_built,
+                        "total_area": property_obj.total_area,
+                        "lot_size": property_obj.lot_size,
+                        "bedrooms": property_obj.bedrooms,
+                        "bathrooms": property_obj.bathrooms,
+                        "owner_name": property_obj.owner_name,
+                        "purchase_date": property_obj.purchase_date.isoformat() if property_obj.purchase_date else None,
+                        "purchase_price": float(property_obj.purchase_price) if property_obj.purchase_price else None
+                    }
+            
+            # Convert anomaly to dictionary for analysis
+            anomaly_dict = {
+                "id": str(anomaly.id),
+                "description": anomaly.description,
+                "severity": anomaly.severity,
+                "status": anomaly.status,
+                "detection_date": anomaly.detection_date.isoformat() if anomaly.detection_date else None,
+                "detection_method": anomaly.detection_method,
+                "metadata": anomaly.metadata
+            }
+            
+            # Analyze the anomaly using LLM
+            classification_result = analyze_anomaly(anomaly.description, property_data)
+            
+            # Update the anomaly with classification results
+            if "classification" in classification_result:
+                # Update anomaly in database with the classification
+                anomaly.classification = classification_result.get("classification")
+                anomaly.analysis_date = datetime.datetime.utcnow()
+                anomaly.analyzed_by = "AnomalyDetectionAgent"
+                
+                if "recommended_priority" in classification_result:
+                    anomaly.priority = classification_result["recommended_priority"]
+                    
+                if "risk_level" in classification_result:
+                    anomaly.risk_level = classification_result["risk_level"]
+                    
+                # Commit the changes
+                db.session.commit()
+            
+            # Return the classification results
+            return {
+                "status": "success",
+                "anomaly_id": anomaly_id,
+                "classification_result": classification_result
+            }
+            
+        except Exception as e:
+            self.status = "error"
+            logger.error(f"Error classifying anomaly: {str(e)}")
+            return {"error": f"Error classifying anomaly: {str(e)}"}
+        finally:
+            self.status = "idle"
+    
+    def suggest_action(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Suggest actions for handling an anomaly.
+        
+        Args:
+            task_data: Dictionary with anomaly data
+            
+        Returns:
+            Dict with suggested actions
+        """
+        self.status = "suggesting_action"
+        
+        try:
+            anomaly_id = task_data.get("anomaly_id")
+            if not anomaly_id:
+                return {"error": "Missing anomaly_id"}
+                
+            # Get the anomaly from database
+            anomaly = Anomaly.query.get(anomaly_id)
+            if not anomaly:
+                return {"error": f"Anomaly with ID {anomaly_id} not found"}
+                
+            # Convert anomaly to dictionary
+            anomaly_data = {
+                "id": str(anomaly.id),
+                "anomaly_type": anomaly.anomaly_type.name if anomaly.anomaly_type else "unknown",
+                "description": anomaly.description,
+                "severity": anomaly.severity,
+                "status": anomaly.status,
+                "detection_method": anomaly.detection_method,
+                "classification": anomaly.classification if hasattr(anomaly, 'classification') else None,
+                "metadata": anomaly.metadata
+            }
+            
+            # Get suggested actions from LLM
+            action_result = suggest_anomaly_action(anomaly_data)
+            
+            # Return the suggested actions
+            return {
+                "status": "success",
+                "anomaly_id": anomaly_id,
+                "suggested_actions": action_result
+            }
+            
+        except Exception as e:
+            self.status = "error"
+            logger.error(f"Error suggesting actions: {str(e)}")
+            return {"error": f"Error suggesting actions: {str(e)}"}
+        finally:
+            self.status = "idle"
+    
+    def validate_property_data(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Validate property data for inconsistencies and errors.
+        
+        Args:
+            task_data: Dictionary with property data or ID
+            
+        Returns:
+            Dict with validation results
+        """
+        self.status = "validating_data"
+        
+        try:
+            property_id = task_data.get("property_id")
+            if not property_id:
+                return {"error": "Missing property_id"}
+                
+            # Get the property from database
+            property_obj = Property.query.get(property_id)
+            if not property_obj:
+                return {"error": f"Property with ID {property_id} not found"}
+                
+            # Create a list of validation checks
+            validations = []
+            
+            # Check for missing required fields
+            required_fields = ['parcel_id', 'address', 'property_type']
+            for field in required_fields:
+                value = getattr(property_obj, field, None)
+                if not value:
+                    validations.append({
+                        "check": "required_field",
+                        "field": field,
+                        "status": "failed",
+                        "message": f"Required field '{field}' is missing"
+                    })
+                else:
+                    validations.append({
+                        "check": "required_field",
+                        "field": field,
+                        "status": "passed"
+                    })
+            
+            # Check for logical consistency in numeric fields
+            # For example, bedrooms should be a non-negative integer
+            if property_obj.bedrooms is not None:
+                if property_obj.bedrooms < 0 or not float(property_obj.bedrooms).is_integer():
+                    validations.append({
+                        "check": "logical_consistency",
+                        "field": "bedrooms",
+                        "status": "failed",
+                        "message": f"Bedrooms should be a non-negative integer, got {property_obj.bedrooms}"
+                    })
+                else:
+                    validations.append({
+                        "check": "logical_consistency",
+                        "field": "bedrooms",
+                        "status": "passed"
+                    })
+            
+            # Check if total_area is reasonable for the property type
+            if property_obj.total_area is not None and property_obj.property_type:
+                area_ranges = {
+                    "residential": (500, 10000),   # 500-10,000 sq ft for residential
+                    "commercial": (1000, 100000),  # 1,000-100,000 sq ft for commercial
+                    "industrial": (2000, 500000),  # 2,000-500,000 sq ft for industrial
+                    "agricultural": (1000, 1000000)  # 1,000-1,000,000 sq ft for agricultural
+                }
+                
+                if property_obj.property_type.lower() in area_ranges:
+                    min_area, max_area = area_ranges[property_obj.property_type.lower()]
+                    if property_obj.total_area < min_area or property_obj.total_area > max_area:
+                        validations.append({
+                            "check": "value_range",
+                            "field": "total_area",
+                            "status": "failed",
+                            "message": f"Total area ({property_obj.total_area} sq ft) is outside the typical range for {property_obj.property_type} properties ({min_area}-{max_area} sq ft)"
+                        })
+                    else:
+                        validations.append({
+                            "check": "value_range",
+                            "field": "total_area",
+                            "status": "passed"
+                        })
+            
+            # Check for assessments
+            assessments = Assessment.query.filter_by(property_id=property_id).count()
+            if assessments == 0:
+                validations.append({
+                    "check": "assessments_exist",
+                    "status": "failed",
+                    "message": "Property has no assessments"
+                })
+            else:
+                validations.append({
+                    "check": "assessments_exist",
+                    "status": "passed",
+                    "message": f"Property has {assessments} assessments"
+                })
+            
+            # Summarize validation results
+            validation_result = {
+                "property_id": property_id,
+                "validation_date": datetime.datetime.utcnow().isoformat(),
+                "validations": validations,
+                "failed_checks": sum(1 for v in validations if v["status"] == "failed"),
+                "passed_checks": sum(1 for v in validations if v["status"] == "passed"),
+                "status": "valid" if all(v["status"] == "passed" for v in validations) else "invalid"
+            }
             
             return {
                 "status": "success",
-                "anomalies": filtered_anomalies,
-                "count": len(filtered_anomalies),
-                "total": len(self.detected_anomalies)
+                "validation_result": validation_result
             }
-        
-        elif task_type == "update_config":
-            # Update agent configuration
-            config_updates = task_data.get("config", {})
             
-            for key, value in config_updates.items():
-                if key in self.config:
-                    self.config[key] = value
+        except Exception as e:
+            self.status = "error"
+            logger.error(f"Error validating property data: {str(e)}")
+            return {"error": f"Error validating property data: {str(e)}"}
+        finally:
+            self.status = "idle"
+    
+    def analyze_trends(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Analyze trends in property data over time.
+        
+        Args:
+            task_data: Dictionary with trend analysis parameters
+            
+        Returns:
+            Dict with trend analysis results
+        """
+        self.status = "analyzing_trends"
+        
+        try:
+            # Extract parameters
+            property_type = task_data.get("property_type")
+            area = task_data.get("area")
+            time_period = task_data.get("time_period", "1y")  # Default to 1 year
+            
+            # Determine the date range based on time period
+            end_date = datetime.datetime.utcnow()
+            
+            if time_period.endswith('y'):
+                years = int(time_period[:-1])
+                start_date = end_date - datetime.timedelta(days=years*365)
+            elif time_period.endswith('m'):
+                months = int(time_period[:-1])
+                start_date = end_date - datetime.timedelta(days=months*30)
+            elif time_period.endswith('d'):
+                days = int(time_period[:-1])
+                start_date = end_date - datetime.timedelta(days=days)
+            else:
+                # Default to 1 year if format is unrecognized
+                start_date = end_date - datetime.timedelta(days=365)
+            
+            # Fetch assessment data for the specified period
+            with db.engine.connect() as connection:
+                query = """
+                SELECT 
+                    a.assessment_date, 
+                    p.property_type,
+                    a.land_value, 
+                    a.improvement_value, 
+                    a.total_value
+                FROM 
+                    assessments a
+                JOIN 
+                    properties p ON a.property_id = p.id
+                WHERE 
+                    a.assessment_date BETWEEN :start_date AND :end_date
+                """
+                
+                params = {"start_date": start_date, "end_date": end_date}
+                
+                if property_type:
+                    query += " AND p.property_type = :property_type"
+                    params["property_type"] = property_type
+                    
+                if area:
+                    # Assuming 'area' is a GeoJSON polygon for spatial filtering
+                    query += " AND ST_Contains(ST_GeomFromGeoJSON(:area), p.location)"
+                    params["area"] = json.dumps(area)
+                
+                assessments_df = pd.read_sql(query, connection, params=params)
+            
+            if len(assessments_df) == 0:
+                return {
+                    "status": "error",
+                    "message": "No assessment data available for the specified period and filters"
+                }
+            
+            # Convert assessment_date to datetime if it's not already
+            assessments_df['assessment_date'] = pd.to_datetime(assessments_df['assessment_date'])
+            
+            # Group by month and property_type
+            assessments_df['month'] = assessments_df['assessment_date'].dt.to_period('M')
+            
+            # Calculate average values by month and property type
+            monthly_averages = assessments_df.groupby(['month', 'property_type']).agg({
+                'land_value': 'mean',
+                'improvement_value': 'mean',
+                'total_value': 'mean'
+            }).reset_index()
+            
+            # Convert period to string for JSON serialization
+            monthly_averages['month'] = monthly_averages['month'].astype(str)
+            
+            # Calculate trends (percent change from start to end)
+            trends = {}
+            for prop_type in monthly_averages['property_type'].unique():
+                type_data = monthly_averages[monthly_averages['property_type'] == prop_type]
+                
+                if len(type_data) < 2:
+                    continue
+                    
+                # Sort by month
+                type_data = type_data.sort_values('month')
+                
+                # Calculate percent changes
+                start_value = type_data['total_value'].iloc[0]
+                end_value = type_data['total_value'].iloc[-1]
+                
+                if start_value > 0:
+                    percent_change = (end_value - start_value) / start_value * 100
+                    
+                    trends[prop_type] = {
+                        "start_date": type_data['month'].iloc[0],
+                        "end_date": type_data['month'].iloc[-1],
+                        "start_value": float(start_value),
+                        "end_value": float(end_value),
+                        "percent_change": float(percent_change),
+                        "trend_direction": "up" if percent_change > 0 else "down"
+                    }
+            
+            # Prepare monthly data for charts
+            chart_data = []
+            for _, row in monthly_averages.iterrows():
+                chart_data.append({
+                    "month": row['month'],
+                    "property_type": row['property_type'],
+                    "land_value": float(row['land_value']),
+                    "improvement_value": float(row['improvement_value']),
+                    "total_value": float(row['total_value'])
+                })
             
             return {
                 "status": "success",
-                "message": "Configuration updated",
-                "config": self.config
+                "time_period": time_period,
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+                "property_type": property_type if property_type else "all",
+                "trends": trends,
+                "chart_data": chart_data
             }
-        
-        else:
-            return {
-                "status": "error",
-                "error": f"Unknown task type: {task_type}"
-            }
+            
+        except Exception as e:
+            self.status = "error"
+            logger.error(f"Error analyzing trends: {str(e)}")
+            return {"error": f"Error analyzing trends: {str(e)}"}
+        finally:
+            self.status = "idle"
