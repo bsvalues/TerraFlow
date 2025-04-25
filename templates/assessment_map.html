@@ -10,16 +10,21 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/14.6.3/nouislider.min.css" />
 <link rel="stylesheet" href="{{ url_for('static', filename='css/assessment.css') }}" />
 <style>
+    /* Base map container styles */
     .map-container {
         height: calc(100vh - 150px);
         min-height: 500px;
         position: relative;
+        overflow: hidden;
     }
+    
     #assessment-map {
         height: 100%;
         width: 100%;
         z-index: 1;
     }
+    
+    /* Map controls and overlays */
     .map-overlay {
         position: absolute;
         top: 10px;
@@ -27,51 +32,191 @@
         z-index: 999;
         background: white;
         padding: 10px;
-        border-radius: 5px;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         max-width: 300px;
+        transition: transform 0.3s ease, opacity 0.3s ease;
     }
+    
     .filter-panel {
         margin-bottom: 15px;
     }
+    
     .legend {
         margin-top: 10px;
         padding: 10px;
-        background: rgba(255, 255, 255, 0.9);
-        border-radius: 5px;
-        box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
     }
+    
     .legend-item {
-        margin-bottom: 5px;
+        margin-bottom: 8px;
         display: flex;
         align-items: center;
     }
+    
     .legend-color {
         width: 20px;
         height: 20px;
-        display: inline-block;
-        margin-right: 5px;
+        border-radius: 4px;
     }
+    
+    /* Mobile responsive styles */
+    @media (max-width: 767.98px) {
+        .map-container {
+            height: calc(100vh - 112px);
+            min-height: 300px;
+        }
+        
+        .map-overlay {
+            max-width: 100%;
+            left: 10px;
+            right: 10px;
+            top: auto;
+            bottom: 10px;
+            max-height: 40vh;
+            overflow-y: auto;
+        }
+        
+        .map-controls {
+            top: 10px;
+            right: 10px;
+            position: absolute;
+            z-index: 999;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .map-controls .btn {
+            width: 44px;
+            height: 44px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+        
+        .assessment-filters-panel {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: white;
+            z-index: 1000;
+            border-radius: 16px 16px 0 0;
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+            padding: 20px;
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            height: 85vh;
+            overflow-y: auto;
+            padding-bottom: 80px;
+        }
+        
+        .assessment-filters-panel.expanded {
+            transform: translateY(0);
+        }
+        
+        .assessment-filters-panel .panel-handle {
+            width: 40px;
+            height: 5px;
+            background-color: #ddd;
+            border-radius: 2.5px;
+            margin: 0 auto 20px;
+        }
+        
+        .property-details-panel {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: white;
+            z-index: 1001;
+            border-radius: 16px 16px 0 0;
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+            padding: 20px;
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+        
+        .property-details-panel.expanded {
+            transform: translateY(0);
+        }
+        
+        .property-details-panel .panel-handle {
+            width: 40px;
+            height: 5px;
+            background-color: #ddd;
+            border-radius: 2.5px;
+            margin: 0 auto 20px;
+        }
+        
+        .leaflet-touch .leaflet-control-layers, 
+        .leaflet-touch .leaflet-bar {
+            border: none;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+        
+        .leaflet-touch .leaflet-bar a {
+            width: 36px;
+            height: 36px;
+            line-height: 36px;
+        }
+    }
+    
+    /* Property popup styles */
     .property-popup {
         max-width: 300px;
     }
+    
     .property-popup img {
         max-width: 100%;
         height: auto;
+        border-radius: 4px;
     }
+    
     .property-popup h4 {
         margin-top: 10px;
         margin-bottom: 5px;
+        font-size: 16px;
     }
+    
     .property-popup p {
         margin-bottom: 5px;
+        font-size: 14px;
     }
+    
     .property-popup .btn {
         margin-top: 10px;
     }
+    
+    /* Mobile property popup */
+    @media (max-width: 767.98px) {
+        .property-popup {
+            max-width: 260px;
+        }
+        
+        .property-popup h4 {
+            font-size: 15px;
+        }
+        
+        .property-popup p {
+            font-size: 13px;
+            margin-bottom: 4px;
+        }
+    }
+    
+    /* Slider and tool controls */
     #value-range-slider {
         margin: 10px 0;
     }
+    
     .map-tools {
         position: absolute;
         bottom: 10px;
@@ -79,9 +224,10 @@
         z-index: 999;
         background: white;
         padding: 10px;
-        border-radius: 5px;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     }
+    
     .layer-control {
         position: absolute;
         bottom: 10px;
@@ -89,9 +235,10 @@
         z-index: 999;
         background: white;
         padding: 10px;
-        border-radius: 5px;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     }
+    
     .coordinates-display {
         position: absolute;
         bottom: 10px;
@@ -100,9 +247,22 @@
         z-index: 999;
         background: white;
         padding: 5px 10px;
-        border-radius: 5px;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         font-size: 12px;
+    }
+    
+    /* Mobile optimizations for map tools */
+    @media (max-width: 767.98px) {
+        .map-tools, .layer-control {
+            padding: 8px;
+        }
+        
+        .coordinates-display {
+            bottom: 55px;
+            padding: 4px 8px;
+            font-size: 11px;
+        }
     }
 </style>
 {% endblock %}
