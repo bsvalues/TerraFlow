@@ -57,7 +57,7 @@ class PropertyValuationAgent(BaseAgent):
     Property Valuation Agent for automated property assessment and valuation.
     """
     
-    def __init__(self):
+    def __init__(self, agent_id=None, name=None, description=None, market_update_interval=None, capabilities=None):
         """Initialize the PropertyValuationAgent"""
         super().__init__()
         # Set the agent's capabilities

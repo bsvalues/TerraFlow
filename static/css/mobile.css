@@ -1,491 +1,377 @@
-/**
- * GeoAssessmentPro Mobile Styles
- * 
- * Mobile-specific styles for GeoAssessmentPro, optimized for field use.
- */
+/* Mobile CSS Styles for GeoAssessmentPro */
 
-/* ====================
-   Base Mobile Styles 
-   ==================== */
+/* Base Mobile Styles */
+.mobile-container {
+    padding: 10px;
+    margin-bottom: 70px; /* Space for bottom navigation */
+}
 
-/* Apply mobile optimizations at 768px and below */
-@media (max-width: 768px) {
-  body {
-    -webkit-text-size-adjust: 100%;
-    -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
-    overflow-x: hidden;
-    padding-bottom: 60px; /* Space for the bottom navigation bar */
-  }
-  
-  /* Fix font sizing */
-  html {
-    font-size: 16px; /* Base font size */
-  }
-  
-  h1 {
-    font-size: 1.75rem;
-  }
-  
-  h2 {
-    font-size: 1.5rem;
-  }
-  
-  h3 {
-    font-size: 1.25rem;
-  }
-  
-  /* Optimize touch targets */
-  button, .btn, a.btn, 
-  input[type="button"], 
-  input[type="submit"],
-  .nav-link,
-  .dropdown-item {
-    min-height: 44px;
-    min-width: 44px;
-    padding: 0.5rem 0.75rem;
-  }
-  
-  /* Improve readability */
-  p, li, td, th, input, select, textarea {
+/* Card Styles */
+.mobile-card {
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    background-color: #fff;
+    margin-bottom: 15px;
+    overflow: hidden;
+}
+
+.mobile-card-header {
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #eee;
+    font-weight: 600;
+}
+
+.mobile-card-body {
+    padding: 15px;
+}
+
+.mobile-card-footer {
+    padding: 10px 15px;
+    background-color: #f8f9fa;
+    border-top: 1px solid #eee;
+}
+
+/* List Styles */
+.mobile-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.mobile-list-item {
+    padding: 12px 15px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    align-items: center;
+}
+
+.mobile-list-item:last-child {
+    border-bottom: none;
+}
+
+.mobile-list-icon {
+    margin-right: 12px;
+    font-size: 1.2rem;
+    width: 24px;
+    text-align: center;
+}
+
+.mobile-list-content {
+    flex: 1;
+}
+
+.mobile-list-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.mobile-list-subtitle {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.mobile-list-action {
+    margin-left: 10px;
+}
+
+/* Form Styles */
+.mobile-form-group {
+    margin-bottom: 16px;
+}
+
+.mobile-form-label {
+    font-weight: 600;
+    margin-bottom: 6px;
+    display: block;
+}
+
+.mobile-form-control {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
     font-size: 1rem;
-    line-height: 1.5;
-  }
-  
-  /* Adjust layout for smaller screens */
-  .container, .container-fluid {
-    padding-left: 15px;
-    padding-right: 15px;
-  }
-  
-  .row {
-    margin-left: -10px;
-    margin-right: -10px;
-  }
-  
-  .col, [class*="col-"] {
-    padding-left: 10px;
-    padding-right: 10px;
-  }
-  
-  /* Optimize forms for touch */
-  .form-control, .form-select {
-    height: 44px;
-    font-size: 16px; /* Prevents iOS zoom on focus */
-  }
-  
-  textarea.form-control {
-    height: auto;
-  }
-  
-  .form-check-input {
-    width: 1.1rem;
-    height: 1.1rem;
-  }
-  
-  /* Adjust card layout */
-  .card {
-    margin-bottom: 1rem;
-  }
-  
-  .card-body {
-    padding: 1rem;
-  }
-  
-  /* Optimize tables */
-  .table-responsive {
-    border: 0;
-  }
-  
-  /* Adjust navigation */
-  .navbar {
-    padding: 0.5rem 1rem;
-  }
-  
-  .navbar-brand {
-    font-size: 1.25rem;
-    margin-right: 0.5rem;
-  }
 }
 
-/* Very small screens (under 576px) */
-@media (max-width: 576px) {
-  .container {
-    padding-left: 10px;
-    padding-right: 10px;
-  }
-  
-  h1 {
-    font-size: 1.5rem;
-  }
-  
-  h2 {
-    font-size: 1.25rem;
-  }
-  
-  h3 {
-    font-size: 1.125rem;
-  }
-  
-  /* Hide certain elements on very small screens */
-  .d-xs-none {
-    display: none !important;
-  }
-  
-  /* Adjust button groups */
-  .btn-group .btn {
-    padding-left: 0.5rem;
-    padding-right: 0.5rem;
-  }
+.mobile-form-control:focus {
+    border-color: var(--tf-flow-aqua);
+    box-shadow: 0 0 0 2px rgba(0, 149, 255, 0.25);
+    outline: none;
 }
 
-/* ====================
-   Field Assessment Mode
-   ==================== */
-
-/* Special mode for field assessors */
-body.field-assessment-mode {
-  /* Visual indicator that field mode is active */
-  background-color: #fcfcfc;
+/* Button Styles */
+.mobile-btn {
+    display: block;
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    border: none;
+    font-weight: 600;
+    text-align: center;
+    cursor: pointer;
 }
 
-.field-assessment-mode .navbar {
-  background-color: #24478f !important;
+.mobile-btn-primary {
+    background-color: var(--tf-flow-aqua);
+    color: white;
 }
 
-/* Enhanced touch targets in field mode */
-.field-assessment-mode button,
-.field-assessment-mode .btn,
-.field-assessment-mode a.btn,
-.field-assessment-mode input[type="button"],
-.field-assessment-mode input[type="submit"] {
-  padding: 0.625rem 1rem;
-  font-size: 1.1rem;
-  min-height: 48px;
+.mobile-btn-secondary {
+    background-color: #eee;
+    color: #333;
 }
 
-/* Field mode form optimizations */
-.field-assessment-mode .form-control,
-.field-assessment-mode .form-select {
-  height: 48px;
-  font-size: 1.1rem;
-  background-color: #fff;
-  border: 1px solid #ced4da;
+.mobile-btn-sm {
+    padding: 8px 12px;
+    font-size: 0.9rem;
 }
 
-.field-assessment-mode .form-label {
-  font-weight: 500;
-  color: #212529;
+.mobile-btn-rounded {
+    border-radius: 50px;
 }
 
-.field-assessment-mode .form-check-input {
-  width: 1.25rem;
-  height: 1.25rem;
+/* Flash Messages */
+.mobile-flash-container {
+    position: fixed;
+    top: 70px;
+    left: 10px;
+    right: 10px;
+    z-index: 1010;
 }
 
-/* Field mode bottom navigation */
-.field-navbar {
-  display: none;
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: #ffffff;
-  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
-  z-index: 1000;
-  padding: 0.5rem;
+.mobile-flash {
+    margin-bottom: 10px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    border-radius: 8px;
 }
 
-.field-assessment-mode .field-navbar {
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
+/* Map Styles */
+.mobile-map-wrapper {
+    position: relative;
+    height: calc(100vh - 130px);
+    width: 100%;
+    margin-bottom: 15px;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
-.field-nav-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 0.5rem;
-  color: #6c757d;
-  text-decoration: none;
-  font-size: 0.8rem;
+.mobile-map {
+    height: 100%;
+    width: 100%;
 }
 
-.field-nav-item.active {
-  color: #0d6efd;
+.mobile-map-controls {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 1000;
 }
 
-.field-nav-icon {
-  font-size: 1.5rem;
-  margin-bottom: 0.25rem;
+.mobile-map-control-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: white;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
 }
 
-/* ====================
-   Offline Indicator
-   ==================== */
-
-/* Offline mode indicator */
-body.offline .offline-indicator {
-  display: block;
+/* Property Card for Map */
+.mobile-property-card {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: white;
+    border-top-left-radius: 16px;
+    border-top-right-radius: 16px;
+    padding: 15px;
+    box-shadow: 0 -4px 10px rgba(0,0,0,0.1);
+    z-index: 1001;
+    transform: translateY(100%);
+    transition: transform 0.3s ease-out;
+    max-height: 50vh;
+    overflow-y: auto;
 }
 
-.offline-indicator {
-  display: none;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  background-color: #dc3545;
-  color: white;
-  text-align: center;
-  padding: 0.5rem;
-  font-weight: 500;
-  z-index: 2000;
+.mobile-property-card.show {
+    transform: translateY(0);
 }
 
-/* Adjust layout when offline indicator is visible */
-body.offline {
-  padding-top: 40px;
+/* Search Bar */
+.mobile-search-bar {
+    position: relative;
+    margin-bottom: 15px;
 }
 
-body.offline .navbar {
-  margin-top: 40px;
+.mobile-search-input {
+    width: 100%;
+    padding: 12px 15px 12px 40px;
+    border: 1px solid #ddd;
+    border-radius: 50px;
+    font-size: 1rem;
 }
 
-/* Offline notification */
-.offline-notification {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  max-width: 300px;
-  z-index: 2000;
-  opacity: 0;
-  transform: translateY(20px);
-  transition: opacity 0.3s ease, transform 0.3s ease;
+.mobile-search-icon {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #888;
 }
 
-.offline-notification.show {
-  opacity: 1;
-  transform: translateY(0);
+/* Tab Navigation */
+.mobile-tabs {
+    display: flex;
+    margin-bottom: 15px;
+    border-bottom: 1px solid #eee;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
 }
 
-.offline-notification-content {
-  padding: 15px;
+.mobile-tab {
+    padding: 10px 15px;
+    font-weight: 600;
+    color: #666;
+    border-bottom: 3px solid transparent;
+    cursor: pointer;
 }
 
-.offline-notification-content strong {
-  display: block;
-  margin-bottom: 5px;
-  color: #212529;
+.mobile-tab.active {
+    color: var(--tf-flow-aqua);
+    border-bottom-color: var(--tf-flow-aqua);
 }
 
-.offline-notification-content p {
-  margin: 0;
-  color: #6c757d;
-  font-size: 0.9rem;
+/* Data Visualization Components */
+.mobile-stat-card {
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 15px;
+    background-color: #f8f9fa;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
 }
 
-.offline-notification-close {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  border: none;
-  background: none;
-  font-size: 1.2rem;
-  line-height: 1;
-  cursor: pointer;
-  color: #6c757d;
+.mobile-stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--tf-flow-aqua);
+    margin-bottom: 5px;
 }
 
-/* Update notification */
-.update-notification {
-  position: fixed;
-  bottom: 20px;
-  left: 20px;
-  background-color: #0d6efd;
-  color: white;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  padding: 15px;
-  max-width: 300px;
-  z-index: 2000;
-  cursor: pointer;
-  opacity: 0;
-  transform: translateY(20px);
-  transition: opacity 0.3s ease, transform 0.3s ease;
+.mobile-stat-label {
+    font-size: 0.9rem;
+    color: #666;
+    font-weight: 600;
 }
 
-.update-notification.show {
-  opacity: 1;
-  transform: translateY(0);
+.mobile-chart-container {
+    height: 200px;
+    margin-bottom: 15px;
 }
 
-.update-notification-content strong {
-  display: block;
-  margin-bottom: 5px;
+/* Utility Classes */
+.mobile-divider {
+    height: 1px;
+    background-color: #eee;
+    margin: 15px 0;
 }
 
-.update-notification-content p {
-  margin: 0;
-  font-size: 0.9rem;
-  opacity: 0.9;
+.mobile-section-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin-bottom: 15px;
+    color: #333;
 }
 
-/* ====================
-   Property Assessment UI
-   ==================== */
-
-/* Mobile optimized property cards */
-.property-card {
-  border-radius: 8px;
-  overflow: hidden;
-  margin-bottom: 1rem;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+.mobile-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 50px;
+    font-size: 0.8rem;
+    font-weight: 600;
 }
 
-.property-card-header {
-  background-color: #f8f9fa;
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid #dee2e6;
+.mobile-badge-primary {
+    background-color: var(--tf-flow-aqua);
+    color: white;
 }
 
-.property-card-body {
-  padding: 1rem;
+.mobile-badge-secondary {
+    background-color: #eee;
+    color: #666;
 }
 
-.property-card-footer {
-  background-color: #f8f9fa;
-  padding: 0.75rem 1rem;
-  border-top: 1px solid #dee2e6;
+/* Responsive Typography */
+@media (max-width: 320px) {
+    .mobile-section-title {
+        font-size: 1.1rem;
+    }
+    
+    .mobile-list-title {
+        font-size: 0.9rem;
+    }
+    
+    .mobile-list-subtitle {
+        font-size: 0.8rem;
+    }
+    
+    .mobile-stat-value {
+        font-size: 1.8rem;
+    }
 }
 
-.property-card-title {
-  margin-bottom: 0;
-  font-size: 1.1rem;
-  font-weight: 500;
-}
-
-.property-card-subtitle {
-  color: #6c757d;
-  font-size: 0.9rem;
-  margin-bottom: 0.5rem;
-}
-
-.property-info-row {
-  display: flex;
-  margin-bottom: 0.5rem;
-  font-size: 0.9rem;
-}
-
-.property-info-label {
-  flex: 1;
-  font-weight: 500;
-  color: #495057;
-}
-
-.property-info-value {
-  flex: 2;
-  color: #212529;
-}
-
-/* Assessment form optimizations */
-.assessment-section {
-  margin-bottom: 1.5rem;
-  padding: 1rem;
-  background-color: #fff;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-}
-
-.assessment-section-title {
-  margin-bottom: 1rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid #dee2e6;
-  font-size: 1.1rem;
-  font-weight: 500;
-}
-
-/* Image capture buttons */
-.capture-photo-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 120px;
-  background-color: #f8f9fa;
-  border: 1px dashed #ced4da;
-  border-radius: 4px;
-  margin-bottom: 1rem;
-  cursor: pointer;
-}
-
-.capture-photo-btn i {
-  font-size: 1.5rem;
-  color: #6c757d;
-  margin-right: 0.5rem;
-}
-
-.thumbnail-preview {
-  width: 100%;
-  height: 120px;
-  object-fit: cover;
-  border-radius: 4px;
-  margin-bottom: 0.5rem;
-}
-
-/* ====================
-   Map Components
-   ==================== */
-
-/* Mobile map container */
-.mobile-map-container {
-  position: relative;
-  height: calc(100vh - 110px);
-  width: 100%;
-}
-
-/* Map UI controls */
-.map-control-overlay {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  right: 10px;
-  z-index: 400;
-  display: flex;
-  justify-content: space-between;
-}
-
-.map-search-container {
-  flex: 1;
-  margin-right: 10px;
-}
-
-.map-search-input {
-  width: 100%;
-  height: 40px;
-  padding: 8px 12px;
-  border-radius: 4px;
-  border: 1px solid #ced4da;
-  background-color: white;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.map-control-button {
-  width: 40px;
-  height: 40px;
-  border-radius: 4px;
-  background-color: white;
-  border: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.map-control-button i {
-  font-size: 1.25rem;
-  color: #212529;
+/* Dark Mode (if needed) */
+@media (prefers-color-scheme: dark) {
+    body.dark-mode {
+        background-color: #121212;
+        color: #eee;
+    }
+    
+    .dark-mode .mobile-card,
+    .dark-mode .mobile-card-header,
+    .dark-mode .mobile-card-footer,
+    .dark-mode .mobile-property-card {
+        background-color: #1e1e1e;
+        border-color: #333;
+    }
+    
+    .dark-mode .mobile-list-item {
+        border-color: #333;
+    }
+    
+    .dark-mode .mobile-form-control {
+        background-color: #1e1e1e;
+        border-color: #333;
+        color: #eee;
+    }
+    
+    .dark-mode .mobile-btn-secondary {
+        background-color: #333;
+        color: #eee;
+    }
+    
+    .dark-mode .mobile-tab {
+        color: #aaa;
+    }
+    
+    .dark-mode .mobile-divider {
+        background-color: #333;
+    }
+    
+    .dark-mode .mobile-badge-secondary {
+        background-color: #333;
+        color: #eee;
+    }
 }
