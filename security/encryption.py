@@ -72,6 +72,9 @@ class EncryptionManager:
             'field_keys': 90      # Quarterly rotation
         }
         
+        # Initialization state
+        self.is_initialized = True
+        
         logger.info("Encryption Manager initialized")
     
     def generate_symmetric_key(self, algorithm: str = None) -> bytes:

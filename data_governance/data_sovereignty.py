@@ -153,6 +153,15 @@ class DataSovereigntyManager:
         
         return retention_periods.get(data_type, default_retention)
     
+    def get_jurisdiction(self) -> str:
+        """
+        Get the primary jurisdiction for data governance.
+        
+        Returns:
+            Primary jurisdiction name (e.g., "washington")
+        """
+        return "washington"
+        
     def get_compliance_requirements(self, regulation: str) -> Dict[str, Any]:
         """
         Get compliance requirements for a specific regulation.

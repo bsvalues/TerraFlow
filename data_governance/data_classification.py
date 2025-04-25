@@ -194,6 +194,18 @@ class DataClassificationManager:
         
         logger.info("Data Classification Manager initialized")
     
+    def get_classification_levels(self) -> List[Dict[str, Any]]:
+        """
+        Get the list of all classification levels defined in the system.
+        
+        Returns:
+            List of dictionaries with classification level information
+        """
+        return [
+            {"id": level.value, "name": level.name, "description": self._get_level_description(level)}
+            for level in SensitivityLevel
+        ]
+        
     def get_field_classification(self, table_name: str, field_name: str) -> SensitivityLevel:
         """
         Get the sensitivity classification level for a specific field.
@@ -211,6 +223,25 @@ class DataClassificationManager:
         # Default to CONFIDENTIAL if not explicitly classified
         logger.warning(f"No classification found for {table_name}.{field_name}, defaulting to CONFIDENTIAL")
         return SensitivityLevel.CONFIDENTIAL
+        
+    def _get_level_description(self, level: SensitivityLevel) -> str:
+        """
+        Get a human-readable description for a sensitivity level.
+        
+        Args:
+            level: SensitivityLevel enum value
+            
+        Returns:
+            Description string
+        """
+        descriptions = {
+            SensitivityLevel.PUBLIC: "General property information already in the public domain",
+            SensitivityLevel.INTERNAL: "Administrative data requiring basic protection",
+            SensitivityLevel.CONFIDENTIAL: "Personal taxpayer information requiring enhanced security",
+            SensitivityLevel.RESTRICTED: "Highly sensitive information requiring maximum protection"
+        }
+        
+        return descriptions.get(level, "Unknown classification level")
     
     def get_record_classification(self, table_name: str, record_data: Dict[str, Any]) -> SensitivityLevel:
         """
