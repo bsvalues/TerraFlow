@@ -26,6 +26,9 @@ class ConversionManager(BaseConversionManager):
         """Initialize the conversion manager with enhanced settings"""
         super().__init__()
         
+        # Initialization state
+        self._initialized = True
+        
         # Additional configuration for GIS data
         self.gis_formats = {
             'shapefile': {
@@ -67,6 +70,15 @@ class ConversionManager(BaseConversionManager):
         self.pipeline_stages.extend(self.gis_pipeline_stages)
         
         logger.info("Enhanced Conversion Manager initialized with GIS capabilities")
+        
+    def is_initialized(self) -> bool:
+        """
+        Check if the conversion manager is properly initialized.
+        
+        Returns:
+            True if initialized, False otherwise
+        """
+        return self._initialized
     
     def convert_gis_format(self, job_id: str, source_path: str, target_format: str,
                           target_path: Optional[str] = None, options: Dict[str, Any] = None) -> bool:
