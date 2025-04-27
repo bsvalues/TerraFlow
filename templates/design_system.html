@@ -1,0 +1,776 @@
+{% extends "base.html" %}
+
+{% block title %}Design System{% endblock %}
+
+{% block head %}
+<style>
+    .design-system-section {
+        margin-bottom: 3rem;
+    }
+    
+    .design-system-subsection {
+        margin-bottom: 2rem;
+    }
+    
+    .design-tokens-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+    
+    .color-swatch {
+        display: flex;
+        flex-direction: column;
+        border-radius: 0.5rem;
+        overflow: hidden;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+    
+    .color-preview {
+        height: 100px;
+        width: 100%;
+    }
+    
+    .color-info {
+        padding: 0.75rem;
+        background: white;
+    }
+    
+    .color-name {
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+    }
+    
+    .color-value {
+        font-family: monospace;
+        font-size: 0.875rem;
+        color: #666;
+    }
+    
+    .typography-sample {
+        margin-bottom: 1.5rem;
+    }
+    
+    .typography-example {
+        margin-bottom: 0.5rem;
+    }
+    
+    .typography-details {
+        font-family: monospace;
+        font-size: 0.875rem;
+        color: #666;
+        margin-bottom: 0.5rem;
+    }
+    
+    .component-example {
+        border: 1px solid #e2e8f0;
+        border-radius: 0.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .component-preview {
+        padding: 2rem;
+        border-bottom: 1px solid #e2e8f0;
+        background-color: #f8fafc;
+    }
+    
+    .component-code {
+        padding: 1rem;
+        background-color: #1e293b;
+        color: #e2e8f0;
+        border-radius: 0 0 0.5rem 0.5rem;
+        font-family: monospace;
+        font-size: 0.875rem;
+        overflow-x: auto;
+    }
+    
+    .component-controls {
+        display: flex;
+        justify-content: flex-end;
+        padding: 0.5rem 1rem;
+        background-color: #f1f5f9;
+        border-top: 1px solid #e2e8f0;
+    }
+    
+    .spacing-example {
+        background-color: #f1f5f9;
+        border-radius: 0.25rem;
+    }
+    
+    .shadow-example {
+        height: 100px;
+        width: 100px;
+        background-color: white;
+        border-radius: 0.5rem;
+        margin: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-5" id="main-content">
+    <div class="row mb-4">
+        <div class="col-md-9">
+            <h1 class="display-5 mb-3">TerraFusion Design System</h1>
+            <p class="lead">A comprehensive guide to the TerraFusion Platform's design language and component library.</p>
+        </div>
+        <div class="col-md-3 d-flex align-items-center justify-content-md-end mt-3 mt-md-0">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="darkModeToggle">
+                <label class="form-check-label" for="darkModeToggle">Dark Mode</label>
+            </div>
+        </div>
+    </div>
+    
+    <nav class="mb-4">
+        <div class="nav nav-tabs" id="nav-tab" role="tablist">
+            <button class="nav-link active" id="nav-foundation-tab" data-bs-toggle="tab" data-bs-target="#nav-foundation" type="button" role="tab" aria-controls="nav-foundation" aria-selected="true">Foundation</button>
+            <button class="nav-link" id="nav-components-tab" data-bs-toggle="tab" data-bs-target="#nav-components" type="button" role="tab" aria-controls="nav-components" aria-selected="false">Components</button>
+            <button class="nav-link" id="nav-patterns-tab" data-bs-toggle="tab" data-bs-target="#nav-patterns" type="button" role="tab" aria-controls="nav-patterns" aria-selected="false">Patterns</button>
+            <button class="nav-link" id="nav-accessibility-tab" data-bs-toggle="tab" data-bs-target="#nav-accessibility" type="button" role="tab" aria-controls="nav-accessibility" aria-selected="false">Accessibility</button>
+        </div>
+    </nav>
+    
+    <div class="tab-content" id="nav-tabContent">
+        <!-- Foundation Tab -->
+        <div class="tab-pane fade show active" id="nav-foundation" role="tabpanel" aria-labelledby="nav-foundation-tab">
+            <!-- Color System -->
+            <div class="design-system-section">
+                <h2 class="h3 mb-4">Color System</h2>
+                
+                <div class="design-system-subsection">
+                    <h3 class="h5 mb-3">Primary Colors</h3>
+                    <div class="design-tokens-grid">
+                        <div class="color-swatch">
+                            <div class="color-preview" style="background-color: var(--primary-500, #00e5ff)"></div>
+                            <div class="color-info">
+                                <div class="color-name">Primary 500</div>
+                                <div class="color-value">#00e5ff</div>
+                            </div>
+                        </div>
+                        <div class="color-swatch">
+                            <div class="color-preview" style="background-color: var(--primary-600, #00b8d4)"></div>
+                            <div class="color-info">
+                                <div class="color-name">Primary 600</div>
+                                <div class="color-value">#00b8d4</div>
+                            </div>
+                        </div>
+                        <div class="color-swatch">
+                            <div class="color-preview" style="background-color: var(--primary-700, #0097a7)"></div>
+                            <div class="color-info">
+                                <div class="color-name">Primary 700</div>
+                                <div class="color-value">#0097a7</div>
+                            </div>
+                        </div>
+                        <div class="color-swatch">
+                            <div class="color-preview" style="background-color: var(--primary-800, #00838f)"></div>
+                            <div class="color-info">
+                                <div class="color-name">Primary 800</div>
+                                <div class="color-value">#00838f</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="design-system-subsection">
+                    <h3 class="h5 mb-3">Secondary Colors</h3>
+                    <div class="design-tokens-grid">
+                        <div class="color-swatch">
+                            <div class="color-preview" style="background-color: var(--secondary-500, #004d7a)"></div>
+                            <div class="color-info">
+                                <div class="color-name">Secondary 500</div>
+                                <div class="color-value">#004d7a</div>
+                            </div>
+                        </div>
+                        <div class="color-swatch">
+                            <div class="color-preview" style="background-color: var(--secondary-600, #003c61)"></div>
+                            <div class="color-info">
+                                <div class="color-name">Secondary 600</div>
+                                <div class="color-value">#003c61</div>
+                            </div>
+                        </div>
+                        <div class="color-swatch">
+                            <div class="color-preview" style="background-color: var(--secondary-700, #002a4a)"></div>
+                            <div class="color-info">
+                                <div class="color-name">Secondary 700</div>
+                                <div class="color-value">#002a4a</div>
+                            </div>
+                        </div>
+                        <div class="color-swatch">
+                            <div class="color-preview" style="background-color: var(--secondary-800, #001529)"></div>
+                            <div class="color-info">
+                                <div class="color-name">Secondary 800</div>
+                                <div class="color-value">#001529</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="design-system-subsection">
+                    <h3 class="h5 mb-3">Semantic Colors</h3>
+                    <div class="design-tokens-grid">
+                        <div class="color-swatch">
+                            <div class="color-preview" style="background-color: var(--success, #28a745)"></div>
+                            <div class="color-info">
+                                <div class="color-name">Success</div>
+                                <div class="color-value">#28a745</div>
+                            </div>
+                        </div>
+                        <div class="color-swatch">
+                            <div class="color-preview" style="background-color: var(--danger, #dc3545)"></div>
+                            <div class="color-info">
+                                <div class="color-name">Danger</div>
+                                <div class="color-value">#dc3545</div>
+                            </div>
+                        </div>
+                        <div class="color-swatch">
+                            <div class="color-preview" style="background-color: var(--warning, #ffc107)"></div>
+                            <div class="color-info">
+                                <div class="color-name">Warning</div>
+                                <div class="color-value">#ffc107</div>
+                            </div>
+                        </div>
+                        <div class="color-swatch">
+                            <div class="color-preview" style="background-color: var(--info, #17a2b8)"></div>
+                            <div class="color-info">
+                                <div class="color-name">Info</div>
+                                <div class="color-value">#17a2b8</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Typography -->
+            <div class="design-system-section">
+                <h2 class="h3 mb-4">Typography</h2>
+                
+                <div class="design-system-subsection">
+                    <h3 class="h5 mb-3">Headings</h3>
+                    
+                    <div class="typography-sample">
+                        <div class="typography-example">
+                            <h1>Heading Level 1</h1>
+                        </div>
+                        <div class="typography-details">
+                            Font: var(--font-family-base, "Inter") | Size: var(--font-size-h1, 48px) | Weight: var(--weight-bold, 600)
+                        </div>
+                    </div>
+                    
+                    <div class="typography-sample">
+                        <div class="typography-example">
+                            <h2>Heading Level 2</h2>
+                        </div>
+                        <div class="typography-details">
+                            Font: var(--font-family-base, "Inter") | Size: var(--font-size-h2, 36px) | Weight: var(--weight-bold, 600)
+                        </div>
+                    </div>
+                    
+                    <div class="typography-sample">
+                        <div class="typography-example">
+                            <h3>Heading Level 3</h3>
+                        </div>
+                        <div class="typography-details">
+                            Font: var(--font-family-base, "Inter") | Size: var(--font-size-h3, 28px) | Weight: var(--weight-bold, 600)
+                        </div>
+                    </div>
+                    
+                    <div class="typography-sample">
+                        <div class="typography-example">
+                            <h4>Heading Level 4</h4>
+                        </div>
+                        <div class="typography-details">
+                            Font: var(--font-family-base, "Inter") | Size: var(--font-size-h4, 24px) | Weight: var(--weight-bold, 600)
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="design-system-subsection">
+                    <h3 class="h5 mb-3">Body Text</h3>
+                    
+                    <div class="typography-sample">
+                        <div class="typography-example">
+                            <p class="lead">Lead paragraph is used for introductory text. It's slightly larger and has a lighter font weight to stand out.</p>
+                        </div>
+                        <div class="typography-details">
+                            Font: var(--font-family-base, "Inter") | Size: 1.25rem | Weight: 300
+                        </div>
+                    </div>
+                    
+                    <div class="typography-sample">
+                        <div class="typography-example">
+                            <p>Regular paragraph text is used for most body content. It should have good readability and be appropriately sized for reading long-form content.</p>
+                        </div>
+                        <div class="typography-details">
+                            Font: var(--font-family-base, "Inter") | Size: var(--font-size-body, 16px) | Weight: var(--weight-regular, 400)
+                        </div>
+                    </div>
+                    
+                    <div class="typography-sample">
+                        <div class="typography-example">
+                            <p class="small">Small text is used for less important information, captions, footnotes, etc.</p>
+                        </div>
+                        <div class="typography-details">
+                            Font: var(--font-family-base, "Inter") | Size: 0.875rem | Weight: var(--weight-regular, 400)
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Spacing -->
+            <div class="design-system-section">
+                <h2 class="h3 mb-4">Spacing</h2>
+                
+                <div class="design-system-subsection">
+                    <h3 class="h5 mb-3">Spacing Scale</h3>
+                    
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <div class="spacing-example p-0">
+                                <div class="p-1 bg-primary text-white">
+                                    Extra Small (XS): 4px
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="spacing-example p-0">
+                                <div class="p-2 bg-primary text-white">
+                                    Small (SM): 8px
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="spacing-example p-0">
+                                <div class="p-3 bg-primary text-white">
+                                    Medium (MD): 16px
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="spacing-example p-0">
+                                <div class="p-4 bg-primary text-white">
+                                    Large (LG): 24px
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="spacing-example p-0">
+                                <div class="p-5 bg-primary text-white">
+                                    Extra Large (XL): 32px
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Shadows -->
+            <div class="design-system-section">
+                <h2 class="h3 mb-4">Shadows</h2>
+                
+                <div class="design-system-subsection">
+                    <h3 class="h5 mb-3">Shadow Scale</h3>
+                    
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <div class="shadow-example shadow-sm">
+                                Small
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="shadow-example shadow">
+                                Default
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="shadow-example shadow-lg">
+                                Large
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="shadow-example" style="box-shadow: var(--shadow-strong, 0 0 30px rgba(0, 229, 255, 0.4));">
+                                Glow
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Components Tab -->
+        <div class="tab-pane fade" id="nav-components" role="tabpanel" aria-labelledby="nav-components-tab">
+            <!-- Alerts & Notifications -->
+            <div class="design-system-section">
+                <h2 class="h3 mb-4">Alerts & Notifications</h2>
+                
+                <div class="design-system-subsection">
+                    <h3 class="h5 mb-3">Notification Toasts</h3>
+                    
+                    <div class="mb-4">
+                        <p>The TerraFusion platform uses a unified notification system for displaying toast notifications consistently across the application.</p>
+                        
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                            <button class="btn btn-success" onclick="terraFusionNotifications.success('Operation completed successfully')">Success Toast</button>
+                            <button class="btn btn-danger" onclick="terraFusionNotifications.error('An error occurred during the operation')">Error Toast</button>
+                            <button class="btn btn-warning" onclick="terraFusionNotifications.warning('This action may take a while to complete')">Warning Toast</button>
+                            <button class="btn btn-info" onclick="terraFusionNotifications.info('The system has been updated to version 2.1')">Info Toast</button>
+                        </div>
+                        
+                        <div class="component-example">
+                            <div class="component-preview">
+                                <div class="tf-toast tf-toast-success">
+                                    <div class="toast-header">
+                                        <i class="fas fa-check-circle text-success me-2"></i>
+                                        <strong class="me-auto">Success</strong>
+                                        <small>Now</small>
+                                        <button type="button" class="btn-close" aria-label="Close"></button>
+                                    </div>
+                                    <div class="toast-body">
+                                        Operation completed successfully
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="component-code">
+                                <pre>terraFusionNotifications.success('Operation completed successfully');</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="design-system-subsection">
+                    <h3 class="h5 mb-3">Loading Indicators</h3>
+                    
+                    <div class="mb-4">
+                        <p>The TerraFusion platform uses standardized loading indicators to provide consistent feedback for all data operations.</p>
+                        
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                            <button class="btn btn-primary" id="showFullScreenLoading">Fullscreen Loading</button>
+                            <button class="btn btn-primary" id="showContainerLoading">Container Loading</button>
+                            <button class="btn btn-primary" id="showSkeletonLoading">Skeleton Loading</button>
+                        </div>
+                        
+                        <div class="component-example">
+                            <div class="component-preview">
+                                <div class="position-relative" style="height: 200px;" id="loadingDemoContainer">
+                                    <div class="card h-100">
+                                        <div class="card-body">
+                                            <h5 class="card-title">Loadable Content</h5>
+                                            <p class="card-text">This container can display a loading indicator overlay when data is being fetched or processed.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="component-code">
+                                <pre>// Show loading indicator on a container
+const loadingId = terraFusionLoading.show('#myContainer', {
+  message: 'Loading data...',
+  spinnerColor: 'primary',
+  spinnerSize: 'lg'
+});
+
+// Hide loading indicator when done
+terraFusionLoading.hide(loadingId);</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="design-system-subsection">
+                    <h3 class="h5 mb-3">Standard Alerts</h3>
+                    
+                    <div class="alert alert-success" role="alert">
+                        <h4 class="alert-heading"><i class="fas fa-check-circle me-2"></i>Success!</h4>
+                        <p>This operation has completed successfully. All data has been processed.</p>
+                    </div>
+                    
+                    <div class="alert alert-danger" role="alert">
+                        <h4 class="alert-heading"><i class="fas fa-exclamation-circle me-2"></i>Error!</h4>
+                        <p>An error occurred while processing your request. Please try again later.</p>
+                    </div>
+                    
+                    <div class="alert alert-warning" role="alert">
+                        <h4 class="alert-heading"><i class="fas fa-exclamation-triangle me-2"></i>Warning!</h4>
+                        <p>This action will permanently delete this data. This cannot be undone.</p>
+                    </div>
+                    
+                    <div class="alert alert-info" role="alert">
+                        <h4 class="alert-heading"><i class="fas fa-info-circle me-2"></i>Information</h4>
+                        <p>The system will be undergoing maintenance on April 30. Please save your work.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- More component sections would go here -->
+        </div>
+        
+        <!-- Patterns Tab -->
+        <div class="tab-pane fade" id="nav-patterns" role="tabpanel" aria-labelledby="nav-patterns-tab">
+            <!-- Empty States -->
+            <div class="design-system-section">
+                <h2 class="h3 mb-4">Empty States</h2>
+                
+                <div class="design-system-subsection">
+                    <h3 class="h5 mb-3">No Data</h3>
+                    
+                    <div class="card">
+                        <div class="card-body text-center py-5">
+                            <div class="mb-4">
+                                <i class="fas fa-database fa-4x text-muted"></i>
+                            </div>
+                            <h3 class="h4 mb-3">No Data Available</h3>
+                            <p class="text-muted mb-4">There are no records matching your current criteria.</p>
+                            <button class="btn btn-primary">
+                                <i class="fas fa-plus me-2"></i> Add New Record
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="design-system-subsection">
+                    <h3 class="h5 mb-3">Empty Search Results</h3>
+                    
+                    <div class="card">
+                        <div class="card-body text-center py-5">
+                            <div class="mb-4">
+                                <i class="fas fa-search fa-4x text-muted"></i>
+                            </div>
+                            <h3 class="h4 mb-3">No Results Found</h3>
+                            <p class="text-muted mb-4">We couldn't find any results matching your search.</p>
+                            <div class="d-flex justify-content-center gap-2">
+                                <button class="btn btn-outline-secondary">
+                                    <i class="fas fa-eraser me-2"></i> Clear Filters
+                                </button>
+                                <button class="btn btn-primary">
+                                    <i class="fas fa-search me-2"></i> Try New Search
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Error States -->
+            <div class="design-system-section">
+                <h2 class="h3 mb-4">Error States</h2>
+                
+                <div class="design-system-subsection">
+                    <h3 class="h5 mb-3">Data Loading Error</h3>
+                    
+                    <div class="card border-danger">
+                        <div class="card-body text-center py-5">
+                            <div class="mb-4">
+                                <i class="fas fa-exclamation-triangle fa-4x text-danger"></i>
+                            </div>
+                            <h3 class="h4 mb-3">Failed to Load Data</h3>
+                            <p class="text-muted mb-4">There was a problem connecting to the server. Please try again later.</p>
+                            <div class="d-flex justify-content-center gap-2">
+                                <button class="btn btn-outline-secondary">
+                                    <i class="fas fa-arrow-left me-2"></i> Go Back
+                                </button>
+                                <button class="btn btn-primary">
+                                    <i class="fas fa-sync-alt me-2"></i> Retry
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="design-system-subsection">
+                    <h3 class="h5 mb-3">Validation Error</h3>
+                    
+                    <form>
+                        <div class="mb-3">
+                            <label for="exampleInputEmail" class="form-label">Email address</label>
+                            <input type="email" class="form-control is-invalid" id="exampleInputEmail" value="invalid-email">
+                            <div class="invalid-feedback">
+                                Please enter a valid email address.
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="exampleInputName" class="form-label">Full Name</label>
+                            <input type="text" class="form-control" id="exampleInputName" value="John Doe">
+                        </div>
+                        <div class="mb-3">
+                            <label for="exampleInputPassword" class="form-label">Password</label>
+                            <input type="password" class="form-control is-invalid" id="exampleInputPassword" value="pass">
+                            <div class="invalid-feedback">
+                                Password must be at least 8 characters long.
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Submit</button>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- More pattern sections would go here -->
+        </div>
+        
+        <!-- Accessibility Tab -->
+        <div class="tab-pane fade" id="nav-accessibility" role="tabpanel" aria-labelledby="nav-accessibility-tab">
+            <div class="design-system-section">
+                <h2 class="h3 mb-4">Accessibility Guidelines</h2>
+                
+                <div class="alert alert-info" role="alert">
+                    <h4 class="alert-heading"><i class="fas fa-universal-access me-2"></i>Accessibility First</h4>
+                    <p>The TerraFusion Platform is designed with accessibility in mind. All components should meet WCAG 2.1 AA standards.</p>
+                </div>
+                
+                <div class="design-system-subsection">
+                    <h3 class="h5 mb-3">Color Contrast</h3>
+                    
+                    <p>All text should have sufficient contrast with its background to ensure readability. The minimum contrast ratios are:</p>
+                    
+                    <ul>
+                        <li>Normal text: 4.5:1</li>
+                        <li>Large text (18pt or 14pt bold): 3:1</li>
+                        <li>UI components and graphics: 3:1</li>
+                    </ul>
+                    
+                    <div class="row mt-4">
+                        <div class="col-md-6 mb-3">
+                            <div class="card">
+                                <div class="card-header bg-success text-white">
+                                    <strong>Good Example: 7:1 ratio</strong>
+                                </div>
+                                <div class="card-body">
+                                    <p class="text-dark">This text has good contrast with the background, making it easy to read for most users.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="card">
+                                <div class="card-header bg-danger text-white">
+                                    <strong>Poor Example: 2:1 ratio</strong>
+                                </div>
+                                <div class="card-body">
+                                    <p class="text-secondary" style="color: #aaaaaa !important;">This text has poor contrast with the background, making it difficult to read for many users.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="design-system-subsection">
+                    <h3 class="h5 mb-3">Keyboard Navigation</h3>
+                    
+                    <p>All interactive elements should be accessible via keyboard navigation. This includes:</p>
+                    
+                    <ul>
+                        <li>Using <code>Tab</code> to navigate between elements</li>
+                        <li>Using <code>Space</code> or <code>Enter</code> to activate buttons</li>
+                        <li>Using arrow keys to navigate within components like selects and date pickers</li>
+                        <li>Providing visible focus indicators</li>
+                    </ul>
+                    
+                    <div class="d-flex flex-wrap gap-2 mt-4">
+                        <button class="btn btn-primary">Focusable Button 1</button>
+                        <button class="btn btn-secondary">Focusable Button 2</button>
+                        <button class="btn btn-success">Focusable Button 3</button>
+                    </div>
+                </div>
+                
+                <div class="design-system-subsection">
+                    <h3 class="h5 mb-3">Screen Reader Support</h3>
+                    
+                    <p>All content should be accessible to screen readers. This includes:</p>
+                    
+                    <ul>
+                        <li>Using semantic HTML elements</li>
+                        <li>Providing alt text for images</li>
+                        <li>Using ARIA attributes where necessary</li>
+                        <li>Ensuring dynamic content changes are announced</li>
+                    </ul>
+                    
+                    <div class="card mt-4">
+                        <div class="card-header">
+                            Example of Screen Reader Announcements
+                        </div>
+                        <div class="card-body">
+                            <p>When you click the button below, a notification will be shown and announced to screen readers:</p>
+                            <button class="btn btn-primary" onclick="terraFusionNotifications.info('This message is announced to screen readers')">
+                                Show Accessible Notification
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Dark mode toggle
+        const darkModeToggle = document.getElementById('darkModeToggle');
+        if (darkModeToggle) {
+            // Set initial state
+            if (document.body.classList.contains('dark-mode') || 
+                localStorage.getItem('dark-mode') === 'true') {
+                darkModeToggle.checked = true;
+                document.body.classList.add('dark-mode');
+            }
+            
+            // Handle toggle
+            darkModeToggle.addEventListener('change', function() {
+                document.body.classList.toggle('dark-mode');
+                localStorage.setItem('dark-mode', 
+                    document.body.classList.contains('dark-mode'));
+            });
+        }
+        
+        // Loading indicator demos
+        const loadingDemoContainer = document.getElementById('loadingDemoContainer');
+        
+        document.getElementById('showFullScreenLoading').addEventListener('click', function() {
+            const loadingId = terraFusionLoading.showFullscreen({
+                message: 'Loading application data...',
+                spinnerSize: 'lg'
+            });
+            
+            setTimeout(function() {
+                terraFusionLoading.hide(loadingId);
+            }, 3000);
+        });
+        
+        document.getElementById('showContainerLoading').addEventListener('click', function() {
+            const loadingId = terraFusionLoading.show('#loadingDemoContainer', {
+                message: 'Loading content...'
+            });
+            
+            setTimeout(function() {
+                terraFusionLoading.hide(loadingId);
+            }, 3000);
+        });
+        
+        document.getElementById('showSkeletonLoading').addEventListener('click', function() {
+            loadingDemoContainer.innerHTML = `
+                <div class="card h-100">
+                    <div class="card-body">
+                        <div class="tf-skeleton tf-skeleton-text w-50 mb-4"></div>
+                        <div class="tf-skeleton tf-skeleton-text w-100 mb-2"></div>
+                        <div class="tf-skeleton tf-skeleton-text w-100 mb-2"></div>
+                        <div class="tf-skeleton tf-skeleton-text w-75"></div>
+                    </div>
+                </div>
+            `;
+            
+            setTimeout(function() {
+                loadingDemoContainer.innerHTML = `
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">Loadable Content</h5>
+                            <p class="card-text">This container can display a loading indicator overlay when data is being fetched or processed.</p>
+                        </div>
+                    </div>
+                `;
+            }, 3000);
+        });
+    });
+</script>
+{% endblock %}
