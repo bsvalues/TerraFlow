@@ -1,646 +1,727 @@
 /**
  * TerraFlow UI Component System
- * A unified component architecture for consistent UI/UX
+ * Core interactive components for the TerraFusion Platform
  */
 
-class UIComponent {
-  constructor(element) {
-    this.element = element;
-    this.initialized = false;
-  }
-  
-  init() {
-    if (this.initialized) return;
-    this.setupEventListeners();
-    this.initialized = true;
-    return this;
-  }
-  
-  setupEventListeners() {
-    // To be implemented by child classes
-  }
-  
-  destroy() {
-    // Clean up any event listeners
-    this.initialized = false;
-  }
-}
-
-/**
- * Data Card component
- * Displays data with loading, error and empty states
- */
-class DataCard extends UIComponent {
-  constructor(element) {
-    super(element);
-    this.loadingTemplate = this.element.querySelector('.loading-template') || this.createLoadingTemplate();
-    this.errorTemplate = this.element.querySelector('.error-template') || this.createErrorTemplate();
-    this.emptyTemplate = this.element.querySelector('.empty-template') || this.createEmptyTemplate();
-    this.contentTemplate = this.element.querySelector('.content-template');
-    this.dataContainer = this.element.querySelector('.data-container');
-    this.retryButton = null;
-  }
-  
-  setupEventListeners() {
-    this.element.addEventListener('dataCard:loading', () => this.showLoading());
-    this.element.addEventListener('dataCard:error', (e) => this.showError(e.detail));
-    this.element.addEventListener('dataCard:empty', (e) => this.showEmpty(e.detail));
-    this.element.addEventListener('dataCard:content', (e) => this.showContent(e.detail));
-  }
-  
-  createLoadingTemplate() {
-    const template = document.createElement('div');
-    template.className = 'loading-template d-none';
-    template.innerHTML = `
-      <div class="text-center p-4">
-        <div class="spinner-border text-primary mb-3" role="status">
-          <span class="visually-hidden">Loading...</span>
-        </div>
-        <p class="loading-message mb-0">Loading data...</p>
-      </div>
-    `;
-    this.element.appendChild(template);
-    return template;
-  }
-  
-  createErrorTemplate() {
-    const template = document.createElement('div');
-    template.className = 'error-template d-none';
-    template.innerHTML = `
-      <div class="text-center p-4">
-        <div class="text-danger mb-3">
-          <i class="fas fa-exclamation-circle fa-3x"></i>
-        </div>
-        <h5 class="error-title">Error Loading Data</h5>
-        <p class="error-message mb-3">There was a problem loading the data.</p>
-        <button type="button" class="btn btn-outline-primary retry-button">Retry</button>
-      </div>
-    `;
-    this.element.appendChild(template);
-    this.retryButton = template.querySelector('.retry-button');
-    return template;
-  }
-  
-  createEmptyTemplate() {
-    const template = document.createElement('div');
-    template.className = 'empty-template d-none';
-    template.innerHTML = `
-      <div class="text-center p-4">
-        <div class="text-neutral mb-3">
-          <i class="fas fa-search fa-3x"></i>
-        </div>
-        <h5 class="empty-title">No Data Found</h5>
-        <p class="empty-message mb-0">No results match your criteria.</p>
-      </div>
-    `;
-    this.element.appendChild(template);
-    return template;
-  }
-  
-  showLoading(message = 'Loading data...') {
-    this._hideAll();
-    const loadingMessage = this.loadingTemplate.querySelector('.loading-message');
-    if (loadingMessage) loadingMessage.textContent = message;
-    this.loadingTemplate.classList.remove('d-none');
-    
-    // Announce for screen readers
-    this._announceForScreenReader(`Loading. ${message}`);
-  }
-  
-  showError(detail = {}) {
-    this._hideAll();
-    const { message = 'There was a problem loading the data.', title = 'Error Loading Data', onRetry = null } = detail;
-    
-    const errorTitle = this.errorTemplate.querySelector('.error-title');
-    const errorMessage = this.errorTemplate.querySelector('.error-message');
-    
-    if (errorTitle) errorTitle.textContent = title;
-    if (errorMessage) errorMessage.textContent = message;
-    
-    // Set up retry handler if provided
-    if (this.retryButton) {
-      // Remove existing listeners
-      const newRetryButton = this.retryButton.cloneNode(true);
-      this.retryButton.parentNode.replaceChild(newRetryButton, this.retryButton);
-      this.retryButton = newRetryButton;
-      
-      if (onRetry && typeof onRetry === 'function') {
-        this.retryButton.addEventListener('click', onRetry);
-      } else {
-        this.retryButton.classList.add('d-none');
-      }
-    }
-    
-    this.errorTemplate.classList.remove('d-none');
-    
-    // Announce for screen readers
-    this._announceForScreenReader(`Error. ${message}`);
-  }
-  
-  showEmpty(detail = {}) {
-    this._hideAll();
-    const { message = 'No results match your criteria.', title = 'No Data Found' } = detail;
-    
-    const emptyTitle = this.emptyTemplate.querySelector('.empty-title');
-    const emptyMessage = this.emptyTemplate.querySelector('.empty-message');
-    
-    if (emptyTitle) emptyTitle.textContent = title;
-    if (emptyMessage) emptyMessage.textContent = message;
-    
-    this.emptyTemplate.classList.remove('d-none');
-    
-    // Announce for screen readers
-    this._announceForScreenReader(`No data found. ${message}`);
-  }
-  
-  showContent(detail = {}) {
-    this._hideAll();
-    
-    if (this.dataContainer) {
-      if (detail.html) {
-        this.dataContainer.innerHTML = detail.html;
-      } else if (detail.element) {
-        // Clear existing content
-        this.dataContainer.innerHTML = '';
-        this.dataContainer.appendChild(detail.element);
-      }
-      this.dataContainer.classList.remove('d-none');
-    } else if (this.contentTemplate) {
-      this.contentTemplate.classList.remove('d-none');
-    }
-    
-    // Announce for screen readers if specified
-    if (detail.announcement) {
-      this._announceForScreenReader(detail.announcement);
-    }
-  }
-  
-  _hideAll() {
-    this.loadingTemplate?.classList.add('d-none');
-    this.errorTemplate?.classList.add('d-none');
-    this.emptyTemplate?.classList.add('d-none');
-    this.contentTemplate?.classList.add('d-none');
-    this.dataContainer?.classList.add('d-none');
-  }
-  
-  _announceForScreenReader(message) {
-    // Find or create an aria-live region
-    let announcer = document.getElementById('screen-reader-announcer');
-    
-    if (!announcer) {
-      announcer = document.createElement('div');
-      announcer.id = 'screen-reader-announcer';
-      announcer.className = 'visually-hidden';
-      announcer.setAttribute('aria-live', 'polite');
-      announcer.setAttribute('aria-atomic', 'true');
-      document.body.appendChild(announcer);
-    }
-    
-    // Update the announcer
-    announcer.textContent = message;
-  }
-}
-
-/**
- * Mobile Navigation component
- * Provides consistent mobile navigation experience
- */
-class MobileNavigation extends UIComponent {
-  constructor(element) {
-    super(element);
-    this.mobileDrawer = document.querySelector('.mobile-drawer') || this.createMobileDrawer();
-    this.overlay = document.querySelector('.mobile-overlay') || this.createOverlay();
-    this.isDrawerOpen = false;
-    this.drawerWidth = 280; // Width in pixels
-    this.startX = 0;
-    this.currentX = 0;
-    this.touchingSurface = false;
-  }
-  
-  setupEventListeners() {
-    // Toggle navigation
-    const toggleButtons = document.querySelectorAll('[data-action="toggle-mobile-nav"]');
-    toggleButtons.forEach(button => {
-      button.addEventListener('click', () => this.toggleDrawer());
-    });
-    
-    // Close when overlay is clicked
-    this.overlay.addEventListener('click', () => this.closeDrawer());
-    
-    // Handle swipe gestures
-    document.addEventListener('touchstart', (e) => this.handleTouchStart(e), { passive: true });
-    document.addEventListener('touchmove', (e) => this.handleTouchMove(e), { passive: false });
-    document.addEventListener('touchend', (e) => this.handleTouchEnd(e), { passive: true });
-    
-    // Close on escape key
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && this.isDrawerOpen) {
-        this.closeDrawer();
-      }
-    });
-  }
-  
-  createMobileDrawer() {
-    const drawer = document.createElement('div');
-    drawer.className = 'mobile-drawer';
-    drawer.setAttribute('aria-hidden', 'true');
-    
-    // Get current page for active highlighting
-    const currentPath = window.location.pathname;
-    
-    drawer.innerHTML = `
-      <div class="drawer-header">
-        <div class="drawer-brand">
-          <img src="/static/img/logo/terrafusion-logo.png" alt="Logo" class="drawer-logo" />
-          <span class="drawer-title">TerraFlow</span>
-        </div>
-        <button class="drawer-close" aria-label="Close menu" data-action="toggle-mobile-nav">
-          <i class="fas fa-times"></i>
-        </button>
-      </div>
-      <nav class="drawer-nav">
-        <ul class="drawer-nav-list">
-          <li class="drawer-nav-item ${currentPath === '/' ? 'active' : ''}">
-            <a href="/" class="drawer-nav-link">
-              <i class="fas fa-home drawer-nav-icon"></i>
-              <span>Home</span>
-            </a>
-          </li>
-          <li class="drawer-nav-item ${currentPath.includes('/map') ? 'active' : ''}">
-            <a href="/map_viewer" class="drawer-nav-link">
-              <i class="fas fa-map drawer-nav-icon"></i>
-              <span>Map Viewer</span>
-            </a>
-          </li>
-          <li class="drawer-nav-item ${currentPath.includes('/file') ? 'active' : ''}">
-            <a href="/file_manager" class="drawer-nav-link">
-              <i class="fas fa-file drawer-nav-icon"></i>
-              <span>Files</span>
-            </a>
-          </li>
-          <li class="drawer-nav-item ${currentPath.includes('/search') ? 'active' : ''}">
-            <a href="/search" class="drawer-nav-link">
-              <i class="fas fa-search drawer-nav-icon"></i>
-              <span>Search</span>
-            </a>
-          </li>
-          <li class="drawer-nav-item ${currentPath.includes('/power_query') ? 'active' : ''}">
-            <a href="/power_query" class="drawer-nav-link">
-              <i class="fas fa-bolt drawer-nav-icon"></i>
-              <span>Power Query</span>
-            </a>
-          </li>
-        </ul>
-      </nav>
-      <div class="drawer-footer">
-        <a href="/logout" class="drawer-footer-link">
-          <i class="fas fa-sign-out-alt"></i>
-          <span>Logout</span>
-        </a>
-      </div>
-    `;
-    
-    document.body.appendChild(drawer);
-    return drawer;
-  }
-  
-  createOverlay() {
-    const overlay = document.createElement('div');
-    overlay.className = 'mobile-overlay';
-    document.body.appendChild(overlay);
-    return overlay;
-  }
-  
-  openDrawer() {
-    this.isDrawerOpen = true;
-    this.mobileDrawer.classList.add('open');
-    this.overlay.classList.add('active');
-    document.body.classList.add('drawer-open');
-    this.mobileDrawer.setAttribute('aria-hidden', 'false');
-    
-    // Set focus to drawer for accessibility
-    setTimeout(() => {
-      const closeButton = this.mobileDrawer.querySelector('.drawer-close');
-      if (closeButton) closeButton.focus();
-    }, 100);
-  }
-  
-  closeDrawer() {
-    this.isDrawerOpen = false;
-    this.mobileDrawer.classList.remove('open');
-    this.overlay.classList.remove('active');
-    document.body.classList.remove('drawer-open');
-    this.mobileDrawer.setAttribute('aria-hidden', 'true');
-    
-    // Return focus to toggle button for accessibility
-    const toggleButton = document.querySelector('[data-action="toggle-mobile-nav"]:not(.drawer-close)');
-    if (toggleButton) toggleButton.focus();
-  }
-  
-  toggleDrawer() {
-    if (this.isDrawerOpen) {
-      this.closeDrawer();
-    } else {
-      this.openDrawer();
-    }
-  }
-  
-  handleTouchStart(e) {
-    this.touchingSurface = true;
-    this.startX = e.touches[0].clientX;
-    this.currentX = this.startX;
-  }
-  
-  handleTouchMove(e) {
-    if (!this.touchingSurface) return;
-    
-    this.currentX = e.touches[0].clientX;
-    const deltaX = this.currentX - this.startX;
-    
-    // Handling drawer opening (swipe right from edge)
-    if (!this.isDrawerOpen && this.startX < 20 && deltaX > 0) {
-      e.preventDefault(); // Prevent scrolling
-      const openPercentage = Math.min(deltaX / this.drawerWidth, 1);
-      this.mobileDrawer.style.transform = `translateX(${-this.drawerWidth + (deltaX)}px)`;
-      this.overlay.style.opacity = openPercentage * 0.5;
-      this.overlay.classList.add('active');
-    }
-    
-    // Handling drawer closing (swipe left)
-    if (this.isDrawerOpen && deltaX < 0) {
-      e.preventDefault(); // Prevent scrolling
-      const openPercentage = Math.max(1 + deltaX / this.drawerWidth, 0);
-      this.mobileDrawer.style.transform = `translateX(${deltaX}px)`;
-      this.overlay.style.opacity = openPercentage * 0.5;
-    }
-  }
-  
-  handleTouchEnd(e) {
-    if (!this.touchingSurface) return;
-    this.touchingSurface = false;
-    
-    const deltaX = this.currentX - this.startX;
-    
-    // Reset styles
-    this.mobileDrawer.style.transform = '';
-    this.overlay.style.opacity = '';
-    
-    // Determine if drawer should open or close based on swipe distance
-    if (!this.isDrawerOpen && deltaX > 70) {
-      this.openDrawer();
-    } else if (this.isDrawerOpen && deltaX < -70) {
-      this.closeDrawer();
-    } else if (this.isDrawerOpen) {
-      // Restore open state if swipe wasn't enough to close
-      this.openDrawer();
-    } else {
-      // Restore closed state if swipe wasn't enough to open
-      this.overlay.classList.remove('active');
-    }
-  }
-}
-
-/**
- * Toast Notification component
- * Provides consistent toast notifications across the application
- */
-class ToastNotifications extends UIComponent {
+class TerraFlowComponents {
   constructor() {
-    super(document.body);
-    this.container = document.getElementById('toast-container') || this.createContainer();
-    this.toasts = [];
-  }
-  
-  createContainer() {
-    const container = document.createElement('div');
-    container.id = 'toast-container';
-    container.className = 'toast-container position-fixed bottom-0 end-0 p-3';
-    container.style.zIndex = '1090';
-    document.body.appendChild(container);
-    return container;
-  }
-  
-  setupEventListeners() {
-    document.addEventListener('toast:show', (e) => this.showToast(e.detail));
+    this.components = {};
+    this.eventListeners = {};
     
-    // Add global method
-    window.showToast = (detail) => this.showToast(detail);
+    // Initialize on DOM ready
+    document.addEventListener('DOMContentLoaded', () => this.init());
   }
   
-  showToast({ title, message, type = 'info', duration = 5000, actions = [] }) {
-    // Create toast element
-    const toastEl = document.createElement('div');
-    toastEl.className = `toast align-items-center border-0 tf-toast tf-toast-${type}`;
-    toastEl.setAttribute('role', 'alert');
-    toastEl.setAttribute('aria-live', 'assertive');
-    toastEl.setAttribute('aria-atomic', 'true');
+  /**
+   * Initialize all components
+   */
+  init() {
+    this.initializeDataCards();
+    this.initializeFilterPanels();
+    this.initializeStatusIndicators();
+    this.initializeTooltips();
+    this.registerComponentEvents();
+  }
+  
+  /**
+   * Initialize all data cards on the page
+   */
+  initializeDataCards() {
+    const dataCards = document.querySelectorAll('.data-card');
     
-    // Create actions markup if provided
-    let actionsMarkup = '';
-    if (actions && actions.length) {
-      actionsMarkup = `
-        <div class="toast-actions mt-2">
-          ${actions.map(action => `
-            <button type="button" class="btn btn-sm ${action.class || 'btn-outline-light'}" data-action="${action.action}">
-              ${action.icon ? `<i class="fas fa-${action.icon} me-1"></i>` : ''}
-              ${action.text}
-            </button>
-          `).join('')}
-        </div>
-      `;
+    dataCards.forEach(card => {
+      const cardId = card.id;
+      if (!cardId) return;
+      
+      this.components[cardId] = {
+        type: 'data-card',
+        element: card,
+        state: 'idle',
+        data: null
+      };
+      
+      // Auto-fetch data if URL is provided
+      const fetchUrl = card.dataset.fetchUrl;
+      if (fetchUrl) {
+        this.fetchCardData(cardId, fetchUrl);
+      }
+      
+      // Add refresh button functionality
+      const refreshBtn = card.querySelector('.tf-card-refresh');
+      if (refreshBtn && fetchUrl) {
+        refreshBtn.addEventListener('click', () => {
+          this.fetchCardData(cardId, fetchUrl, true);
+        });
+      }
+    });
+  }
+  
+  /**
+   * Fetch data for a card from a provided URL
+   * @param {string} cardId - The ID of the card to fetch data for
+   * @param {string} url - The URL to fetch data from
+   * @param {boolean} forceRefresh - Whether to force a refresh (bypass cache)
+   */
+  fetchCardData(cardId, url, forceRefresh = false) {
+    const card = this.components[cardId];
+    if (!card) return;
+    
+    // Update card state
+    card.state = 'loading';
+    this.updateCardState(cardId);
+    
+    // Add cache busting if forced refresh
+    const fetchUrl = forceRefresh ? `${url}${url.includes('?') ? '&' : '?'}_=${Date.now()}` : url;
+    
+    // Fetch data
+    fetch(fetchUrl)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        card.data = data;
+        card.state = data && Object.keys(data).length > 0 ? 'loaded' : 'empty';
+        card.error = null;
+        card.lastUpdated = new Date();
+        
+        this.updateCardState(cardId);
+        this.updateCardContent(cardId);
+        
+        // Trigger card updated event
+        this.triggerEvent('cardUpdated', {
+          cardId,
+          state: card.state,
+          data: card.data
+        });
+      })
+      .catch(error => {
+        console.error(`Error fetching data for card ${cardId}:`, error);
+        card.state = 'error';
+        card.error = error.message;
+        
+        this.updateCardState(cardId);
+        
+        // Trigger card error event
+        this.triggerEvent('cardError', {
+          cardId,
+          error: error.message
+        });
+      });
+  }
+  
+  /**
+   * Update the visual state of a card based on its data state
+   * @param {string} cardId - The ID of the card to update
+   */
+  updateCardState(cardId) {
+    const card = this.components[cardId];
+    if (!card) return;
+    
+    const element = card.element;
+    const dataContainer = element.querySelector('.data-container');
+    const footer = element.querySelector('.tf-card-footer');
+    
+    // Clear previous states
+    const loadingEl = element.querySelector('.loading-template')?.cloneNode(true);
+    const errorEl = element.querySelector('.error-template')?.cloneNode(true);
+    const emptyEl = element.querySelector('.empty-template')?.cloneNode(true);
+    
+    // Remove any existing state elements
+    element.querySelectorAll('.tf-loading-indicator, .tf-error-content, .tf-empty-content')
+      .forEach(el => el.remove());
+    
+    // Update based on current state
+    switch (card.state) {
+      case 'loading':
+        if (loadingEl) {
+          loadingEl.classList.remove('d-none');
+          dataContainer.style.display = 'none';
+          dataContainer.after(loadingEl);
+        } else {
+          // Use the dataFeedback utility if available
+          if (window.dataFeedback) {
+            window.dataFeedback.showLoading(cardId);
+          }
+        }
+        
+        if (footer) footer.classList.add('d-none');
+        break;
+        
+      case 'error':
+        if (errorEl) {
+          errorEl.classList.remove('d-none');
+          dataContainer.style.display = 'none';
+          
+          // Update error message if available
+          if (card.error) {
+            const errorMsg = errorEl.querySelector('.tf-error-message');
+            if (errorMsg) errorMsg.textContent = card.error;
+          }
+          
+          // Set up retry button
+          const retryBtn = errorEl.querySelector('.tf-retry-button');
+          if (retryBtn) {
+            retryBtn.addEventListener('click', () => {
+              const fetchUrl = element.dataset.fetchUrl;
+              if (fetchUrl) {
+                this.fetchCardData(cardId, fetchUrl, true);
+              }
+            });
+          }
+          
+          dataContainer.after(errorEl);
+        } else {
+          // Use the dataFeedback utility if available
+          if (window.dataFeedback) {
+            window.dataFeedback.showError(cardId, {
+              message: card.error || 'Error loading data',
+              onRetry: () => {
+                const fetchUrl = element.dataset.fetchUrl;
+                if (fetchUrl) {
+                  this.fetchCardData(cardId, fetchUrl, true);
+                }
+              }
+            });
+          }
+        }
+        
+        if (footer) footer.classList.add('d-none');
+        break;
+        
+      case 'empty':
+        if (emptyEl) {
+          emptyEl.classList.remove('d-none');
+          dataContainer.style.display = 'none';
+          dataContainer.after(emptyEl);
+        } else {
+          // Use the dataFeedback utility if available
+          if (window.dataFeedback) {
+            window.dataFeedback.showEmpty(cardId);
+          }
+        }
+        
+        if (footer) footer.classList.add('d-none');
+        break;
+        
+      case 'loaded':
+        // Show the data container and hide any state templates
+        dataContainer.style.display = '';
+        
+        // Clear any feedback states if using dataFeedback
+        if (window.dataFeedback) {
+          window.dataFeedback.clearFeedback(cardId);
+        }
+        
+        // Show footer with updated timestamp if available
+        if (footer) {
+          footer.classList.remove('d-none');
+          
+          // Update last updated timestamp
+          const updatedAt = footer.querySelector('.tf-card-updated-at');
+          if (updatedAt && card.lastUpdated) {
+            updatedAt.textContent = `Updated: ${this.formatDateTime(card.lastUpdated)}`;
+          }
+        }
+        break;
+        
+      default:
+        // Default/idle state - just show the data container
+        dataContainer.style.display = '';
+        
+        // Clear any feedback states if using dataFeedback
+        if (window.dataFeedback) {
+          window.dataFeedback.clearFeedback(cardId);
+        }
+        
+        if (footer) footer.classList.add('d-none');
+    }
+  }
+  
+  /**
+   * Update the content of a card with the loaded data
+   * @param {string} cardId - The ID of the card to update
+   */
+  updateCardContent(cardId) {
+    const card = this.components[cardId];
+    if (!card || card.state !== 'loaded' || !card.data) return;
+    
+    // Get the template ID from the card if available
+    const element = card.element;
+    const templateId = element.dataset.templateId;
+    
+    if (templateId) {
+      const template = document.getElementById(templateId);
+      if (template && template.tagName === 'TEMPLATE') {
+        this.renderTemplate(cardId, template, card.data);
+        return;
+      }
     }
     
-    // Create toast content
-    toastEl.innerHTML = `
-      <div class="d-flex">
-        <div class="toast-body">
-          <div class="d-flex align-items-center mb-1">
-            <i class="fas fa-${this._getIconForType(type)} me-2"></i>
-            <strong>${title}</strong>
-          </div>
-          <div>${message}</div>
-          ${actionsMarkup}
-        </div>
-        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
-      </div>
-    `;
-    
-    // Add to container
-    this.container.appendChild(toastEl);
-    
-    // Initialize toast
-    const toast = new bootstrap.Toast(toastEl, {
-      autohide: true,
-      delay: duration
+    // If no template or template not found, trigger an event for custom handling
+    this.triggerEvent('cardContentUpdate', {
+      cardId,
+      data: card.data
     });
+  }
+  
+  /**
+   * Render a template into a card
+   * @param {string} cardId - The ID of the card to render into
+   * @param {HTMLTemplateElement} template - The template to render
+   * @param {object} data - The data to use for rendering
+   */
+  renderTemplate(cardId, template, data) {
+    const card = this.components[cardId];
+    if (!card) return;
     
-    // Add any action event listeners
-    if (actions && actions.length) {
-      actions.forEach(action => {
-        const actionButton = toastEl.querySelector(`[data-action="${action.action}"]`);
-        if (actionButton && action.handler) {
-          actionButton.addEventListener('click', (e) => {
-            e.preventDefault();
-            action.handler();
+    const dataContainer = card.element.querySelector('.data-container');
+    if (!dataContainer) return;
+    
+    // Clone the template content
+    const content = template.content.cloneNode(true);
+    
+    // Replace placeholders with data
+    this.processTemplateNodes(content, data);
+    
+    // Clear and append the new content
+    dataContainer.innerHTML = '';
+    dataContainer.appendChild(content);
+    
+    // Initialize any components in the new content
+    this.initializeComponentsInContainer(dataContainer);
+  }
+  
+  /**
+   * Process template nodes to replace placeholders with data
+   * @param {DocumentFragment|Element} node - The node to process
+   * @param {object} data - The data to use for replacement
+   */
+  processTemplateNodes(node, data) {
+    // Process text nodes for {{placeholder}} patterns
+    const processTextNode = (textNode, data) => {
+      const text = textNode.nodeValue;
+      const placeholderPattern = /{{([\w.]+)}}/g;
+      let match;
+      let newText = text;
+      
+      while ((match = placeholderPattern.exec(text)) !== null) {
+        const placeholder = match[1];
+        const value = this.getNestedValue(data, placeholder);
+        
+        if (value !== undefined) {
+          newText = newText.replace(match[0], value);
+        }
+      }
+      
+      if (newText !== text) {
+        textNode.nodeValue = newText;
+      }
+    };
+    
+    // Process element attributes for data-bind attributes
+    const processElement = (element, data) => {
+      // Process data-bind attributes
+      if (element.hasAttribute('data-bind')) {
+        const binding = element.getAttribute('data-bind');
+        const value = this.getNestedValue(data, binding);
+        
+        if (value !== undefined) {
+          element.textContent = value;
+        }
+      }
+      
+      // Process data-attr-* attributes (bind values to other attributes)
+      Array.from(element.attributes)
+        .filter(attr => attr.name.startsWith('data-attr-'))
+        .forEach(attr => {
+          const targetAttr = attr.name.substring(10); // Remove "data-attr-" prefix
+          const binding = attr.value;
+          const value = this.getNestedValue(data, binding);
+          
+          if (value !== undefined) {
+            element.setAttribute(targetAttr, value);
+          }
+        });
+      
+      // Process data-if attribute (conditional rendering)
+      if (element.hasAttribute('data-if')) {
+        const condition = element.getAttribute('data-if');
+        const value = this.getNestedValue(data, condition);
+        
+        if (!value) {
+          element.remove();
+          return;
+        }
+      }
+      
+      // Process data-for attribute (list rendering)
+      if (element.hasAttribute('data-for')) {
+        const forAttr = element.getAttribute('data-for');
+        const [itemName, collectionName] = forAttr.split(' in ').map(s => s.trim());
+        const collection = this.getNestedValue(data, collectionName);
+        
+        if (Array.isArray(collection)) {
+          const template = element.cloneNode(true);
+          template.removeAttribute('data-for');
+          
+          // Clear original content
+          element.textContent = '';
+          
+          // Create a new item for each item in the collection
+          collection.forEach(item => {
+            const newItem = template.cloneNode(true);
+            
+            // Create a new data context with the item
+            const itemData = { 
+              ...data,
+              [itemName]: item 
+            };
+            
+            // Process the new item with the item data
+            this.processTemplateNodes(newItem, itemData);
+            element.appendChild(newItem);
           });
         }
+        
+        return;
+      }
+      
+      // Process child elements
+      Array.from(element.childNodes).forEach(child => {
+        if (child.nodeType === Node.ELEMENT_NODE) {
+          processElement(child, data);
+        } else if (child.nodeType === Node.TEXT_NODE) {
+          processTextNode(child, data);
+        }
+      });
+    };
+    
+    // Handle DocumentFragment or Element
+    if (node.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
+      Array.from(node.childNodes).forEach(child => {
+        if (child.nodeType === Node.ELEMENT_NODE) {
+          processElement(child, data);
+        } else if (child.nodeType === Node.TEXT_NODE) {
+          processTextNode(child, data);
+        }
+      });
+    } else if (node.nodeType === Node.ELEMENT_NODE) {
+      processElement(node, data);
+    }
+  }
+  
+  /**
+   * Get a nested value from an object using dot notation
+   * @param {object} obj - The object to get the value from
+   * @param {string} path - The path to the value using dot notation
+   * @returns {*} The value at the path or undefined if not found
+   */
+  getNestedValue(obj, path) {
+    return path.split('.').reduce((prev, curr) => {
+      return prev && prev[curr] !== undefined ? prev[curr] : undefined;
+    }, obj);
+  }
+  
+  /**
+   * Initialize filter panels
+   */
+  initializeFilterPanels() {
+    const filterPanels = document.querySelectorAll('.tf-filter-panel');
+    
+    filterPanels.forEach(panel => {
+      const panelId = panel.id;
+      if (!panelId) return;
+      
+      this.components[panelId] = {
+        type: 'filter-panel',
+        element: panel,
+        state: 'idle',
+        filters: {}
+      };
+      
+      // Set up filter controls
+      const applyBtn = panel.querySelector('.tf-filter-apply');
+      const resetBtn = panel.querySelector('.tf-filter-reset');
+      
+      if (applyBtn) {
+        applyBtn.addEventListener('click', () => {
+          this.applyFilters(panelId);
+        });
+      }
+      
+      if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+          this.resetFilters(panelId);
+        });
+      }
+      
+      // Set up mobile filter panel behavior
+      if (window.innerWidth < 768) {
+        const handle = document.createElement('div');
+        handle.className = 'tf-filter-handle';
+        panel.insertBefore(handle, panel.firstChild);
+        
+        // Add touch gestures
+        let startY = 0;
+        let currentTranslate = 0;
+        
+        handle.addEventListener('touchstart', (e) => {
+          startY = e.touches[0].clientY;
+          panel.style.transition = 'none';
+        });
+        
+        handle.addEventListener('touchmove', (e) => {
+          const currentY = e.touches[0].clientY;
+          const diff = currentY - startY;
+          
+          // Only allow dragging down
+          if (diff > 0) {
+            currentTranslate = diff;
+            panel.style.transform = `translateY(${diff}px)`;
+          }
+        });
+        
+        handle.addEventListener('touchend', () => {
+          panel.style.transition = 'transform 0.3s ease';
+          
+          // If dragged more than 100px, close the panel
+          if (currentTranslate > 100) {
+            panel.classList.remove('open');
+          } else {
+            panel.style.transform = '';
+          }
+          
+          currentTranslate = 0;
+        });
+      }
+    });
+  }
+  
+  /**
+   * Apply filters from a filter panel
+   * @param {string} panelId - The ID of the filter panel
+   */
+  applyFilters(panelId) {
+    const panel = this.components[panelId];
+    if (!panel) return;
+    
+    // Collect all filter values
+    const filters = {};
+    const filterInputs = panel.element.querySelectorAll('input, select');
+    
+    filterInputs.forEach(input => {
+      const name = input.name;
+      if (!name) return;
+      
+      // Different handling for different input types
+      if (input.type === 'checkbox') {
+        filters[name] = input.checked;
+      } else if (input.type === 'radio') {
+        if (input.checked) {
+          filters[name] = input.value;
+        }
+      } else if (input.type === 'select-multiple') {
+        filters[name] = Array.from(input.selectedOptions).map(opt => opt.value);
+      } else {
+        filters[name] = input.value;
+      }
+    });
+    
+    panel.filters = filters;
+    
+    // Trigger filter applied event
+    this.triggerEvent('filtersApplied', {
+      panelId,
+      filters
+    });
+    
+    // For mobile: close the panel after applying
+    if (window.innerWidth < 768) {
+      panel.element.classList.remove('open');
+    }
+  }
+  
+  /**
+   * Reset filters in a filter panel
+   * @param {string} panelId - The ID of the filter panel
+   */
+  resetFilters(panelId) {
+    const panel = this.components[panelId];
+    if (!panel) return;
+    
+    // Reset all filter inputs
+    const filterInputs = panel.element.querySelectorAll('input, select');
+    
+    filterInputs.forEach(input => {
+      if (input.type === 'checkbox' || input.type === 'radio') {
+        input.checked = input.defaultChecked;
+      } else if (input.type === 'select-one' || input.type === 'select-multiple') {
+        Array.from(input.options).forEach(opt => {
+          opt.selected = opt.defaultSelected;
+        });
+      } else {
+        input.value = input.defaultValue;
+      }
+    });
+    
+    panel.filters = {};
+    
+    // Trigger filter reset event
+    this.triggerEvent('filtersReset', {
+      panelId
+    });
+  }
+  
+  /**
+   * Initialize status indicators
+   */
+  initializeStatusIndicators() {
+    // Enable tooltips for status indicators
+    const statusIndicators = document.querySelectorAll('.tf-status-indicator[data-bs-toggle="tooltip"]');
+    if (statusIndicators.length > 0 && typeof bootstrap !== 'undefined') {
+      statusIndicators.forEach(indicator => {
+        new bootstrap.Tooltip(indicator);
+      });
+    }
+  }
+  
+  /**
+   * Initialize all tooltips
+   */
+  initializeTooltips() {
+    if (typeof bootstrap !== 'undefined') {
+      const tooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+      tooltips.forEach(tooltip => {
+        new bootstrap.Tooltip(tooltip);
+      });
+    }
+  }
+  
+  /**
+   * Initialize components within a dynamically loaded container
+   * @param {HTMLElement} container - The container element
+   */
+  initializeComponentsInContainer(container) {
+    // Re-initialize tooltips
+    if (typeof bootstrap !== 'undefined') {
+      const tooltips = container.querySelectorAll('[data-bs-toggle="tooltip"]');
+      tooltips.forEach(tooltip => {
+        new bootstrap.Tooltip(tooltip);
       });
     }
     
-    // Show toast
-    toast.show();
+    // Initialize any cards
+    const cards = container.querySelectorAll('.data-card');
+    if (cards.length > 0) {
+      this.initializeDataCards();
+    }
     
-    // Remove from DOM after hiding
-    toastEl.addEventListener('hidden.bs.toast', () => {
-      toastEl.remove();
-    });
-    
-    return toast;
-  }
-  
-  _getIconForType(type) {
-    switch (type) {
-      case 'success': return 'check-circle';
-      case 'warning': return 'exclamation-triangle';
-      case 'danger': return 'exclamation-circle';
-      case 'info': return 'info-circle';
-      default: return 'bell';
+    // Initialize any filter panels
+    const panels = container.querySelectorAll('.tf-filter-panel');
+    if (panels.length > 0) {
+      this.initializeFilterPanels();
     }
   }
-}
-
-/**
- * Form Validation component
- * Provides enhanced form validation with accessible error messages
- */
-class FormValidator extends UIComponent {
-  constructor(element) {
-    super(element);
-    this.form = element;
-    this.submitButton = this.form.querySelector('[type="submit"]');
-    this.validated = false;
-  }
   
-  setupEventListeners() {
-    this.form.addEventListener('submit', e => this.handleSubmit(e));
+  /**
+   * Register global component event listeners
+   */
+  registerComponentEvents() {
+    // Register global filter button
+    const filterToggleButtons = document.querySelectorAll('[data-action="toggle-filters"]');
     
-    // Live validation for fields
-    const inputs = this.form.querySelectorAll('input, select, textarea');
-    inputs.forEach(input => {
-      input.addEventListener('blur', () => this.validateField(input));
-      input.addEventListener('input', () => {
-        if (this.validated) {
-          this.validateField(input);
+    filterToggleButtons.forEach(button => {
+      const targetId = button.dataset.target;
+      if (!targetId) return;
+      
+      button.addEventListener('click', () => {
+        const panel = document.getElementById(targetId);
+        if (panel) {
+          panel.classList.toggle('open');
         }
       });
     });
-  }
-  
-  handleSubmit(e) {
-    if (!this.form.checkValidity()) {
-      e.preventDefault();
-      e.stopPropagation();
+    
+    // Register global map marker buttons
+    document.addEventListener('click', (e) => {
+      const button = e.target.closest('[data-action="show-on-map"]');
+      if (!button) return;
       
-      // Find the first invalid field and focus it
-      const invalidField = this.form.querySelector(':invalid');
-      if (invalidField) {
-        invalidField.focus();
-        this.validateField(invalidField);
-      }
-    }
-    
-    this.form.classList.add('was-validated');
-    this.validated = true;
-  }
-  
-  validateField(field) {
-    // Remove existing error message
-    const existingMessage = field.parentElement.querySelector('.invalid-feedback');
-    if (existingMessage) {
-      existingMessage.remove();
-    }
-    
-    // If field is invalid, add custom error message
-    if (!field.checkValidity()) {
-      const errorMessage = document.createElement('div');
-      errorMessage.className = 'invalid-feedback';
-      errorMessage.textContent = this.getValidationMessage(field);
-      field.parentElement.appendChild(errorMessage);
+      const lat = parseFloat(button.dataset.lat);
+      const lng = parseFloat(button.dataset.lng);
       
-      // Add error class to parent for styling
-      field.parentElement.classList.add('has-error');
-    } else {
-      // Remove error class
-      field.parentElement.classList.remove('has-error');
-    }
+      if (!isNaN(lat) && !isNaN(lng)) {
+        this.triggerEvent('showOnMap', { lat, lng });
+      }
+    });
   }
   
-  getValidationMessage(field) {
-    // Get the validation message based on validation state
-    if (field.validity.valueMissing) {
-      return field.getAttribute('data-required-message') || 'This field is required';
+  /**
+   * Format a date and time for display
+   * @param {Date} date - The date to format
+   * @returns {string} The formatted date and time
+   */
+  formatDateTime(date) {
+    if (!(date instanceof Date)) {
+      date = new Date(date);
     }
     
-    if (field.validity.typeMismatch) {
-      if (field.type === 'email') {
-        return field.getAttribute('data-email-message') || 'Please enter a valid email address';
+    return date.toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+  
+  /**
+   * Add an event listener for component events
+   * @param {string} event - The event name
+   * @param {Function} callback - The callback function
+   */
+  addEventListener(event, callback) {
+    if (!this.eventListeners[event]) {
+      this.eventListeners[event] = [];
+    }
+    
+    this.eventListeners[event].push(callback);
+  }
+  
+  /**
+   * Remove an event listener
+   * @param {string} event - The event name
+   * @param {Function} callback - The callback function to remove
+   */
+  removeEventListener(event, callback) {
+    if (!this.eventListeners[event]) return;
+    
+    this.eventListeners[event] = this.eventListeners[event]
+      .filter(cb => cb !== callback);
+  }
+  
+  /**
+   * Trigger an event
+   * @param {string} event - The event name
+   * @param {object} data - The event data
+   */
+  triggerEvent(event, data) {
+    if (!this.eventListeners[event]) return;
+    
+    this.eventListeners[event].forEach(callback => {
+      try {
+        callback(data);
+      } catch (error) {
+        console.error(`Error in event handler for ${event}:`, error);
       }
-      if (field.type === 'url') {
-        return field.getAttribute('data-url-message') || 'Please enter a valid URL';
-      }
-    }
-    
-    if (field.validity.patternMismatch) {
-      return field.getAttribute('data-pattern-message') || 'Please match the requested format';
-    }
-    
-    if (field.validity.tooShort) {
-      return `Please use at least ${field.minLength} characters`;
-    }
-    
-    if (field.validity.tooLong) {
-      return `Please use no more than ${field.maxLength} characters`;
-    }
-    
-    if (field.validity.rangeUnderflow) {
-      return `Value must be at least ${field.min}`;
-    }
-    
-    if (field.validity.rangeOverflow) {
-      return `Value must be no more than ${field.max}`;
-    }
-    
-    return field.validationMessage || 'This value is invalid';
+    });
   }
 }
 
-/**
- * Initialize all UI components
- */
-document.addEventListener('DOMContentLoaded', function() {
-  // Register component classes for reuse
-  window.TerraFlowUI = {
-    DataCard,
-    MobileNavigation,
-    ToastNotifications,
-    FormValidator
-  };
-  
-  // Initialize Toast Notifications (singleton)
-  const toastNotifications = new ToastNotifications().init();
-  
-  // Initialize Mobile Navigation on mobile devices
-  if (window.innerWidth < 768) {
-    const mobileNav = new MobileNavigation(document.body).init();
-  }
-  
-  // Initialize DataCards
-  document.querySelectorAll('.data-card').forEach(element => {
-    new DataCard(element).init();
-  });
-  
-  // Initialize Form Validators
-  document.querySelectorAll('form.needs-validation').forEach(form => {
-    new FormValidator(form).init();
-  });
-});
+// Create and export a singleton instance
+const terraFlowComponents = new TerraFlowComponents();
+
+// Add to window for global access
+window.terraFlowComponents = terraFlowComponents;

@@ -17,6 +17,8 @@
     <!-- TerraFlow Unified CSS Framework -->
     <!-- Base Visual Design System -->
     <link href="{{ url_for('static', filename='css/visual-system.css') }}" rel="stylesheet">
+    <!-- UI Components -->
+    <link href="{{ url_for('static', filename='css/components.css') }}" rel="stylesheet">
     <!-- Core Styles -->
     <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
     <!-- Mobile Styles (consolidated) -->
@@ -231,22 +233,23 @@
     </footer>
     {% endif %}
     
+    <!-- External Dependencies -->
     <!-- Bootstrap Bundle with Popper -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
     <!-- jQuery (for DataTable support) -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <!-- Custom JavaScript -->
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-    <!-- Mobile JavaScript -->
-    <script src="{{ url_for('static', filename='js/mobile.js') }}"></script>
-    <!-- Enhanced Mobile JavaScript v2 -->
-    <script src="{{ url_for('static', filename='js/mobile-v2.js') }}"></script>
-    <!-- Mobile Gestures Library -->
-    <script src="{{ url_for('static', filename='js/mobile-gestures.js') }}"></script>
-    <!-- Accessibility JavaScript -->
-    <script src="{{ url_for('static', filename='js/accessibility.js') }}"></script>
     
-    <!-- Accessibility Enhancements -->
+    <!-- TerraFlow Unified JavaScript Framework -->
+    <!-- Core Component System -->
+    <script src="{{ url_for('static', filename='js/components.js') }}"></script>
+    <!-- Data State Feedback System -->
+    <script src="{{ url_for('static', filename='js/data-feedback.js') }}"></script>
+    <!-- Accessibility System -->
+    <script src="{{ url_for('static', filename='js/accessibility.js') }}"></script>
+    <!-- Legacy Support (for compatibility) -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    
+    <!-- Global Initialization -->
     <script>
       // Add keyboard accessibility
       document.addEventListener('DOMContentLoaded', function() {
