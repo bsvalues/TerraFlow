@@ -1,702 +1,817 @@
 {% extends "base.html" %}
 
-{% block title %}Design System{% endblock %}
+{% block title %}TerraFusion Design System{% endblock %}
 
-{% block head %}
+{% block styles %}
 <style>
     .design-system-section {
-        margin-bottom: 3rem;
+        margin-bottom: 4rem;
+        padding-top: 2rem;
     }
     
-    .design-system-subsection {
-        margin-bottom: 2rem;
+    .design-system-section h2 {
+        margin-bottom: 1.5rem;
+        border-bottom: 1px solid var(--gray-200);
+        padding-bottom: 0.5rem;
     }
     
-    .design-tokens-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-        gap: 1rem;
-    }
-    
-    .color-swatch {
-        display: flex;
-        flex-direction: column;
+    .component-demo {
+        background-color: var(--gray-100);
         border-radius: 0.5rem;
-        overflow: hidden;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    }
-    
-    .color-preview {
-        height: 100px;
-        width: 100%;
-    }
-    
-    .color-info {
-        padding: 0.75rem;
-        background: white;
-    }
-    
-    .color-name {
-        font-weight: 600;
-        margin-bottom: 0.25rem;
-    }
-    
-    .color-value {
-        font-family: monospace;
-        font-size: 0.875rem;
-        color: #666;
-    }
-    
-    .typography-sample {
+        padding: 1.5rem;
         margin-bottom: 1.5rem;
     }
     
-    .typography-example {
-        margin-bottom: 0.5rem;
-    }
-    
-    .typography-details {
-        font-family: monospace;
-        font-size: 0.875rem;
-        color: #666;
-        margin-bottom: 0.5rem;
-    }
-    
-    .component-example {
-        border: 1px solid #e2e8f0;
-        border-radius: 0.5rem;
-        margin-bottom: 2rem;
-    }
-    
-    .component-preview {
-        padding: 2rem;
-        border-bottom: 1px solid #e2e8f0;
-        background-color: #f8fafc;
-    }
-    
     .component-code {
+        background-color: var(--gray-900);
+        color: var(--gray-100);
+        border-radius: 0.5rem;
         padding: 1rem;
-        background-color: #1e293b;
-        color: #e2e8f0;
-        border-radius: 0 0 0.5rem 0.5rem;
+        margin-bottom: 1.5rem;
         font-family: monospace;
-        font-size: 0.875rem;
-        overflow-x: auto;
+        overflow: auto;
+        max-height: 300px;
+    }
+    
+    .color-swatch {
+        display: inline-block;
+        width: 100px;
+        height: 100px;
+        margin-right: 1rem;
+        margin-bottom: 1rem;
+        border-radius: 0.5rem;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    
+    .color-label {
+        font-size: 0.8rem;
+        margin-top: 0.5rem;
+        display: block;
+    }
+    
+    .typography-demo {
+        margin-bottom: 1.5rem;
     }
     
     .component-controls {
-        display: flex;
-        justify-content: flex-end;
-        padding: 0.5rem 1rem;
-        background-color: #f1f5f9;
-        border-top: 1px solid #e2e8f0;
-    }
-    
-    .spacing-example {
-        background-color: #f1f5f9;
-        border-radius: 0.25rem;
-    }
-    
-    .shadow-example {
-        height: 100px;
-        width: 100px;
-        background-color: white;
+        margin-bottom: 1rem;
+        padding: 0.75rem;
+        background-color: var(--gray-200);
         border-radius: 0.5rem;
-        margin: 1rem;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 600;
+    }
+    
+    .component-controls button {
+        margin-right: 0.5rem;
+        margin-bottom: 0.5rem;
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container mt-4 mb-5" id="main-content">
+<div class="container py-4">
     <div class="row mb-4">
-        <div class="col-md-9">
-            <h1 class="display-5 mb-3">TerraFusion Design System</h1>
-            <p class="lead">A comprehensive guide to the TerraFusion Platform's design language and component library.</p>
-        </div>
-        <div class="col-md-3 d-flex align-items-center justify-content-md-end mt-3 mt-md-0">
-            <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" role="switch" id="darkModeToggle">
-                <label class="form-check-label" for="darkModeToggle">Dark Mode</label>
-            </div>
+        <div class="col-12">
+            <h1 class="mb-3">TerraFusion Design System</h1>
+            <p class="lead">
+                A unified design system to ensure consistency and quality across the TerraFusion platform.
+            </p>
+            
+            <nav>
+                <div class="nav nav-tabs" id="nav-tab" role="tablist">
+                    <button class="nav-link active" id="nav-intro-tab" data-bs-toggle="tab" data-bs-target="#nav-intro" type="button" role="tab" aria-controls="nav-intro" aria-selected="true">Introduction</button>
+                    <button class="nav-link" id="nav-colors-tab" data-bs-toggle="tab" data-bs-target="#nav-colors" type="button" role="tab" aria-controls="nav-colors" aria-selected="false">Colors & Typography</button>
+                    <button class="nav-link" id="nav-components-tab" data-bs-toggle="tab" data-bs-target="#nav-components" type="button" role="tab" aria-controls="nav-components" aria-selected="false">Core Components</button>
+                    <button class="nav-link" id="nav-notifications-tab" data-bs-toggle="tab" data-bs-target="#nav-notifications" type="button" role="tab" aria-controls="nav-notifications" aria-selected="false">Notifications</button>
+                    <button class="nav-link" id="nav-loading-tab" data-bs-toggle="tab" data-bs-target="#nav-loading" type="button" role="tab" aria-controls="nav-loading" aria-selected="false">Loading</button>
+                    <button class="nav-link" id="nav-errors-tab" data-bs-toggle="tab" data-bs-target="#nav-errors" type="button" role="tab" aria-controls="nav-errors" aria-selected="false">Error Handling</button>
+                    <button class="nav-link" id="nav-data-states-tab" data-bs-toggle="tab" data-bs-target="#nav-data-states" type="button" role="tab" aria-controls="nav-data-states" aria-selected="false">Data States</button>
+                </div>
+            </nav>
         </div>
     </div>
     
-    <nav class="mb-4">
-        <div class="nav nav-tabs" id="nav-tab" role="tablist">
-            <button class="nav-link active" id="nav-foundation-tab" data-bs-toggle="tab" data-bs-target="#nav-foundation" type="button" role="tab" aria-controls="nav-foundation" aria-selected="true">Foundation</button>
-            <button class="nav-link" id="nav-components-tab" data-bs-toggle="tab" data-bs-target="#nav-components" type="button" role="tab" aria-controls="nav-components" aria-selected="false">Components</button>
-            <button class="nav-link" id="nav-patterns-tab" data-bs-toggle="tab" data-bs-target="#nav-patterns" type="button" role="tab" aria-controls="nav-patterns" aria-selected="false">Patterns</button>
-            <button class="nav-link" id="nav-accessibility-tab" data-bs-toggle="tab" data-bs-target="#nav-accessibility" type="button" role="tab" aria-controls="nav-accessibility" aria-selected="false">Accessibility</button>
-        </div>
-    </nav>
-    
     <div class="tab-content" id="nav-tabContent">
-        <!-- Foundation Tab -->
-        <div class="tab-pane fade show active" id="nav-foundation" role="tabpanel" aria-labelledby="nav-foundation-tab">
-            <!-- Color System -->
+        <!-- Introduction -->
+        <div class="tab-pane fade show active" id="nav-intro" role="tabpanel" aria-labelledby="nav-intro-tab">
             <div class="design-system-section">
-                <h2 class="h3 mb-4">Color System</h2>
+                <h2>Introduction</h2>
+                <p>
+                    The TerraFusion Design System is a comprehensive set of design standards, components, and best practices 
+                    that ensures a consistent and high-quality user experience across the TerraFusion platform. This system 
+                    is designed to be flexible, accessible, and maintainable, allowing for rapid development without 
+                    compromising on quality.
+                </p>
                 
-                <div class="design-system-subsection">
-                    <h3 class="h5 mb-3">Primary Colors</h3>
-                    <div class="design-tokens-grid">
-                        <div class="color-swatch">
-                            <div class="color-preview" style="background-color: var(--primary-500, #00e5ff)"></div>
-                            <div class="color-info">
-                                <div class="color-name">Primary 500</div>
-                                <div class="color-value">#00e5ff</div>
+                <h3 class="mt-4 mb-3">Design Principles</h3>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h4 class="card-title">Clarity</h4>
+                                <p class="card-text">
+                                    Eliminate ambiguity. Enable users to see, understand, and act with confidence.
+                                </p>
                             </div>
                         </div>
-                        <div class="color-swatch">
-                            <div class="color-preview" style="background-color: var(--primary-600, #00b8d4)"></div>
-                            <div class="color-info">
-                                <div class="color-name">Primary 600</div>
-                                <div class="color-value">#00b8d4</div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h4 class="card-title">Efficiency</h4>
+                                <p class="card-text">
+                                    Streamline workflows. Help users complete tasks with minimal effort.
+                                </p>
                             </div>
                         </div>
-                        <div class="color-swatch">
-                            <div class="color-preview" style="background-color: var(--primary-700, #0097a7)"></div>
-                            <div class="color-info">
-                                <div class="color-name">Primary 700</div>
-                                <div class="color-value">#0097a7</div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h4 class="card-title">Consistency</h4>
+                                <p class="card-text">
+                                    Create familiarity through standardized components and patterns.
+                                </p>
                             </div>
                         </div>
-                        <div class="color-swatch">
-                            <div class="color-preview" style="background-color: var(--primary-800, #00838f)"></div>
-                            <div class="color-info">
-                                <div class="color-name">Primary 800</div>
-                                <div class="color-value">#00838f</div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h4 class="card-title">Accessibility</h4>
+                                <p class="card-text">
+                                    Design for all abilities, ensuring everyone can use our products successfully.
+                                </p>
                             </div>
                         </div>
                     </div>
                 </div>
                 
-                <div class="design-system-subsection">
-                    <h3 class="h5 mb-3">Secondary Colors</h3>
-                    <div class="design-tokens-grid">
-                        <div class="color-swatch">
-                            <div class="color-preview" style="background-color: var(--secondary-500, #004d7a)"></div>
-                            <div class="color-info">
-                                <div class="color-name">Secondary 500</div>
-                                <div class="color-value">#004d7a</div>
-                            </div>
-                        </div>
-                        <div class="color-swatch">
-                            <div class="color-preview" style="background-color: var(--secondary-600, #003c61)"></div>
-                            <div class="color-info">
-                                <div class="color-name">Secondary 600</div>
-                                <div class="color-value">#003c61</div>
-                            </div>
-                        </div>
-                        <div class="color-swatch">
-                            <div class="color-preview" style="background-color: var(--secondary-700, #002a4a)"></div>
-                            <div class="color-info">
-                                <div class="color-name">Secondary 700</div>
-                                <div class="color-value">#002a4a</div>
-                            </div>
-                        </div>
-                        <div class="color-swatch">
-                            <div class="color-preview" style="background-color: var(--secondary-800, #001529)"></div>
-                            <div class="color-info">
-                                <div class="color-name">Secondary 800</div>
-                                <div class="color-value">#001529</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="design-system-subsection">
-                    <h3 class="h5 mb-3">Semantic Colors</h3>
-                    <div class="design-tokens-grid">
-                        <div class="color-swatch">
-                            <div class="color-preview" style="background-color: var(--success, #28a745)"></div>
-                            <div class="color-info">
-                                <div class="color-name">Success</div>
-                                <div class="color-value">#28a745</div>
-                            </div>
-                        </div>
-                        <div class="color-swatch">
-                            <div class="color-preview" style="background-color: var(--danger, #dc3545)"></div>
-                            <div class="color-info">
-                                <div class="color-name">Danger</div>
-                                <div class="color-value">#dc3545</div>
-                            </div>
-                        </div>
-                        <div class="color-swatch">
-                            <div class="color-preview" style="background-color: var(--warning, #ffc107)"></div>
-                            <div class="color-info">
-                                <div class="color-name">Warning</div>
-                                <div class="color-value">#ffc107</div>
-                            </div>
-                        </div>
-                        <div class="color-swatch">
-                            <div class="color-preview" style="background-color: var(--info, #17a2b8)"></div>
-                            <div class="color-info">
-                                <div class="color-name">Info</div>
-                                <div class="color-value">#17a2b8</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <h3 class="mt-4 mb-3">How to Use This System</h3>
+                <p>
+                    This documentation provides comprehensive guidance on using the TerraFusion Design System. Developers 
+                    and designers should refer to this documentation when implementing UI components or designing new 
+                    interfaces. The system includes:
+                </p>
+                <ul>
+                    <li>Visual language (colors, typography, spacing)</li>
+                    <li>Reusable UI components</li>
+                    <li>Interaction patterns</li>
+                    <li>Implementation guidelines</li>
+                </ul>
             </div>
-            
-            <!-- Typography -->
+        </div>
+        
+        <!-- Colors & Typography -->
+        <div class="tab-pane fade" id="nav-colors" role="tabpanel" aria-labelledby="nav-colors-tab">
             <div class="design-system-section">
-                <h2 class="h3 mb-4">Typography</h2>
+                <h2>Colors & Typography</h2>
                 
-                <div class="design-system-subsection">
-                    <h3 class="h5 mb-3">Headings</h3>
-                    
-                    <div class="typography-sample">
-                        <div class="typography-example">
-                            <h1>Heading Level 1</h1>
-                        </div>
-                        <div class="typography-details">
-                            Font: var(--font-family-base, "Inter") | Size: var(--font-size-h1, 48px) | Weight: var(--weight-bold, 600)
-                        </div>
+                <h3 class="mb-3">Color Palette</h3>
+                <p>
+                    Our color system uses a thoughtful palette that communicates our brand identity while ensuring accessibility.
+                </p>
+                
+                <h4 class="mt-4">Primary Colors</h4>
+                <div class="mb-4">
+                    <div class="color-swatch" style="background-color: #0d6efd;">
+                        <span class="color-label text-white">Primary<br>#0d6efd</span>
                     </div>
-                    
-                    <div class="typography-sample">
-                        <div class="typography-example">
-                            <h2>Heading Level 2</h2>
-                        </div>
-                        <div class="typography-details">
-                            Font: var(--font-family-base, "Inter") | Size: var(--font-size-h2, 36px) | Weight: var(--weight-bold, 600)
-                        </div>
+                    <div class="color-swatch" style="background-color: #6610f2;">
+                        <span class="color-label text-white">Purple<br>#6610f2</span>
                     </div>
-                    
-                    <div class="typography-sample">
-                        <div class="typography-example">
-                            <h3>Heading Level 3</h3>
-                        </div>
-                        <div class="typography-details">
-                            Font: var(--font-family-base, "Inter") | Size: var(--font-size-h3, 28px) | Weight: var(--weight-bold, 600)
-                        </div>
+                    <div class="color-swatch" style="background-color: #0dcaf0;">
+                        <span class="color-label">Info<br>#0dcaf0</span>
                     </div>
-                    
-                    <div class="typography-sample">
-                        <div class="typography-example">
-                            <h4>Heading Level 4</h4>
-                        </div>
-                        <div class="typography-details">
-                            Font: var(--font-family-base, "Inter") | Size: var(--font-size-h4, 24px) | Weight: var(--weight-bold, 600)
-                        </div>
+                    <div class="color-swatch" style="background-color: #198754;">
+                        <span class="color-label text-white">Success<br>#198754</span>
+                    </div>
+                    <div class="color-swatch" style="background-color: #ffc107;">
+                        <span class="color-label">Warning<br>#ffc107</span>
+                    </div>
+                    <div class="color-swatch" style="background-color: #dc3545;">
+                        <span class="color-label text-white">Danger<br>#dc3545</span>
                     </div>
                 </div>
                 
-                <div class="design-system-subsection">
-                    <h3 class="h5 mb-3">Body Text</h3>
-                    
-                    <div class="typography-sample">
-                        <div class="typography-example">
-                            <p class="lead">Lead paragraph is used for introductory text. It's slightly larger and has a lighter font weight to stand out.</p>
-                        </div>
-                        <div class="typography-details">
-                            Font: var(--font-family-base, "Inter") | Size: 1.25rem | Weight: 300
-                        </div>
+                <h4 class="mt-4">Neutral Colors</h4>
+                <div class="mb-4">
+                    <div class="color-swatch" style="background-color: #f8f9fa;">
+                        <span class="color-label">Gray-100<br>#f8f9fa</span>
                     </div>
-                    
-                    <div class="typography-sample">
-                        <div class="typography-example">
-                            <p>Regular paragraph text is used for most body content. It should have good readability and be appropriately sized for reading long-form content.</p>
-                        </div>
-                        <div class="typography-details">
-                            Font: var(--font-family-base, "Inter") | Size: var(--font-size-body, 16px) | Weight: var(--weight-regular, 400)
-                        </div>
+                    <div class="color-swatch" style="background-color: #e9ecef;">
+                        <span class="color-label">Gray-200<br>#e9ecef</span>
                     </div>
-                    
-                    <div class="typography-sample">
-                        <div class="typography-example">
-                            <p class="small">Small text is used for less important information, captions, footnotes, etc.</p>
-                        </div>
-                        <div class="typography-details">
-                            Font: var(--font-family-base, "Inter") | Size: 0.875rem | Weight: var(--weight-regular, 400)
-                        </div>
+                    <div class="color-swatch" style="background-color: #dee2e6;">
+                        <span class="color-label">Gray-300<br>#dee2e6</span>
+                    </div>
+                    <div class="color-swatch" style="background-color: #adb5bd;">
+                        <span class="color-label">Gray-500<br>#adb5bd</span>
+                    </div>
+                    <div class="color-swatch" style="background-color: #6c757d;">
+                        <span class="color-label text-white">Gray-600<br>#6c757d</span>
+                    </div>
+                    <div class="color-swatch" style="background-color: #343a40;">
+                        <span class="color-label text-white">Gray-800<br>#343a40</span>
+                    </div>
+                    <div class="color-swatch" style="background-color: #212529;">
+                        <span class="color-label text-white">Gray-900<br>#212529</span>
                     </div>
                 </div>
-            </div>
-            
-            <!-- Spacing -->
-            <div class="design-system-section">
-                <h2 class="h3 mb-4">Spacing</h2>
                 
-                <div class="design-system-subsection">
-                    <h3 class="h5 mb-3">Spacing Scale</h3>
-                    
-                    <div class="row">
-                        <div class="col-md-3 mb-3">
-                            <div class="spacing-example p-0">
-                                <div class="p-1 bg-primary text-white">
-                                    Extra Small (XS): 4px
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <div class="spacing-example p-0">
-                                <div class="p-2 bg-primary text-white">
-                                    Small (SM): 8px
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <div class="spacing-example p-0">
-                                <div class="p-3 bg-primary text-white">
-                                    Medium (MD): 16px
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <div class="spacing-example p-0">
-                                <div class="p-4 bg-primary text-white">
-                                    Large (LG): 24px
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <div class="spacing-example p-0">
-                                <div class="p-5 bg-primary text-white">
-                                    Extra Large (XL): 32px
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Shadows -->
-            <div class="design-system-section">
-                <h2 class="h3 mb-4">Shadows</h2>
+                <h3 class="mt-5 mb-3">Typography</h3>
+                <p>
+                    Typography is a fundamental element of our design system, providing clarity and hierarchy.
+                </p>
                 
-                <div class="design-system-subsection">
-                    <h3 class="h5 mb-3">Shadow Scale</h3>
+                <div class="typography-demo">
+                    <h1>Heading 1 (2.5rem/40px)</h1>
+                    <h2>Heading 2 (2rem/32px)</h2>
+                    <h3>Heading 3 (1.75rem/28px)</h3>
+                    <h4>Heading 4 (1.5rem/24px)</h4>
+                    <h5>Heading 5 (1.25rem/20px)</h5>
+                    <h6>Heading 6 (1rem/16px)</h6>
                     
-                    <div class="row">
-                        <div class="col-md-3 mb-3">
-                            <div class="shadow-example shadow-sm">
-                                Small
-                            </div>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <div class="shadow-example shadow">
-                                Default
-                            </div>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <div class="shadow-example shadow-lg">
-                                Large
-                            </div>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <div class="shadow-example" style="box-shadow: var(--shadow-strong, 0 0 30px rgba(0, 229, 255, 0.4));">
-                                Glow
-                            </div>
-                        </div>
-                    </div>
+                    <p class="lead mt-4">
+                        Lead paragraph (1.25rem/20px). Used for introductory text that you want to emphasize.
+                    </p>
+                    
+                    <p>
+                        Regular paragraph (1rem/16px). The quick brown fox jumps over the lazy dog. This is the standard 
+                        paragraph style used throughout the application for body copy.
+                    </p>
+                    
+                    <p class="small">
+                        Small text (0.875rem/14px). Used for secondary information, helper text, and notes.
+                    </p>
                 </div>
             </div>
         </div>
         
-        <!-- Components Tab -->
+        <!-- Core Components -->
         <div class="tab-pane fade" id="nav-components" role="tabpanel" aria-labelledby="nav-components-tab">
-            <!-- Alerts & Notifications -->
             <div class="design-system-section">
-                <h2 class="h3 mb-4">Alerts & Notifications</h2>
+                <h2>Core Components</h2>
+                <p>
+                    TerraFusion uses a combination of standard Bootstrap components and custom components. 
+                    Here are some of our most commonly used components:
+                </p>
                 
-                <div class="design-system-subsection">
-                    <h3 class="h5 mb-3">Notification Toasts</h3>
-                    
-                    <div class="mb-4">
-                        <p>The TerraFusion platform uses a unified notification system for displaying toast notifications consistently across the application.</p>
-                        
-                        <div class="d-flex flex-wrap gap-2 mb-3">
-                            <button class="btn btn-success" onclick="terraFusionNotifications.success('Operation completed successfully')">Success Toast</button>
-                            <button class="btn btn-danger" onclick="terraFusionNotifications.error('An error occurred during the operation')">Error Toast</button>
-                            <button class="btn btn-warning" onclick="terraFusionNotifications.warning('This action may take a while to complete')">Warning Toast</button>
-                            <button class="btn btn-info" onclick="terraFusionNotifications.info('The system has been updated to version 2.1')">Info Toast</button>
-                        </div>
-                        
-                        <div class="component-example">
-                            <div class="component-preview">
-                                <div class="tf-toast tf-toast-success">
-                                    <div class="toast-header">
-                                        <i class="fas fa-check-circle text-success me-2"></i>
-                                        <strong class="me-auto">Success</strong>
-                                        <small>Now</small>
-                                        <button type="button" class="btn-close" aria-label="Close"></button>
-                                    </div>
-                                    <div class="toast-body">
-                                        Operation completed successfully
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="component-code">
-                                <pre>terraFusionNotifications.success('Operation completed successfully');</pre>
-                            </div>
-                        </div>
-                    </div>
+                <h3 class="mt-4 mb-3">Buttons</h3>
+                <div class="component-demo">
+                    <button type="button" class="btn btn-primary">Primary</button>
+                    <button type="button" class="btn btn-secondary">Secondary</button>
+                    <button type="button" class="btn btn-success">Success</button>
+                    <button type="button" class="btn btn-danger">Danger</button>
+                    <button type="button" class="btn btn-warning">Warning</button>
+                    <button type="button" class="btn btn-info">Info</button>
+                    <button type="button" class="btn btn-light">Light</button>
+                    <button type="button" class="btn btn-dark">Dark</button>
+                    <button type="button" class="btn btn-link">Link</button>
                 </div>
                 
-                <div class="design-system-subsection">
-                    <h3 class="h5 mb-3">Loading Indicators</h3>
-                    
-                    <div class="mb-4">
-                        <p>The TerraFusion platform uses standardized loading indicators to provide consistent feedback for all data operations.</p>
-                        
-                        <div class="d-flex flex-wrap gap-2 mb-3">
-                            <button class="btn btn-primary" id="showFullScreenLoading">Fullscreen Loading</button>
-                            <button class="btn btn-primary" id="showContainerLoading">Container Loading</button>
-                            <button class="btn btn-primary" id="showSkeletonLoading">Skeleton Loading</button>
-                        </div>
-                        
-                        <div class="component-example">
-                            <div class="component-preview">
-                                <div class="position-relative" style="height: 200px;" id="loadingDemoContainer">
-                                    <div class="card h-100">
-                                        <div class="card-body">
-                                            <h5 class="card-title">Loadable Content</h5>
-                                            <p class="card-text">This container can display a loading indicator overlay when data is being fetched or processed.</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="component-code">
-                                <pre>// Show loading indicator on a container
-const loadingId = terraFusionLoading.show('#myContainer', {
-  message: 'Loading data...',
-  spinnerColor: 'primary',
-  spinnerSize: 'lg'
-});
-
-// Hide loading indicator when done
-terraFusionLoading.hide(loadingId);</pre>
-                            </div>
-                        </div>
-                    </div>
+                <h4 class="mt-3 mb-2">Button Sizes</h4>
+                <div class="component-demo">
+                    <button type="button" class="btn btn-primary btn-lg">Large</button>
+                    <button type="button" class="btn btn-primary">Regular</button>
+                    <button type="button" class="btn btn-primary btn-sm">Small</button>
                 </div>
                 
-                <div class="design-system-subsection">
-                    <h3 class="h5 mb-3">Standard Alerts</h3>
-                    
-                    <div class="alert alert-success" role="alert">
-                        <h4 class="alert-heading"><i class="fas fa-check-circle me-2"></i>Success!</h4>
-                        <p>This operation has completed successfully. All data has been processed.</p>
-                    </div>
-                    
-                    <div class="alert alert-danger" role="alert">
-                        <h4 class="alert-heading"><i class="fas fa-exclamation-circle me-2"></i>Error!</h4>
-                        <p>An error occurred while processing your request. Please try again later.</p>
-                    </div>
-                    
-                    <div class="alert alert-warning" role="alert">
-                        <h4 class="alert-heading"><i class="fas fa-exclamation-triangle me-2"></i>Warning!</h4>
-                        <p>This action will permanently delete this data. This cannot be undone.</p>
-                    </div>
-                    
-                    <div class="alert alert-info" role="alert">
-                        <h4 class="alert-heading"><i class="fas fa-info-circle me-2"></i>Information</h4>
-                        <p>The system will be undergoing maintenance on April 30. Please save your work.</p>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- More component sections would go here -->
-        </div>
-        
-        <!-- Patterns Tab -->
-        <div class="tab-pane fade" id="nav-patterns" role="tabpanel" aria-labelledby="nav-patterns-tab">
-            <!-- Empty States -->
-            <div class="design-system-section">
-                <h2 class="h3 mb-4">Empty States</h2>
-                
-                <div class="design-system-subsection">
-                    <h3 class="h5 mb-3">No Data</h3>
-                    
-                    <div class="card">
-                        <div class="card-body text-center py-5">
-                            <div class="mb-4">
-                                <i class="fas fa-database fa-4x text-muted"></i>
-                            </div>
-                            <h3 class="h4 mb-3">No Data Available</h3>
-                            <p class="text-muted mb-4">There are no records matching your current criteria.</p>
-                            <button class="btn btn-primary">
-                                <i class="fas fa-plus me-2"></i> Add New Record
-                            </button>
-                        </div>
-                    </div>
+                <h4 class="mt-3 mb-2">Button States</h4>
+                <div class="component-demo">
+                    <button type="button" class="btn btn-primary">Normal</button>
+                    <button type="button" class="btn btn-primary active">Active</button>
+                    <button type="button" class="btn btn-primary" disabled>Disabled</button>
+                    <button type="button" class="btn btn-primary btn-loading">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                        Loading...
+                    </button>
                 </div>
                 
-                <div class="design-system-subsection">
-                    <h3 class="h5 mb-3">Empty Search Results</h3>
-                    
-                    <div class="card">
-                        <div class="card-body text-center py-5">
-                            <div class="mb-4">
-                                <i class="fas fa-search fa-4x text-muted"></i>
-                            </div>
-                            <h3 class="h4 mb-3">No Results Found</h3>
-                            <p class="text-muted mb-4">We couldn't find any results matching your search.</p>
-                            <div class="d-flex justify-content-center gap-2">
-                                <button class="btn btn-outline-secondary">
-                                    <i class="fas fa-eraser me-2"></i> Clear Filters
-                                </button>
-                                <button class="btn btn-primary">
-                                    <i class="fas fa-search me-2"></i> Try New Search
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Error States -->
-            <div class="design-system-section">
-                <h2 class="h3 mb-4">Error States</h2>
-                
-                <div class="design-system-subsection">
-                    <h3 class="h5 mb-3">Data Loading Error</h3>
-                    
-                    <div class="card border-danger">
-                        <div class="card-body text-center py-5">
-                            <div class="mb-4">
-                                <i class="fas fa-exclamation-triangle fa-4x text-danger"></i>
-                            </div>
-                            <h3 class="h4 mb-3">Failed to Load Data</h3>
-                            <p class="text-muted mb-4">There was a problem connecting to the server. Please try again later.</p>
-                            <div class="d-flex justify-content-center gap-2">
-                                <button class="btn btn-outline-secondary">
-                                    <i class="fas fa-arrow-left me-2"></i> Go Back
-                                </button>
-                                <button class="btn btn-primary">
-                                    <i class="fas fa-sync-alt me-2"></i> Retry
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="design-system-subsection">
-                    <h3 class="h5 mb-3">Validation Error</h3>
-                    
+                <h3 class="mt-4 mb-3">Forms</h3>
+                <div class="component-demo">
                     <form>
                         <div class="mb-3">
-                            <label for="exampleInputEmail" class="form-label">Email address</label>
-                            <input type="email" class="form-control is-invalid" id="exampleInputEmail" value="invalid-email">
-                            <div class="invalid-feedback">
-                                Please enter a valid email address.
+                            <label for="exampleInput1" class="form-label">Text Input</label>
+                            <input type="text" class="form-control" id="exampleInput1" placeholder="Enter text">
+                            <div class="form-text">Helper text provides additional guidance.</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="exampleSelect1" class="form-label">Select Menu</label>
+                            <select class="form-select" id="exampleSelect1">
+                                <option selected>Choose an option</option>
+                                <option value="1">Option One</option>
+                                <option value="2">Option Two</option>
+                                <option value="3">Option Three</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="exampleCheck1">
+                                <label class="form-check-label" for="exampleCheck1">Checkbox example</label>
                             </div>
                         </div>
+                        
                         <div class="mb-3">
-                            <label for="exampleInputName" class="form-label">Full Name</label>
-                            <input type="text" class="form-control" id="exampleInputName" value="John Doe">
-                        </div>
-                        <div class="mb-3">
-                            <label for="exampleInputPassword" class="form-label">Password</label>
-                            <input type="password" class="form-control is-invalid" id="exampleInputPassword" value="pass">
-                            <div class="invalid-feedback">
-                                Password must be at least 8 characters long.
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="flexSwitchCheckDefault">
+                                <label class="form-check-label" for="flexSwitchCheckDefault">Toggle switch</label>
                             </div>
                         </div>
-                        <button type="submit" class="btn btn-primary">Submit</button>
+                        
+                        <div class="mb-3">
+                            <label for="exampleRange" class="form-label">Range Input</label>
+                            <input type="range" class="form-range" id="exampleRange">
+                        </div>
                     </form>
                 </div>
+                
+                <h3 class="mt-4 mb-3">Cards</h3>
+                <div class="component-demo">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    Simple Card
+                                </div>
+                                <div class="card-body">
+                                    <h5 class="card-title">Card Title</h5>
+                                    <p class="card-text">This is a basic card with a header, body, and footer.</p>
+                                </div>
+                                <div class="card-footer text-muted">
+                                    Card Footer
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100">
+                                <img src="https://via.placeholder.com/300x150" class="card-img-top" alt="Placeholder image">
+                                <div class="card-body">
+                                    <h5 class="card-title">Card with Image</h5>
+                                    <p class="card-text">This card includes an image at the top and an action button.</p>
+                                    <button class="btn btn-primary">Action</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100 bg-light">
+                                <div class="card-body">
+                                    <h5 class="card-title">Information Card</h5>
+                                    <p class="card-text">A simple card with a light background for informational content.</p>
+                                    <ul class="list-group list-group-flush mb-3">
+                                        <li class="list-group-item bg-light">Item One</li>
+                                        <li class="list-group-item bg-light">Item Two</li>
+                                    </ul>
+                                    <a href="#" class="card-link">Card link</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <h3 class="mt-4 mb-3">Alerts</h3>
+                <div class="component-demo">
+                    <div class="alert alert-primary" role="alert">
+                        A primary alert for information that's not critical.
+                    </div>
+                    <div class="alert alert-success" role="alert">
+                        A success alert indicating a positive action.
+                    </div>
+                    <div class="alert alert-warning" role="alert">
+                        A warning alert to highlight something that needs attention.
+                    </div>
+                    <div class="alert alert-danger" role="alert">
+                        A danger alert for critical or error information.
+                    </div>
+                    <div class="alert alert-info" role="alert">
+                        <h4 class="alert-heading">Complex Alert</h4>
+                        <p>This alert includes multiple elements and a dismissible option.</p>
+                        <hr>
+                        <p class="mb-0">Additional information can be added as needed.</p>
+                        <button type="button" class="btn-close float-end" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                </div>
             </div>
-            
-            <!-- More pattern sections would go here -->
         </div>
         
-        <!-- Accessibility Tab -->
-        <div class="tab-pane fade" id="nav-accessibility" role="tabpanel" aria-labelledby="nav-accessibility-tab">
+        <!-- Notifications -->
+        <div class="tab-pane fade" id="nav-notifications" role="tabpanel" aria-labelledby="nav-notifications-tab">
             <div class="design-system-section">
-                <h2 class="h3 mb-4">Accessibility Guidelines</h2>
+                <h2>Notification System</h2>
+                <p>
+                    The TerraFusion Notification System provides a consistent way to display 
+                    notifications, alerts, and messages to users.
+                </p>
                 
-                <div class="alert alert-info" role="alert">
-                    <h4 class="alert-heading"><i class="fas fa-universal-access me-2"></i>Accessibility First</h4>
-                    <p>The TerraFusion Platform is designed with accessibility in mind. All components should meet WCAG 2.1 AA standards.</p>
+                <div class="component-controls">
+                    <h4>Try it:</h4>
+                    <button type="button" class="btn btn-info" id="showInfoNotification">
+                        Show Info Notification
+                    </button>
+                    <button type="button" class="btn btn-success" id="showSuccessNotification">
+                        Show Success Notification
+                    </button>
+                    <button type="button" class="btn btn-warning" id="showWarningNotification">
+                        Show Warning Notification
+                    </button>
+                    <button type="button" class="btn btn-danger" id="showErrorNotification">
+                        Show Error Notification
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="showPersistentNotification">
+                        Show Persistent Notification
+                    </button>
                 </div>
                 
-                <div class="design-system-subsection">
-                    <h3 class="h5 mb-3">Color Contrast</h3>
-                    
-                    <p>All text should have sufficient contrast with its background to ensure readability. The minimum contrast ratios are:</p>
-                    
-                    <ul>
-                        <li>Normal text: 4.5:1</li>
-                        <li>Large text (18pt or 14pt bold): 3:1</li>
-                        <li>UI components and graphics: 3:1</li>
-                    </ul>
-                    
-                    <div class="row mt-4">
-                        <div class="col-md-6 mb-3">
-                            <div class="card">
-                                <div class="card-header bg-success text-white">
-                                    <strong>Good Example: 7:1 ratio</strong>
-                                </div>
-                                <div class="card-body">
-                                    <p class="text-dark">This text has good contrast with the background, making it easy to read for most users.</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <div class="card">
-                                <div class="card-header bg-danger text-white">
-                                    <strong>Poor Example: 2:1 ratio</strong>
-                                </div>
-                                <div class="card-body">
-                                    <p class="text-secondary" style="color: #aaaaaa !important;">This text has poor contrast with the background, making it difficult to read for many users.</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                <h3 class="mt-4 mb-3">Usage</h3>
+                <div class="component-code">
+<pre>// Show a notification
+terraFusionNotifications.info('Information message');
+terraFusionNotifications.success('Success message');
+terraFusionNotifications.warning('Warning message');
+terraFusionNotifications.error('Error message');
+
+// Show a notification with options
+terraFusionNotifications.show({
+  message: 'Custom notification',
+  type: 'info', // 'info', 'success', 'warning', 'error'
+  icon: 'fas fa-info-circle',
+  duration: 5000, // milliseconds
+  closable: true,
+  position: 'top-right', // 'top-right', 'top-left', 'bottom-right', 'bottom-left'
+  animationDuration: 300 // milliseconds
+});</pre>
                 </div>
                 
-                <div class="design-system-subsection">
-                    <h3 class="h5 mb-3">Keyboard Navigation</h3>
-                    
-                    <p>All interactive elements should be accessible via keyboard navigation. This includes:</p>
-                    
-                    <ul>
-                        <li>Using <code>Tab</code> to navigate between elements</li>
-                        <li>Using <code>Space</code> or <code>Enter</code> to activate buttons</li>
-                        <li>Using arrow keys to navigate within components like selects and date pickers</li>
-                        <li>Providing visible focus indicators</li>
-                    </ul>
-                    
-                    <div class="d-flex flex-wrap gap-2 mt-4">
-                        <button class="btn btn-primary">Focusable Button 1</button>
-                        <button class="btn btn-secondary">Focusable Button 2</button>
-                        <button class="btn btn-success">Focusable Button 3</button>
-                    </div>
+                <h3 class="mt-4 mb-3">Common Use Cases</h3>
+                <ul>
+                    <li><strong>Success:</strong> After successful form submission, data saving, or operation completion</li>
+                    <li><strong>Error:</strong> When an operation fails or validation errors occur</li>
+                    <li><strong>Warning:</strong> For potential issues or attention-needed scenarios</li>
+                    <li><strong>Info:</strong> For general information, tips, or updates</li>
+                </ul>
+                
+                <h3 class="mt-4 mb-3">Accessibility Considerations</h3>
+                <ul>
+                    <li>Notifications are announced to screen readers</li>
+                    <li>Color is not the only way to convey the notification type</li>
+                    <li>Notifications can be dismissed with keyboard</li>
+                    <li>Notifications do not interfere with keyboard navigation</li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Loading -->
+        <div class="tab-pane fade" id="nav-loading" role="tabpanel" aria-labelledby="nav-loading-tab">
+            <div class="design-system-section">
+                <h2>Loading Indicators</h2>
+                <p>
+                    Loading indicators provide visual feedback when content is being loaded or an operation is in progress.
+                </p>
+                
+                <div class="component-controls">
+                    <h4>Try it:</h4>
+                    <button type="button" class="btn btn-primary" id="showPageLoader">
+                        Show Page Loader (2s)
+                    </button>
+                    <button type="button" class="btn btn-primary" id="showContainerLoader">
+                        Show Container Loader (2s)
+                    </button>
+                    <button type="button" class="btn btn-primary" id="showButtonLoader">
+                        Show Button Loader (2s)
+                    </button>
+                    <button type="button" class="btn btn-primary" id="showSkeletonLoader">
+                        Show Skeleton Loader (2s)
+                    </button>
                 </div>
                 
-                <div class="design-system-subsection">
-                    <h3 class="h5 mb-3">Screen Reader Support</h3>
-                    
-                    <p>All content should be accessible to screen readers. This includes:</p>
-                    
-                    <ul>
-                        <li>Using semantic HTML elements</li>
-                        <li>Providing alt text for images</li>
-                        <li>Using ARIA attributes where necessary</li>
-                        <li>Ensuring dynamic content changes are announced</li>
-                    </ul>
-                    
-                    <div class="card mt-4">
-                        <div class="card-header">
-                            Example of Screen Reader Announcements
-                        </div>
+                <div class="my-4" id="loaderDemoContainer">
+                    <div class="card">
                         <div class="card-body">
-                            <p>When you click the button below, a notification will be shown and announced to screen readers:</p>
-                            <button class="btn btn-primary" onclick="terraFusionNotifications.info('This message is announced to screen readers')">
-                                Show Accessible Notification
-                            </button>
+                            <h5 class="card-title">Loader Demo Container</h5>
+                            <p class="card-text">This container will display a loader when the button above is clicked.</p>
                         </div>
                     </div>
                 </div>
+                
+                <div class="my-4" id="skeletonDemoContainer">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Skeleton Loader Demo</h5>
+                            <p class="card-text">This will display a skeleton loader when the button above is clicked.</p>
+                            <table class="table" id="skeletonTable">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Name</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>1</td>
+                                        <td>Sample Data</td>
+                                        <td>Active</td>
+                                    </tr>
+                                    <tr>
+                                        <td>2</td>
+                                        <td>Another Entry</td>
+                                        <td>Inactive</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <h3 class="mt-4 mb-3">Usage</h3>
+                <div class="component-code">
+<pre>// Show a page loader
+terraFusionLoaders.showPageLoader();
+
+// Show a container loader
+terraFusionLoaders.showContainerLoader('containerElementId', {
+  message: 'Loading data...',
+  size: 'md', // 'sm', 'md', 'lg'
+  overlay: true,
+  spinner: 'border' // 'border', 'grow'
+});
+
+// Show a button loader
+terraFusionLoaders.showButtonLoader('buttonElementId', {
+  disableButton: true,
+  originalText: 'Click Me',
+  loadingText: 'Loading...'
+});
+
+// Show a skeleton loader
+terraFusionLoaders.showSkeletonLoader('tableElementId', {
+  rows: 5,
+  columns: 3
+});
+
+// Hide loaders
+terraFusionLoaders.hidePageLoader();
+terraFusionLoaders.hideContainerLoader('containerElementId');
+terraFusionLoaders.hideButtonLoader('buttonElementId');
+terraFusionLoaders.hideSkeletonLoader('tableElementId');</pre>
+                </div>
+                
+                <h3 class="mt-4 mb-3">Best Practices</h3>
+                <ul>
+                    <li>Show a loader for any operation that takes more than 300ms</li>
+                    <li>Use skeleton loaders for content-heavy components</li>
+                    <li>Include meaningful loading messages to describe what's happening</li>
+                    <li>Ensure loading indicators are accessible and properly announced to screen readers</li>
+                    <li>Use appropriate loader sizes based on the context</li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Error Handling -->
+        <div class="tab-pane fade" id="nav-errors" role="tabpanel" aria-labelledby="nav-errors-tab">
+            <div class="design-system-section">
+                <h2>Error Handling</h2>
+                <p>
+                    The Error Handling System provides a consistent approach to displaying and managing errors across the application.
+                </p>
+                
+                <div class="component-controls">
+                    <h4>Try it:</h4>
+                    <button type="button" class="btn btn-danger" id="showSimpleError">
+                        Show Simple Error
+                    </button>
+                    <button type="button" class="btn btn-danger" id="showDetailedError">
+                        Show Detailed Error
+                    </button>
+                    <button type="button" class="btn btn-danger" id="showValidationError">
+                        Show Validation Error
+                    </button>
+                    <button type="button" class="btn btn-danger" id="showApiError">
+                        Show API Error
+                    </button>
+                    <button type="button" class="btn btn-danger" id="triggerGlobalError">
+                        Trigger Global Error
+                    </button>
+                </div>
+                
+                <div class="my-4 p-3 border rounded" id="errorDemoContainer">
+                    <h5>Error Demo Container</h5>
+                    <p>This container will display various error messages when the buttons above are clicked.</p>
+                </div>
+                
+                <div id="global-error-container"></div>
+                
+                <h3 class="mt-4 mb-3">Usage</h3>
+                <div class="component-code">
+<pre>// Show a simple error
+terraFusionErrors.showError('containerElementId', 'Error message');
+
+// Show a detailed error
+terraFusionErrors.showError('containerElementId', 'Error message', {
+  details: 'Detailed error information or stack trace',
+  source: 'API Endpoint',
+  onRetry: function() {
+    // Code to retry the operation
+  },
+  onDismiss: function() {
+    // Code to run when error is dismissed
+  }
+});
+
+// Show an API error
+terraFusionErrors.showApiError('containerElementId', errorObject);
+
+// Show a validation error
+terraFusionErrors.showValidationError('containerElementId', {
+  field1: 'Error message for field1',
+  field2: 'Error message for field2'
+});
+
+// Show a not found error
+terraFusionErrors.showNotFoundError('containerElementId', 'User', '123');
+
+// Show an authorization error
+terraFusionErrors.showAuthorizationError('containerElementId', 'You do not have permission to perform this action');
+
+// Clear errors
+terraFusionErrors.clearErrors('containerElementId');
+terraFusionErrors.clearAllErrors();</pre>
+                </div>
+                
+                <h3 class="mt-4 mb-3">Error States</h3>
+                <ul>
+                    <li><strong>Simple Errors:</strong> Brief messages with minimal details</li>
+                    <li><strong>Detailed Errors:</strong> Errors with additional context and retry options</li>
+                    <li><strong>Validation Errors:</strong> Field-specific errors from form validation</li>
+                    <li><strong>API Errors:</strong> Errors from backend API calls with response details</li>
+                    <li><strong>Authorization Errors:</strong> Permission or access-related errors</li>
+                    <li><strong>Not Found Errors:</strong> Resource not found errors with resource type and ID</li>
+                </ul>
+                
+                <h3 class="mt-4 mb-3">Best Practices</h3>
+                <ul>
+                    <li>Provide clear, actionable error messages</li>
+                    <li>Include retry options when appropriate</li>
+                    <li>Make error messages accessible to screen readers</li>
+                    <li>For technical errors, show user-friendly messages but provide details for troubleshooting</li>
+                    <li>Group related errors together instead of showing multiple separate errors</li>
+                    <li>Ensure error components don't interfere with the user's ability to recover</li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Data States -->
+        <div class="tab-pane fade" id="nav-data-states" role="tabpanel" aria-labelledby="nav-data-states-tab">
+            <div class="design-system-section">
+                <h2>Data State Management</h2>
+                <p>
+                    The Data State Manager provides a consistent approach to managing and displaying data states 
+                    across the application.
+                </p>
+                
+                <div class="component-controls">
+                    <h4>Try it:</h4>
+                    <button type="button" class="btn btn-primary" id="dataStateInitial">
+                        Initial
+                    </button>
+                    <button type="button" class="btn btn-info" id="dataStateLoading">
+                        Loading
+                    </button>
+                    <button type="button" class="btn btn-success" id="dataStateSuccess">
+                        Success
+                    </button>
+                    <button type="button" class="btn btn-danger" id="dataStateError">
+                        Error
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="dataStateEmpty">
+                        Empty
+                    </button>
+                    <button type="button" class="btn btn-warning" id="dataStateModified">
+                        Modified
+                    </button>
+                    <button type="button" class="btn btn-primary" id="dataStateSaving">
+                        Saving
+                    </button>
+                    <button type="button" class="btn btn-dark" id="dataStateOffline">
+                        Offline
+                    </button>
+                </div>
+                
+                <div class="my-4" id="dataStateDemoContainer">
+                    <h5>Data State Demo</h5>
+                    <p>Click the buttons above to see different data states in action.</p>
+                    <table class="table" id="dataStateTable">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>1</td>
+                                <td>Sample Data</td>
+                                <td>Active</td>
+                            </tr>
+                            <tr>
+                                <td>2</td>
+                                <td>Another Entry</td>
+                                <td>Inactive</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <h3 class="mt-4 mb-3">Usage</h3>
+                <div class="component-code">
+<pre>// Register a container for data state management
+const dataManager = terraFusionDataStates.register('containerElementId', {
+  // Optional custom states and transitions
+  states: {
+    // Custom state definitions
+    customState: {
+      icon: 'fas fa-custom-icon',
+      title: 'Custom State',
+      message: 'Custom state message',
+      showInToolbar: true,
+      actionLabel: 'Action',
+      actionIcon: 'fas fa-action'
+    }
+  },
+  transitions: {
+    // Custom state transitions
+    success: ['customState']
+  },
+  stateDisplayOptions: {
+    showToolbar: true,
+    showPlaceholder: true,
+    toolbarPosition: 'top',
+    toolbarStyle: 'standard',
+    animateTransitions: true,
+    announceStateChanges: true
+  },
+  callbacks: {
+    onStateChange: function(newState, oldState, data) {
+      console.log(`State changed from ${oldState} to ${newState}`);
+    },
+    onAction: function(state, data) {
+      console.log(`Action clicked for state: ${state}`);
+    }
+  }
+});
+
+// Set data state
+dataManager.setState('loading', 'Loading user data...');
+dataManager.setState('success', { name: 'John Doe', id: 123 });
+dataManager.setState('error', 'Failed to load data');
+
+// Get current state and data
+const currentState = dataManager.getState();
+const currentData = dataManager.getData();
+
+// Check if a transition is valid
+if (dataManager.isValidTransition('modified')) {
+  dataManager.setState('modified');
+}
+
+// Reset to initial state
+dataManager.reset();
+
+// Start loading with a promise-like interface
+dataManager.startLoading('Loading data...')
+  .success(responseData)
+  .error(errorObject);</pre>
+                </div>
+                
+                <h3 class="mt-4 mb-3">Data States</h3>
+                <ul>
+                    <li><strong>Initial:</strong> Ready to load data</li>
+                    <li><strong>Loading:</strong> Data is being fetched or processed</li>
+                    <li><strong>Success:</strong> Data loaded successfully</li>
+                    <li><strong>Error:</strong> An error occurred while loading data</li>
+                    <li><strong>Empty:</strong> No data is available</li>
+                    <li><strong>Modified:</strong> Data has been modified but not saved</li>
+                    <li><strong>Saving:</strong> Data is being saved</li>
+                    <li><strong>Syncing:</strong> Data is being synchronized with server</li>
+                    <li><strong>Offline:</strong> Working in offline mode</li>
+                    <li><strong>Stale:</strong> Data may be outdated</li>
+                    <li><strong>Filtered:</strong> Data is being filtered</li>
+                    <li><strong>Partial:</strong> Only partial data is loaded</li>
+                </ul>
+                
+                <h3 class="mt-4 mb-3">Best Practices</h3>
+                <ul>
+                    <li>Always show the current data state to users</li>
+                    <li>Use consistent state transitions throughout the application</li>
+                    <li>Provide clear actions for states that require user intervention</li>
+                    <li>Ensure state changes are accessible and properly announced to screen readers</li>
+                    <li>Use appropriate loading states for long-running operations</li>
+                    <li>Connect data state management to forms and tables for automatic state handling</li>
+                </ul>
             </div>
         </div>
     </div>
@@ -705,72 +820,208 @@ terraFusionLoading.hide(loadingId);</pre>
 
 {% block scripts %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Dark mode toggle
-        const darkModeToggle = document.getElementById('darkModeToggle');
-        if (darkModeToggle) {
-            // Set initial state
-            if (document.body.classList.contains('dark-mode') || 
-                localStorage.getItem('dark-mode') === 'true') {
-                darkModeToggle.checked = true;
-                document.body.classList.add('dark-mode');
-            }
-            
-            // Handle toggle
-            darkModeToggle.addEventListener('change', function() {
-                document.body.classList.toggle('dark-mode');
-                localStorage.setItem('dark-mode', 
-                    document.body.classList.contains('dark-mode'));
-            });
-        }
-        
-        // Loading indicator demos
-        const loadingDemoContainer = document.getElementById('loadingDemoContainer');
-        
-        document.getElementById('showFullScreenLoading').addEventListener('click', function() {
-            const loadingId = terraFusionLoading.showFullscreen({
-                message: 'Loading application data...',
-                spinnerSize: 'lg'
-            });
-            
-            setTimeout(function() {
-                terraFusionLoading.hide(loadingId);
-            }, 3000);
-        });
-        
-        document.getElementById('showContainerLoading').addEventListener('click', function() {
-            const loadingId = terraFusionLoading.show('#loadingDemoContainer', {
-                message: 'Loading content...'
-            });
-            
-            setTimeout(function() {
-                terraFusionLoading.hide(loadingId);
-            }, 3000);
-        });
-        
-        document.getElementById('showSkeletonLoading').addEventListener('click', function() {
-            loadingDemoContainer.innerHTML = `
-                <div class="card h-100">
-                    <div class="card-body">
-                        <div class="tf-skeleton tf-skeleton-text w-50 mb-4"></div>
-                        <div class="tf-skeleton tf-skeleton-text w-100 mb-2"></div>
-                        <div class="tf-skeleton tf-skeleton-text w-100 mb-2"></div>
-                        <div class="tf-skeleton tf-skeleton-text w-75"></div>
-                    </div>
-                </div>
-            `;
-            
-            setTimeout(function() {
-                loadingDemoContainer.innerHTML = `
-                    <div class="card h-100">
-                        <div class="card-body">
-                            <h5 class="card-title">Loadable Content</h5>
-                            <p class="card-text">This container can display a loading indicator overlay when data is being fetched or processed.</p>
-                        </div>
-                    </div>
-                `;
-            }, 3000);
-        });
+  document.addEventListener('DOMContentLoaded', function() {
+    // Notification Demos
+    document.getElementById('showInfoNotification').addEventListener('click', function() {
+      terraFusionNotifications.info('This is an information notification');
     });
+    
+    document.getElementById('showSuccessNotification').addEventListener('click', function() {
+      terraFusionNotifications.success('Operation completed successfully');
+    });
+    
+    document.getElementById('showWarningNotification').addEventListener('click', function() {
+      terraFusionNotifications.warning('Please review your changes before proceeding');
+    });
+    
+    document.getElementById('showErrorNotification').addEventListener('click', function() {
+      terraFusionNotifications.error('An error occurred while processing your request');
+    });
+    
+    document.getElementById('showPersistentNotification').addEventListener('click', function() {
+      terraFusionNotifications.show({
+        message: 'This notification will not auto-dismiss',
+        type: 'info',
+        duration: 0,
+        closable: true
+      });
+    });
+    
+    // Loading Indicator Demos
+    document.getElementById('showPageLoader').addEventListener('click', function() {
+      terraFusionLoaders.showPageLoader();
+      setTimeout(function() {
+        terraFusionLoaders.hidePageLoader();
+      }, 2000);
+    });
+    
+    document.getElementById('showContainerLoader').addEventListener('click', function() {
+      terraFusionLoaders.showContainerLoader('loaderDemoContainer', {
+        message: 'Loading container data...'
+      });
+      setTimeout(function() {
+        terraFusionLoaders.hideContainerLoader('loaderDemoContainer');
+      }, 2000);
+    });
+    
+    document.getElementById('showButtonLoader').addEventListener('click', function() {
+      const btn = document.getElementById('showButtonLoader');
+      terraFusionLoaders.showButtonLoader('showButtonLoader', {
+        disableButton: true,
+        originalText: btn.textContent,
+        loadingText: 'Loading...'
+      });
+      setTimeout(function() {
+        terraFusionLoaders.hideButtonLoader('showButtonLoader');
+      }, 2000);
+    });
+    
+    document.getElementById('showSkeletonLoader').addEventListener('click', function() {
+      const table = document.getElementById('skeletonTable');
+      terraFusionLoaders.showSkeletonLoader('skeletonTable', {
+        rows: 3,
+        columns: 3
+      });
+      setTimeout(function() {
+        terraFusionLoaders.hideSkeletonLoader('skeletonTable');
+      }, 2000);
+    });
+    
+    // Error Handling Demos
+    document.getElementById('showSimpleError').addEventListener('click', function() {
+      terraFusionErrors.showError('errorDemoContainer', 'A simple error occurred');
+    });
+    
+    document.getElementById('showDetailedError').addEventListener('click', function() {
+      terraFusionErrors.showError('errorDemoContainer', 'A detailed error occurred', {
+        details: 'Error ID: ERR12345\nTimestamp: ' + new Date().toISOString() + '\nMore details about this error can be found in the logs.',
+        source: 'DataProcessingService',
+        onRetry: function() {
+          terraFusionNotifications.info('Retrying operation...');
+          terraFusionErrors.clearErrors('errorDemoContainer');
+        }
+      });
+    });
+    
+    document.getElementById('showValidationError').addEventListener('click', function() {
+      terraFusionErrors.showValidationError('errorDemoContainer', {
+        'username': 'Username must be at least 5 characters long',
+        'email': 'Please enter a valid email address',
+        'password': 'Password must contain at least one number and one uppercase letter'
+      });
+    });
+    
+    document.getElementById('showApiError').addEventListener('click', function() {
+      const mockResponse = {
+        status: 403,
+        statusText: 'Forbidden',
+        headers: {
+          get: function(name) {
+            if (name === 'content-type') return 'application/json';
+            return '';
+          }
+        },
+        clone: function() {
+          return {
+            json: function() {
+              return Promise.resolve({
+                error: 'Access Denied',
+                message: 'You do not have permission to access this resource',
+                code: 'PERMISSION_DENIED',
+                requestId: 'req-12345'
+              });
+            },
+            text: function() {
+              return Promise.resolve(JSON.stringify({
+                error: 'Access Denied',
+                message: 'You do not have permission to access this resource',
+                code: 'PERMISSION_DENIED',
+                requestId: 'req-12345'
+              }));
+            }
+          };
+        }
+      };
+      
+      terraFusionErrors.showApiError('errorDemoContainer', mockResponse);
+    });
+    
+    document.getElementById('triggerGlobalError').addEventListener('click', function() {
+      // Create a custom error event
+      const errorEvent = new CustomEvent('tf:error', {
+        detail: {
+          message: 'A global error occurred',
+          details: 'This is a global error that should be handled by the global error handler',
+          source: 'Design System Demo'
+        }
+      });
+      document.dispatchEvent(errorEvent);
+    });
+    
+    // Data State Management Demos
+    const dataStateManager = terraFusionDataStates.register('dataStateDemoContainer', {
+      callbacks: {
+        onAction: function(state) {
+          terraFusionNotifications.info(`Action clicked for state: ${state}`);
+          
+          if (state === 'empty') {
+            dataStateManager.setState('loading', 'Loading data...');
+            setTimeout(function() {
+              dataStateManager.setState('success');
+            }, 1500);
+          } else if (state === 'error') {
+            dataStateManager.setState('loading', 'Retrying...');
+            setTimeout(function() {
+              dataStateManager.setState('success');
+            }, 1500);
+          } else if (state === 'modified') {
+            dataStateManager.setState('saving', 'Saving changes...');
+            setTimeout(function() {
+              dataStateManager.setState('success', 'Changes saved successfully');
+              terraFusionNotifications.success('Changes saved successfully');
+            }, 1500);
+          } else if (state === 'offline') {
+            dataStateManager.setState('syncing', 'Connecting and syncing data...');
+            setTimeout(function() {
+              dataStateManager.setState('success', 'Connected and synced successfully');
+              terraFusionNotifications.success('Connected successfully');
+            }, 1500);
+          }
+        }
+      }
+    });
+    
+    document.getElementById('dataStateInitial').addEventListener('click', function() {
+      dataStateManager.setState('initial');
+    });
+    
+    document.getElementById('dataStateLoading').addEventListener('click', function() {
+      dataStateManager.setState('loading', 'Loading data...');
+    });
+    
+    document.getElementById('dataStateSuccess').addEventListener('click', function() {
+      dataStateManager.setState('success', 'Data loaded successfully');
+    });
+    
+    document.getElementById('dataStateError').addEventListener('click', function() {
+      dataStateManager.setState('error', 'Failed to load data from server');
+    });
+    
+    document.getElementById('dataStateEmpty').addEventListener('click', function() {
+      dataStateManager.setState('empty', 'No data available');
+    });
+    
+    document.getElementById('dataStateModified').addEventListener('click', function() {
+      dataStateManager.setState('modified', 'Data has been modified');
+    });
+    
+    document.getElementById('dataStateSaving').addEventListener('click', function() {
+      dataStateManager.setState('saving', 'Saving changes...');
+    });
+    
+    document.getElementById('dataStateOffline').addEventListener('click', function() {
+      dataStateManager.setState('offline', 'Working in offline mode');
+    });
+  });
 </script>
 {% endblock %}
