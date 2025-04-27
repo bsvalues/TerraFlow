@@ -1174,6 +1174,12 @@ def test_scenario(scenario_type):
     scenario = scenarios[scenario_type]
     return render_template('testing/scenario.html', scenario=scenario)
 
+@app.route('/design-system')
+@login_required
+def design_system():
+    """TerraFusion Design System documentation"""
+    return render_template('design_system.html')
+
 # Register template filters
 try:
     from template_filters import register_template_filters
