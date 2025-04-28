@@ -85,6 +85,7 @@
                     <button class="nav-link" id="nav-loading-tab" data-bs-toggle="tab" data-bs-target="#nav-loading" type="button" role="tab" aria-controls="nav-loading" aria-selected="false">Loading</button>
                     <button class="nav-link" id="nav-errors-tab" data-bs-toggle="tab" data-bs-target="#nav-errors" type="button" role="tab" aria-controls="nav-errors" aria-selected="false">Error Handling</button>
                     <button class="nav-link" id="nav-data-states-tab" data-bs-toggle="tab" data-bs-target="#nav-data-states" type="button" role="tab" aria-controls="nav-data-states" aria-selected="false">Data States</button>
+                    <button class="nav-link" id="nav-form-validation-tab" data-bs-toggle="tab" data-bs-target="#nav-form-validation" type="button" role="tab" aria-controls="nav-form-validation" aria-selected="false">Form Validation</button>
                 </div>
             </nav>
         </div>
@@ -814,6 +815,318 @@ dataManager.startLoading('Loading data...')
                 </ul>
             </div>
         </div>
+
+        <!-- Form Validation -->
+        <div class="tab-pane fade" id="nav-form-validation" role="tabpanel" aria-labelledby="nav-form-validation-tab">
+            <div class="design-system-section">
+                <h2>Form Validation</h2>
+                <p>
+                    The Form Validation System provides a consistent approach to form validation across the application.
+                </p>
+                
+                <div class="component-controls">
+                    <h4>Try it:</h4>
+                    <button type="button" class="btn btn-primary" id="showBasicValidation">
+                        Basic Validation Demo
+                    </button>
+                    <button type="button" class="btn btn-primary" id="showComplexValidation">
+                        Complex Validation Demo
+                    </button>
+                    <button type="button" class="btn btn-primary" id="showInlineValidation">
+                        Inline Validation Demo
+                    </button>
+                    <button type="button" class="btn btn-danger" id="resetValidationForm">
+                        Reset Forms
+                    </button>
+                </div>
+                
+                <div class="my-4 p-4 border rounded" id="validationDemoContainer">
+                    <!-- Basic Validation Form -->
+                    <div id="basicValidationForm" style="display: none;">
+                        <h4>Basic Validation Form</h4>
+                        <form id="simpleForm" class="needs-validation" novalidate>
+                            <div class="mb-3">
+                                <label for="simpleUsername" class="form-label">Username</label>
+                                <input type="text" class="form-control" id="simpleUsername" name="username" required>
+                                <div class="invalid-feedback">
+                                    Please enter a username.
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="simpleEmail" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="simpleEmail" name="email" required>
+                                <div class="invalid-feedback">
+                                    Please enter a valid email address.
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="simplePassword" class="form-label">Password</label>
+                                <input type="password" class="form-control" id="simplePassword" name="password" required>
+                                <div class="invalid-feedback">
+                                    Please enter a password.
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Submit</button>
+                        </form>
+                    </div>
+                    
+                    <!-- Complex Validation Form -->
+                    <div id="complexValidationForm" style="display: none;">
+                        <h4>Complex Validation Form</h4>
+                        <form id="advancedForm" class="needs-validation" novalidate>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="firstName" class="form-label">First Name</label>
+                                    <input type="text" class="form-control" id="firstName" name="firstName" required>
+                                    <div class="invalid-feedback">
+                                        First name is required.
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="lastName" class="form-label">Last Name</label>
+                                    <input type="text" class="form-control" id="lastName" name="lastName" required>
+                                    <div class="invalid-feedback">
+                                        Last name is required.
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="complexEmail" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="complexEmail" name="email" required>
+                                <div class="invalid-feedback">
+                                    Please enter a valid email address.
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="phone" class="form-label">Phone Number</label>
+                                <input type="tel" class="form-control" id="phone" name="phone" pattern="[0-9]{3}-[0-9]{3}-[0-9]{4}" placeholder="123-456-7890">
+                                <div class="invalid-feedback">
+                                    Please enter a valid phone number (format: 123-456-7890).
+                                </div>
+                                <div class="form-text">Format: 123-456-7890</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="password" class="form-label">Password</label>
+                                <input type="password" class="form-control" id="password" name="password" required minlength="8">
+                                <div class="invalid-feedback">
+                                    Password must be at least 8 characters.
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="confirmPassword" class="form-label">Confirm Password</label>
+                                <input type="password" class="form-control" id="confirmPassword" name="confirmPassword" required>
+                                <div class="invalid-feedback">
+                                    Passwords do not match.
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="ageRange" class="form-label">Age Range</label>
+                                <select class="form-select" id="ageRange" name="ageRange" required>
+                                    <option value="">Select an age range</option>
+                                    <option value="18-24">18-24</option>
+                                    <option value="25-34">25-34</option>
+                                    <option value="35-44">35-44</option>
+                                    <option value="45-54">45-54</option>
+                                    <option value="55+">55+</option>
+                                </select>
+                                <div class="invalid-feedback">
+                                    Please select an age range.
+                                </div>
+                            </div>
+                            <div class="mb-3 form-check">
+                                <input type="checkbox" class="form-check-input" id="terms" name="terms" required>
+                                <label class="form-check-label" for="terms">I agree to the terms and conditions</label>
+                                <div class="invalid-feedback">
+                                    You must agree before submitting.
+                                </div>
+                            </div>
+                            <div class="tf-validation-error-container" id="complexFormErrors" style="display: none;"></div>
+                            <button type="submit" class="btn btn-primary">Submit</button>
+                        </form>
+                    </div>
+                    
+                    <!-- Inline Validation Form -->
+                    <div id="inlineValidationForm" style="display: none;">
+                        <h4>Inline Validation Form</h4>
+                        <form id="inlineForm" class="needs-validation" novalidate>
+                            <div class="row g-3 align-items-center mb-3">
+                                <div class="col-auto">
+                                    <label for="inlineUsername" class="col-form-label">Username</label>
+                                </div>
+                                <div class="col-auto">
+                                    <input type="text" id="inlineUsername" name="username" class="form-control" required>
+                                </div>
+                                <div class="col-auto">
+                                    <span class="form-text">
+                                        Must be 3-20 characters long.
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="row g-3 align-items-center mb-3">
+                                <div class="col-auto">
+                                    <label for="inlineEmail" class="col-form-label">Email</label>
+                                </div>
+                                <div class="col-auto">
+                                    <input type="email" id="inlineEmail" name="email" class="form-control" required>
+                                </div>
+                                <div class="col-auto">
+                                    <span class="form-text">
+                                        Enter a valid email address.
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="row g-3 align-items-center mb-3">
+                                <div class="col-auto">
+                                    <label for="inlineAge" class="col-form-label">Age</label>
+                                </div>
+                                <div class="col-auto">
+                                    <input type="number" id="inlineAge" name="age" class="form-control" min="18" max="100" required>
+                                </div>
+                                <div class="col-auto">
+                                    <span class="form-text">
+                                        Must be between 18-100.
+                                    </span>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Submit</button>
+                        </form>
+                    </div>
+                </div>
+                
+                <h3 class="mt-4 mb-3">Usage</h3>
+                <div class="component-code">
+<pre>// Register a form for validation
+const formValidator = terraFusionForms.register('myFormId', {
+  validateOnInput: true,
+  validateOnBlur: true,
+  validateOnSubmit: true,
+  showValidationMessages: true,
+  preventSubmitOnError: true,
+  scrollToFirstError: true,
+  customErrorContainer: null,
+  errorClass: 'is-invalid',
+  successClass: 'is-valid'
+}, {
+  // Validation rules for form fields
+  username: {
+    required: true,
+    minLength: 3,
+    maxLength: 20
+  },
+  email: {
+    required: true,
+    email: true
+  },
+  password: {
+    required: true,
+    minLength: 8,
+    pattern: '^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).*$'
+  },
+  confirmPassword: {
+    required: true,
+    equalTo: '#password'
+  }
+});
+
+// Validate the entire form
+const isValid = formValidator.validate();
+
+// Validate a specific field
+formValidator.validateField('username');
+
+// Check if form has errors
+if (formValidator.hasErrors()) {
+  console.log(formValidator.getErrors());
+}
+
+// Reset validation state
+formValidator.reset();
+
+// Add custom validator
+formValidator.addValidator('customRule', {
+  validate: function(value, param) {
+    // Return true if valid, false if invalid
+    return value.toString().includes(param);
+  },
+  message: 'Value must include "{0}"'
+});</pre>
+                </div>
+                
+                <h3 class="mt-4 mb-3">Default Validators</h3>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Description</th>
+                            <th>Example</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>required</code></td>
+                            <td>Field must have a value</td>
+                            <td><code>required: true</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>email</code></td>
+                            <td>Field must be a valid email address</td>
+                            <td><code>email: true</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>minLength</code></td>
+                            <td>Field must have at least specified number of characters</td>
+                            <td><code>minLength: 8</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>maxLength</code></td>
+                            <td>Field must have no more than specified number of characters</td>
+                            <td><code>maxLength: 50</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>pattern</code></td>
+                            <td>Field must match the specified regex pattern</td>
+                            <td><code>pattern: '\\d{3}-\\d{3}-\\d{4}'</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>numeric</code></td>
+                            <td>Field must be a valid number</td>
+                            <td><code>numeric: true</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>integer</code></td>
+                            <td>Field must be a valid integer</td>
+                            <td><code>integer: true</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>min</code></td>
+                            <td>Field value must be greater than or equal to the specified value</td>
+                            <td><code>min: 18</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>max</code></td>
+                            <td>Field value must be less than or equal to the specified value</td>
+                            <td><code>max: 100</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>equalTo</code></td>
+                            <td>Field value must be equal to the value of another field</td>
+                            <td><code>equalTo: '#password'</code></td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <h3 class="mt-4 mb-3">Best Practices</h3>
+                <ul>
+                    <li>Provide clear, actionable error messages</li>
+                    <li>Validate in real-time for immediate user feedback</li>
+                    <li>Group related validation errors together for better understanding</li>
+                    <li>Use appropriate validation rules for different types of fields</li>
+                    <li>Include helper text to guide users on expected input format</li>
+                    <li>Ensure validation is accessible to all users including those using screen readers</li>
+                    <li>Provide visual cues (like colors and icons) but don't rely solely on them</li>
+                </ul>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -1022,6 +1335,184 @@ dataManager.startLoading('Loading data...')
     document.getElementById('dataStateOffline').addEventListener('click', function() {
       dataStateManager.setState('offline', 'Working in offline mode');
     });
+    
+    // Form Validation Demos
+    if (document.getElementById('showBasicValidation')) {
+      document.getElementById('showBasicValidation').addEventListener('click', function() {
+        document.getElementById('basicValidationForm').style.display = 'block';
+        document.getElementById('complexValidationForm').style.display = 'none';
+        document.getElementById('inlineValidationForm').style.display = 'none';
+        
+        // Initialize basic form validation
+        const simpleFormValidator = terraFusionForms.register('simpleForm', {
+          validateOnInput: true,
+          validateOnBlur: true
+        }, {
+          username: {
+            required: true,
+            minLength: 3
+          },
+          email: {
+            required: true,
+            email: true
+          },
+          password: {
+            required: true,
+            minLength: 6
+          }
+        });
+        
+        // Set up form submission
+        document.getElementById('simpleForm').addEventListener('submit', function(e) {
+          e.preventDefault();
+          
+          if (simpleFormValidator.validate()) {
+            terraFusionNotifications.success('Form submitted successfully!');
+          } else {
+            terraFusionNotifications.error('Please fix the validation errors.');
+          }
+        });
+      });
+    }
+    
+    if (document.getElementById('showComplexValidation')) {
+      document.getElementById('showComplexValidation').addEventListener('click', function() {
+        document.getElementById('basicValidationForm').style.display = 'none';
+        document.getElementById('complexValidationForm').style.display = 'block';
+        document.getElementById('inlineValidationForm').style.display = 'none';
+        
+        // Initialize complex form validation
+        const advancedFormValidator = terraFusionForms.register('advancedForm', {
+          validateOnInput: true,
+          validateOnBlur: true,
+          customErrorContainer: '#complexFormErrors'
+        }, {
+          firstName: {
+            required: true
+          },
+          lastName: {
+            required: true
+          },
+          email: {
+            required: true,
+            email: true
+          },
+          phone: {
+            pattern: '[0-9]{3}-[0-9]{3}-[0-9]{4}'
+          },
+          password: {
+            required: true,
+            minLength: 8,
+            pattern: {
+              value: '^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).*$',
+              message: 'Password must contain at least one lowercase letter, one uppercase letter, and one number'
+            }
+          },
+          confirmPassword: {
+            required: true,
+            equalTo: '#password'
+          },
+          ageRange: {
+            required: true
+          },
+          terms: {
+            required: true
+          }
+        });
+        
+        // Set up form submission
+        document.getElementById('advancedForm').addEventListener('submit', function(e) {
+          e.preventDefault();
+          
+          if (advancedFormValidator.validate()) {
+            terraFusionNotifications.success('Form submitted successfully!');
+          } else {
+            terraFusionNotifications.error('Please fix the validation errors.');
+          }
+        });
+        
+        // Add custom validation for confirm password
+        document.getElementById('confirmPassword').addEventListener('input', function() {
+          const password = document.getElementById('password').value;
+          const confirmPassword = this.value;
+          
+          if (password !== confirmPassword) {
+            advancedFormValidator.setRules({
+              confirmPassword: {
+                required: true,
+                equalTo: {
+                  value: '#password',
+                  message: 'Passwords do not match'
+                }
+              }
+            });
+          }
+        });
+      });
+    }
+    
+    if (document.getElementById('showInlineValidation')) {
+      document.getElementById('showInlineValidation').addEventListener('click', function() {
+        document.getElementById('basicValidationForm').style.display = 'none';
+        document.getElementById('complexValidationForm').style.display = 'none';
+        document.getElementById('inlineValidationForm').style.display = 'block';
+        
+        // Initialize inline form validation
+        const inlineFormValidator = terraFusionForms.register('inlineForm', {
+          validateOnInput: true,
+          validateOnBlur: true,
+          showValidationMessages: true
+        }, {
+          username: {
+            required: true,
+            minLength: 3,
+            maxLength: 20
+          },
+          email: {
+            required: true,
+            email: true
+          },
+          age: {
+            required: true,
+            numeric: true,
+            min: 18,
+            max: 100
+          }
+        });
+        
+        // Set up form submission
+        document.getElementById('inlineForm').addEventListener('submit', function(e) {
+          e.preventDefault();
+          
+          if (inlineFormValidator.validate()) {
+            terraFusionNotifications.success('Form submitted successfully!');
+          } else {
+            terraFusionNotifications.error('Please fix the validation errors.');
+          }
+        });
+      });
+    }
+    
+    if (document.getElementById('resetValidationForm')) {
+      document.getElementById('resetValidationForm').addEventListener('click', function() {
+        document.getElementById('basicValidationForm').style.display = 'none';
+        document.getElementById('complexValidationForm').style.display = 'none';
+        document.getElementById('inlineValidationForm').style.display = 'none';
+        
+        // Reset all forms
+        if (document.getElementById('simpleForm')) {
+          document.getElementById('simpleForm').reset();
+        }
+        if (document.getElementById('advancedForm')) {
+          document.getElementById('advancedForm').reset();
+        }
+        if (document.getElementById('inlineForm')) {
+          document.getElementById('inlineForm').reset();
+        }
+        
+        terraFusionNotifications.info('All forms have been reset');
+      });
+    }
   });
 </script>
 {% endblock %}
