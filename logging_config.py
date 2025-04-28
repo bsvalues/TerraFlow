@@ -97,13 +97,42 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):
                 'username': record.username
             }
         
+        # Add database info if available
+        if hasattr(record, 'db_operation'):
+            log_record['database'] = {
+                'operation': record.db_operation,
+                'table': getattr(record, 'db_table', None),
+                'query': getattr(record, 'db_query', None),
+                'duration_ms': getattr(record, 'db_duration_ms', None)
+            }
+        
+        # Add feature info if available
+        if hasattr(record, 'feature'):
+            log_record['feature'] = record.feature
+        
         # Add exception info if available
         if record.exc_info:
+            exception_type = record.exc_info[0].__name__
+            exception_msg = str(record.exc_info[1])
+            exception_traceback = traceback.format_exception(*record.exc_info)
+            
             log_record['exception'] = {
-                'type': record.exc_info[0].__name__,
-                'message': str(record.exc_info[1]),
-                'traceback': traceback.format_exception(*record.exc_info)
+                'type': exception_type,
+                'message': exception_msg,
+                'traceback': exception_traceback
             }
+            
+            # Add more detailed info for specific exception types
+            if 'SQLAlchemy' in exception_type or 'DatabaseError' in exception_type or 'OperationalError' in exception_type:
+                log_record['exception']['category'] = 'database'
+                
+                # Extract connection details if available (but sanitize credentials)
+                if hasattr(record, 'db_connection_info'):
+                    conn_info = record.db_connection_info
+                    # Remove sensitive information
+                    if isinstance(conn_info, dict) and 'password' in conn_info:
+                        conn_info['password'] = '***'
+                    log_record['exception']['connection_info'] = conn_info
 
 def get_development_config() -> Dict[str, Any]:
     """

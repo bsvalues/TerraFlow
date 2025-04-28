@@ -98,17 +98,27 @@ else:
             logger.info("Using standard database connection for development (SQLite)")
             app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///benton_gis.db"
 
+# Determine if SSL should be required based on environment
+use_ssl = os.environ.get("DB_USE_SSL", "").lower() in ("true", "1", "yes")
+db_connect_args = {
+    "application_name": "BCBSGeoAssessmentPro",
+    "keepalives": 1,
+    "keepalives_idle": 30,
+    "keepalives_interval": 10,
+    "keepalives_count": 5
+}
+
+# Only add sslmode if SSL is enabled
+if use_ssl:
+    db_connect_args["sslmode"] = "require"
+    logger.info("Database SSL mode: require")
+else:
+    logger.info("Database SSL mode: disable")
+
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_recycle": 300,
     "pool_pre_ping": True,
-    "connect_args": {
-        "sslmode": "require",
-        "application_name": "BCBSGeoAssessmentPro",
-        "keepalives": 1,
-        "keepalives_idle": 30,
-        "keepalives_interval": 10,
-        "keepalives_count": 5
-    }
+    "connect_args": db_connect_args
 }
 
 # Configure file uploads
@@ -130,6 +140,14 @@ os.makedirs(temp_upload_dir, exist_ok=True)
 
 # Initialize the database
 db.init_app(app)
+
+# Setup database error handler
+try:
+    from db_error_handler import setup_error_handler
+    db_error_handler = setup_error_handler(db)
+    logger.info("Database error handler initialized successfully")
+except ImportError as e:
+    logger.warning(f"Database error handler not available: {str(e)}")
 
 # Configure Flask-Migrate
 from flask_migrate import Migrate

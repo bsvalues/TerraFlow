@@ -31,7 +31,8 @@ class AgentConfigManager:
         self._load_config()
         
     def _load_config(self):
-        """Load configuration from a JSON file if available"""
+        """Load configuration from environment variables and JSON file if available"""
+        # First try to load from JSON file if it exists
         if os.path.exists(self.config_file):
             try:
                 with open(self.config_file, "r") as f:
@@ -40,6 +41,45 @@ class AgentConfigManager:
                 logger.info(f"Loaded agent configuration from {self.config_file}")
             except Exception as e:
                 logger.error(f"Error loading agent config file {self.config_file}: {str(e)}")
+                
+        # Then override with environment variables if they exist
+        self._load_from_environment()
+        
+    def _load_from_environment(self):
+        """Load configuration from environment variables"""
+        # Timeout configuration
+        if "AGENT_TIMEOUT_SECONDS" in os.environ:
+            try:
+                self.config["timeout_seconds"] = int(os.environ["AGENT_TIMEOUT_SECONDS"])
+                logger.info(f"Using timeout from environment: {self.config['timeout_seconds']} seconds")
+            except ValueError:
+                logger.warning(f"Invalid AGENT_TIMEOUT_SECONDS value: {os.environ['AGENT_TIMEOUT_SECONDS']}")
+                
+        if "AGENT_WARNING_INTERVAL" in os.environ:
+            try:
+                self.config["warning_interval"] = int(os.environ["AGENT_WARNING_INTERVAL"])
+                logger.info(f"Using warning interval from environment: {self.config['warning_interval']} seconds")
+            except ValueError:
+                logger.warning(f"Invalid AGENT_WARNING_INTERVAL value: {os.environ['AGENT_WARNING_INTERVAL']}")
+                
+        # Warning and auto-restart configuration
+        if "AGENT_DISABLE_WARNINGS" in os.environ:
+            disable_warnings = os.environ["AGENT_DISABLE_WARNINGS"].lower() in ("true", "1", "yes")
+            self.config["disable_timeout_warnings"] = disable_warnings
+            logger.info(f"{'Disabled' if disable_warnings else 'Enabled'} agent timeout warnings from environment")
+            
+        if "AGENT_AUTO_RESTART" in os.environ:
+            auto_restart = os.environ["AGENT_AUTO_RESTART"].lower() in ("true", "1", "yes")
+            self.config["auto_restart_on_timeout"] = auto_restart
+            logger.info(f"{'Enabled' if auto_restart else 'Disabled'} agent auto-restart from environment")
+            
+        # Enabled agents configuration
+        if "AGENT_ENABLED_TYPES" in os.environ:
+            enabled_types = os.environ["AGENT_ENABLED_TYPES"].split(",")
+            enabled_types = [agent_type.strip() for agent_type in enabled_types if agent_type.strip()]
+            if enabled_types:
+                self.config["enabled_agents"] = enabled_types
+                logger.info(f"Enabled agent types from environment: {', '.join(enabled_types)}")
                 
     def save_config(self):
         """Save current configuration to the config file"""
