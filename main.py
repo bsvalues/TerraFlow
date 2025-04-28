@@ -50,7 +50,18 @@ except Exception as e:
 
 # Import and initialize the Flask app
 from app import app  # noqa: F401
+
+# Import and register routes
 from mobile_routes import register_mobile_routes
+
+# Register UI components routes
+try:
+    logger.info("Registering UI components routes")
+    from ui_components_routes import register_ui_components_routes
+    register_ui_components_routes(app)
+    logger.info("UI components routes registered successfully")
+except ImportError as e:
+    logger.warning(f"Could not register UI components routes: {str(e)}")
 
 # Register mobile routes
 register_mobile_routes(app)

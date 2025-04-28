@@ -1,573 +1,569 @@
 /**
  * TerraFusion Form Validation System
- * Provides a consistent approach to form validation across the application
+ * A comprehensive form validation system for TerraFusion applications
  */
 
-class FormValidationSystem {
-  constructor() {
-    this.forms = new Map();
-    this.defaultOptions = {
-      validateOnInput: true,
-      validateOnBlur: true,
-      validateOnSubmit: true,
-      showValidationMessages: true,
-      preventSubmitOnError: true,
-      scrollToFirstError: true,
-      customErrorContainer: null,
-      errorClass: 'is-invalid',
-      successClass: 'is-valid',
-      errorMessageClass: 'invalid-feedback',
-      successMessageClass: 'valid-feedback'
-    };
-    
-    this.defaultValidators = {
-      required: {
-        validate: function(value) {
-          if (Array.isArray(value)) {
-            return value.length > 0;
-          }
-          return value !== null && value !== undefined && value.toString().trim() !== '';
-        },
-        message: 'This field is required'
-      },
-      email: {
-        validate: function(value) {
-          if (!value) return true; // Skip empty values, use required for those
-          const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-          return emailRegex.test(value);
-        },
-        message: 'Please enter a valid email address'
-      },
-      minLength: {
-        validate: function(value, length) {
-          if (!value) return true; // Skip empty values, use required for those
-          return value.toString().length >= length;
-        },
-        message: function(length) {
-          return `Please enter at least ${length} characters`;
-        }
-      },
-      maxLength: {
-        validate: function(value, length) {
-          if (!value) return true; // Skip empty values
-          return value.toString().length <= length;
-        },
-        message: function(length) {
-          return `Please enter no more than ${length} characters`;
-        }
-      },
-      pattern: {
-        validate: function(value, pattern) {
-          if (!value) return true; // Skip empty values, use required for those
-          const regex = new RegExp(pattern);
-          return regex.test(value);
-        },
-        message: 'Please match the requested format'
-      },
-      numeric: {
-        validate: function(value) {
-          if (!value) return true; // Skip empty values, use required for those
-          return !isNaN(parseFloat(value)) && isFinite(value);
-        },
-        message: 'Please enter a valid number'
-      },
-      integer: {
-        validate: function(value) {
-          if (!value) return true; // Skip empty values, use required for those
-          return /^-?\d+$/.test(value);
-        },
-        message: 'Please enter a valid integer'
-      },
-      min: {
-        validate: function(value, min) {
-          if (!value) return true; // Skip empty values, use required for those
-          const num = parseFloat(value);
-          return !isNaN(num) && num >= min;
-        },
-        message: function(min) {
-          return `Please enter a value greater than or equal to ${min}`;
-        }
-      },
-      max: {
-        validate: function(value, max) {
-          if (!value) return true; // Skip empty values, use required for those
-          const num = parseFloat(value);
-          return !isNaN(num) && num <= max;
-        },
-        message: function(max) {
-          return `Please enter a value less than or equal to ${max}`;
-        }
-      },
-      equalTo: {
-        validate: function(value, targetSelector) {
-          if (!value) return true; // Skip empty values, use required for those
-          const targetElement = document.querySelector(targetSelector);
-          return targetElement && value === targetElement.value;
-        },
-        message: function(targetSelector) {
-          const targetElement = document.querySelector(targetSelector);
-          const targetLabel = targetElement ? 
-            targetElement.previousElementSibling?.textContent || 'specified field' : 
-            'specified field';
-          return `This field must match the ${targetLabel}`;
-        }
-      },
-      date: {
-        validate: function(value) {
-          if (!value) return true; // Skip empty values, use required for those
-          return !isNaN(Date.parse(value));
-        },
-        message: 'Please enter a valid date'
-      }
-    };
-  }
+const terraFusionForms = (function() {
+  'use strict';
   
-  /**
-   * Register a form for validation
-   * @param {string} formId - The ID of the form to validate
-   * @param {object} options - Validation options
-   * @param {object} rules - Validation rules for form fields
-   * @returns {object} - The validation interface for this form
-   */
-  register(formId, options = {}, rules = {}) {
-    const form = document.getElementById(formId);
-    if (!form) {
-      console.error(`Form with ID ${formId} not found`);
-      return null;
+  // Store registered forms and their validators
+  const registeredForms = new Map();
+  
+  // Default validation rules
+  const defaultValidators = {
+    required: {
+      validate: function(value) {
+        if (typeof value === 'string') {
+          return value.trim().length > 0;
+        }
+        return value !== null && value !== undefined && value !== '';
+      },
+      message: 'This field is required'
+    },
+    email: {
+      validate: function(value) {
+        if (!value) return true; // Skip if empty (use required for that)
+        const pattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        return pattern.test(value);
+      },
+      message: 'Please enter a valid email address'
+    },
+    minLength: {
+      validate: function(value, param) {
+        if (!value) return true; // Skip if empty
+        return value.length >= param;
+      },
+      message: 'Please enter at least {0} characters'
+    },
+    maxLength: {
+      validate: function(value, param) {
+        if (!value) return true; // Skip if empty
+        return value.length <= param;
+      },
+      message: 'Please enter no more than {0} characters'
+    },
+    pattern: {
+      validate: function(value, param) {
+        if (!value) return true; // Skip if empty
+        // If param is an object with a value property, use that
+        const pattern = typeof param === 'object' ? new RegExp(param.value) : new RegExp(param);
+        return pattern.test(value);
+      },
+      message: 'Please enter a valid value'
+    },
+    numeric: {
+      validate: function(value) {
+        if (!value) return true; // Skip if empty
+        return !isNaN(parseFloat(value)) && isFinite(value);
+      },
+      message: 'Please enter a valid number'
+    },
+    integer: {
+      validate: function(value) {
+        if (!value) return true; // Skip if empty
+        return Number.isInteger(Number(value));
+      },
+      message: 'Please enter a valid integer'
+    },
+    min: {
+      validate: function(value, param) {
+        if (!value) return true; // Skip if empty
+        return Number(value) >= param;
+      },
+      message: 'Please enter a value greater than or equal to {0}'
+    },
+    max: {
+      validate: function(value, param) {
+        if (!value) return true; // Skip if empty
+        return Number(value) <= param;
+      },
+      message: 'Please enter a value less than or equal to {0}'
+    },
+    equalTo: {
+      validate: function(value, param) {
+        if (!value) return true; // Skip if empty
+        const targetElement = document.querySelector(param);
+        return targetElement ? value === targetElement.value : true;
+      },
+      message: 'Values must match'
+    },
+    date: {
+      validate: function(value) {
+        if (!value) return true; // Skip if empty
+        return !isNaN(Date.parse(value));
+      },
+      message: 'Please enter a valid date'
+    },
+    url: {
+      validate: function(value) {
+        if (!value) return true; // Skip if empty
+        try {
+          new URL(value);
+          return true;
+        } catch (e) {
+          return false;
+        }
+      },
+      message: 'Please enter a valid URL'
+    }
+  };
+  
+  // Create Form Validator class
+  class FormValidator {
+    constructor(formId, options, rules) {
+      this.formId = formId;
+      this.form = document.getElementById(formId);
+      this.options = Object.assign({
+        validateOnInput: false,
+        validateOnBlur: true,
+        validateOnSubmit: true,
+        showValidationMessages: true,
+        preventSubmitOnError: true,
+        scrollToFirstError: true,
+        customErrorContainer: null,
+        errorClass: 'is-invalid',
+        successClass: 'is-valid'
+      }, options);
+      
+      this.rules = rules || {};
+      this.validators = { ...defaultValidators };
+      this.errors = new Map();
+      
+      this.init();
     }
     
-    // Merge default and custom options
-    const mergedOptions = { ...this.defaultOptions, ...options };
+    init() {
+      if (!this.form) {
+        console.error(`Form with ID "${this.formId}" not found.`);
+        return;
+      }
+      
+      // Add CSS classes for Bootstrap validation
+      this.form.classList.add('needs-validation');
+      this.form.setAttribute('novalidate', '');
+      
+      // Set up event listeners
+      this.setupEventListeners();
+    }
     
-    // Set up validation rules
-    const validationRules = rules;
-    
-    // Store form info
-    const formInfo = {
-      element: form,
-      options: mergedOptions,
-      rules: validationRules,
-      errors: new Map(),
-      validators: { ...this.defaultValidators }
-    };
-    
-    this.forms.set(formId, formInfo);
-    
-    // Set up event listeners
-    this._setupEventListeners(formId);
-    
-    // Create validation interface for this form
-    const validationInterface = this._createValidationInterface(formId);
-    
-    return validationInterface;
-  }
-  
-  /**
-   * Set up event listeners for a form
-   * @param {string} formId - The ID of the form to set up
-   * @private
-   */
-  _setupEventListeners(formId) {
-    const formInfo = this.forms.get(formId);
-    if (!formInfo) return;
-    
-    const { element, options, rules } = formInfo;
-    
-    // Handle form submission
-    if (options.validateOnSubmit) {
-      element.addEventListener('submit', (event) => {
-        const isValid = this.validateForm(formId);
-        
-        if (!isValid && options.preventSubmitOnError) {
-          event.preventDefault();
+    setupEventListeners() {
+      const self = this;
+      
+      // Form submit event
+      if (this.options.validateOnSubmit) {
+        this.form.addEventListener('submit', function(e) {
+          const isValid = self.validate();
           
-          if (options.scrollToFirstError) {
-            const firstErrorField = element.querySelector('.' + options.errorClass);
-            if (firstErrorField) {
-              firstErrorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              firstErrorField.focus();
+          if (!isValid && self.options.preventSubmitOnError) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            if (self.options.scrollToFirstError) {
+              const firstErrorField = self.form.querySelector(`.${self.options.errorClass}`);
+              if (firstErrorField) {
+                firstErrorField.focus();
+                firstErrorField.scrollIntoView({
+                  behavior: 'smooth',
+                  block: 'center'
+                });
+              }
             }
           }
-        }
-      });
-    }
-    
-    // Add validation handlers to individual fields
-    for (const fieldName in rules) {
-      if (rules.hasOwnProperty(fieldName)) {
-        const field = element.querySelector(`[name="${fieldName}"]`);
-        if (!field) continue;
-        
-        // Validate on input change
-        if (options.validateOnInput) {
-          field.addEventListener('input', () => {
-            this.validateField(formId, fieldName);
-          });
-        }
-        
-        // Validate on blur
-        if (options.validateOnBlur) {
-          field.addEventListener('blur', () => {
-            this.validateField(formId, fieldName);
-          });
-        }
+        });
       }
-    }
-  }
-  
-  /**
-   * Create a validation interface for a specific form
-   * @param {string} formId - The ID of the form
-   * @returns {object} - The validation interface
-   * @private
-   */
-  _createValidationInterface(formId) {
-    return {
-      validate: () => this.validateForm(formId),
-      validateField: (fieldName) => this.validateField(formId, fieldName),
-      getErrors: () => this.getFormErrors(formId),
-      hasErrors: () => this.hasFormErrors(formId),
-      reset: () => this.resetValidation(formId),
-      clearErrors: () => this.clearFormErrors(formId),
-      setRules: (rules) => this.setValidationRules(formId, rules),
-      addValidator: (name, validator) => this.addCustomValidator(formId, name, validator)
-    };
-  }
-  
-  /**
-   * Validate an entire form
-   * @param {string} formId - The ID of the form to validate
-   * @returns {boolean} - True if the form is valid, false otherwise
-   */
-  validateForm(formId) {
-    const formInfo = this.forms.get(formId);
-    if (!formInfo) return false;
-    
-    const { rules } = formInfo;
-    let isValid = true;
-    
-    // Clear previous errors
-    this.clearFormErrors(formId);
-    
-    // Validate each field
-    for (const fieldName in rules) {
-      if (rules.hasOwnProperty(fieldName)) {
-        const fieldIsValid = this.validateField(formId, fieldName);
-        isValid = isValid && fieldIsValid;
+      
+      // Field-level validation on input
+      if (this.options.validateOnInput) {
+        this.form.addEventListener('input', function(e) {
+          const field = e.target;
+          const fieldName = field.name;
+          
+          if (fieldName && self.rules[fieldName]) {
+            self.validateField(fieldName);
+          }
+        });
+      }
+      
+      // Field-level validation on blur
+      if (this.options.validateOnBlur) {
+        this.form.addEventListener('blur', function(e) {
+          const field = e.target;
+          const fieldName = field.name;
+          
+          if (fieldName && self.rules[fieldName]) {
+            self.validateField(fieldName);
+          }
+        }, true);
       }
     }
     
-    // Show errors in custom container if specified
-    if (!isValid && formInfo.options.customErrorContainer) {
-      const errors = this.getFormErrors(formId);
-      this._displayCustomErrors(formId, errors);
+    validate() {
+      // Reset previous errors
+      this.errors.clear();
+      
+      // Reset form validation state
+      this.form.classList.remove('was-validated');
+      
+      const formFields = this.form.elements;
+      let isValid = true;
+      
+      // Validate all fields with rules
+      for (const fieldName in this.rules) {
+        if (!this.validateField(fieldName)) {
+          isValid = false;
+        }
+      }
+      
+      // Add was-validated class to show validation state
+      if (this.options.showValidationMessages) {
+        this.form.classList.add('was-validated');
+      }
+      
+      // Display errors in custom container if specified
+      if (this.options.customErrorContainer && this.errors.size > 0) {
+        this.displayErrorsInContainer();
+      }
+      
+      return isValid;
     }
     
-    // If integrated with our error handling system, show errors there
-    if (!isValid && window.terraFusionErrors && !formInfo.options.customErrorContainer) {
-      const errors = this.getFormErrors(formId);
-      const errorObj = {};
+    validateField(fieldName) {
+      const field = this.form.elements[fieldName];
+      if (!field) return true; // Skip if field not found
       
-      errors.forEach((error, field) => {
-        errorObj[field] = error;
-      });
+      const fieldRules = this.rules[fieldName];
+      if (!fieldRules) return true; // Skip if no rules for this field
       
-      window.terraFusionErrors.showValidationError(formId, errorObj);
-    }
-    
-    return isValid;
-  }
-  
-  /**
-   * Validate a specific field
-   * @param {string} formId - The ID of the form
-   * @param {string} fieldName - The name of the field to validate
-   * @returns {boolean} - True if the field is valid, false otherwise
-   */
-  validateField(formId, fieldName) {
-    const formInfo = this.forms.get(formId);
-    if (!formInfo) return false;
-    
-    const { element, rules, validators, options } = formInfo;
-    const field = element.querySelector(`[name="${fieldName}"]`);
-    
-    if (!field || !rules[fieldName]) return true;
-    
-    // Get field value
-    let fieldValue;
-    if (field.type === 'checkbox') {
-      fieldValue = field.checked;
-    } else if (field.type === 'radio') {
-      const checkedRadio = element.querySelector(`[name="${fieldName}"]:checked`);
-      fieldValue = checkedRadio ? checkedRadio.value : '';
-    } else if (field.type === 'file') {
-      fieldValue = field.files;
-    } else if (field.multiple) {
-      fieldValue = Array.from(field.selectedOptions).map(option => option.value);
-    } else {
-      fieldValue = field.value;
-    }
-    
-    // Run validation rules
-    const fieldRules = rules[fieldName];
-    let isValid = true;
-    let errorMessage = '';
-    
-    for (const ruleKey in fieldRules) {
-      if (!fieldRules.hasOwnProperty(ruleKey)) continue;
+      // Get field value
+      let value = field.type === 'checkbox' ? field.checked : field.value;
       
-      const ruleValue = fieldRules[ruleKey];
-      const validator = validators[ruleKey];
+      // Remove previous validation state
+      field.classList.remove(this.options.errorClass);
+      field.classList.remove(this.options.successClass);
       
-      if (!validator) continue;
+      // Find or create feedback elements
+      let invalidFeedback = this.findOrCreateFeedback(field, 'invalid');
       
-      let isRuleValid;
-      if (ruleKey === 'custom' && typeof ruleValue === 'function') {
-        // Custom validator function
-        isRuleValid = ruleValue(fieldValue, field);
-      } else if (validator.validate) {
-        // Standard validator
-        isRuleValid = validator.validate(fieldValue, ruleValue);
+      let isFieldValid = true;
+      let errorMessages = [];
+      
+      // Validate against each rule
+      for (const ruleName in fieldRules) {
+        const ruleValue = fieldRules[ruleName];
+        
+        // Skip if rule value is not truthy (allows conditional validation)
+        if (!ruleValue) continue;
+        
+        const validator = this.validators[ruleName];
+        if (!validator) {
+          console.warn(`Unknown validator: ${ruleName}`);
+          continue;
+        }
+        
+        // Get the rule parameter (could be a value or an object with value and message)
+        const ruleParam = typeof ruleValue === 'object' && ruleValue !== null ? 
+          ruleValue.value : ruleValue;
+        
+        // Validate the field
+        const isValid = validator.validate(value, ruleParam);
+        
+        if (!isValid) {
+          isFieldValid = false;
+          
+          // Get custom message if provided
+          let errorMessage = typeof ruleValue === 'object' && ruleValue !== null && ruleValue.message ? 
+            ruleValue.message : validator.message;
+          
+          // Replace any parameters in the message
+          if (typeof ruleParam !== 'object' && ruleParam !== null) {
+            errorMessage = errorMessage.replace('{0}', ruleParam);
+          }
+          
+          errorMessages.push(errorMessage);
+        }
+      }
+      
+      // Update validation state
+      if (!isFieldValid) {
+        // Add error class
+        field.classList.add(this.options.errorClass);
+        
+        // Update feedback message
+        if (invalidFeedback && errorMessages.length > 0) {
+          invalidFeedback.textContent = errorMessages[0]; // Show first error
+        }
+        
+        // Store errors
+        this.errors.set(fieldName, errorMessages);
       } else {
-        isRuleValid = true;
+        // Add success class
+        field.classList.add(this.options.successClass);
       }
       
-      if (!isRuleValid) {
-        isValid = false;
-        
-        if (typeof ruleValue === 'object' && ruleValue.message) {
-          // Custom message in the rule
-          errorMessage = ruleValue.message;
-        } else if (typeof validator.message === 'function') {
-          // Dynamic message from validator
-          errorMessage = validator.message(ruleValue);
-        } else {
-          // Static message from validator
-          errorMessage = validator.message;
+      return isFieldValid;
+    }
+    
+    findOrCreateFeedback(field, type) {
+      const fieldId = field.id || field.name;
+      const feedbackClass = `${type}-feedback`;
+      
+      // Try to find existing feedback element
+      let feedback = field.nextElementSibling;
+      
+      if (feedback && feedback.classList.contains(feedbackClass)) {
+        return feedback;
+      } else {
+        // Check if there's a container (form-group, etc.)
+        const container = field.closest('.form-group, .mb-3');
+        if (container) {
+          feedback = container.querySelector(`.${feedbackClass}`);
+          if (feedback) {
+            return feedback;
+          }
         }
+      }
+      
+      // Don't create new elements if not showing messages
+      if (!this.options.showValidationMessages) {
+        return null;
+      }
+      
+      // Create a new feedback element if needed
+      feedback = document.createElement('div');
+      feedback.classList.add(feedbackClass);
+      feedback.id = `${fieldId}-${type}-feedback`;
+      
+      // Insert after field or at the end of container
+      if (field.nextElementSibling) {
+        field.parentNode.insertBefore(feedback, field.nextElementSibling);
+      } else {
+        field.parentNode.appendChild(feedback);
+      }
+      
+      return feedback;
+    }
+    
+    displayErrorsInContainer() {
+      const container = document.querySelector(this.options.customErrorContainer);
+      if (!container) return;
+      
+      // Clear previous content
+      container.innerHTML = '';
+      
+      // Create error list
+      const errorHeading = document.createElement('h5');
+      errorHeading.className = 'tf-validation-error-heading';
+      errorHeading.textContent = 'Please fix the following errors:';
+      
+      const errorList = document.createElement('ul');
+      errorList.className = 'tf-validation-error-list';
+      
+      this.errors.forEach((messages, fieldName) => {
+        const field = this.form.elements[fieldName];
+        const fieldLabel = this.getFieldLabel(field);
         
-        break;
-      }
+        messages.forEach(message => {
+          const listItem = document.createElement('li');
+          listItem.innerHTML = `<strong>${fieldLabel}:</strong> ${message}`;
+          
+          // Add click event to focus the field
+          listItem.addEventListener('click', function() {
+            field.focus();
+          });
+          
+          errorList.appendChild(listItem);
+        });
+      });
+      
+      container.appendChild(errorHeading);
+      container.appendChild(errorList);
+      container.style.display = 'block';
     }
     
-    // Update field state and error message
-    this._updateFieldState(formId, fieldName, field, isValid, errorMessage);
-    
-    return isValid;
-  }
-  
-  /**
-   * Update the visual state of a field based on validation
-   * @param {string} formId - The ID of the form
-   * @param {string} fieldName - The name of the field
-   * @param {HTMLElement} field - The field element
-   * @param {boolean} isValid - Whether the field is valid
-   * @param {string} errorMessage - The error message, if any
-   * @private
-   */
-  _updateFieldState(formId, fieldName, field, isValid, errorMessage) {
-    const formInfo = this.forms.get(formId);
-    if (!formInfo) return;
-    
-    const { options, errors } = formInfo;
-    
-    // Remove previous state
-    field.classList.remove(options.errorClass, options.successClass);
-    
-    // Remove previous message
-    const parent = field.parentElement;
-    const existingMessage = parent.querySelector(`.${options.errorMessageClass}, .${options.successMessageClass}`);
-    if (existingMessage) {
-      parent.removeChild(existingMessage);
-    }
-    
-    if (isValid) {
-      // Valid state
-      field.classList.add(options.successClass);
-      errors.delete(fieldName);
-      
-      // Add success message if desired
-      if (options.showValidationMessages && field.getAttribute('data-success-message')) {
-        const successMessage = document.createElement('div');
-        successMessage.className = options.successMessageClass;
-        successMessage.textContent = field.getAttribute('data-success-message');
-        parent.appendChild(successMessage);
-      }
-    } else {
-      // Invalid state
-      field.classList.add(options.errorClass);
-      errors.set(fieldName, errorMessage);
-      
-      // Add error message if desired
-      if (options.showValidationMessages) {
-        const errorElement = document.createElement('div');
-        errorElement.className = options.errorMessageClass;
-        errorElement.textContent = errorMessage;
-        parent.appendChild(errorElement);
-      }
-    }
-  }
-  
-  /**
-   * Display errors in a custom container
-   * @param {string} formId - The ID of the form
-   * @param {Map} errors - The errors to display
-   * @private
-   */
-  _displayCustomErrors(formId, errors) {
-    const formInfo = this.forms.get(formId);
-    if (!formInfo || !formInfo.options.customErrorContainer) return;
-    
-    const container = document.querySelector(formInfo.options.customErrorContainer);
-    if (!container) return;
-    
-    // Clear previous errors
-    container.innerHTML = '';
-    
-    if (errors.size === 0) {
-      container.style.display = 'none';
-      return;
-    }
-    
-    // Create error list
-    container.style.display = 'block';
-    const errorList = document.createElement('ul');
-    errorList.className = 'tf-validation-error-list';
-    
-    errors.forEach((message, fieldName) => {
-      const listItem = document.createElement('li');
-      
-      // Try to get a more friendly field name
-      const field = formInfo.element.querySelector(`[name="${fieldName}"]`);
-      let friendlyName = fieldName;
-      
-      if (field) {
-        // Try to get label text
-        const label = document.querySelector(`label[for="${field.id}"]`);
+    getFieldLabel(field) {
+      // Try to find label for the field
+      const fieldId = field.id;
+      if (fieldId) {
+        const label = document.querySelector(`label[for="${fieldId}"]`);
         if (label) {
-          friendlyName = label.textContent;
-        } else {
-          // Try to get from placeholder
-          friendlyName = field.getAttribute('placeholder') || field.getAttribute('aria-label') || fieldName;
+          return label.textContent;
         }
       }
       
-      listItem.innerHTML = `<strong>${friendlyName}:</strong> ${message}`;
-      errorList.appendChild(listItem);
-    });
-    
-    container.appendChild(errorList);
-  }
-  
-  /**
-   * Get all errors for a form
-   * @param {string} formId - The ID of the form
-   * @returns {Map} - Map of field names to error messages
-   */
-  getFormErrors(formId) {
-    const formInfo = this.forms.get(formId);
-    if (!formInfo) return new Map();
-    
-    return new Map(formInfo.errors);
-  }
-  
-  /**
-   * Check if a form has any validation errors
-   * @param {string} formId - The ID of the form
-   * @returns {boolean} - True if the form has errors, false otherwise
-   */
-  hasFormErrors(formId) {
-    const formInfo = this.forms.get(formId);
-    if (!formInfo) return false;
-    
-    return formInfo.errors.size > 0;
-  }
-  
-  /**
-   * Clear all validation errors for a form
-   * @param {string} formId - The ID of the form
-   */
-  clearFormErrors(formId) {
-    const formInfo = this.forms.get(formId);
-    if (!formInfo) return;
-    
-    const { element, options, errors } = formInfo;
-    
-    // Clear error map
-    errors.clear();
-    
-    // Remove error/success classes and messages
-    const fields = element.querySelectorAll(`.${options.errorClass}, .${options.successClass}`);
-    fields.forEach(field => {
-      field.classList.remove(options.errorClass, options.successClass);
+      // Try parent label
+      const parentLabel = field.closest('label');
+      if (parentLabel) {
+        // Strip any child elements' text
+        const clone = parentLabel.cloneNode(true);
+        Array.from(clone.querySelectorAll('input, select, textarea')).forEach(el => el.remove());
+        return clone.textContent.trim();
+      }
       
-      const parent = field.parentElement;
-      const message = parent.querySelector(`.${options.errorMessageClass}, .${options.successMessageClass}`);
-      if (message) {
-        parent.removeChild(message);
-      }
-    });
+      // Fallback to field name or placeholder
+      return field.getAttribute('placeholder') || field.name;
+    }
     
-    // Clear custom error container if specified
-    if (options.customErrorContainer) {
-      const container = document.querySelector(options.customErrorContainer);
-      if (container) {
-        container.innerHTML = '';
-        container.style.display = 'none';
+    hasErrors() {
+      return this.errors.size > 0;
+    }
+    
+    getErrors() {
+      return Object.fromEntries(this.errors);
+    }
+    
+    reset() {
+      this.errors.clear();
+      
+      // Reset all form elements
+      Array.from(this.form.elements).forEach(field => {
+        field.classList.remove(this.options.errorClass, this.options.successClass);
+      });
+      
+      // Reset form validation state
+      this.form.classList.remove('was-validated');
+      
+      // Clear custom error container
+      if (this.options.customErrorContainer) {
+        const container = document.querySelector(this.options.customErrorContainer);
+        if (container) {
+          container.innerHTML = '';
+          container.style.display = 'none';
+        }
       }
     }
     
-    // Clear errors in error handling system if integrated
-    if (window.terraFusionErrors) {
-      window.terraFusionErrors.clearErrors(formId);
+    resetField(fieldName) {
+      const field = this.form.elements[fieldName];
+      if (!field) return;
+      
+      field.classList.remove(this.options.errorClass, this.options.successClass);
+      
+      // Clear feedback messages
+      const invalidFeedback = this.findOrCreateFeedback(field, 'invalid');
+      if (invalidFeedback) {
+        invalidFeedback.textContent = '';
+      }
+      
+      // Remove from errors map
+      this.errors.delete(fieldName);
+    }
+    
+    setRules(rules) {
+      this.rules = { ...this.rules, ...rules };
+    }
+    
+    getRules() {
+      return this.rules;
+    }
+    
+    addValidator(name, validator) {
+      if (!validator.validate || typeof validator.validate !== 'function') {
+        console.error('Validator must have a validate function.');
+        return;
+      }
+      
+      this.validators[name] = validator;
+    }
+    
+    removeValidator(name) {
+      delete this.validators[name];
+    }
+    
+    destroy() {
+      // Clean up event listeners
+      // Note: Current setup doesn't allow for specific removeEventListener
+      
+      // Remove validation classes
+      this.form.classList.remove('needs-validation', 'was-validated');
+      
+      // Remove validation attributes
+      this.form.removeAttribute('novalidate');
+      
+      // Remove field classes
+      Array.from(this.form.elements).forEach(field => {
+        field.classList.remove(this.options.errorClass, this.options.successClass);
+      });
+      
+      // Remove from registry
+      registeredForms.delete(this.formId);
     }
   }
   
-  /**
-   * Reset form validation to initial state
-   * @param {string} formId - The ID of the form
-   */
-  resetValidation(formId) {
-    const formInfo = this.forms.get(formId);
-    if (!formInfo) return;
+  return {
+    register: function(formId, options, rules) {
+      // If already registered, return existing or create new
+      if (registeredForms.has(formId)) {
+        const existing = registeredForms.get(formId);
+        
+        // Update options and rules if provided
+        if (options) {
+          existing.options = Object.assign(existing.options, options);
+        }
+        
+        if (rules) {
+          existing.setRules(rules);
+        }
+        
+        return existing;
+      }
+      
+      // Create new validator
+      const validator = new FormValidator(formId, options, rules);
+      registeredForms.set(formId, validator);
+      return validator;
+    },
     
-    this.clearFormErrors(formId);
+    get: function(formId) {
+      return registeredForms.get(formId);
+    },
     
-    // Reset the form itself
-    formInfo.element.reset();
-  }
-  
-  /**
-   * Set validation rules for a form
-   * @param {string} formId - The ID of the form
-   * @param {object} rules - The validation rules
-   */
-  setValidationRules(formId, rules) {
-    const formInfo = this.forms.get(formId);
-    if (!formInfo) return;
+    validate: function(formId) {
+      const validator = registeredForms.get(formId);
+      return validator ? validator.validate() : false;
+    },
     
-    formInfo.rules = rules;
+    reset: function(formId) {
+      const validator = registeredForms.get(formId);
+      if (validator) {
+        validator.reset();
+      }
+    },
     
-    // Clear existing errors
-    this.clearFormErrors(formId);
-  }
-  
-  /**
-   * Add a custom validator
-   * @param {string} formId - The ID of the form
-   * @param {string} name - The name of the validator
-   * @param {object} validator - The validator object with validate and message properties
-   */
-  addCustomValidator(formId, name, validator) {
-    const formInfo = this.forms.get(formId);
-    if (!formInfo) return;
+    unregister: function(formId) {
+      const validator = registeredForms.get(formId);
+      if (validator) {
+        validator.destroy();
+      }
+    },
     
-    formInfo.validators[name] = validator;
-  }
-}
+    validateOnLoad: function() {
+      // Initialize validation for forms with data-tf-validate attribute
+      document.querySelectorAll('form[data-tf-validate]').forEach(form => {
+        const formId = form.id;
+        if (!formId) {
+          console.warn('Form with data-tf-validate must have an id attribute.');
+          return;
+        }
+        
+        // Get options from data attributes
+        const options = {
+          validateOnInput: form.dataset.tfValidateOnInput === 'true',
+          validateOnBlur: form.dataset.tfValidateOnBlur !== 'false',
+          validateOnSubmit: form.dataset.tfValidateOnSubmit !== 'false',
+          showValidationMessages: form.dataset.tfShowMessages !== 'false',
+          preventSubmitOnError: form.dataset.tfPreventSubmit !== 'false',
+          scrollToFirstError: form.dataset.tfScrollToError !== 'false',
+          customErrorContainer: form.dataset.tfErrorContainer || null
+        };
+        
+        // Create validator
+        this.register(formId, options);
+      });
+    }
+  };
+})();
 
-// Create global instance
-const terraFusionForms = new FormValidationSystem();
-
-// Add to window for global access
-window.terraFusionForms = terraFusionForms;
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+  terraFusionForms.validateOnLoad();
+});
