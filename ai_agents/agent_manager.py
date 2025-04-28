@@ -15,6 +15,7 @@ import time
 from typing import Dict, List, Any, Optional, Union, Tuple, Type, Callable
 
 from ai_agents.base_agent import AIAgent, AIAgentPool
+from ai_agents.agent_config import get_agent_config_manager
 
 logger = logging.getLogger(__name__)
 
@@ -136,8 +137,8 @@ class AIAgentManager:
         del self.agents[agent_id]
         logger.info(f"Unregistered agent: {agent_id}")
     
-    def create_agent(self, agent_type: str, name: str = None, 
-                    description: str = "", capabilities: List[str] = None, 
+    def create_agent(self, agent_type: str, name: Optional[str] = None, 
+                    description: str = "", capabilities: Optional[List[str]] = None, 
                     **kwargs) -> Optional[AIAgent]:
         """
         Create and register a new agent instance.
@@ -262,7 +263,7 @@ class AIAgentManager:
             return False
     
     def broadcast_message(self, message_type: str, payload: Dict[str, Any], 
-                         agent_filter: Callable[[AIAgent], bool] = None) -> int:
+                         agent_filter: Optional[Callable[[AIAgent], bool]] = None) -> int:
         """
         Broadcast a message to multiple agents.
         
@@ -344,19 +345,48 @@ class AIAgentManager:
         """Monitor agent health periodically"""
         while self.monitor_running:
             try:
-                # Check each agent
-                for agent_id, agent in list(self.agents.items()):
-                    # Check if agent is responsive
-                    if agent.status == "running":
-                        time_since_activity = time.time() - agent.last_activity
-                        
-                        # Check for agents that haven't been active in a while
-                        if time_since_activity > 300:  # 5 minutes
-                            logger.warning(f"Agent {agent_id} has been inactive for {time_since_activity:.1f} seconds")
+                # Get the configuration manager
+                config = get_agent_config_manager()
+                
+                # Only perform these checks if timeout warnings are enabled
+                if config.is_timeout_warning_enabled():
+                    timeout = config.get_timeout_seconds()
+                    warning_interval = config.get_warning_interval()
                     
-                    # Check for agents in error status
-                    elif agent.status in ["error", "failed"]:
-                        logger.error(f"Agent {agent_id} is in error state: {agent.status}")
+                    # Check each agent
+                    for agent_id, agent in list(self.agents.items()):
+                        # Skip this agent if not enabled in configuration
+                        if not config.is_agent_enabled(agent.__class__.__name__):
+                            continue
+                            
+                        # Check if agent is responsive
+                        if agent.status == "running":
+                            time_since_activity = time.time() - agent.last_activity
+                            
+                            # Skip this check for agents that have been inactive for less than the timeout
+                            if time_since_activity < timeout:
+                                continue
+                                
+                            # Only log warnings at the specified interval to avoid log spam
+                            last_warning_time = getattr(agent, 'last_warning_time', 0)
+                            time_since_last_warning = time.time() - last_warning_time
+                            
+                            if time_since_last_warning >= warning_interval:
+                                agent.last_warning_time = time.time()
+                                logger.warning(f"Agent {agent_id} has been inactive for {time_since_activity:.1f} seconds")
+                                
+                                # Auto-restart agents if configured
+                                if config.should_auto_restart():
+                                    try:
+                                        logger.info(f"Auto-restarting inactive agent {agent_id}")
+                                        agent.stop()
+                                        agent.start()
+                                    except Exception as e:
+                                        logger.error(f"Failed to auto-restart agent {agent_id}: {str(e)}")
+                        
+                        # Check for agents in error status
+                        elif agent.status in ["error", "failed"]:
+                            logger.error(f"Agent {agent_id} is in error state: {agent.status}")
                 
                 # Sleep until next check
                 time.sleep(self.monitor_interval)
