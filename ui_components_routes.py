@@ -20,4 +20,12 @@ def design_system():
 
 def register_ui_components_routes(app):
     """Register UI components routes with the Flask app"""
-    app.register_blueprint(ui_components_bp)
+    # Import form_components template
+    try:
+        with app.app_context():
+            app.register_blueprint(ui_components_bp)
+    except Exception as e:
+        import logging
+        logging.error(f"Error registering UI components routes: {e}")
+        # Continue without ui components routes
+        pass
