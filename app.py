@@ -1183,7 +1183,11 @@ def design_system():
 @app.route('/form-components')
 def form_components_demo():
     """Form components demo page"""
-    return render_template('form_components_demo.html')
+    try:
+        return render_template('form_components_demo.html')
+    except Exception as e:
+        app.logger.error(f"Error rendering form components demo: {str(e)}")
+        return render_template('error.html', error=str(e))
 
 # Register template filters
 try:
