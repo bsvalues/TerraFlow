@@ -1179,6 +1179,11 @@ def test_scenario(scenario_type):
 def design_system():
     """TerraFusion Design System documentation"""
     return render_template('design_system.html')
+    
+@app.route('/form-components')
+def form_components_demo():
+    """Form components demo page"""
+    return render_template('form_components_demo.html')
 
 # Register template filters
 try:
