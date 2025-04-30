@@ -698,16 +698,45 @@
       }
       
       // Fit map to bounds if there are markers
-      const allLayers = L.layerGroup([propertyLayer, anomalyLayer]);
-      if (allLayers.getLayers().length > 0) {
-        try {
-          const bounds = L.featureGroup(allLayers.getLayers()).getBounds();
-          map.fitBounds(bounds);
-        } catch (err) {
-          console.error('Error fitting map to bounds:', err);
+      try {
+        // Get all layers with valid markers
+        const validLayers = [];
+        propertyLayer.eachLayer(layer => {
+          if (layer && layer.getLatLng) {
+            validLayers.push(layer);
+          }
+        });
+        anomalyLayer.eachLayer(layer => {
+          if (layer && layer.getLatLng) {
+            validLayers.push(layer);
+          }
+        });
+        
+        if (validLayers.length > 0) {
+          // Create a feature group with only valid layers
+          const group = L.featureGroup(validLayers);
+          const bounds = group.getBounds();
+          
+          // Check if bounds are valid before fitting
+          if (bounds && bounds.isValid()) {
+            map.fitBounds(bounds, {
+              padding: [50, 50],  // Add padding around bounds
+              maxZoom: 15,        // Don't zoom in too far
+              animate: true
+            });
+          } else {
+            // Fallback to Benton County, WA coordinates if bounds are invalid
+            map.setView([46.2062, -119.1686], 11);
+          }
+        } else {
+          // No valid markers, use default view for Benton County, WA
+          map.setView([46.2062, -119.1686], 11);
+          console.log('No valid map markers to display, using default view');
         }
-      } else {
-        console.log('No map layers to display, keeping current view');
+      } catch (err) {
+        // Final fallback in case of any error
+        console.error('Error fitting map to bounds:', err);
+        map.setView([46.2062, -119.1686], 11);
       }
     } catch (error) {
       console.error('Error updating map data:', error);
