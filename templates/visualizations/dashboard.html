@@ -631,125 +631,221 @@
   
   // Update dashboard statistics
   function updateDashboardStats(stats) {
-    document.getElementById('totalProperties').textContent = stats.total_properties.toLocaleString();
-    document.getElementById('totalAnomalies').textContent = stats.total_anomalies.toLocaleString();
-    document.getElementById('averageValue').textContent = '$' + stats.average_value.toLocaleString();
-    document.getElementById('anomalyRate').textContent = stats.anomaly_rate.toFixed(1) + '%';
+    try {
+      if (!stats) {
+        console.error('No stats data provided to updateDashboardStats');
+        return;
+      }
+      
+      const totalPropEl = document.getElementById('totalProperties');
+      if (totalPropEl) totalPropEl.textContent = stats.total_properties.toLocaleString();
+      
+      const totalAnomaliesEl = document.getElementById('totalAnomalies');
+      if (totalAnomaliesEl) totalAnomaliesEl.textContent = stats.total_anomalies.toLocaleString();
+      
+      const avgValueEl = document.getElementById('averageValue');
+      if (avgValueEl) avgValueEl.textContent = '$' + stats.average_value.toLocaleString();
+      
+      const anomalyRateEl = document.getElementById('anomalyRate');
+      if (anomalyRateEl) anomalyRateEl.textContent = stats.anomaly_rate.toFixed(1) + '%';
+    } catch (error) {
+      console.error('Error updating dashboard stats:', error);
+    }
   }
   
   // Update map with property and anomaly data
   function updateMapData(properties, anomalies) {
-    // Clear existing layers
-    propertyLayer.clearLayers();
-    anomalyLayer.clearLayers();
-    
-    // Add properties to the map
-    properties.forEach(property => {
-      if (property.location) {
-        const marker = createPropertyMarker(property);
-        propertyLayer.addLayer(marker);
+    try {
+      // Clear existing layers
+      if (!propertyLayer || !anomalyLayer) {
+        console.error('Map layers not initialized');
+        return;
       }
-    });
-    
-    // Add anomalies to the map
-    anomalies.forEach(anomaly => {
-      if (anomaly.location) {
-        const marker = createAnomalyMarker(anomaly);
-        anomalyLayer.addLayer(marker);
+      
+      propertyLayer.clearLayers();
+      anomalyLayer.clearLayers();
+      
+      // Add properties to the map
+      if (properties && Array.isArray(properties)) {
+        properties.forEach(property => {
+          if (property && property.location) {
+            try {
+              const marker = createPropertyMarker(property);
+              propertyLayer.addLayer(marker);
+            } catch (err) {
+              console.error('Error creating property marker:', err, property);
+            }
+          }
+        });
+      } else {
+        console.warn('No valid properties data for map');
       }
-    });
-    
-    // Fit map to bounds if there are markers
-    const allLayers = L.layerGroup([propertyLayer, anomalyLayer]);
-    if (allLayers.getLayers().length > 0) {
-      const bounds = L.featureGroup(allLayers.getLayers()).getBounds();
-      map.fitBounds(bounds);
+      
+      // Add anomalies to the map
+      if (anomalies && Array.isArray(anomalies)) {
+        anomalies.forEach(anomaly => {
+          if (anomaly && anomaly.location) {
+            try {
+              const marker = createAnomalyMarker(anomaly);
+              anomalyLayer.addLayer(marker);
+            } catch (err) {
+              console.error('Error creating anomaly marker:', err, anomaly);
+            }
+          }
+        });
+      } else {
+        console.warn('No valid anomalies data for map');
+      }
+      
+      // Fit map to bounds if there are markers
+      const allLayers = L.layerGroup([propertyLayer, anomalyLayer]);
+      if (allLayers.getLayers().length > 0) {
+        try {
+          const bounds = L.featureGroup(allLayers.getLayers()).getBounds();
+          map.fitBounds(bounds);
+        } catch (err) {
+          console.error('Error fitting map to bounds:', err);
+        }
+      } else {
+        console.log('No map layers to display, keeping current view');
+      }
+    } catch (error) {
+      console.error('Error updating map data:', error);
     }
   }
   
   // Create a marker for a property
   function createPropertyMarker(property) {
-    // Create a marker with a popup
-    const latLng = [property.location.coordinates[1], property.location.coordinates[0]];
-    const marker = L.circleMarker(latLng, {
-      radius: 8,
-      fillColor: '#4CAF50',
-      color: '#fff',
-      weight: 1,
-      opacity: 1,
-      fillOpacity: 0.8
-    });
-    
-    // Create popup content
-    const popupContent = `
-      <div class="property-popup">
-        <h4>${property.address}</h4>
-        <div class="property-detail"><strong>Parcel ID:</strong> ${property.parcel_id}</div>
-        <div class="property-detail"><strong>Type:</strong> ${property.property_type}</div>
-        <div class="property-detail"><strong>Value:</strong> $${property.total_value.toLocaleString()}</div>
-        <button class="btn btn-sm btn-primary mt-2" onclick="showPropertyDetails('${property.id}')">View Details</button>
-      </div>
-    `;
-    
-    marker.bindPopup(popupContent);
-    return marker;
+    try {
+      if (!property || !property.location || !property.location.coordinates || 
+          !Array.isArray(property.location.coordinates) || property.location.coordinates.length < 2) {
+        console.error('Invalid location data for property:', property);
+        return null;
+      }
+      
+      // Create a marker with a popup
+      const latLng = [property.location.coordinates[1], property.location.coordinates[0]];
+      const marker = L.circleMarker(latLng, {
+        radius: 8,
+        fillColor: '#4CAF50',
+        color: '#fff',
+        weight: 1,
+        opacity: 1,
+        fillOpacity: 0.8
+      });
+      
+      // Create popup content
+      const popupContent = `
+        <div class="property-popup">
+          <h4>${property.address || 'Unnamed Property'}</h4>
+          <div class="property-detail"><strong>Parcel ID:</strong> ${property.parcel_id || 'N/A'}</div>
+          <div class="property-detail"><strong>Type:</strong> ${property.property_type || 'N/A'}</div>
+          <div class="property-detail"><strong>Value:</strong> $${typeof property.total_value === 'number' ? property.total_value.toLocaleString() : '0'}</div>
+          <button class="btn btn-sm btn-primary mt-2" onclick="showPropertyDetails('${property.id}')">View Details</button>
+        </div>
+      `;
+      
+      marker.bindPopup(popupContent);
+      return marker;
+    } catch (error) {
+      console.error('Error creating property marker:', error, property);
+      return null;
+    }
   }
   
   // Create a marker for an anomaly
   function createAnomalyMarker(anomaly) {
-    // Determine color based on severity
-    let fillColor;
-    switch (anomaly.severity) {
-      case 'high':
-        fillColor = '#F44336'; // Red
-        break;
-      case 'medium':
-        fillColor = '#FF9800'; // Orange
-        break;
-      case 'low':
-        fillColor = '#FFC107'; // Yellow
-        break;
-      default:
-        fillColor = '#F44336'; // Default to red
+    try {
+      if (!anomaly || !anomaly.location || !anomaly.location.coordinates || 
+          !Array.isArray(anomaly.location.coordinates) || anomaly.location.coordinates.length < 2) {
+        console.error('Invalid location data for anomaly:', anomaly);
+        return null;
+      }
+      
+      // Determine color based on severity
+      let fillColor;
+      switch (anomaly.severity) {
+        case 'high':
+          fillColor = '#F44336'; // Red
+          break;
+        case 'medium':
+          fillColor = '#FF9800'; // Orange
+          break;
+        case 'low':
+          fillColor = '#FFC107'; // Yellow
+          break;
+        default:
+          fillColor = '#F44336'; // Default to red
+      }
+      
+      // Create a marker with a popup
+      const latLng = [anomaly.location.coordinates[1], anomaly.location.coordinates[0]];
+      const marker = L.circleMarker(latLng, {
+        radius: 10,
+        fillColor: fillColor,
+        color: '#fff',
+        weight: 1,
+        opacity: 1,
+        fillOpacity: 0.8
+      });
+      
+      // Create popup content
+      const popupContent = `
+        <div class="property-popup">
+          <h4>Anomaly Detected</h4>
+          <div class="property-detail"><strong>Property:</strong> ${anomaly.property_address || 'Unknown Property'}</div>
+          <div class="property-detail"><strong>Type:</strong> ${anomaly.anomaly_type || 'Unknown Type'}</div>
+          <div class="property-detail"><strong>Severity:</strong> ${anomaly.severity || 'low'}</div>
+          <div class="property-detail"><strong>Detected:</strong> ${anomaly.detected_at ? new Date(anomaly.detected_at).toLocaleString() : 'Unknown Date'}</div>
+          ${anomaly.property_id ? `<button class="btn btn-sm btn-primary mt-2" onclick="showPropertyDetails('${anomaly.property_id}')">View Property</button>` : ''}
+        </div>
+      `;
+      
+      marker.bindPopup(popupContent);
+      return marker;
+    } catch (error) {
+      console.error('Error creating anomaly marker:', error, anomaly);
+      return null;
     }
-    
-    // Create a marker with a popup
-    const latLng = [anomaly.location.coordinates[1], anomaly.location.coordinates[0]];
-    const marker = L.circleMarker(latLng, {
-      radius: 10,
-      fillColor: fillColor,
-      color: '#fff',
-      weight: 1,
-      opacity: 1,
-      fillOpacity: 0.8
-    });
-    
-    // Create popup content
-    const popupContent = `
-      <div class="property-popup">
-        <h4>Anomaly Detected</h4>
-        <div class="property-detail"><strong>Property:</strong> ${anomaly.property_address}</div>
-        <div class="property-detail"><strong>Type:</strong> ${anomaly.anomaly_type}</div>
-        <div class="property-detail"><strong>Severity:</strong> ${anomaly.severity}</div>
-        <div class="property-detail"><strong>Detected:</strong> ${new Date(anomaly.detected_at).toLocaleString()}</div>
-        <button class="btn btn-sm btn-primary mt-2" onclick="showPropertyDetails('${anomaly.property_id}')">View Property</button>
-      </div>
-    `;
-    
-    marker.bindPopup(popupContent);
-    return marker;
   }
   
   // Update the anomaly trend chart
   function updateAnomalyTrendChart(data) {
-    anomalyTrendChart.data.labels = data.labels;
-    anomalyTrendChart.data.datasets[0].data = data.values;
-    anomalyTrendChart.update();
+    try {
+      if (!data || !data.labels || !data.values) {
+        console.error('Invalid or missing chart data');
+        return;
+      }
+      
+      if (!anomalyTrendChart) {
+        console.error('Chart not initialized');
+        return;
+      }
+      
+      anomalyTrendChart.data.labels = data.labels;
+      anomalyTrendChart.data.datasets[0].data = data.values;
+      anomalyTrendChart.update();
+    } catch (error) {
+      console.error('Error updating trend chart:', error);
+    }
   }
   
   // Update the recent anomalies table
   function updateRecentAnomaliesTable(anomalies) {
-    const tableBody = document.querySelector('#anomalyTable tbody');
+    const table = document.getElementById('anomalyTable');
+    if (!table) {
+      console.error('Anomaly table not found in the DOM');
+      return;
+    }
+    
+    let tableBody = table.querySelector('tbody');
+    if (!tableBody) {
+      // Create tbody if it doesn't exist
+      console.log('Table body not found, creating one');
+      tableBody = document.createElement('tbody');
+      table.appendChild(tableBody);
+    }
+    
     tableBody.innerHTML = '';
     
     if (anomalies.length === 0) {
@@ -762,10 +858,10 @@
     anomalies.forEach(anomaly => {
       const row = document.createElement('tr');
       row.innerHTML = `
-        <td><a href="#" onclick="showPropertyDetails('${anomaly.property_id}'); return false;">${anomaly.property_address}</a></td>
-        <td>${anomaly.anomaly_type}</td>
-        <td><span class="badge ${anomaly.severity === 'high' ? 'badge-anomaly' : 'badge-normal'}">${anomaly.severity}</span></td>
-        <td>${new Date(anomaly.detected_at).toLocaleDateString()}</td>
+        <td><a href="#" onclick="showPropertyDetails('${anomaly.property_id}'); return false;">${anomaly.property_address || 'Unknown'}</a></td>
+        <td>${anomaly.anomaly_type || 'Unknown'}</td>
+        <td><span class="badge ${anomaly.severity === 'high' ? 'badge-anomaly' : 'badge-normal'}">${anomaly.severity || 'low'}</span></td>
+        <td>${anomaly.detected_at ? new Date(anomaly.detected_at).toLocaleDateString() : 'N/A'}</td>
       `;
       tableBody.appendChild(row);
     });
