@@ -1,0 +1,62 @@
+groups:
+  - name: agent_alerts
+    rules:
+      - alert: AgentSystemUnhealthy
+        expr: agent_system_health_status == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Agent system unhealthy"
+          description: "The AI agent system is reporting an unhealthy status for more than 2 minutes"
+          dashboard_url: "http://grafana:3000/d/agent-system"
+          
+      - alert: AgentInactive
+        expr: agent_inactive_count > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Inactive AI agents detected"
+          description: "{{ $value }} AI agents have been inactive for more than 5 minutes"
+          dashboard_url: "http://grafana:3000/d/agent-system"
+          
+      - alert: TooManyAgentRestarts
+        expr: rate(agent_restart_count[15m]) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Frequent agent restarts detected"
+          description: "AI agents are restarting too frequently (more than 5 restarts in 15 minutes)"
+          dashboard_url: "http://grafana:3000/d/agent-system"
+
+      - alert: AgentErrorRate
+        expr: rate(agent_error_count[5m]) / rate(agent_task_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High agent error rate"
+          description: "AI agents error rate is above 10% for the last 5 minutes"
+          dashboard_url: "http://grafana:3000/d/agent-system"
+          
+      - alert: AgentTaskBacklog
+        expr: agent_task_queue_size > 50
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Large agent task backlog"
+          description: "AI agent task queue has more than 50 pending tasks for over 5 minutes"
+          dashboard_url: "http://grafana:3000/d/agent-system"
+          
+      - alert: AgentHighMemoryUsage
+        expr: agent_memory_usage_bytes / 1024 / 1024 > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High agent memory usage"
+          description: "AI agent {{ $labels.agent_id }} is using more than 1GB of memory"
+          dashboard_url: "http://grafana:3000/d/agent-system"

@@ -100,6 +100,22 @@ services:
       - terrafusion_network
     depends_on:
       - prometheus
+      
+  alertmanager:
+    image: prom/alertmanager:v0.25.0
+    restart: always
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./monitoring/alertmanager:/etc/alertmanager
+      - alertmanager_data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    networks:
+      - terrafusion_network
+    depends_on:
+      - prometheus
 
 volumes:
   postgres_data:

@@ -1,0 +1,62 @@
+groups:
+  - name: database_alerts
+    rules:
+      - alert: PostgreSQLDown
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL instance down"
+          description: "PostgreSQL instance is down on {{ $labels.instance }}"
+          dashboard_url: "http://grafana:3000/d/database-metrics"
+
+      - alert: PostgreSQLHighConnections
+        expr: sum by (datname) (pg_stat_activity_count) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High number of PostgreSQL connections"
+          description: "PostgreSQL instance has more than 80 active connections on database {{ $labels.datname }}"
+          dashboard_url: "http://grafana:3000/d/database-metrics"
+
+      - alert: PostgreSQLSlowQueries
+        expr: rate(pg_stat_activity_max_tx_duration{datname!=""}[1m]) > 30
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow PostgreSQL queries detected"
+          description: "PostgreSQL queries are taking more than 30 seconds on database {{ $labels.datname }}"
+          dashboard_url: "http://grafana:3000/d/database-metrics"
+
+      - alert: PostgreSQLHighReplicationLag
+        expr: pg_replication_lag > 300
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High PostgreSQL replication lag"
+          description: "PostgreSQL replication lag is over 5 minutes on {{ $labels.instance }}"
+          dashboard_url: "http://grafana:3000/d/database-metrics"
+
+      - alert: PostgreSQLDiskSpacePressure
+        expr: pg_database_size_bytes / 1024 / 1024 > 10000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL database size growing rapidly"
+          description: "Database {{ $labels.datname }} on {{ $labels.instance }} is larger than 10GB"
+          dashboard_url: "http://grafana:3000/d/database-metrics"
+
+      - alert: PostgreSQLTooManyDeadlocks
+        expr: rate(pg_stat_database_deadlocks{datname!=""}[1m]) > 5
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Too many PostgreSQL deadlocks"
+          description: "PostgreSQL detected more than 5 deadlocks per minute on database {{ $labels.datname }}"
+          dashboard_url: "http://grafana:3000/d/database-metrics"
