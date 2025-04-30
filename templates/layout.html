@@ -96,7 +96,7 @@
                         </a>
                     </li>
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {% if '/sync' in request.path or '/verification' in request.path or '/data-quality' in request.path or '/visualizations/anomaly-map' in request.path %}active{% endif %}" href="#" id="syncDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <a class="nav-link dropdown-toggle {% if '/sync' in request.path or '/verification' in request.path or '/data-quality' in request.path or '/visualizations/anomaly-map' in request.path or '/health/dashboard' in request.path %}active{% endif %}" href="#" id="syncDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="fas fa-sync me-1" style="color: var(--tf-flow-aqua);"></i> Services
                         </a>
                         <ul class="dropdown-menu" aria-labelledby="syncDropdown">
@@ -111,6 +111,10 @@
                             </a></li>
                             <li><a class="dropdown-item" href="/visualizations/anomaly-map">
                                 <i class="fas fa-map-marked-alt me-1" style="color: var(--tf-map-green);"></i> Anomaly Map
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="/health/dashboard">
+                                <i class="fas fa-heartbeat me-1" style="color: var(--tf-success);"></i> Health Dashboard
                             </a></li>
                         </ul>
                     </li>
@@ -182,7 +186,8 @@
                     <p class="mb-0">
                         <a href="{{ url_for('index') }}" class="text-decoration-none fw-bold" style="color: var(--tf-flow-aqua);">Home</a> |
                         <a href="/sync/" class="text-decoration-none fw-bold" style="color: var(--tf-flow-aqua);">Sync</a> |
-                        <a href="/data-quality/dashboard" class="text-decoration-none fw-bold" style="color: var(--tf-flow-aqua);">Quality</a>
+                        <a href="/data-quality/dashboard" class="text-decoration-none fw-bold" style="color: var(--tf-flow-aqua);">Quality</a> |
+                        <a href="/health/dashboard" class="text-decoration-none fw-bold" style="color: var(--tf-flow-aqua);">Health</a>
                     </p>
                     <p class="small mb-0 fw-semibold text-dark">Version 2.1.0</p>
                 </div>
