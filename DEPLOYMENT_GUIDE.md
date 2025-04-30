@@ -602,6 +602,77 @@ chmod -R 770 /opt/geoassessmentpro/uploads
 - **"Module not found" errors**: Ensure all dependencies are installed in the virtual environment.
 - **"Permission denied" errors**: Check file and directory permissions.
 - **"Address already in use" errors**: Another process is using port 5000, either stop it or configure the application to use a different port.
+- **"SSL connection required"**: Check DB_USE_SSL setting in the environment file if you're seeing SSL-related errors.
+
+## Advanced Configuration
+
+### Database Error Handling
+
+The system includes robust database error handling with automatic retries for transient errors. You can configure these settings in your environment file:
+
+```
+# Database Error Handling
+DB_MAX_RETRIES=3             # Maximum number of retry attempts
+DB_RETRY_DELAY=0.5           # Initial delay between retries (seconds)
+DB_RETRY_BACKOFF=2.0         # Exponential backoff multiplier
+```
+
+Increase the retry count and delay for less stable network environments.
+
+### AI Agent Configuration
+
+The system's AI agents can be configured through environment variables or directly using the agent management CLI:
+
+```bash
+# View current agent status
+./agent_cli.py status
+
+# List all agent types
+./agent_cli.py list
+
+# Enable specific agent types
+./agent_cli.py enable property_valuation
+
+# Disable specific agent types
+./agent_cli.py disable data_recovery
+
+# Configure agent timeout settings
+./agent_cli.py config --timeout 900 --warning-interval 300 --warnings enable --auto-restart disable
+```
+
+You can also use the following environment variables to configure agent behavior:
+
+```
+# Agent Configuration
+AGENT_CONFIG_FILE=agent_config.json
+AGENT_TIMEOUT_SECONDS=600
+AGENT_WARNING_INTERVAL=300
+AGENT_DISABLE_WARNINGS=false
+AGENT_AUTO_RESTART=false
+AGENT_ENABLED_TYPES=*
+```
+
+### Enhanced Logging
+
+The application includes enhanced logging for better error diagnostics. Log files are stored in:
+
+```
+/opt/geoassessmentpro/logs/
+```
+
+The key log files include:
+- `application.log`: General application logs
+- `errors.log`: Detailed error logs with stack traces and context
+- `database.log`: Database operations and errors
+- `gunicorn_stderr.log`: Web server errors
+
+Log levels can be configured in the environment file:
+
+```
+LOG_LEVEL=INFO  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
+```
+
+For production environments, we recommend keeping the log level at INFO or WARNING.
 
 ## Additional Resources
 
