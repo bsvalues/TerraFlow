@@ -349,6 +349,16 @@ with app.app_context():
     if anomaly_map_bp:
         app.register_blueprint(anomaly_map_bp)
         logger.info("Anomaly Map visualization registered successfully")
+        
+    # Register real-time dashboard visualization
+    try:
+        from visualizations import register_blueprint as register_visualizations
+        if register_visualizations(app):
+            logger.info("Real-time visualization dashboard registered successfully")
+        else:
+            logger.warning("Real-time visualization dashboard registration failed")
+    except ImportError as e:
+        logger.warning(f"Real-time visualization dashboard not available: {str(e)}")
     
     # Initialize secrets manager
     try:
