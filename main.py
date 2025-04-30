@@ -51,6 +51,9 @@ except Exception as e:
 # Import and initialize the Flask app
 from app import app  # noqa: F401
 
+# Import health checker
+import health_checker  # noqa: F401
+
 # Import and register routes
 from mobile_routes import register_mobile_routes
 
@@ -69,11 +72,20 @@ register_mobile_routes(app)
 # Register API endpoints
 try:
     logger.info("Registering API endpoints")
-    from api import register_apis
-    register_apis(app)
+    from api import init_api
+    init_api(app)
     logger.info("API endpoints registered successfully")
 except ImportError as e:
     logger.warning(f"Could not register API endpoints: {str(e)}")
+
+# Initialize monitoring
+try:
+    logger.info("Initializing monitoring")
+    from monitoring import init_monitoring
+    init_monitoring(app)
+    logger.info("Monitoring initialized successfully")
+except ImportError as e:
+    logger.warning(f"Could not initialize monitoring: {str(e)}")
 
 # Import map routes
 try:

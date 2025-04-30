@@ -1,901 +1,482 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
-Health Check System for GeoAssessmentPro
+TerraFusion Health Checker
 
-This module provides comprehensive health checking capabilities for the application,
-including component-level checks and self-healing mechanisms.
+This script performs health checks on the TerraFusion application and related services.
+It reports the health status to monitoring systems and can optionally alert on issues.
 """
 
+import argparse
+import json
+import logging
 import os
+import random
 import sys
 import time
-import logging
-import json
-import datetime
-import threading
-import requests
-import socket
+from datetime import datetime
+from typing import Dict, List, Optional, Union
+
 import psutil
-from typing import Dict, List, Any, Tuple, Optional
+import requests
+import sqlalchemy as sa
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
-from flask import Blueprint, jsonify, current_app, request
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, 
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+        logging.FileHandler(os.path.join('logs', 'health_checker.log'))
+    ]
+)
+logger = logging.getLogger('health_checker')
 
-# Constants
-CHECK_INTERVAL = 60  # seconds
-CACHE_TTL = 30       # seconds
-RETRY_ATTEMPTS = 3
-RETRY_DELAY = 2      # seconds
-SERVICE_TIMEOUT = 5  # seconds
-
-# Health check status constants
-STATUS_OK = "ok"
-STATUS_DEGRADED = "degraded"
-STATUS_DOWN = "down"
-STATUS_UNKNOWN = "unknown"
-
-# Cache for health check results
-health_cache = {
-    "timestamp": 0,
-    "results": {},
-    "overall_status": STATUS_UNKNOWN
+# Health check endpoints
+HEALTH_ENDPOINTS = {
+    'app': 'http://localhost:5000/api/health',
+    'sync_service': 'http://localhost:5000/api/sync/health',
+    'map_service': 'http://localhost:5000/api/map/health',
 }
 
-# Blueprint for health check routes
-health_bp = Blueprint("health_check", __name__, url_prefix="/health")
+# Prometheus metrics endpoint
+PROMETHEUS_METRICS_PATH = '/tmp/terrafusion_health_metrics.prom'
 
-class ComponentCheck:
-    """Base class for component health checks"""
-    
-    def __init__(self, name: str, critical: bool = False):
-        """
-        Initialize component check
-        
-        Args:
-            name: Name of the component
-            critical: Whether this component is critical for the application
-        """
-        self.name = name
-        self.critical = critical
-        self.last_check_time = 0
-        self.last_status = STATUS_UNKNOWN
-        self.details = {}
-        
-    def check_health(self) -> Dict[str, Any]:
-        """
-        Check component health and return status
-        
-        Returns:
-            Dict with health check results
-        """
-        try:
-            start_time = time.time()
-            status, details = self._perform_check()
-            end_time = time.time()
-            response_time = end_time - start_time
-            
-            result = {
-                "status": status,
-                "response_time_ms": int(response_time * 1000),
-                "critical": self.critical,
-                "timestamp": datetime.datetime.utcnow().isoformat(),
-                "details": details if details else {}
-            }
-            
-            self.last_check_time = time.time()
-            self.last_status = status
-            self.details = details if details else {}
-            
-            return result
-        except Exception as e:
-            logger.error(f"Error checking health of {self.name}: {str(e)}")
-            return {
-                "status": STATUS_DOWN,
-                "critical": self.critical,
-                "timestamp": datetime.datetime.utcnow().isoformat(),
-                "details": {"error": str(e)}
-            }
-    
-    def _perform_check(self) -> Tuple[str, Dict[str, Any]]:
-        """
-        Perform the actual health check
-        
-        Returns:
-            Tuple of (status, details)
-        """
-        # To be implemented by subclasses
-        return STATUS_UNKNOWN, {"message": "Not implemented"}
-    
-    def heal(self) -> bool:
-        """
-        Attempt to heal the component if it's down
-        
-        Returns:
-            True if healing was successful, False otherwise
-        """
-        # To be implemented by subclasses
-        return False
+class HealthChecker:
+    """Health checker for TerraFusion application and related services."""
 
-class DatabaseCheck(ComponentCheck):
-    """Health check for database connectivity"""
-    
-    def __init__(self, critical: bool = True):
-        """Initialize database health check"""
-        super().__init__("database", critical)
+    def __init__(self, args: argparse.Namespace) -> None:
+        """Initialize the health checker."""
+        self.args = args
+        self.results = {}
+        self.prometheus_metrics = []
         
-    def _perform_check(self) -> Tuple[str, Dict[str, Any]]:
-        """
-        Check database connectivity
+        # Create logs directory if it doesn't exist
+        os.makedirs('logs', exist_ok=True)
+
+    def check_all(self) -> Dict[str, Dict]:
+        """Run all health checks."""
+        self.results = {}
         
-        Returns:
-            Tuple of (status, details)
-        """
-        from flask import current_app
-        from app import db
+        # Check system health
+        self.results['system'] = self.check_system_health()
         
-        try:
-            # Try to execute a simple query
-            result = db.session.execute("SELECT 1").fetchone()
-            if result and result[0] == 1:
-                # Also check connection pool stats
-                engine = db.engine
-                pool_size = engine.pool.size()
-                pool_checkedin = engine.pool.checkedin()
-                pool_overflow = engine.pool.overflow()
-                pool_checkedout = engine.pool.checkedout()
-                
-                return STATUS_OK, {
-                    "connection_pool": {
-                        "size": pool_size,
-                        "checkedin": pool_checkedin,
-                        "checkedout": pool_checkedout,
-                        "overflow": pool_overflow
-                    },
-                    "database_url": "****", # Redacted for security
-                    "engine": str(engine.dialect.name)
+        # Check database
+        self.results['database'] = self.check_database()
+        
+        # Check API endpoints
+        for service, url in HEALTH_ENDPOINTS.items():
+            self.results[service] = self.check_endpoint(service, url)
+        
+        # Check AI agents
+        self.results['ai_agents'] = self.check_ai_agents()
+        
+        # Generate Prometheus metrics
+        self.generate_prometheus_metrics()
+        
+        return self.results
+
+    def check_system_health(self) -> Dict[str, Union[float, str, bool]]:
+        """Check system health (CPU, memory, disk)."""
+        cpu_percent = psutil.cpu_percent(interval=1)
+        memory = psutil.virtual_memory()
+        disk = psutil.disk_usage('/')
+        
+        # Get process info if running
+        process_info = {'running': False}
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+            if any('gunicorn' in arg for arg in proc.info['cmdline'] if arg):
+                process_info = {
+                    'running': True,
+                    'pid': proc.info['pid'],
+                    'memory_percent': proc.memory_percent(),
+                    'cpu_percent': proc.cpu_percent(interval=0.1),
+                    'uptime': time.time() - proc.create_time()
                 }
-            else:
-                return STATUS_DOWN, {"message": "Database query did not return expected result"}
-        except SQLAlchemyError as e:
-            return STATUS_DOWN, {"error": str(e)}
-        except Exception as e:
-            return STATUS_DOWN, {"error": str(e)}
-    
-    def heal(self) -> bool:
-        """
-        Attempt to heal database connection issues
-        
-        Returns:
-            True if healing was successful, False otherwise
-        """
-        from app import db
-        
-        try:
-            # Try to dispose and recreate engine connections
-            db.engine.dispose()
-            
-            # Test if it worked
-            result = db.session.execute("SELECT 1").fetchone()
-            if result and result[0] == 1:
-                logger.info("Successfully healed database connection")
-                return True
-            
-            return False
-        except Exception as e:
-            logger.error(f"Failed to heal database connection: {str(e)}")
-            return False
-
-class CacheCheck(ComponentCheck):
-    """Health check for cache service"""
-    
-    def __init__(self, critical: bool = False):
-        """Initialize cache health check"""
-        super().__init__("cache", critical)
-        
-    def _perform_check(self) -> Tuple[str, Dict[str, Any]]:
-        """
-        Check cache connectivity
-        
-        Returns:
-            Tuple of (status, details)
-        """
-        # Check if cache is configured
-        if not hasattr(current_app, 'cache'):
-            return STATUS_UNKNOWN, {"message": "Cache not configured"}
-        
-        try:
-            # Try to set and get a value
-            test_key = f"health_check_{time.time()}"
-            test_value = str(time.time())
-            
-            current_app.cache.set(test_key, test_value, timeout=10)
-            retrieved_value = current_app.cache.get(test_key)
-            
-            if retrieved_value == test_value:
-                # Get cache stats if available
-                stats = {}
-                if hasattr(current_app.cache, 'get_stats'):
-                    stats = current_app.cache.get_stats()
-                
-                return STATUS_OK, {"stats": stats}
-            else:
-                return STATUS_DEGRADED, {"message": "Cache set/get test failed"}
-        except Exception as e:
-            return STATUS_DOWN, {"error": str(e)}
-    
-    def heal(self) -> bool:
-        """
-        Attempt to heal cache connection issues
-        
-        Returns:
-            True if healing was successful, False otherwise
-        """
-        # Typically no healing is possible for cache, but we could clear it
-        if not hasattr(current_app, 'cache'):
-            return False
-        
-        try:
-            # Try to clear the cache
-            current_app.cache.clear()
-            
-            # Test if it works
-            test_key = f"health_check_{time.time()}"
-            test_value = str(time.time())
-            current_app.cache.set(test_key, test_value, timeout=10)
-            retrieved_value = current_app.cache.get(test_key)
-            
-            if retrieved_value == test_value:
-                logger.info("Successfully healed cache")
-                return True
-            
-            return False
-        except Exception as e:
-            logger.error(f"Failed to heal cache: {str(e)}")
-            return False
-
-class SuperabaseCheck(ComponentCheck):
-    """Health check for Supabase connection"""
-    
-    def __init__(self, critical: bool = False):
-        """Initialize Supabase health check"""
-        super().__init__("supabase", critical)
-        
-    def _perform_check(self) -> Tuple[str, Dict[str, Any]]:
-        """
-        Check Supabase connectivity
-        
-        Returns:
-            Tuple of (status, details)
-        """
-        from config_loader import is_supabase_enabled
-        
-        if not is_supabase_enabled():
-            return STATUS_UNKNOWN, {"message": "Supabase not enabled"}
-        
-        try:
-            # Import here to avoid circular imports
-            from supabase_client import get_supabase_client
-            
-            client = get_supabase_client()
-            if not client:
-                return STATUS_DOWN, {"message": "Could not get Supabase client"}
-            
-            # Try a simple query
-            response = client.table('app_settings').select('*').limit(1).execute()
-            
-            if hasattr(response, 'data'):
-                # Success, get some stats about the connection
-                return STATUS_OK, {
-                    "supabase_url": "****",  # Redacted for security
-                    "tables_available": True
-                }
-            else:
-                return STATUS_DEGRADED, {"message": "Supabase query did not return expected result"}
-        except Exception as e:
-            return STATUS_DOWN, {"error": str(e)}
-    
-    def heal(self) -> bool:
-        """
-        Attempt to heal Supabase connection issues
-        
-        Returns:
-            True if healing was successful, False otherwise
-        """
-        try:
-            # Try to reinitialize the Supabase client
-            from supabase_client import initialize_supabase
-            
-            result = initialize_supabase()
-            
-            if result:
-                # Test if it works
-                from supabase_client import get_supabase_client
-                client = get_supabase_client()
-                if not client:
-                    return False
-                
-                response = client.table('app_settings').select('*').limit(1).execute()
-                if hasattr(response, 'data'):
-                    logger.info("Successfully healed Supabase connection")
-                    return True
-            
-            return False
-        except Exception as e:
-            logger.error(f"Failed to heal Supabase connection: {str(e)}")
-            return False
-
-class FileSystemCheck(ComponentCheck):
-    """Health check for file system"""
-    
-    def __init__(self, critical: bool = True):
-        """Initialize file system health check"""
-        super().__init__("filesystem", critical)
-        
-    def _perform_check(self) -> Tuple[str, Dict[str, Any]]:
-        """
-        Check file system health
-        
-        Returns:
-            Tuple of (status, details)
-        """
-        try:
-            # Check if upload directory exists and is writable
-            upload_dir = current_app.config.get("UPLOAD_FOLDER", "uploads")
-            
-            if not os.path.exists(upload_dir):
-                return STATUS_DOWN, {"message": f"Upload directory {upload_dir} does not exist"}
-            
-            if not os.access(upload_dir, os.W_OK):
-                return STATUS_DOWN, {"message": f"Upload directory {upload_dir} is not writable"}
-            
-            # Check disk space
-            disk_usage = psutil.disk_usage(upload_dir)
-            free_space_mb = disk_usage.free / (1024 * 1024)
-            total_space_mb = disk_usage.total / (1024 * 1024)
-            used_space_mb = disk_usage.used / (1024 * 1024)
-            percent_used = disk_usage.percent
-            
-            # If less than 5% or 100MB free, it's degraded
-            if percent_used > 95 or free_space_mb < 100:
-                return STATUS_DEGRADED, {
-                    "message": "Low disk space",
-                    "free_mb": round(free_space_mb, 2),
-                    "total_mb": round(total_space_mb, 2),
-                    "used_mb": round(used_space_mb, 2),
-                    "percent_used": percent_used
-                }
-            
-            # Write a test file to ensure write capability
-            test_file = os.path.join(upload_dir, ".health_check_test")
-            with open(test_file, "w") as f:
-                f.write("test")
-            
-            # Read the test file to ensure read capability
-            with open(test_file, "r") as f:
-                content = f.read()
-            
-            # Delete the test file
-            os.remove(test_file)
-            
-            if content != "test":
-                return STATUS_DEGRADED, {"message": "File read/write test failed"}
-            
-            return STATUS_OK, {
-                "directory": upload_dir,
-                "free_mb": round(free_space_mb, 2),
-                "total_mb": round(total_space_mb, 2),
-                "used_mb": round(used_space_mb, 2),
-                "percent_used": percent_used
-            }
-        except Exception as e:
-            return STATUS_DOWN, {"error": str(e)}
-    
-    def heal(self) -> bool:
-        """
-        Attempt to heal file system issues
-        
-        Returns:
-            True if healing was successful, False otherwise
-        """
-        try:
-            # Try to create upload directory if it doesn't exist
-            upload_dir = current_app.config.get("UPLOAD_FOLDER", "uploads")
-            
-            if not os.path.exists(upload_dir):
-                os.makedirs(upload_dir, exist_ok=True)
-                logger.info(f"Created upload directory {upload_dir}")
-            
-            # Check if upload directory is writable
-            if not os.access(upload_dir, os.W_OK):
-                # Try to change permissions
-                os.chmod(upload_dir, 0o755)
-                logger.info(f"Changed permissions for upload directory {upload_dir}")
-            
-            # Test if it works
-            test_file = os.path.join(upload_dir, ".health_check_test")
-            with open(test_file, "w") as f:
-                f.write("test")
-            
-            # Read the test file to ensure read capability
-            with open(test_file, "r") as f:
-                content = f.read()
-            
-            # Delete the test file
-            os.remove(test_file)
-            
-            if content == "test":
-                logger.info("Successfully healed file system")
-                return True
-            
-            return False
-        except Exception as e:
-            logger.error(f"Failed to heal file system: {str(e)}")
-            return False
-
-class SystemResourcesCheck(ComponentCheck):
-    """Health check for system resources"""
-    
-    def __init__(self, critical: bool = False):
-        """Initialize system resources health check"""
-        super().__init__("system_resources", critical)
-        
-    def _perform_check(self) -> Tuple[str, Dict[str, Any]]:
-        """
-        Check system resources health
-        
-        Returns:
-            Tuple of (status, details)
-        """
-        try:
-            # Check CPU usage
-            cpu_percent = psutil.cpu_percent(interval=0.5)
-            
-            # Check memory usage
-            memory = psutil.virtual_memory()
-            memory_percent = memory.percent
-            memory_available_mb = memory.available / (1024 * 1024)
-            memory_total_mb = memory.total / (1024 * 1024)
-            memory_used_mb = memory.used / (1024 * 1024)
-            
-            # If CPU or memory usage is high, it's degraded
-            status = STATUS_OK
-            message = "System resources are healthy"
-            
-            if cpu_percent > 90:
-                status = STATUS_DEGRADED
-                message = "High CPU usage"
-            
-            if memory_percent > 90:
-                status = STATUS_DEGRADED
-                message = "High memory usage"
-            
-            if memory_available_mb < 100:
-                status = STATUS_DEGRADED
-                message = "Low available memory"
-            
-            return status, {
-                "message": message,
-                "cpu": {
-                    "percent": cpu_percent
-                },
-                "memory": {
-                    "percent": memory_percent,
-                    "available_mb": round(memory_available_mb, 2),
-                    "total_mb": round(memory_total_mb, 2),
-                    "used_mb": round(memory_used_mb, 2)
-                }
-            }
-        except Exception as e:
-            return STATUS_DOWN, {"error": str(e)}
-    
-    def heal(self) -> bool:
-        """
-        Attempt to heal system resources issues
-        
-        Returns:
-            True if healing was successful, False otherwise
-        """
-        # Not much we can do to heal system resources, but we could
-        # try to free up memory by suggesting garbage collection
-        try:
-            import gc
-            gc.collect()
-            
-            # Check if it helped
-            memory = psutil.virtual_memory()
-            memory_percent = memory.percent
-            
-            if memory_percent < 90:
-                logger.info("Successfully freed up memory")
-                return True
-            
-            return False
-        except Exception as e:
-            logger.error(f"Failed to heal system resources: {str(e)}")
-            return False
-
-class ExternalApiCheck(ComponentCheck):
-    """Health check for external API connections"""
-    
-    def __init__(self, name: str, url: str, method: str = "GET", 
-                expected_status: int = 200, timeout: int = SERVICE_TIMEOUT, 
-                headers: Dict[str, str] = None, data: Dict[str, Any] = None,
-                critical: bool = False):
-        """
-        Initialize external API health check
-        
-        Args:
-            name: Name of the external API
-            url: URL to check
-            method: HTTP method to use
-            expected_status: Expected HTTP status code
-            timeout: Request timeout in seconds
-            headers: HTTP headers to send
-            data: Request data to send
-            critical: Whether this component is critical for the application
-        """
-        super().__init__(f"external_api_{name}", critical)
-        self.url = url
-        self.method = method
-        self.expected_status = expected_status
-        self.timeout = timeout
-        self.headers = headers or {}
-        self.data = data or {}
-        
-    def _perform_check(self) -> Tuple[str, Dict[str, Any]]:
-        """
-        Check external API health
-        
-        Returns:
-            Tuple of (status, details)
-        """
-        try:
-            # Make the request
-            response = requests.request(
-                method=self.method,
-                url=self.url,
-                headers=self.headers,
-                json=self.data,
-                timeout=self.timeout
-            )
-            
-            # Check the status code
-            if response.status_code == self.expected_status:
-                return STATUS_OK, {
-                    "status_code": response.status_code,
-                    "url": self.url,
-                    "method": self.method
-                }
-            else:
-                return STATUS_DEGRADED, {
-                    "message": f"Unexpected status code: {response.status_code}",
-                    "expected": self.expected_status,
-                    "url": self.url,
-                    "method": self.method
-                }
-        except requests.exceptions.Timeout:
-            return STATUS_DEGRADED, {
-                "message": "Request timed out",
-                "url": self.url,
-                "method": self.method
-            }
-        except requests.exceptions.ConnectionError:
-            return STATUS_DOWN, {
-                "message": "Connection error",
-                "url": self.url,
-                "method": self.method
-            }
-        except Exception as e:
-            return STATUS_DOWN, {
-                "error": str(e),
-                "url": self.url,
-                "method": self.method
-            }
-    
-    def heal(self) -> bool:
-        """
-        Attempt to heal external API connection issues
-        
-        Returns:
-            True if healing was successful, False otherwise
-        """
-        # For external APIs, we can just retry the request a few times
-        for attempt in range(RETRY_ATTEMPTS):
-            try:
-                logger.info(f"Healing attempt {attempt + 1} for {self.name}")
-                
-                # Make the request
-                response = requests.request(
-                    method=self.method,
-                    url=self.url,
-                    headers=self.headers,
-                    json=self.data,
-                    timeout=self.timeout
-                )
-                
-                # Check the status code
-                if response.status_code == self.expected_status:
-                    logger.info(f"Successfully healed {self.name}")
-                    return True
-                
-                # Wait before retry
-                time.sleep(RETRY_DELAY)
-            except Exception as e:
-                logger.error(f"Healing attempt {attempt + 1} failed: {str(e)}")
-                time.sleep(RETRY_DELAY)
-        
-        return False
-
-class HealthCheckManager:
-    """Manager for health checks"""
-    
-    def __init__(self):
-        """Initialize health check manager"""
-        self.components = {}
-        self.lock = threading.Lock()
-        
-    def register_component(self, component: ComponentCheck) -> None:
-        """
-        Register a component health check
-        
-        Args:
-            component: Component health check
-        """
-        with self.lock:
-            self.components[component.name] = component
-            logger.info(f"Registered health check for component: {component.name}")
-    
-    def check_component(self, component_name: str) -> Dict[str, Any]:
-        """
-        Check a specific component's health
-        
-        Args:
-            component_name: Name of the component to check
-            
-        Returns:
-            Dict with health check results
-        """
-        with self.lock:
-            if component_name not in self.components:
-                return {
-                    "status": STATUS_UNKNOWN,
-                    "timestamp": datetime.datetime.utcnow().isoformat(),
-                    "details": {"message": f"Component {component_name} not registered"}
-                }
-            
-            component = self.components[component_name]
-            return component.check_health()
-    
-    def check_all_components(self) -> Dict[str, Dict[str, Any]]:
-        """
-        Check health of all registered components
-        
-        Returns:
-            Dict with health check results for all components
-        """
-        results = {}
-        with self.lock:
-            for name, component in self.components.items():
-                results[name] = component.check_health()
-        
-        return results
-    
-    def get_overall_status(self, results: Dict[str, Dict[str, Any]]) -> str:
-        """
-        Get overall health status based on component results
-        
-        Args:
-            results: Dict with health check results for all components
-            
-        Returns:
-            Overall health status
-        """
-        # If any critical component is down, overall status is down
-        for name, result in results.items():
-            if result.get("critical", False) and result.get("status") == STATUS_DOWN:
-                return STATUS_DOWN
-        
-        # If any component is down, or any critical component is degraded, overall status is degraded
-        for name, result in results.items():
-            if result.get("status") == STATUS_DOWN:
-                return STATUS_DEGRADED
-            
-            if result.get("critical", False) and result.get("status") == STATUS_DEGRADED:
-                return STATUS_DEGRADED
-        
-        # If all components are OK, overall status is OK
-        all_ok = True
-        for name, result in results.items():
-            if result.get("status") != STATUS_OK and result.get("status") != STATUS_UNKNOWN:
-                all_ok = False
                 break
         
-        if all_ok:
-            return STATUS_OK
-        
-        # Otherwise, overall status is degraded
-        return STATUS_DEGRADED
-    
-    def heal_component(self, component_name: str) -> bool:
-        """
-        Attempt to heal a specific component
-        
-        Args:
-            component_name: Name of the component to heal
+        return {
+            'cpu_percent': cpu_percent,
+            'memory_percent': memory.percent,
+            'memory_available_mb': memory.available / (1024 * 1024),
+            'disk_percent': disk.percent,
+            'disk_free_gb': disk.free / (1024 * 1024 * 1024),
+            'process': process_info,
+            'status': 'healthy' if cpu_percent < 80 and memory.percent < 80 and disk.percent < 80 else 'unhealthy'
+        }
+
+    def check_database(self) -> Dict[str, Union[str, bool, float]]:
+        """Check database connectivity and health."""
+        try:
+            # Create database connection
+            database_url = os.environ.get('DATABASE_URL')
+            if not database_url:
+                return {
+                    'status': 'error',
+                    'message': 'DATABASE_URL environment variable not set',
+                    'connected': False
+                }
             
-        Returns:
-            True if healing was successful, False otherwise
-        """
-        with self.lock:
-            if component_name not in self.components:
-                return False
+            engine = sa.create_engine(database_url)
             
-            component = self.components[component_name]
-            return component.heal()
-    
-    def heal_all_components(self) -> Dict[str, bool]:
-        """
-        Attempt to heal all components that are down
-        
-        Returns:
-            Dict with healing results for all components
-        """
-        results = {}
-        with self.lock:
-            # First check all components
-            check_results = self.check_all_components()
-            
-            # Then try to heal components that are down
-            for name, result in check_results.items():
-                if result.get("status") == STATUS_DOWN:
-                    component = self.components[name]
-                    results[name] = component.heal()
+            # Check connection
+            start_time = time.time()
+            with engine.connect() as conn:
+                # Execute a simple query
+                result = conn.execute(text('SELECT 1'))
+                assert result.scalar() == 1
+                
+                # Check PostgreSQL version
+                version = conn.execute(text('SHOW server_version')).scalar()
+                
+                # Check if PostGIS is installed
+                postgis_enabled = False
+                try:
+                    postgis_version = conn.execute(text('SELECT PostGIS_Version()')).scalar()
+                    postgis_enabled = True
+                except:
+                    postgis_version = None
+                
+                # Get some basic database stats
+                db_stats_query = text('''
+                    SELECT 
+                        numbackends as active_connections,
+                        xact_commit as transactions_committed,
+                        xact_rollback as transactions_rollback,
+                        blks_read as blocks_read,
+                        blks_hit as blocks_hit,
+                        tup_returned as rows_returned,
+                        tup_fetched as rows_fetched,
+                        tup_inserted as rows_inserted,
+                        tup_updated as rows_updated,
+                        tup_deleted as rows_deleted
+                    FROM pg_stat_database
+                    WHERE datname = current_database()
+                ''')
+                db_stats = dict(conn.execute(db_stats_query).mappings().first())
+                
+                # Calculate cache hit ratio
+                if db_stats['blocks_read'] + db_stats['blocks_hit'] > 0:
+                    cache_hit_ratio = db_stats['blocks_hit'] / (db_stats['blocks_read'] + db_stats['blocks_hit'])
                 else:
-                    results[name] = True
+                    cache_hit_ratio = 0
+                
+            query_time = time.time() - start_time
+            
+            return {
+                'status': 'healthy',
+                'connected': True,
+                'version': version,
+                'postgis_enabled': postgis_enabled,
+                'postgis_version': postgis_version,
+                'query_time_ms': query_time * 1000,
+                'active_connections': db_stats['active_connections'],
+                'cache_hit_ratio': cache_hit_ratio,
+                'transactions': {
+                    'committed': db_stats['transactions_committed'],
+                    'rollback': db_stats['transactions_rollback'],
+                },
+                'rows': {
+                    'returned': db_stats['rows_returned'],
+                    'fetched': db_stats['rows_fetched'],
+                    'inserted': db_stats['rows_inserted'],
+                    'updated': db_stats['rows_updated'],
+                    'deleted': db_stats['rows_deleted']
+                }
+            }
+        except SQLAlchemyError as e:
+            logger.error(f"Database check failed: {str(e)}")
+            return {
+                'status': 'error',
+                'message': str(e),
+                'connected': False
+            }
+        except Exception as e:
+            logger.error(f"Unexpected error in database check: {str(e)}")
+            return {
+                'status': 'error',
+                'message': str(e),
+                'connected': False
+            }
+
+    def check_endpoint(self, service: str, url: str) -> Dict[str, Union[str, bool, float]]:
+        """Check health of an API endpoint."""
+        try:
+            start_time = time.time()
+            response = requests.get(url, timeout=5)
+            response_time = time.time() - start_time
+            
+            if response.status_code == 200:
+                # Try to parse response as JSON
+                try:
+                    data = response.json()
+                    status = data.get('status', 'unknown')
+                except:
+                    status = 'healthy'  # Assume healthy if we get 200 but not JSON
+                
+                return {
+                    'status': status,
+                    'response_time_ms': response_time * 1000,
+                    'status_code': response.status_code,
+                    'available': True
+                }
+            else:
+                return {
+                    'status': 'unhealthy',
+                    'response_time_ms': response_time * 1000,
+                    'status_code': response.status_code,
+                    'available': False,
+                    'message': f"Unexpected status code: {response.status_code}"
+                }
+        except requests.RequestException as e:
+            logger.warning(f"Failed to connect to {service} at {url}: {str(e)}")
+            return {
+                'status': 'unavailable',
+                'available': False,
+                'message': str(e)
+            }
+
+    def check_ai_agents(self) -> Dict[str, Union[str, List[Dict]]]:
+        """Check health of AI agents."""
+        try:
+            # Try to get agent statuses from the agent manager API
+            url = 'http://localhost:5000/api/agent/status'
+            response = requests.get(url, timeout=5)
+            
+            if response.status_code == 200:
+                data = response.json()
+                agents = data.get('agents', [])
+                
+                # Check if there are any unhealthy agents
+                unhealthy_agents = [
+                    agent for agent in agents 
+                    if agent.get('status') not in ('healthy', 'active', 'idle')
+                ]
+                
+                status = 'healthy' if not unhealthy_agents else 'unhealthy'
+                
+                return {
+                    'status': status,
+                    'agents': agents,
+                    'agent_count': len(agents),
+                    'unhealthy_count': len(unhealthy_agents),
+                    'unhealthy_agents': [
+                        agent['name'] for agent in unhealthy_agents
+                    ] if unhealthy_agents else []
+                }
+            else:
+                # API call failed, see if we can find agent processes
+                agent_procs = []
+                for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+                    if any('agent.py' in arg for arg in proc.info['cmdline'] if arg):
+                        agent_procs.append({
+                            'pid': proc.info['pid'],
+                            'cmdline': ' '.join(proc.info['cmdline']),
+                            'cpu_percent': proc.cpu_percent(interval=0.1),
+                            'memory_percent': proc.memory_percent()
+                        })
+                
+                status = 'unknown' if agent_procs else 'unavailable'
+                
+                return {
+                    'status': status,
+                    'message': f"Agent API unavailable. Found {len(agent_procs)} agent processes.",
+                    'agent_processes': agent_procs,
+                    'agent_count': len(agent_procs)
+                }
+        except Exception as e:
+            logger.error(f"Error checking AI agents: {str(e)}")
+            return {
+                'status': 'error',
+                'message': str(e)
+            }
+
+    def generate_prometheus_metrics(self) -> None:
+        """Generate Prometheus metrics from health check results."""
+        self.prometheus_metrics = []
+        timestamp = int(time.time() * 1000)
         
-        return results
-
-# Create health check manager
-health_manager = HealthCheckManager()
-
-@health_bp.route("/", methods=["GET"])
-def health_check():
-    """
-    Health check endpoint
-    
-    Returns:
-        JSON response with health check results
-    """
-    global health_cache
-    
-    # Check if cached result is still valid
-    now = time.time()
-    if now - health_cache["timestamp"] < CACHE_TTL:
-        return jsonify({
-            "status": health_cache["overall_status"],
-            "components": health_cache["results"],
-            "timestamp": datetime.datetime.utcfromtimestamp(health_cache["timestamp"]).isoformat(),
-            "cached": True
-        })
-    
-    # Get fresh results
-    results = health_manager.check_all_components()
-    overall_status = health_manager.get_overall_status(results)
-    
-    # Update cache
-    health_cache = {
-        "timestamp": now,
-        "results": results,
-        "overall_status": overall_status
-    }
-    
-    return jsonify({
-        "status": overall_status,
-        "components": results,
-        "timestamp": datetime.datetime.utcfromtimestamp(now).isoformat(),
-        "cached": False
-    })
-
-@health_bp.route("/<component_name>", methods=["GET"])
-def component_health_check(component_name):
-    """
-    Health check endpoint for a specific component
-    
-    Args:
-        component_name: Name of the component to check
+        # System metrics
+        if 'system' in self.results:
+            system = self.results['system']
+            self.prometheus_metrics.extend([
+                f'# HELP terrafusion_system_cpu_percent System CPU usage percentage',
+                f'# TYPE terrafusion_system_cpu_percent gauge',
+                f'terrafusion_system_cpu_percent {system["cpu_percent"]} {timestamp}',
+                f'# HELP terrafusion_system_memory_percent System memory usage percentage',
+                f'# TYPE terrafusion_system_memory_percent gauge',
+                f'terrafusion_system_memory_percent {system["memory_percent"]} {timestamp}',
+                f'# HELP terrafusion_system_disk_percent System disk usage percentage',
+                f'# TYPE terrafusion_system_disk_percent gauge',
+                f'terrafusion_system_disk_percent {system["disk_percent"]} {timestamp}',
+            ])
+            
+            # Process metrics
+            if system['process']['running']:
+                self.prometheus_metrics.extend([
+                    f'# HELP terrafusion_process_memory_percent Process memory usage percentage',
+                    f'# TYPE terrafusion_process_memory_percent gauge',
+                    f'terrafusion_process_memory_percent {system["process"]["memory_percent"]} {timestamp}',
+                    f'# HELP terrafusion_process_cpu_percent Process CPU usage percentage',
+                    f'# TYPE terrafusion_process_cpu_percent gauge',
+                    f'terrafusion_process_cpu_percent {system["process"]["cpu_percent"]} {timestamp}',
+                    f'# HELP terrafusion_process_uptime_seconds Process uptime in seconds',
+                    f'# TYPE terrafusion_process_uptime_seconds counter',
+                    f'terrafusion_process_uptime_seconds {system["process"]["uptime"]} {timestamp}',
+                ])
         
-    Returns:
-        JSON response with health check results
-    """
-    result = health_manager.check_component(component_name)
-    
-    return jsonify({
-        "status": result.get("status", STATUS_UNKNOWN),
-        "component": component_name,
-        "details": result.get("details", {}),
-        "timestamp": datetime.datetime.utcnow().isoformat()
-    })
-
-@health_bp.route("/heal", methods=["POST"])
-def heal_all_components():
-    """
-    Endpoint to attempt healing all components
-    
-    Returns:
-        JSON response with healing results
-    """
-    results = health_manager.heal_all_components()
-    
-    return jsonify({
-        "results": results,
-        "timestamp": datetime.datetime.utcnow().isoformat()
-    })
-
-@health_bp.route("/heal/<component_name>", methods=["POST"])
-def heal_component(component_name):
-    """
-    Endpoint to attempt healing a specific component
-    
-    Args:
-        component_name: Name of the component to heal
+        # Database metrics
+        if 'database' in self.results and self.results['database'].get('connected', False):
+            db = self.results['database']
+            self.prometheus_metrics.extend([
+                f'# HELP terrafusion_database_query_time_ms Database query response time in milliseconds',
+                f'# TYPE terrafusion_database_query_time_ms gauge',
+                f'terrafusion_database_query_time_ms {db["query_time_ms"]} {timestamp}',
+                f'# HELP terrafusion_database_connections Number of active database connections',
+                f'# TYPE terrafusion_database_connections gauge',
+                f'terrafusion_database_connections {db["active_connections"]} {timestamp}',
+                f'# HELP terrafusion_database_cache_hit_ratio Database cache hit ratio',
+                f'# TYPE terrafusion_database_cache_hit_ratio gauge',
+                f'terrafusion_database_cache_hit_ratio {db["cache_hit_ratio"]} {timestamp}',
+            ])
         
-    Returns:
-        JSON response with healing result
-    """
-    result = health_manager.heal_component(component_name)
-    
-    return jsonify({
-        "success": result,
-        "component": component_name,
-        "timestamp": datetime.datetime.utcnow().isoformat()
-    })
-
-def initialize_health_checks():
-    """Initialize health checks"""
-    # Register default components
-    health_manager.register_component(DatabaseCheck())
-    health_manager.register_component(FileSystemCheck())
-    health_manager.register_component(SystemResourcesCheck())
-    
-    # Register Supabase check if enabled
-    from config_loader import is_supabase_enabled
-    if is_supabase_enabled():
-        health_manager.register_component(SuperabaseCheck(critical=True))
-    
-    # Register cache check if configured
-    if hasattr(current_app, 'cache'):
-        health_manager.register_component(CacheCheck())
-    
-    logger.info("Health check system initialized")
-    
-    return health_manager
-
-def register_blueprint(app):
-    """
-    Register health check blueprint with the application
-    
-    Args:
-        app: Flask application
+        # API endpoint metrics
+        for service, data in self.results.items():
+            if service in HEALTH_ENDPOINTS:
+                available = int(data.get('available', False))
+                self.prometheus_metrics.extend([
+                    f'# HELP terrafusion_service_{service}_available Service availability (1=available, 0=unavailable)',
+                    f'# TYPE terrafusion_service_{service}_available gauge',
+                    f'terrafusion_service_{service}_available {available} {timestamp}',
+                ])
+                
+                if data.get('available', False) and 'response_time_ms' in data:
+                    self.prometheus_metrics.extend([
+                        f'# HELP terrafusion_service_{service}_response_time_ms Service response time in milliseconds',
+                        f'# TYPE terrafusion_service_{service}_response_time_ms gauge',
+                        f'terrafusion_service_{service}_response_time_ms {data["response_time_ms"]} {timestamp}',
+                    ])
         
-    Returns:
-        Health check manager
-    """
-    app.register_blueprint(health_bp)
-    
-    # Initialize health checks
-    with app.app_context():
-        return initialize_health_checks()
-
-if __name__ == "__main__":
-    # This is mainly for testing
-    from app import app
-    
-    with app.app_context():
-        manager = initialize_health_checks()
-        results = manager.check_all_components()
+        # AI Agents metrics
+        if 'ai_agents' in self.results:
+            agents = self.results['ai_agents']
+            agent_count = agents.get('agent_count', 0)
+            unhealthy_count = agents.get('unhealthy_count', 0)
+            
+            self.prometheus_metrics.extend([
+                f'# HELP terrafusion_agents_total Total number of AI agents',
+                f'# TYPE terrafusion_agents_total gauge',
+                f'terrafusion_agents_total {agent_count} {timestamp}',
+                f'# HELP terrafusion_agents_unhealthy Number of unhealthy AI agents',
+                f'# TYPE terrafusion_agents_unhealthy gauge',
+                f'terrafusion_agents_unhealthy {unhealthy_count} {timestamp}',
+            ])
         
+        # Write metrics to file for Prometheus Node Exporter
+        if self.args.write_metrics:
+            self.write_prometheus_metrics()
+
+    def write_prometheus_metrics(self) -> None:
+        """Write Prometheus metrics to a file for node_exporter textfile collector."""
+        try:
+            with open(PROMETHEUS_METRICS_PATH, 'w') as f:
+                f.write('\n'.join(self.prometheus_metrics))
+            logger.info(f"Wrote Prometheus metrics to {PROMETHEUS_METRICS_PATH}")
+        except Exception as e:
+            logger.error(f"Failed to write Prometheus metrics: {str(e)}")
+
+    def print_report(self) -> None:
+        """Print a human-readable health report."""
+        print("\n===== TerraFusion Health Report =====")
+        print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print("\n=== System Health ===")
+        system = self.results['system']
+        print(f"CPU Usage:    {system['cpu_percent']:.1f}%")
+        print(f"Memory Usage: {system['memory_percent']:.1f}%")
+        print(f"Disk Usage:   {system['disk_percent']:.1f}%")
+        print(f"Process:      {'Running' if system['process']['running'] else 'Not running'}")
+        
+        print("\n=== Database ===")
+        db = self.results['database']
+        print(f"Status:       {db['status']}")
+        if db.get('connected', False):
+            print(f"Version:      {db['version']}")
+            print(f"PostGIS:      {'Enabled' if db['postgis_enabled'] else 'Not enabled'}")
+            print(f"Query Time:   {db['query_time_ms']:.2f}ms")
+            print(f"Connections:  {db['active_connections']}")
+            
+        print("\n=== Services ===")
+        for service, url in HEALTH_ENDPOINTS.items():
+            data = self.results.get(service, {})
+            status = data.get('status', 'unknown')
+            available = data.get('available', False)
+            response_time = data.get('response_time_ms', 0)
+            
+            if available:
+                print(f"{service:12} {status} ({response_time:.2f}ms)")
+            else:
+                message = data.get('message', 'unavailable')
+                print(f"{service:12} {status} - {message}")
+        
+        print("\n=== AI Agents ===")
+        agents = self.results['ai_agents']
+        if 'agents' in agents:
+            print(f"Total Agents: {agents['agent_count']}")
+            print(f"Unhealthy:    {agents['unhealthy_count']}")
+            if agents['unhealthy_count'] > 0:
+                print("Unhealthy Agents:")
+                for agent_name in agents['unhealthy_agents']:
+                    print(f"  - {agent_name}")
+        else:
+            print(f"Status: {agents['status']}")
+            if 'message' in agents:
+                print(f"Info: {agents['message']}")
+        
+        print("\n====================================")
+
+def parse_args() -> argparse.Namespace:
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(description='TerraFusion Health Checker')
+    parser.add_argument('-o', '--output', choices=['text', 'json'], default='text',
+                        help='Output format (default: text)')
+    parser.add_argument('-j', '--json-file', metavar='FILE',
+                        help='Write JSON output to file')
+    parser.add_argument('-p', '--write-metrics', action='store_true',
+                        help='Write Prometheus metrics to file')
+    parser.add_argument('-v', '--verbose', action='store_true',
+                        help='Enable verbose output')
+    return parser.parse_args()
+
+def main() -> None:
+    """Main function."""
+    args = parse_args()
+    
+    if args.verbose:
+        logger.setLevel(logging.DEBUG)
+    
+    checker = HealthChecker(args)
+    results = checker.check_all()
+    
+    if args.output == 'text':
+        checker.print_report()
+    else:  # json
         print(json.dumps(results, indent=2))
+    
+    if args.json_file:
+        try:
+            with open(args.json_file, 'w') as f:
+                json.dump(results, f, indent=2)
+            logger.info(f"Wrote JSON output to {args.json_file}")
+        except Exception as e:
+            logger.error(f"Failed to write JSON output: {str(e)}")
+    
+    # Exit with non-zero code if any service is unhealthy
+    for service, data in results.items():
+        if data.get('status') in ('error', 'unhealthy'):
+            sys.exit(1)
+    
+    sys.exit(0)
+
+if __name__ == '__main__':
+    main()

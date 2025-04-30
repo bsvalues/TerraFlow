@@ -30,3 +30,4 @@ openai
 matplotlib
 seaborn
 reportlab
+psutil
