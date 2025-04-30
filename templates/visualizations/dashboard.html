@@ -567,7 +567,7 @@
     }
     
     // Fetch data from API
-    fetch('/api/dashboard?' + params.toString())
+    fetch('/visualizations/dashboard/api/dashboard?' + params.toString())
       .then(response => response.json())
       .then(data => {
         updateDashboardStats(data.stats);
@@ -583,7 +583,7 @@
   
   // Fetch anomaly trend data
   function fetchAnomalyTrend(period) {
-    fetch(`/api/dashboard/trend/${period}`)
+    fetch(`/visualizations/dashboard/api/dashboard/trend/${period}`)
       .then(response => response.json())
       .then(data => {
         updateAnomalyTrendChart(data);
@@ -595,7 +595,7 @@
   
   // Fetch recent anomalies
   function fetchRecentAnomalies() {
-    fetch('/api/dashboard/recent-anomalies')
+    fetch('/visualizations/dashboard/api/dashboard/recent-anomalies')
       .then(response => response.json())
       .then(data => {
         updateRecentAnomaliesTable(data);
@@ -750,7 +750,7 @@
   // Show property details in a modal
   function showPropertyDetails(propertyId) {
     // Fetch property details
-    fetch(`/api/properties/${propertyId}`)
+    fetch(`/visualizations/dashboard/api/properties/${propertyId}`)
       .then(response => response.json())
       .then(property => {
         // Update modal content
