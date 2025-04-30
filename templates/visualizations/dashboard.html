@@ -220,10 +220,43 @@
   .chart-container {
     height: 200px;
     width: 100%;
+    margin-bottom: 15px;
+    position: relative;
   }
   #anomalyTrendChart {
     width: 100%;
     height: 100%;
+  }
+  .chart-controls {
+    display: flex;
+    align-items: center;
+  }
+  .chart-selector {
+    width: auto;
+    font-size: 0.85rem;
+    height: 30px;
+    padding: 2px 8px;
+  }
+  .chart-metrics {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 5px;
+    padding-top: 10px;
+    border-top: 1px solid #eaeaea;
+  }
+  .metric-item {
+    text-align: center;
+    flex: 1;
+  }
+  .metric-label {
+    font-size: 0.8rem;
+    color: #666;
+    margin-bottom: 2px;
+  }
+  .metric-value {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--tf-primary);
   }
   .time-filter {
     display: flex;
@@ -624,6 +657,12 @@
       });
     });
     
+    // Chart type selector
+    document.getElementById('chartTypeSelector').addEventListener('change', function() {
+      const chartType = this.value;
+      updateChartType(chartType);
+    });
+    
     // View full property details button
     document.getElementById('viewFullPropertyDetails').addEventListener('click', function() {
       const propertyId = this.getAttribute('data-property-id');
@@ -631,6 +670,18 @@
         window.location.href = '/property/' + propertyId;
       }
     });
+    
+    // Add error handling for event listeners
+    try {
+      // Add a window resize event handler to redraw charts when the window size changes
+      window.addEventListener('resize', function() {
+        if (anomalyTrendChart) {
+          anomalyTrendChart.resize();
+        }
+      });
+    } catch (error) {
+      console.error('Error setting up window resize handler:', error);
+    }
   }
   
   // Start the data refresh cycle
@@ -971,8 +1022,111 @@
       anomalyTrendChart.data.labels = data.labels;
       anomalyTrendChart.data.datasets[0].data = data.values;
       anomalyTrendChart.update();
+      
+      // Update chart metrics
+      updateChartMetrics(data.values);
     } catch (error) {
       console.error('Error updating trend chart:', error);
+    }
+  }
+  
+  // Update chart metrics (peak, average, total)
+  function updateChartMetrics(values) {
+    try {
+      if (!values || !Array.isArray(values)) {
+        console.warn('No valid data for chart metrics');
+        return;
+      }
+      
+      // Calculate metrics
+      const peak = Math.max(...values);
+      
+      // Calculate average (avoid division by zero)
+      let average = 0;
+      if (values.length > 0) {
+        const sum = values.reduce((a, b) => a + b, 0);
+        average = sum / values.length;
+      }
+      
+      // Calculate total
+      const total = values.reduce((a, b) => a + b, 0);
+      
+      // Update the UI
+      const peakElement = document.getElementById('peakAnomalies');
+      if (peakElement) peakElement.textContent = peak;
+      
+      const avgElement = document.getElementById('avgAnomalies');
+      if (avgElement) avgElement.textContent = average.toFixed(1);
+      
+      const totalElement = document.getElementById('totalAnomaliesChart');
+      if (totalElement) totalElement.textContent = total;
+      
+      // Update data completeness
+      updateDataCompleteness(values);
+    } catch (error) {
+      console.error('Error updating chart metrics:', error);
+    }
+  }
+  
+  // Update the data completeness progress bar
+  function updateDataCompleteness(values) {
+    try {
+      if (!values || !Array.isArray(values)) {
+        return;
+      }
+      
+      // Calculate completeness as percentage of non-zero values
+      const nonZeroCount = values.filter(v => v > 0).length;
+      const completeness = values.length > 0 ? (nonZeroCount / values.length) * 100 : 0;
+      
+      // Update progress bar
+      const progressBar = document.getElementById('dataCompleteness');
+      if (progressBar) {
+        progressBar.style.width = `${completeness}%`;
+        progressBar.setAttribute('aria-valuenow', completeness);
+        progressBar.textContent = `${Math.round(completeness)}%`;
+      }
+    } catch (error) {
+      console.error('Error updating data completeness:', error);
+    }
+  }
+  
+  // Update chart type
+  function updateChartType(chartType) {
+    try {
+      if (!anomalyTrendChart) {
+        console.error('Chart not initialized');
+        return;
+      }
+      
+      // Store current data
+      const currentData = {
+        labels: anomalyTrendChart.data.labels,
+        datasets: anomalyTrendChart.data.datasets
+      };
+      
+      // Update chart type
+      if (chartType === 'bar') {
+        anomalyTrendChart.config.type = 'bar';
+        anomalyTrendChart.data.datasets[0].fill = false;
+        anomalyTrendChart.data.datasets[0].backgroundColor = 'rgba(244, 67, 54, 0.7)';
+      } else if (chartType === 'area') {
+        anomalyTrendChart.config.type = 'line';
+        anomalyTrendChart.data.datasets[0].fill = true;
+        anomalyTrendChart.data.datasets[0].backgroundColor = 'rgba(244, 67, 54, 0.2)';
+        anomalyTrendChart.data.datasets[0].tension = 0.4;
+      } else {
+        // Default: line chart
+        anomalyTrendChart.config.type = 'line';
+        anomalyTrendChart.data.datasets[0].fill = false;
+        anomalyTrendChart.data.datasets[0].tension = 0.2;
+      }
+      
+      // Restore data and update
+      anomalyTrendChart.data = currentData;
+      anomalyTrendChart.update();
+    } catch (error) {
+      console.error('Error updating chart type:', error);
     }
   }
   
