@@ -51,14 +51,42 @@
     justify-content: space-between;
   }
   .data-stat {
-    text-align: center;
-    padding: 10px;
+    padding: 12px;
     border-radius: 8px;
-    background-color: rgba(var(--tf-primary-rgb), 0.1);
+    background-color: rgba(var(--tf-primary-rgb), 0.05);
     margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    transition: all 0.3s ease;
+    border: 1px solid rgba(var(--tf-primary-rgb), 0.1);
+  }
+  .data-stat:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+    border-color: var(--tf-primary);
+    background-color: rgba(var(--tf-primary-rgb), 0.08);
+  }
+  .stat-icon {
+    background-color: rgba(var(--tf-primary-rgb), 0.1);
+    color: var(--tf-primary);
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 12px;
+    flex-shrink: 0;
+  }
+  .stat-icon.alert-icon {
+    background-color: rgba(244, 67, 54, 0.1);
+    color: #F44336;
+  }
+  .stat-content {
+    flex-grow: 1;
   }
   .stat-value {
-    font-size: 1.8rem;
+    font-size: 1.5rem;
     font-weight: 700;
     color: var(--tf-primary);
     line-height: 1.2;
@@ -67,6 +95,30 @@
     font-size: 0.9rem;
     color: var(--tf-secondary);
     font-weight: 500;
+  }
+  .stats-summary {
+    border-top: 1px solid #eaeaea;
+    padding-top: 15px;
+  }
+  .summary-label {
+    font-size: 0.85rem;
+    color: #666;
+    margin-bottom: 5px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .summary-progress {
+    margin-bottom: 10px;
+  }
+  .progress {
+    height: 10px;
+    border-radius: 5px;
+    background-color: #e9ecef;
+  }
+  .progress-bar {
+    background-color: var(--tf-primary);
+    border-radius: 5px;
+    transition: width 0.6s ease;
   }
   .data-filters {
     margin-bottom: 15px;
@@ -214,28 +266,70 @@
           <div class="row">
             <div class="col-6">
               <div class="data-stat">
-                <div class="stat-value" id="totalProperties">--</div>
-                <div class="stat-label">Properties</div>
+                <div class="stat-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M8.707 1.5a1 1 0 0 0-1.414 0L.646 8.146a.5.5 0 0 0 .708.708L8 2.207l6.646 6.647a.5.5 0 0 0 .708-.708L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293L8.707 1.5Z"/>
+                    <path d="m8 3.293 6 6V13.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 13.5V9.293l6-6Z"/>
+                  </svg>
+                </div>
+                <div class="stat-content">
+                  <div class="stat-value" id="totalProperties">--</div>
+                  <div class="stat-label">Properties</div>
+                </div>
               </div>
             </div>
             <div class="col-6">
               <div class="data-stat">
-                <div class="stat-value" id="totalAnomalies">--</div>
-                <div class="stat-label">Anomalies</div>
+                <div class="stat-icon alert-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                    <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 4.995z"/>
+                  </svg>
+                </div>
+                <div class="stat-content">
+                  <div class="stat-value" id="totalAnomalies">--</div>
+                  <div class="stat-label">Anomalies</div>
+                </div>
               </div>
             </div>
           </div>
-          <div class="row">
+          <div class="row mt-3">
             <div class="col-6">
               <div class="data-stat">
-                <div class="stat-value" id="averageValue">--</div>
-                <div class="stat-label">Avg. Value</div>
+                <div class="stat-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                    <path fill-rule="evenodd" d="M11 15a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm5-4a5 5 0 1 1-10 0 5 5 0 0 1 10 0z"/>
+                    <path d="M9.438 11.944c.047.596.518 1.06 1.363 1.116v.44h.375v-.443c.875-.061 1.386-.529 1.386-1.207 0-.618-.39-.936-1.09-1.1l-.296-.07v-1.2c.376.043.614.248.671.532h.658c-.047-.575-.54-1.024-1.329-1.073V8.5h-.375v.45c-.747.073-1.255.522-1.255 1.158 0 .562.378.92 1.007 1.066l.248.061v1.272c-.384-.058-.639-.27-.696-.563h-.668zm1.36-1.354c-.369-.085-.569-.26-.569-.522 0-.294.216-.514.572-.578v1.1h-.003zm.432.746c.449.104.655.272.655.569 0 .339-.257.571-.709.614v-1.195l.054.012z"/>
+                    <path d="M1 0a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h4.083c.058-.344.145-.678.258-1H3a2 2 0 0 0-2-2V3a2 2 0 0 0 2-2h10a2 2 0 0 0 2 2v3.528c.38.34.717.728 1 1.154V1a1 1 0 0 0-1-1H1z"/>
+                    <path d="M9.998 5.083 10 5a2 2 0 1 0-3.132 1.65 5.982 5.982 0 0 1 3.13-1.567z"/>
+                  </svg>
+                </div>
+                <div class="stat-content">
+                  <div class="stat-value" id="averageValue">--</div>
+                  <div class="stat-label">Avg. Value</div>
+                </div>
               </div>
             </div>
             <div class="col-6">
               <div class="data-stat">
-                <div class="stat-value" id="anomalyRate">--</div>
-                <div class="stat-label">Anomaly Rate</div>
+                <div class="stat-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"/>
+                    <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"/>
+                  </svg>
+                </div>
+                <div class="stat-content">
+                  <div class="stat-value" id="anomalyRate">--</div>
+                  <div class="stat-label">Anomaly Rate</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="stats-summary mt-3">
+            <div class="summary-progress">
+              <div class="summary-label">Data Completeness</div>
+              <div class="progress">
+                <div id="dataCompleteness" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
               </div>
             </div>
           </div>
@@ -292,9 +386,32 @@
         </div>
 
         <div class="dashboard-card dashboard-card-fixed">
-          <div class="card-title">Anomaly Trend</div>
+          <div class="card-title">
+            <span>Anomaly Trend</span>
+            <div class="chart-controls">
+              <select id="chartTypeSelector" class="form-select form-select-sm chart-selector">
+                <option value="line">Line Chart</option>
+                <option value="bar">Bar Chart</option>
+                <option value="area">Area Chart</option>
+              </select>
+            </div>
+          </div>
           <div class="chart-container">
             <canvas id="anomalyTrendChart"></canvas>
+          </div>
+          <div class="chart-metrics">
+            <div class="metric-item">
+              <div class="metric-label">Peak</div>
+              <div class="metric-value" id="peakAnomalies">--</div>
+            </div>
+            <div class="metric-item">
+              <div class="metric-label">Average</div>
+              <div class="metric-value" id="avgAnomalies">--</div>
+            </div>
+            <div class="metric-item">
+              <div class="metric-label">Total</div>
+              <div class="metric-value" id="totalAnomaliesChart">--</div>
+            </div>
           </div>
         </div>
 
