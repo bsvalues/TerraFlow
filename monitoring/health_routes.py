@@ -9,7 +9,7 @@ import time
 from datetime import datetime
 from typing import Dict, Any
 
-from flask import Blueprint, jsonify, current_app
+from flask import Blueprint, jsonify, current_app, render_template, request
 import psutil
 import sqlalchemy as sa
 from sqlalchemy import text
@@ -118,6 +118,40 @@ def metrics():
     }
     
     return jsonify(system_metrics)
+
+@health_monitoring_bp.route('/monitoring/dashboard', methods=['GET'])
+def health_dashboard():
+    """Health monitoring dashboard"""
+    # Get detailed health data
+    start_time = time.time()
+    
+    # Check system
+    system_status = check_system_health()
+    
+    # Check database
+    db_status = check_database()
+    
+    # Check AI agents
+    agents_status = check_ai_agents()
+    
+    # Check environment
+    env_status = check_environment()
+    
+    # Calculate response time
+    response_time = (time.time() - start_time) * 1000  # in milliseconds
+    
+    # Compile result
+    health_data = {
+        'status': 'healthy' if system_status.get('status') == 'healthy' and db_status.get('status') == 'healthy' else 'unhealthy',
+        'timestamp': datetime.now().isoformat(),
+        'response_time_ms': response_time,
+        'system': system_status,
+        'database': db_status,
+        'ai_agents': agents_status,
+        'environment': env_status
+    }
+    
+    return render_template('monitoring/dashboard.html', health_data=health_data)
 
 def check_system_health() -> Dict[str, Any]:
     """Check system health (CPU, memory, disk)"""
