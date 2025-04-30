@@ -9,6 +9,14 @@ import json
 import datetime
 import logging
 import random
+import os
+import sys
+
+# Add the parent directory to sys.path to avoid import issues
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if parent_dir not in sys.path:
+    sys.path.append(parent_dir)
+
 from flask import Blueprint, render_template, jsonify, request
 from sqlalchemy import func, and_, or_, cast, Float, desc
 from sqlalchemy.dialects.postgresql import JSONB
@@ -159,12 +167,22 @@ def dashboard_data():
             # Get the latest assessment
             assessment = Assessment.query.filter_by(property_id=prop.id).order_by(Assessment.assessment_date.desc()).first()
             
+            # Handle the location data properly
+            location_data = None
+            if prop.location:
+                # The location is already a JSONB from PostgreSQL, no need to parse it again
+                try:
+                    # Just passing the existing dict from JSONB
+                    location_data = prop.location
+                except Exception as e:
+                    logger.error(f"Error processing location data: {str(e)}")
+            
             prop_dict = {
                 'id': str(prop.id),
                 'parcel_id': prop.parcel_id,
                 'address': prop.address,
                 'property_type': prop.property_type or 'unknown',
-                'location': json.loads(str(prop.location)) if prop.location else None,
+                'location': location_data,
                 'total_value': float(assessment.total_value) if assessment else 0,
             }
             
