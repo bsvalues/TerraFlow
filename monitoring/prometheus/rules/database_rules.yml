@@ -1,62 +1,82 @@
 groups:
-  - name: database_alerts
+  - name: database_rules
     rules:
-      - alert: PostgreSQLDown
-        expr: pg_up == 0
-        for: 1m
-        labels:
-          severity: critical
-        annotations:
-          summary: "PostgreSQL instance down"
-          description: "PostgreSQL instance is down on {{ $labels.instance }}"
-          dashboard_url: "http://grafana:3000/d/database-metrics"
-
-      - alert: PostgreSQLHighConnections
-        expr: sum by (datname) (pg_stat_activity_count) > 80
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "High number of PostgreSQL connections"
-          description: "PostgreSQL instance has more than 80 active connections on database {{ $labels.datname }}"
-          dashboard_url: "http://grafana:3000/d/database-metrics"
-
-      - alert: PostgreSQLSlowQueries
-        expr: rate(pg_stat_activity_max_tx_duration{datname!=""}[1m]) > 30
+      - alert: DatabaseConnectionFailed
+        expr: terrafusion_database_connected == 0
         for: 2m
         labels:
-          severity: warning
+          severity: critical
+          service: database
         annotations:
-          summary: "Slow PostgreSQL queries detected"
-          description: "PostgreSQL queries are taking more than 30 seconds on database {{ $labels.datname }}"
-          dashboard_url: "http://grafana:3000/d/database-metrics"
-
-      - alert: PostgreSQLHighReplicationLag
-        expr: pg_replication_lag > 300
-        for: 1m
-        labels:
-          severity: warning
-        annotations:
-          summary: "High PostgreSQL replication lag"
-          description: "PostgreSQL replication lag is over 5 minutes on {{ $labels.instance }}"
-          dashboard_url: "http://grafana:3000/d/database-metrics"
-
-      - alert: PostgreSQLDiskSpacePressure
-        expr: pg_database_size_bytes / 1024 / 1024 > 10000
+          summary: "Database Connection Failed"
+          description: "The application cannot connect to the database"
+          
+      - alert: DatabaseQuerySlowResponse
+        expr: terrafusion_database_query_time_ms > 1000
         for: 5m
         labels:
           severity: warning
+          service: database
         annotations:
-          summary: "PostgreSQL database size growing rapidly"
-          description: "Database {{ $labels.datname }} on {{ $labels.instance }} is larger than 10GB"
-          dashboard_url: "http://grafana:3000/d/database-metrics"
-
-      - alert: PostgreSQLTooManyDeadlocks
-        expr: rate(pg_stat_database_deadlocks{datname!=""}[1m]) > 5
-        for: 1m
+          summary: "Slow Database Queries"
+          description: "Database queries are taking more than 1 second to complete"
+          
+      - alert: DatabaseHighConnections
+        expr: terrafusion_database_connections > 80
+        for: 10m
         labels:
           severity: warning
+          service: database
         annotations:
-          summary: "Too many PostgreSQL deadlocks"
-          description: "PostgreSQL detected more than 5 deadlocks per minute on database {{ $labels.datname }}"
-          dashboard_url: "http://grafana:3000/d/database-metrics"
+          summary: "High Database Connections"
+          description: "There are {{ $value }} active database connections"
+          
+      - alert: DatabaseLowDiskSpace
+        expr: terrafusion_database_disk_free_gb < 5
+        for: 5m
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "Low Database Disk Space"
+          description: "The database has only {{ $value }}GB free disk space remaining"
+          
+      - alert: DatabaseBackupFailure
+        expr: terrafusion_database_backup_success == 0
+        for: 24h
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "Database Backup Failure"
+          description: "Database backup has failed for more than 24 hours"
+          
+      - alert: PostgreSQLHighCPU
+        expr: terrafusion_postgres_cpu_usage > 80
+        for: 15m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "PostgreSQL High CPU Usage"
+          description: "PostgreSQL is using {{ $value }}% CPU"
+          
+      - alert: PostgreSQLHighMemory
+        expr: terrafusion_postgres_memory_usage > 85
+        for: 15m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "PostgreSQL High Memory Usage"
+          description: "PostgreSQL is using {{ $value }}% memory"
+          
+      - alert: PostGISFunctionFailure
+        expr: terrafusion_postgis_function_success == 0
+        for: 5m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "PostGIS Function Failure"
+          description: "A PostGIS database function has failed"

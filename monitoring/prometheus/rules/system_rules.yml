@@ -1,62 +1,102 @@
 groups:
-  - name: system_alerts
+  - name: system_rules
     rules:
       - alert: HighCPUUsage
-        expr: 100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
-        for: 5m
+        expr: terrafusion_cpu_usage > 80
+        for: 15m
         labels:
           severity: warning
+          service: system
         annotations:
-          summary: "High CPU usage detected"
-          description: "CPU usage is above 80% for more than 5 minutes on {{ $labels.instance }}"
-          dashboard_url: "http://grafana:3000/d/system-overview"
-
-      - alert: HighMemoryUsage
-        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 85
+          summary: "High CPU Usage"
+          description: "CPU usage is {{ $value }}%"
+          
+      - alert: CriticalCPUUsage
+        expr: terrafusion_cpu_usage > 95
         for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "High memory usage detected"
-          description: "Memory usage is above 85% for more than 5 minutes on {{ $labels.instance }}"
-          dashboard_url: "http://grafana:3000/d/system-overview"
-
-      - alert: CriticalMemoryUsage
-        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 95
-        for: 1m
         labels:
           severity: critical
+          service: system
         annotations:
-          summary: "Critical memory usage detected"
-          description: "Memory usage is above 95% on {{ $labels.instance }}, system stability at risk"
-          dashboard_url: "http://grafana:3000/d/system-overview"
-
-      - alert: HighDiskUsage
-        expr: 100 - ((node_filesystem_avail_bytes * 100) / node_filesystem_size_bytes) > 85
-        for: 5m
+          summary: "Critical CPU Usage"
+          description: "CPU usage is {{ $value }}%"
+          
+      - alert: HighMemoryUsage
+        expr: terrafusion_memory_usage_percent > 85
+        for: 15m
         labels:
           severity: warning
+          service: system
         annotations:
-          summary: "High disk usage detected"
-          description: "Disk usage is above 85% for more than 5 minutes on {{ $labels.instance }}: {{ $labels.mountpoint }}"
-          dashboard_url: "http://grafana:3000/d/system-overview"
-
+          summary: "High Memory Usage"
+          description: "Memory usage is {{ $value }}%"
+          
+      - alert: CriticalMemoryUsage
+        expr: terrafusion_memory_usage_percent > 95
+        for: 5m
+        labels:
+          severity: critical
+          service: system
+        annotations:
+          summary: "Critical Memory Usage"
+          description: "Memory usage is {{ $value }}%"
+          
+      - alert: HighDiskUsage
+        expr: terrafusion_disk_usage_percent{mountpoint="/"} > 80
+        for: 30m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High Disk Usage"
+          description: "Disk usage on {{ $labels.mountpoint }} is {{ $value }}%"
+          
+      - alert: CriticalDiskUsage
+        expr: terrafusion_disk_usage_percent{mountpoint="/"} > 95
+        for: 5m
+        labels:
+          severity: critical
+          service: system
+        annotations:
+          summary: "Critical Disk Usage"
+          description: "Disk usage on {{ $labels.mountpoint }} is {{ $value }}%"
+          
+      - alert: SlowPageLoad
+        expr: terrafusion_page_load_time_ms{page="/"} > 2000
+        for: 10m
+        labels:
+          severity: warning
+          service: web
+        annotations:
+          summary: "Slow Page Load"
+          description: "Page {{ $labels.page }} is loading slowly: {{ $value }}ms"
+          
+      - alert: HighErrorRate
+        expr: rate(terrafusion_http_5xx_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+          service: web
+        annotations:
+          summary: "High Error Rate"
+          description: "High rate of 5xx errors over the last 5 minutes"
+          
       - alert: InstanceDown
         expr: up == 0
         for: 1m
         labels:
           severity: critical
+          service: system
         annotations:
-          summary: "Instance {{ $labels.instance }} down"
-          description: "{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 1 minute"
-          dashboard_url: "http://grafana:3000/d/system-overview"
-
-      - alert: SlowHTTPResponses
-        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, instance, handler)) > 2
-        for: 5m
+          summary: "Instance Down"
+          description: "Instance {{ $labels.instance }} is down"
+          
+      - alert: WebServiceUnavailable
+        expr: terrafusion_health_check_success == 0
+        for: 2m
         labels:
-          severity: warning
+          severity: critical
+          service: web
         annotations:
-          summary: "Slow HTTP responses detected"
-          description: "95th percentile of HTTP request duration is above 2 seconds for {{ $labels.handler }} on {{ $labels.instance }}"
-          dashboard_url: "http://grafana:3000/d/system-overview"
+          summary: "Web Service Unavailable"
+          description: "The TerraFusion web service is not responding to health checks"

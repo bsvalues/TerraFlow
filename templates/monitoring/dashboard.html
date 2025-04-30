@@ -301,6 +301,34 @@
                     <div class="metric-value">{{ health_data.ai_agents.agent_processes|length }}</div>
                 </div>
                 {% endif %}
+                
+                <!-- Agent Recovery System metrics -->
+                {% if health_data.ai_agents.recovery_system is defined %}
+                <div class="health-metric">
+                    <div class="metric-name">Recovery System</div>
+                    <div class="metric-value {% if health_data.ai_agents.recovery_system.active %}status-green{% else %}status-red{% endif %}">
+                        {{ "Active" if health_data.ai_agents.recovery_system.active else "Inactive" }}
+                    </div>
+                </div>
+                
+                {% if health_data.ai_agents.recovery_system.active and health_data.ai_agents.recovery_system.metrics %}
+                {% set metrics = health_data.ai_agents.recovery_system.metrics.metrics %}
+                {% if metrics %}
+                <div class="health-metric">
+                    <div class="metric-name">Total Recoveries</div>
+                    <div class="metric-value">{{ metrics.total_recoveries }}</div>
+                </div>
+                <div class="health-metric">
+                    <div class="metric-name">Successful Recoveries</div>
+                    <div class="metric-value" style="color: #10b981;">{{ metrics.successful_recoveries }}</div>
+                </div>
+                <div class="health-metric">
+                    <div class="metric-name">Failed Recoveries</div>
+                    <div class="metric-value" style="color: {{ '#ef4444' if metrics.failed_recoveries > 0 else '#6b7280' }};">{{ metrics.failed_recoveries }}</div>
+                </div>
+                {% endif %}
+                {% endif %}
+                {% endif %}
             </div>
             {% endif %}
             

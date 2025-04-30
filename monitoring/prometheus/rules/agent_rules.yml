@@ -1,62 +1,72 @@
 groups:
-  - name: agent_alerts
+  - name: agent_rules
     rules:
-      - alert: AgentSystemUnhealthy
-        expr: agent_system_health_status == 0
-        for: 2m
+      - alert: AgentInactive
+        expr: terrafusion_agent_inactive_seconds > 900
+        for: 5m
+        labels:
+          severity: warning
+          service: ai_agents
+        annotations:
+          summary: "Agent Inactive"
+          description: "Agent {{ $labels.agent_id }} has been inactive for {{ $value }} seconds"
+          
+      - alert: AgentHighErrorRate
+        expr: terrafusion_agent_error_count{} > 10
+        for: 15m
+        labels:
+          severity: warning
+          service: ai_agents
+        annotations:
+          summary: "Agent High Error Rate"
+          description: "Agent {{ $labels.agent_id }} has {{ $value }} errors in the last 15 minutes"
+          
+      - alert: AgentCriticalError
+        expr: terrafusion_agent_critical_errors{} > 0
+        for: 1m
         labels:
           severity: critical
+          service: ai_agents
         annotations:
-          summary: "Agent system unhealthy"
-          description: "The AI agent system is reporting an unhealthy status for more than 2 minutes"
-          dashboard_url: "http://grafana:3000/d/agent-system"
+          summary: "Agent Critical Error"
+          description: "Agent {{ $labels.agent_id }} has encountered a critical error: {{ $labels.error }}"
           
-      - alert: AgentInactive
-        expr: agent_inactive_count > 0
-        for: 5m
+      - alert: AgentMemoryHigh
+        expr: terrafusion_agent_memory_usage{} > 90
+        for: 10m
         labels:
           severity: warning
+          service: ai_agents
         annotations:
-          summary: "Inactive AI agents detected"
-          description: "{{ $value }} AI agents have been inactive for more than 5 minutes"
-          dashboard_url: "http://grafana:3000/d/agent-system"
+          summary: "Agent High Memory Usage"
+          description: "Agent {{ $labels.agent_id }} is using {{ $value }}% of memory"
           
-      - alert: TooManyAgentRestarts
-        expr: rate(agent_restart_count[15m]) > 5
-        for: 5m
+      - alert: AgentRestartFailure
+        expr: terrafusion_agent_restart_failure{} > 3
+        for: 30m
         labels:
-          severity: warning
+          severity: critical
+          service: ai_agents
         annotations:
-          summary: "Frequent agent restarts detected"
-          description: "AI agents are restarting too frequently (more than 5 restarts in 15 minutes)"
-          dashboard_url: "http://grafana:3000/d/agent-system"
-
-      - alert: AgentErrorRate
-        expr: rate(agent_error_count[5m]) / rate(agent_task_total[5m]) > 0.1
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "High agent error rate"
-          description: "AI agents error rate is above 10% for the last 5 minutes"
-          dashboard_url: "http://grafana:3000/d/agent-system"
+          summary: "Agent Restart Failure"
+          description: "Agent {{ $labels.agent_id }} failed to restart {{ $value }} times"
           
-      - alert: AgentTaskBacklog
-        expr: agent_task_queue_size > 50
+      - alert: AgentSystemUnhealthy
+        expr: terrafusion_agent_system_healthy == 0
         for: 5m
         labels:
-          severity: warning
+          severity: critical
+          service: ai_agents
         annotations:
-          summary: "Large agent task backlog"
-          description: "AI agent task queue has more than 50 pending tasks for over 5 minutes"
-          dashboard_url: "http://grafana:3000/d/agent-system"
+          summary: "Agent System Unhealthy"
+          description: "The Agent System is reporting unhealthy status"
           
-      - alert: AgentHighMemoryUsage
-        expr: agent_memory_usage_bytes / 1024 / 1024 > 1000
-        for: 5m
+      - alert: TooFewActiveAgents
+        expr: terrafusion_active_agent_count < 3
+        for: 10m
         labels:
           severity: warning
+          service: ai_agents
         annotations:
-          summary: "High agent memory usage"
-          description: "AI agent {{ $labels.agent_id }} is using more than 1GB of memory"
-          dashboard_url: "http://grafana:3000/d/agent-system"
+          summary: "Too Few Active Agents"
+          description: "Only {{ $value }} agents are active, expected at least 3"
