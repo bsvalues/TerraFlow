@@ -222,6 +222,160 @@ def api_status():
         "sync_services": sync_services_status
     })
 
+# Direct health dashboard route
+@app.route('/health/dashboard', methods=['GET'])
+def health_dashboard():
+    """Health monitoring dashboard"""
+    from flask import render_template
+    import psutil
+    import platform
+    import time
+    from datetime import datetime
+    import sqlalchemy as sa
+    from sqlalchemy import text
+    
+    # Start timing the response
+    start_time = time.time()
+    
+    # Check system health
+    cpu_percent = psutil.cpu_percent(interval=0.1)
+    memory = psutil.virtual_memory()
+    disk = psutil.disk_usage('/')
+    
+    # Get process info
+    process = psutil.Process(os.getpid())
+    process_info = {
+        'pid': process.pid,
+        'memory_percent': process.memory_percent(),
+        'cpu_percent': process.cpu_percent(interval=0.1),
+        'threads': len(process.threads()),
+        'uptime': time.time() - process.create_time()
+    }
+    
+    system_status = {
+        'status': 'healthy' if cpu_percent < 80 and memory.percent < 80 and disk.percent < 80 else 'unhealthy',
+        'cpu_percent': cpu_percent,
+        'memory_percent': memory.percent,
+        'memory_available_mb': memory.available / (1024 * 1024),
+        'disk_percent': disk.percent,
+        'disk_free_gb': disk.free / (1024 * 1024 * 1024),
+        'process': process_info
+    }
+    
+    # Check database connection
+    try:
+        # Get database URL
+        database_url = app.config.get('SQLALCHEMY_DATABASE_URI')
+        if not database_url:
+            db_status = {
+                'status': 'error',
+                'message': 'Database URL not configured',
+                'connected': False
+            }
+        else:
+            # Create engine and check connection
+            engine = sa.create_engine(database_url)
+            db_start_time = time.time()
+            
+            with engine.connect() as conn:
+                # Execute a simple query
+                result = conn.execute(text('SELECT 1'))
+                assert result.scalar() == 1
+                
+                # Check PostgreSQL version
+                version = conn.execute(text('SHOW server_version')).scalar()
+                
+                # Check if PostGIS is installed
+                postgis_enabled = False
+                try:
+                    postgis_version = conn.execute(text('SELECT PostGIS_Version()')).scalar()
+                    postgis_enabled = True
+                except:
+                    postgis_version = None
+            
+            query_time = time.time() - db_start_time
+            
+            db_status = {
+                'status': 'healthy',
+                'connected': True,
+                'version': version,
+                'postgis_enabled': postgis_enabled,
+                'postgis_version': postgis_version,
+                'query_time_ms': query_time * 1000
+            }
+    except Exception as e:
+        db_status = {
+            'status': 'error',
+            'message': str(e),
+            'connected': False
+        }
+    
+    # Check AI agents
+    try:
+        # Get MCP status
+        agent_count = 0
+        try:
+            from ai_agents.mcp_core import get_mcp
+            mcp = get_mcp()
+            if mcp:
+                agent_count = len(mcp.active_agents)
+        except ImportError:
+            pass
+        
+        # Get agent info from processes
+        agent_processes = []
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+            if proc.info['cmdline'] and any('agent.py' in arg for arg in proc.info['cmdline']):
+                agent_processes.append({
+                    'pid': proc.info['pid'],
+                    'cmdline': ' '.join(proc.info['cmdline']),
+                    'cpu_percent': proc.cpu_percent(interval=0.1),
+                    'memory_percent': proc.memory_percent()
+                })
+                
+        ai_agents_status = {
+            'status': 'healthy' if agent_count > 0 else 'unknown',
+            'agent_count': agent_count,
+            'agent_processes': agent_processes
+        }
+    except Exception as e:
+        ai_agents_status = {
+            'status': 'error',
+            'message': str(e)
+        }
+    
+    # Check environment
+    env_mode = os.environ.get('ENV_MODE', 'development')
+    env_status = {
+        'python_version': platform.python_version(),
+        'platform': platform.platform(),
+        'env_mode': env_mode,
+        'environment_variables': {
+            'ENV_MODE': env_mode,
+            'FLASK_ENV': os.environ.get('FLASK_ENV', 'development'),
+            'FLASK_DEBUG': os.environ.get('FLASK_DEBUG', '0')
+        }
+    }
+    
+    # Calculate response time
+    response_time = (time.time() - start_time) * 1000  # in milliseconds
+    
+    # Compile result
+    health_data = {
+        'status': 'healthy' if system_status.get('status') == 'healthy' and db_status.get('status') == 'healthy' else 'unhealthy',
+        'timestamp': datetime.now().isoformat(),
+        'response_time_ms': response_time,
+        'system': system_status,
+        'database': db_status,
+        'ai_agents': ai_agents_status,
+        'environment': env_status
+    }
+    
+    try:
+        return render_template('monitoring/dashboard.html', health_data=health_data)
+    except Exception as e:
+        return render_template('monitoring/error.html', error_message=str(e))
+
 if __name__ == "__main__":
     # Run the Flask app
     port = int(os.environ.get("PORT", 5000))
