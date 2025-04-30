@@ -199,7 +199,7 @@ def dashboard_data():
                 'severity': anomaly.severity,
                 'detected_at': anomaly.detected_at.isoformat(),
                 'status': anomaly.status,
-                'location': json.loads(str(anomaly.property.location)) if anomaly.property and anomaly.property.location else None
+                'location': anomaly.property.location if anomaly.property and anomaly.property.location else None
             }
             
             anomaly_list.append(anomaly_dict)
@@ -407,7 +407,7 @@ def property_details(property_id):
             'owner_name': property.owner_name,
             'purchase_date': property.purchase_date.isoformat() if property.purchase_date else None,
             'purchase_price': float(property.purchase_price) if property.purchase_price else None,
-            'location': json.loads(str(property.location)) if property.location else None,
+            'location': property.location,
             'features': property.features,
         }
         
