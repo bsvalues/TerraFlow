@@ -116,6 +116,20 @@ try:
 except ImportError as e:
     logger.warning(f"Could not initialize Data Stability Framework: {str(e)}")
 
+# Initialize Agent Recovery System
+try:
+    logger.info("Initializing Agent Recovery System")
+    from ai_agents.agent_recovery import initialize_recovery_system
+    
+    # Initialize the recovery system with the Flask app context
+    recovery_system = initialize_recovery_system(app.app_context)
+    
+    # Make recovery system available through the app
+    app.recovery_system = recovery_system
+    logger.info("Agent Recovery System initialized successfully")
+except ImportError as e:
+    logger.warning(f"Could not initialize Agent Recovery System: {str(e)}")
+
 # Initialize Sync Services (both legacy and TerraFusion)
 try:
     logger.info("Initializing Sync Services")
@@ -332,11 +346,23 @@ def health_dashboard():
                     'cpu_percent': proc.cpu_percent(interval=0.1),
                     'memory_percent': proc.memory_percent()
                 })
+        
+        # Get agent recovery metrics if available
+        recovery_metrics = {}
+        try:
+            if hasattr(app, 'recovery_system'):
+                recovery_metrics = app.recovery_system.get_metrics()
+        except Exception as recovery_error:
+            logger.warning(f"Could not get agent recovery metrics: {str(recovery_error)}")
                 
         ai_agents_status = {
             'status': 'healthy' if agent_count > 0 else 'unknown',
             'agent_count': agent_count,
-            'agent_processes': agent_processes
+            'agent_processes': agent_processes,
+            'recovery_system': {
+                'active': hasattr(app, 'recovery_system'),
+                'metrics': recovery_metrics
+            }
         }
     except Exception as e:
         ai_agents_status = {

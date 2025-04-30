@@ -124,6 +124,7 @@ volumes:
   instance_data:
   prometheus_data:
   grafana_data:
+  alertmanager_data:
 
 networks:
   terrafusion_network:
