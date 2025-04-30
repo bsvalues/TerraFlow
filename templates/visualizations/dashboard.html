@@ -567,9 +567,17 @@
     }
     
     // Fetch data from API
+    console.log('Fetching dashboard data from:', '/visualizations/dashboard/api/dashboard?' + params.toString());
     fetch('/visualizations/dashboard/api/dashboard?' + params.toString())
-      .then(response => response.json())
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        console.log('Dashboard API response received:', response);
+        return response.json();
+      })
       .then(data => {
+        console.log('Dashboard data loaded:', data);
         updateDashboardStats(data.stats);
         updateMapData(data.properties, data.anomalies);
         hideLoadingSpinner();
@@ -583,9 +591,17 @@
   
   // Fetch anomaly trend data
   function fetchAnomalyTrend(period) {
+    console.log('Fetching trend data from:', `/visualizations/dashboard/api/dashboard/trend/${period}`);
     fetch(`/visualizations/dashboard/api/dashboard/trend/${period}`)
-      .then(response => response.json())
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        console.log('Trend API response received:', response);
+        return response.json();
+      })
       .then(data => {
+        console.log('Trend data loaded:', data);
         updateAnomalyTrendChart(data);
       })
       .catch(error => {
@@ -595,9 +611,17 @@
   
   // Fetch recent anomalies
   function fetchRecentAnomalies() {
+    console.log('Fetching recent anomalies from:', '/visualizations/dashboard/api/dashboard/recent-anomalies');
     fetch('/visualizations/dashboard/api/dashboard/recent-anomalies')
-      .then(response => response.json())
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        console.log('Recent anomalies API response received:', response);
+        return response.json();
+      })
       .then(data => {
+        console.log('Recent anomalies data loaded:', data);
         updateRecentAnomaliesTable(data);
       })
       .catch(error => {
@@ -750,8 +774,15 @@
   // Show property details in a modal
   function showPropertyDetails(propertyId) {
     // Fetch property details
+    console.log('Fetching property details from:', `/visualizations/dashboard/api/properties/${propertyId}`);
     fetch(`/visualizations/dashboard/api/properties/${propertyId}`)
-      .then(response => response.json())
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        console.log('Property API response received:', response);
+        return response.json();
+      })
       .then(property => {
         // Update modal content
         const modalContent = document.getElementById('propertyDetailContent');
