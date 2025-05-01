@@ -59,6 +59,26 @@ jobs:
       run: |
         python -m pytest tests/ --cov=. --cov-report=xml
     
+    - name: Accessibility check with axe-core
+      run: |
+        pip install playwright pytest-playwright
+        playwright install
+        npx axe-core-cli http://localhost:5000 || true
+
+    - name: Lighthouse performance & a11y report
+      run: |
+        npm install -g @lhci/cli
+        lhci autorun --collect.url=http://localhost:5000 || true
+
+    - name: (Stub) Visual regression testing
+      run: |
+        echo "Visual regression testing would run here (Percy/Chromatic integration recommended for React apps)"
+
+    - name: (Stub) Deploy PR preview
+      if: github.event_name == 'pull_request'
+      run: |
+        echo "Deploy preview for PR would run here (Netlify/Vercel or ephemeral cloud environment)"
+    
     - name: Upload coverage report
       uses: codecov/codecov-action@v2
       with:

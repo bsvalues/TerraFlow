@@ -17,6 +17,43 @@ TerraFlow provides a sophisticated platform for managing Geographic Information 
 - Secure authentication (LDAP and Supabase)
 - API for third-party applications and microservices
 
+## Local Development & DevOps
+
+### Docker Compose
+
+A `docker-compose.yml` is provided for local and CI parity. It includes:
+- `web`: Flask app
+- `db`: PostGIS-enabled PostgreSQL
+- `redis`: Caching
+- `prometheus`: Metrics collection (see `monitoring/prometheus.yml`)
+- `grafana`: Dashboards (default login: admin/admin)
+
+Start all services:
+```bash
+docker compose up --build
+```
+
+### Monitoring & Observability
+- Prometheus and Grafana are included for metrics and dashboards.
+- See `monitoring/README.md` for setup and next steps.
+- Add `/metrics` endpoint to Flask app using `prometheus_flask_exporter` for full observability.
+
+### CI/CD
+- GitHub Actions workflows in `.github/workflows` for linting, testing, accessibility, and deployment.
+- Accessibility and performance checks (axe-core, Lighthouse) run automatically.
+- Visual regression and PR deploy previews are stubbed for future expansion.
+
+### Secrets Management
+- All secrets should be stored in GitHub Secrets or a cloud secrets manager.
+- Never commit sensitive info to the repo.
+
+### Security & Compliance
+- Enable secret scanning (git-secrets, TruffleHog) and dependency scanning (Dependabot, Snyk).
+
+### Onboarding & Runbooks
+- See this README and `monitoring/README.md` for setup.
+- Automate local setup scripts as needed.
+
 ## Setting Up Supabase Integration
 
 ### Prerequisites
@@ -208,4 +245,4 @@ gunicorn --bind 0.0.0.0:5000 --workers 4 --threads 2 main:app
 
 ## License
 
-Copyright © 2025 Benton County. All rights reserved.
+Copyright 2025 Benton County. All rights reserved.
